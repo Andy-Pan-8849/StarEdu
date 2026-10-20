@@ -19,3 +19,6 @@ dist/
 # editor
 .idea/
 .vscode/
+
+# local-only design notes
+Design.md

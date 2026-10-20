@@ -1,73 +1,121 @@
-# StarEdu · StarIT Enterprise AI Blueprint（星辰 IT 教育 · 传统业务 + AI 融合样板工程）
+# StarEdu
 
-> 状态：**需求澄清阶段的工作稿**。尚无应用代码，只有需求文档和样例数据。内容随讨论更新，最终整理后再作为正式 README 发布。
-> 未经用户确认的内容一律标为【建议】。
+A blueprint for small and mid-sized companies that want to add AI to a traditional business system. It pairs an enterprise back office with an AI knowledge assistant and agents, and uses one fictional company, **StarIT Education**, as the running example: an IT training company with eight campuses across China.
 
-## 1. 这是什么
+> **Project status: early stage.** The sample data and the design are done. The application code (RAG pipeline, agents, web apps) has **not been written yet**. Sections marked *Planned* describe the intended design, not something you can run today.
 
-一个面向中小企业的"传统业务系统 + AI 能力"样板工程，同时用来展示作者的工程能力。以虚构的全国连锁 IT 培训企业 **StarIT Education（星辰 IT 教育）** 为业务背景，分两个模块：
+## Overview
 
-| 模块 | 目录 | 内容 | 顺序 |
+The project has two modules that describe the same company:
+
+| Module | Folder | What it is | Status |
 |---|---|---|---|
-| AI 模块 | [ai-module/](ai-module/) | 企业知识助手（RAG，重点是 hybrid search）+ Agent（重点）+ MCP Server + 自建 RAG ETL 管线 | 先做 |
-| 传统业务模块 | [business-module/](business-module/) | 按开源竞品需求，用 TypeScript 重做的企业后台：Next.js 15 + Tailwind + shadcn/ui + NestJS | 后做 |
-| 可观测性 | 两个模块共用 | Prometheus、Grafana、Loki、Tempo、OpenTelemetry；Langfuse 仅本地 | 随模块逐步加入 |
+| AI module | [`ai-module/`](ai-module/) | Enterprise knowledge assistant (RAG with hybrid search) and agents, exposed through a FastAPI service and a Next.js front end | Sample data done, code planned |
+| Business module | [`business-module/`](business-module/) | A traditional enterprise back office in the style of open-source competitor, rebuilt in TypeScript | Not started |
 
-参考架构图（本机）：`Documents/my_document/others/TempFiles/interview_arch_traditional_plus_ai_v2.png`。
+The goals are to show how the pieces fit together in a realistic business setting, and to give learners a codebase they can run, read and extend.
 
-## 2. 已确定的决定（用户）
+## Features
 
-- 本地用 Docker Compose 开发；服务器用 **k3s**，部署在 **Oracle Always Free**（Arm）。两个系统用不同入口演示。
-- **Full profile + Lite profile**：同一份代码，full 在本地跑完整架构，lite 部署到 Oracle 做在线演示。
-- 不做：ArgoCD、Vault、Sentry、本地 vLLM、移动端 App。LLM 直接调用 OpenAI 和 Anthropic。
-- Langfuse v3 只在本地使用，不部署到 Oracle。
-- 成本策略：能买就不自己做。AI 部分重点是 **Agent**；RAG 部分重点是 **hybrid search**，要掌握原理。
-- RAG ETL：本地先部署 **RAGFlow** 学习对标；项目内**自建管线**（FastAPI + 后台 worker：解析、清洗、分块、向量化、写入 pgvector），解析器可插拔。
-- Keycloak 的 Java 版可以接受，能联合工作即可。
-- 暂无域名，能省则省；开源项目默认不依赖域名（用端口区分入口）。
-- 样例业务：虚构公司 **StarIT Education（星辰 IT 教育）**，覆盖 HR、Finance、Technical Support 三个领域；**先做英文版**，中文版以后再做。
-- Embedding：`text-embedding-3-small`（OpenAI），提供方、模型名、维度都做成变量，换模型只改变量（换后需重新入库）。
-- 入口地址优先级：配置了域名 → 用域名；否则配置了公网 IP → 用公网 IP；否则默认本地（localhost + 端口）。域名可用免费的 DuckDNS，也可以完全不用。
-- Oracle 公网 IP 使用"保留 IP"。
-- NestJS 的 ORM 用 Prisma。
-- lite profile = 部署到 Oracle、给雇主展示工程能力的版本，Langfuse 等较大组件不部署。
+**Available now**
 
-## 3. 建议（待确认）
+- A synthetic data set for the fictional company StarIT Education (see [Sample data](#sample-data)):
+  - 28 documents in HR, Finance and Technical Support, in mixed formats (docx, pdf, md, txt)
+  - 7 structured tables (campuses, employees, expense claims, support tickets, students, assignments, submissions)
+  - 70 evaluation questions with expected answers
+  - Deliberate retrieval challenges: superseded policy versions, role-based access, exact identifiers, paraphrases, multi-document reasoning, unanswerable questions
 
-- 架构：Next.js(3000) / NestJS(4000) / FastAPI(8000) / MCP Server 独立进程；LiteLLM 作为 LLM 网关；Postgres + pgvector；Redis；对象存储。
-- hybrid search：Postgres 内实现 BM25 风格关键词检索（全文索引）+ pgvector 向量检索 + 应用层 RRF 融合 + rerank；检索器接口可插拔，full profile 可加 Elasticsearch / OpenSearch 对比。中文以后需要分词（如 jieba）。
-- embedding：OpenAI 的 embeddings 接口（与对话模型同一把 key，单独计费），例如 `text-embedding-3-small`；不自己部署。
-- lite 轻量替代：Kafka → Redis Streams 或 Postgres outbox；Elasticsearch → Postgres 全文 + pgvector；Redis Cluster → 单节点；MinIO → Oracle Object Storage 或单节点 MinIO。
-- 身份认证：NestJS 与 FastAPI 都用标准 OIDC/JWKS 校验 JWT。full 用 Keycloak；lite 待实测内存后决定（备选 Logto，或自签 JWT）。
-- 入口：默认 `localhost` 加不同端口；Oracle 演示站先用公网 IP 加端口（无 HTTPS，仅用虚构账号）。有域名后再加子域名和 HTTPS，域名通过环境变量配置，不写死在仓库里。
-- Oracle：只开 1 台 VM、单节点 k3s、两个 namespace；实际额度需用户在账号里核实（网上报道 2026 年 6 月起为 2 核 12GB）。
+**Planned**
 
-## 4. 样例数据（已生成）
+- RAG pipeline with pluggable parsers (parse, clean, chunk, embed, store in pgvector)
+- Hybrid search: keyword search plus vector search, fused with reciprocal rank fusion, then reranking
+- Agents with tool use through an MCP server, guardrails, and read-only SQL access
+- Role-based access to documents
+- Two deployment profiles from one codebase: a **full** profile for local use and a **lite** profile for a small server
+- Observability: Prometheus, Grafana, Loki, Tempo and OpenTelemetry
 
-位置：[ai-module/sample-data/](ai-module/sample-data/)。28 份英文文档（docx、pdf、md、txt）、7 张结构化 CSV、70 条评测问答。说明见该目录的 README。
+## Planned architecture
 
-## 5. 目录结构
+| Part | Technology |
+|---|---|
+| Front end | Next.js 15, Tailwind CSS, shadcn/ui |
+| Business back end | NestJS, Prisma |
+| AI back end | FastAPI, MCP server |
+| LLMs | OpenAI and Anthropic through an LLM gateway (LiteLLM) |
+| Embeddings | OpenAI `text-embedding-3-small` (configurable) |
+| Database | PostgreSQL with pgvector |
+| Cache and queues | Redis |
+| Deployment | Docker Compose for development, k3s for the server |
+
+Decisions that are still open (for example the identity service for the lite profile) are tracked by the maintainer and not listed here.
+
+## Repository layout
 
 ```
 StarEdu/
-├── README.md                  本文件
+├── README.md
+├── LICENSE
 ├── docs/
-│   └── project-requirements.md   需求与讨论记录（含待核实项）
+│   └── project-requirements.md   requirements and decision log
 ├── ai-module/
 │   ├── README.md
-│   └── sample-data/           样例文档、CSV、评测集、生成工具
+│   └── sample-data/              synthetic documents, tables, evaluation sets, generators
 └── business-module/
-    └── README.md              （占位，尚未开始）
+    └── README.md                 placeholder
 ```
 
-## 6. 尚未讨论的事项
+## Getting started
 
-1. 企业后台要做开源竞品的哪些模块。
-2. GitHub 仓库结构（monorepo 或多仓库）和许可证。
-3. ORM（Prisma 或 TypeORM）。
-4. lite profile 的身份服务。
-5. 预建向量库转储的具体做法（等 ETL 管线和 embedding 模型定下来后做）。
+Right now the only runnable parts are the sample-data generators. They need Python 3 and nothing else.
 
-## 7. 流程
+```bash
+git clone https://github.com/Andy-Pan-8849/StarEdu.git
+cd StarEdu/ai-module/sample-data
 
-需求确认 → 正式设计文档 → 用户批准 → 实施计划 → 开发。在用户批准之前，不生成应用代码。
+python3 tools/generate_structured.py   # regenerates the CSV tables and the SQL evaluation set
+python3 tools/build_documents.py       # rebuilds the documents from the Markdown sources
+```
+
+`build_documents.py` writes docx files with the macOS `textutil` command and PDFs with headless Google Chrome, so it only works on a Mac with Chrome installed. On other systems, change the `format:` of each source file in `_markdown-source/` to `md` or `txt`. The repository already contains the generated documents, so you do not need to run it to use the data.
+
+## Configuration (planned)
+
+The application will read its settings from environment variables. Docker Compose will use a `.env` file (a `.env.example` will be provided and the real `.env` is git-ignored). The k3s deployment will use Helm values and Kubernetes Secrets with the same variable names.
+
+The intended behavior for the public address of the apps:
+
+1. If a domain is configured, use the domain.
+2. Otherwise, if a public IP is configured, use the public IP.
+3. Otherwise, run locally on `localhost` with separate ports.
+
+You will be able to run everything locally without any domain. A free dynamic DNS name (for example from DuckDNS) is an optional extra for a public demo.
+
+The embedding model is configurable by provider, model name and dimensions. Changing the model changes the vector size, so documents must be indexed again after a change.
+
+## Sample data
+
+Everything in [`ai-module/sample-data/`](ai-module/sample-data/) is **synthetic**. StarIT Education is fictional; names, numbers, policies, URLs (`*.starit.example`) and the tax ID are invented. The policies follow common practice in the IT training industry and do not describe any real company. The English data set comes first; a Chinese version is planned.
+
+See the [sample-data README](ai-module/sample-data/README.md) for the file list, the built-in retrieval challenges and the access model.
+
+## Testing and validation
+
+Today you can check the data, not the application:
+
+1. **The generator is reproducible.** Run `python3 tools/generate_structured.py` and then `git status`. A clean working tree means the committed tables match the generator.
+2. **The documents match the manifest.** `documents/manifest.csv` lists all 28 documents with their version, status and access level.
+3. **The evaluation sets are consistent.** Every `source_docs` entry in `eval/qa-set.jsonl` is a `doc_id` in the manifest, and the answers in `eval/sql-qa.jsonl` are computed by the generator from the CSV tables.
+
+When the application exists, the evaluation sets will be used to measure answer quality, compare keyword, vector and hybrid search, and check that role-based access works.
+
+## Roadmap
+
+1. AI module: RAG pipeline, hybrid search, agents, API and chat front end
+2. Observability for the AI module
+3. Business module: enterprise back office in TypeScript
+4. Deployment profiles and a public demo
+5. Chinese version of the sample data
+
+## License
+
+MIT, see [LICENSE](LICENSE).
