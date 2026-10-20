@@ -1,0 +1,53 @@
+---
+doc_id: TS-CRS-005
+title: Courseware Download Guide
+domain: tech-support
+version: 3.0
+status: active
+effective_date: 2026-02-01
+access: students-and-staff
+campus_scope: all
+format: txt
+---
+
+# Courseware Download Guide
+
+## 1. Where to find courseware
+
+Courseware is on the learning portal at https://learn.starit.example. Sign in with your student ID. Open "My Courses", choose the course, then the tab "Materials".
+
+## 2. Release schedule
+
+New weekly materials are released every **Monday at 09:00** campus time. The materials of a week stay available until the end of the program and for 12 months after graduation.
+
+## 3. What can be downloaded
+
+| Material | Download | Notes |
+|---|---|---|
+| Slides | PDF download | Watermarked with your student ID |
+| Lab handouts | PDF download | |
+| Source code of examples | Git repository | See TS-ENV-004 |
+| Class recordings | Streaming only | Cannot be downloaded |
+| Lab walkthrough videos | Download for 7 days after release | Then streaming only |
+
+## 4. Limits
+
+- Each account can be registered on at most **3 devices**. Remove an old device under Profile > Devices.
+- The monthly download quota is **5 GB**. The quota resets on the 1st of the month.
+- Sharing downloaded material outside StarIT is forbidden and can lead to dismissal.
+
+## 5. Alumni
+
+Graduates have read-only access for 12 months. They can stream and download slides but cannot submit assignments.
+
+## 6. Password and lock-out
+
+After 5 failed sign-in attempts the account is locked for 30 minutes. You can reset the password yourself with your student ID and the phone number registered at enrollment. If your phone number changed, ask the Admissions and Student Services desk of your campus.
+
+## 7. Error codes
+
+| Code | Meaning | Fix |
+|---|---|---|
+| ERR-PORTAL-403 | Device limit reached | Remove an old device in Profile > Devices |
+| ERR-PORTAL-429 | Download quota used up | Wait for the 1st of the month or ask your instructor for an extra quota |
+| ERR-PORTAL-503 | Portal maintenance | Retry later; maintenance windows are Sunday 02:00 to 04:00 |

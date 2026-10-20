@@ -1,0 +1,16 @@
+{"id": "SQL-01", "type": "sql", "question": "How many hotel claims exceed the nightly hotel limit in FIN-REIM-002?", "expected_answer": "5", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-02", "type": "sql", "question": "List the claim IDs of hotel claims that exceed the nightly hotel limit.", "expected_answer": "C0035, C0036, C0037, C0038, C0039", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-03", "type": "sql", "question": "How many expense claims were submitted more than 30 days after the expense date?", "expected_answer": "7", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-04", "type": "sql", "question": "How many expense claims were submitted more than 90 days after the expense date (and must be rejected)?", "expected_answer": "1", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-05", "type": "sql", "question": "How many entertainment claims exceed CNY 300 per person?", "expected_answer": "4", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-06", "type": "sql", "question": "How many teaching-supply claims above CNY 500 were made without pre-approval?", "expected_answer": "3", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-07", "type": "sql", "question": "What is the total amount in CNY of paid expense claims for the Beijing campus?", "expected_answer": "14604", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-08", "type": "sql", "question": "Which expense category has the highest total amount across all claims, and what is the total?", "expected_answer": "TRAVEL-HOTEL: 42203", "tables": ["expense_claims"], "access": "finance-and-hr"}
+{"id": "SQL-09", "type": "sql", "question": "How many P1 tickets missed the 30-minute first-response target in TS-NET-009?", "expected_answer": "1", "tables": ["support_tickets"], "access": "staff"}
+{"id": "SQL-10", "type": "sql", "question": "How many P2 tickets missed the 4-hour first-response target?", "expected_answer": "8", "tables": ["support_tickets"], "access": "staff"}
+{"id": "SQL-11", "type": "sql", "question": "How many tickets were opened by students and how many by staff?", "expected_answer": "students: 54, staff: 16", "tables": ["support_tickets"], "access": "staff"}
+{"id": "SQL-12", "type": "sql", "question": "How many submissions were late, according to the portal records?", "expected_answer": "30", "tables": ["submissions"], "access": "staff"}
+{"id": "SQL-13", "type": "sql", "question": "How many submissions received a score of zero because they were more than 72 hours late?", "expected_answer": "5", "tables": ["submissions"], "access": "staff"}
+{"id": "SQL-14", "type": "sql", "question": "How many instructors (levels I1 to I5) work at the Shenzhen campus?", "expected_answer": "8", "tables": ["employees"], "access": "finance-and-hr"}
+{"id": "SQL-15", "type": "sql", "question": "How many employees in total are in the employees table?", "expected_answer": "141", "tables": ["employees"], "access": "finance-and-hr"}
+{"id": "SQL-16", "type": "sql", "question": "How many active students are enrolled in the Java program?", "expected_answer": "13", "tables": ["students"], "access": "staff"}

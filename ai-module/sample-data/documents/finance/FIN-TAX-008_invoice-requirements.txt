@@ -1,0 +1,37 @@
+doc_id: FIN-TAX-008
+version: 1.3
+status: active
+effective_date: 2026-01-01
+access: all-staff
+campus_scope: all
+
+Invoice and Tax Requirements
+
+1. Company invoice details
+
+All invoices for company expenses must be issued to:
+
+- Company name: StarIT Education Technology Co., Ltd.
+- Tax ID: 91510000FAKE00001X (fictional, for demonstration)
+
+Invoices issued to a personal name or to a different company are not accepted.
+
+2. Valid invoices
+
+1. Electronic VAT invoices (PDF or OFD) are accepted. Print them only if the Finance portal asks for it.
+2. A claim above CNY 1,000 must have a VAT special invoice that shows the company tax ID. A general invoice is enough for claims up to CNY 1,000.
+3. The invoice date must lie in the claim period and must not be older than 90 days.
+4. The invoice must list the goods or services. A generic description such as "office supplies" or "service fee" without a detail list is not accepted for amounts above CNY 500.
+
+3. Train tickets, flights and taxis
+
+- Train tickets and electronic flight itineraries with an invoice number are accepted as invoices.
+- Taxi and ride-hailing receipts must show the date, route and amount.
+
+4. Duplicate and altered invoices
+
+Submitting the same invoice twice or altering an invoice is treated as fraud. It leads to rejection of all claims of the employee in the past 12 months for review and may end in dismissal.
+
+5. Questions
+
+Finance Shared Service answers invoice questions at finance-help@starit.example on business days.

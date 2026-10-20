@@ -1,0 +1,9 @@
+campus_id,name,city_tier,region,opened_year
+BJ,Beijing,1,North,2013
+SH,Shanghai,1,East,2014
+SZ,Shenzhen,1,South,2015
+GZ,Guangzhou,1,South,2016
+HZ,Hangzhou,2,East,2017
+CD,Chengdu,2,West,2012
+WH,Wuhan,2,Central,2018
+XA,Xi'an,2,West,2019

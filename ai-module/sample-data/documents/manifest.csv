@@ -1,0 +1,29 @@
+file,domain,title,doc_id,version,status,effective_date,access,campus_scope,format
+finance/FIN-BEN-006_employee-benefits.pdf,finance,Employee Benefits Policy,FIN-BEN-006,3.2,active,2026-01-01,all-staff,all,pdf
+finance/FIN-BUD-007_campus-budget-and-procurement.docx,finance,Campus Budget and Procurement Policy,FIN-BUD-007,2.0,active,2026-01-01,managers,all,docx
+finance/FIN-PAY-004_payroll-policy.pdf,finance,Payroll Policy,FIN-PAY-004,4.0,active,2026-01-01,all-staff,all,pdf
+finance/FIN-PAY-005_bonus-and-commission.pdf,finance,Bonus and Commission Policy (Confidential),FIN-PAY-005,2.1,active,2026-01-01,finance-and-hr,all,pdf
+finance/FIN-REIM-001_expense-reimbursement-policy.pdf,finance,Expense Reimbursement Policy,FIN-REIM-001,3.0,active,2026-01-01,all-staff,all,pdf
+finance/FIN-REIM-002_travel-and-accommodation.pdf,finance,Travel and Accommodation Policy,FIN-REIM-002,2.4,active,2026-01-01,all-staff,all,pdf
+finance/FIN-REIM-003_meals-entertainment-and-supplies.pdf,finance,"Meals, Entertainment and Teaching Supplies Policy",FIN-REIM-003,1.8,active,2026-01-01,all-staff,all,pdf
+finance/FIN-TAX-008_invoice-requirements.txt,finance,Invoice and Tax Requirements,FIN-TAX-008,1.3,active,2026-01-01,all-staff,all,txt
+hr/HR-GEN-000_company-profile.md,hr,StarIT Education Company Profile and Organization,HR-GEN-000,3.0,active,2026-01-01,all-staff,all,md
+hr/HR-LEV-007_leave-policy.txt,hr,Leave Policy,HR-LEV-007,2.3,active,2026-01-01,all-staff,all,txt
+hr/HR-ONB-003_onboarding-and-probation.docx,hr,Onboarding and Probation Policy,HR-ONB-003,2.0,active,2026-01-01,all-staff,all,docx
+hr/HR-PERF-006_performance-review.docx,hr,Performance Review Policy,HR-PERF-006,2.0,active,2026-01-01,all-staff,all,docx
+hr/HR-PRM-005_promotion-and-career-ladder.docx,hr,Promotion and Career Ladder Policy,HR-PRM-005,3.1,active,2026-01-01,all-staff,all,docx
+hr/HR-REC-001_recruitment-policy-v1.0-superseded.txt,hr,Recruitment Policy,HR-REC-001,1.0,superseded,2024-03-01,all-staff,all,txt
+hr/HR-REC-001_recruitment-policy-v2.1.docx,hr,Recruitment Policy,HR-REC-001,2.1,active,2026-01-01,all-staff,all,docx
+hr/HR-REC-002_instructor-selection-standard.docx,hr,Instructor Selection Standard (Confidential),HR-REC-002,1.4,active,2026-01-01,hr-only,all,docx
+hr/HR-TRN-004_training-and-certification.docx,hr,Instructor Training and Certification Policy,HR-TRN-004,2.2,active,2026-01-01,all-staff,all,docx
+hr/HR-WRK-008_working-hours-and-teaching-load.docx,hr,Working Hours and Teaching Load Policy,HR-WRK-008,1.5,active,2026-01-01,all-staff,all,docx
+tech-support/TS-CRS-005_courseware-download-guide.txt,tech-support,Courseware Download Guide,TS-CRS-005,3.0,active,2026-02-01,students-and-staff,all,txt
+tech-support/TS-ENV-001_java-environment-setup.md,tech-support,Java Development Environment Setup,TS-ENV-001,4.1,active,2026-02-01,students-and-staff,all,md
+tech-support/TS-ENV-002_python-environment-setup.md,tech-support,Python Development Environment Setup,TS-ENV-002,3.4,active,2026-02-01,students-and-staff,all,md
+tech-support/TS-ENV-003_typescript-node-environment-setup.md,tech-support,TypeScript and Node.js Development Environment Setup,TS-ENV-003,2.6,active,2026-02-01,students-and-staff,all,md
+tech-support/TS-ENV-004_git-and-gitlab-setup.md,tech-support,Git and Campus GitLab Setup,TS-ENV-004,2.2,active,2026-02-01,students-and-staff,all,md
+tech-support/TS-FAQ-008_troubleshooting-faq.md,tech-support,Troubleshooting FAQ for Development Environments,TS-FAQ-008,5.0,active,2026-03-01,students-and-staff,all,md
+tech-support/TS-HW-006_assignment-submission-rules.docx,tech-support,Assignment Submission Rules,TS-HW-006,3.3,active,2026-02-01,students-and-staff,all,docx
+tech-support/TS-IT-010_staff-account-and-device-policy.docx,tech-support,Staff Account and Device Policy,TS-IT-010,1.6,active,2026-01-01,staff,all,docx
+tech-support/TS-NET-009_helpdesk-service-levels.txt,tech-support,Helpdesk Service Levels and Loaner Equipment,TS-NET-009,2.0,active,2026-02-01,students-and-staff,all,txt
+tech-support/TS-PRJ-007_student-project-collaboration-rules.pdf,tech-support,Student Project Collaboration Rules,TS-PRJ-007,2.5,active,2026-02-01,students-and-staff,all,pdf

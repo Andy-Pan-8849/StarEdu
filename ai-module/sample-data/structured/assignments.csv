@@ -1,0 +1,13 @@
+assignment_id,program,title,due_date
+JA-A01,java,Java assignment 1,2026-04-03
+JA-A02,java,Java assignment 2,2026-04-17
+JA-A03,java,Java assignment 3,2026-05-01
+JA-A04,java,Java assignment 4,2026-05-15
+PY-A01,python,Python assignment 1,2026-04-03
+PY-A02,python,Python assignment 2,2026-04-17
+PY-A03,python,Python assignment 3,2026-05-01
+PY-A04,python,Python assignment 4,2026-05-15
+TY-A01,typescript,Typescript assignment 1,2026-04-03
+TY-A02,typescript,Typescript assignment 2,2026-04-17
+TY-A03,typescript,Typescript assignment 3,2026-05-01
+TY-A04,typescript,Typescript assignment 4,2026-05-15

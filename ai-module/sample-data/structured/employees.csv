@@ -1,0 +1,142 @@
+employee_id,name,campus_id,department,title,level,hire_date,status
+E0001,Ling Liu,BJ,Campus Management,Campus Director,M3,2020-08-09,active
+E0002,Hui Lin,BJ,Academic,Department Head,M2,2017-05-18,active
+E0003,Fang Wang,BJ,Admissions and Student Services,Department Head,M2,2018-04-13,active
+E0004,Hao Wang,BJ,Career Services,Department Head,M2,2018-11-29,active
+E0005,Jun Hu,BJ,Campus Operations,Department Head,M2,2021-02-11,active
+E0006,Fang Lin,BJ,Academic,Junior Instructor,I1,2023-03-17,active
+E0007,Jing Zhang,BJ,Academic,Junior Instructor,I1,2019-07-17,active
+E0008,Fang Huang,BJ,Academic,Instructor,I2,2020-04-25,active
+E0009,Jing Yang,BJ,Academic,Instructor,I2,2021-01-23,active
+E0010,Ling Wang,BJ,Academic,Instructor,I2,2020-07-09,active
+E0011,Mei Xu,BJ,Academic,Senior Instructor,I3,2025-07-07,active
+E0012,Yan Gao,BJ,Academic,Senior Instructor,I3,2019-01-05,active
+E0013,Bo Luo,BJ,Academic,Lead Instructor,I4,2017-02-05,active
+E0014,Ning Ma,BJ,Admissions and Student Services,Admissions Advisor,S2,2019-06-05,active
+E0015,Bo Xu,BJ,Admissions and Student Services,Admissions Advisor,S2,2019-01-01,active
+E0016,Ning Zhou,BJ,Career Services,Career Coach,S2,2024-06-26,active
+E0017,Jun Xu,BJ,Campus Operations,Operations Assistant,S1,2026-02-06,active
+E0018,Peng Liu,SH,Campus Management,Campus Director,M3,2016-10-23,active
+E0019,Hui Guo,SH,Academic,Department Head,M2,2016-07-10,active
+E0020,Xin Zhao,SH,Admissions and Student Services,Department Head,M2,2015-10-13,active
+E0021,Lei Sun,SH,Career Services,Department Head,M2,2019-03-23,active
+E0022,Ning Huang,SH,Campus Operations,Department Head,M2,2018-06-21,active
+E0023,Ning Huang,SH,Academic,Junior Instructor,I1,2016-06-17,active
+E0024,Fang Liu,SH,Academic,Junior Instructor,I1,2020-05-06,active
+E0025,Wei He,SH,Academic,Instructor,I2,2019-07-22,active
+E0026,Yan Gao,SH,Academic,Instructor,I2,2020-07-16,active
+E0027,Fang He,SH,Academic,Instructor,I2,2022-06-05,active
+E0028,Jing He,SH,Academic,Senior Instructor,I3,2025-12-06,active
+E0029,Tao Xu,SH,Academic,Senior Instructor,I3,2019-05-12,active
+E0030,Min Xu,SH,Academic,Lead Instructor,I4,2021-07-03,active
+E0031,Yan Wu,SH,Admissions and Student Services,Admissions Advisor,S2,2026-01-24,active
+E0032,Ling Zhao,SH,Admissions and Student Services,Admissions Advisor,S2,2025-06-24,active
+E0033,Peng Ma,SH,Career Services,Career Coach,S2,2021-12-08,active
+E0034,Lei Xu,SH,Campus Operations,Operations Assistant,S1,2022-11-01,active
+E0035,Mei Xu,SZ,Campus Management,Campus Director,M3,2014-06-23,active
+E0036,Yu Chen,SZ,Academic,Department Head,M2,2021-04-16,active
+E0037,Jing Zhu,SZ,Admissions and Student Services,Department Head,M2,2020-11-06,active
+E0038,Jun Hu,SZ,Career Services,Department Head,M2,2020-07-24,active
+E0039,Ning Zhou,SZ,Campus Operations,Department Head,M2,2017-04-24,active
+E0040,Bo Zhao,SZ,Academic,Junior Instructor,I1,2018-10-15,active
+E0041,Wei Sun,SZ,Academic,Junior Instructor,I1,2016-10-02,active
+E0042,Min Zhou,SZ,Academic,Instructor,I2,2017-09-12,active
+E0043,Jun Zhou,SZ,Academic,Instructor,I2,2025-02-12,active
+E0044,Hao Zhao,SZ,Academic,Instructor,I2,2018-06-23,active
+E0045,Peng Xu,SZ,Academic,Senior Instructor,I3,2025-04-07,active
+E0046,Mei Yang,SZ,Academic,Senior Instructor,I3,2024-01-12,active
+E0047,Yan Hu,SZ,Academic,Lead Instructor,I4,2018-02-11,active
+E0048,Wei Guo,SZ,Admissions and Student Services,Admissions Advisor,S2,2024-09-16,active
+E0049,Yan Luo,SZ,Admissions and Student Services,Admissions Advisor,S2,2020-02-17,active
+E0050,Bo Wu,SZ,Career Services,Career Coach,S2,2026-03-29,active
+E0051,Wei Sun,SZ,Campus Operations,Operations Assistant,S1,2020-07-31,active
+E0052,Peng Liu,GZ,Campus Management,Campus Director,M3,2014-11-06,active
+E0053,Wei Liu,GZ,Academic,Department Head,M2,2015-09-30,active
+E0054,Hui Chen,GZ,Admissions and Student Services,Department Head,M2,2019-11-10,active
+E0055,Mei Guo,GZ,Career Services,Department Head,M2,2015-09-06,active
+E0056,Chen Luo,GZ,Campus Operations,Department Head,M2,2021-02-06,active
+E0057,Ling He,GZ,Academic,Junior Instructor,I1,2024-07-30,active
+E0058,Yu Zhou,GZ,Academic,Junior Instructor,I1,2022-03-19,active
+E0059,Yan Hu,GZ,Academic,Instructor,I2,2026-03-08,active
+E0060,Bo Yang,GZ,Academic,Instructor,I2,2018-05-08,active
+E0061,Yan Xu,GZ,Academic,Instructor,I2,2021-02-28,active
+E0062,Ning Sun,GZ,Academic,Senior Instructor,I3,2022-02-28,active
+E0063,Min Liu,GZ,Academic,Senior Instructor,I3,2022-09-26,active
+E0064,Wei Luo,GZ,Academic,Lead Instructor,I4,2018-01-21,active
+E0065,Xin Zhao,GZ,Admissions and Student Services,Admissions Advisor,S2,2024-12-11,active
+E0066,Ling Huang,GZ,Admissions and Student Services,Admissions Advisor,S2,2022-10-26,active
+E0067,Xin He,GZ,Career Services,Career Coach,S2,2020-06-29,active
+E0068,Peng Li,GZ,Campus Operations,Operations Assistant,S1,2022-09-01,active
+E0069,Hui Gao,HZ,Campus Management,Campus Director,M3,2018-05-28,active
+E0070,Jing Wu,HZ,Academic,Department Head,M2,2016-05-21,active
+E0071,Lei Liu,HZ,Admissions and Student Services,Department Head,M2,2015-05-26,active
+E0072,Kai Yang,HZ,Career Services,Department Head,M2,2019-11-30,active
+E0073,Jun Zhu,HZ,Campus Operations,Department Head,M2,2020-02-12,active
+E0074,Lei Zhou,HZ,Academic,Junior Instructor,I1,2021-07-24,active
+E0075,Chen Luo,HZ,Academic,Junior Instructor,I1,2023-05-15,active
+E0076,Tao Wu,HZ,Academic,Instructor,I2,2023-09-23,active
+E0077,Peng Wu,HZ,Academic,Instructor,I2,2022-12-31,active
+E0078,Fang Sun,HZ,Academic,Instructor,I2,2017-11-16,active
+E0079,Kai Wu,HZ,Academic,Senior Instructor,I3,2021-05-02,active
+E0080,Bo Wu,HZ,Academic,Senior Instructor,I3,2022-11-02,active
+E0081,Ning Yang,HZ,Academic,Lead Instructor,I4,2021-03-06,active
+E0082,Lei Gao,HZ,Admissions and Student Services,Admissions Advisor,S2,2021-03-30,active
+E0083,Yan Liu,HZ,Admissions and Student Services,Admissions Advisor,S2,2022-07-27,active
+E0084,Ling Wang,HZ,Career Services,Career Coach,S2,2024-11-06,active
+E0085,Yu Xu,HZ,Campus Operations,Operations Assistant,S1,2023-11-23,active
+E0086,Kai Zhu,CD,Campus Management,Campus Director,M3,2020-07-17,active
+E0087,Hao Zhao,CD,Academic,Department Head,M2,2021-04-09,active
+E0088,Ling Wu,CD,Admissions and Student Services,Department Head,M2,2019-11-01,active
+E0089,Tao Li,CD,Career Services,Department Head,M2,2015-03-22,active
+E0090,Bo Sun,CD,Campus Operations,Department Head,M2,2015-11-28,active
+E0091,Bo Zhou,CD,Academic,Junior Instructor,I1,2021-02-15,active
+E0092,Xin Wu,CD,Academic,Junior Instructor,I1,2017-02-21,active
+E0093,Kai Gao,CD,Academic,Instructor,I2,2025-08-23,active
+E0094,Min Zhao,CD,Academic,Instructor,I2,2020-11-24,active
+E0095,Kai Zhao,CD,Academic,Instructor,I2,2026-04-20,active
+E0096,Yu Wang,CD,Academic,Senior Instructor,I3,2024-06-30,active
+E0097,Qing Wu,CD,Academic,Senior Instructor,I3,2023-08-26,active
+E0098,Mei Gao,CD,Academic,Lead Instructor,I4,2016-05-12,active
+E0099,Yan Lin,CD,Admissions and Student Services,Admissions Advisor,S2,2021-10-27,active
+E0100,Fang Guo,CD,Admissions and Student Services,Admissions Advisor,S2,2019-11-04,active
+E0101,Peng Zhu,CD,Career Services,Career Coach,S2,2024-08-17,active
+E0102,Wei Wang,CD,Campus Operations,Operations Assistant,S1,2026-05-11,active
+E0103,Fang Sun,WH,Campus Management,Campus Director,M3,2017-10-12,active
+E0104,Min Wang,WH,Academic,Department Head,M2,2019-08-15,active
+E0105,Qing Zhou,WH,Admissions and Student Services,Department Head,M2,2017-06-06,active
+E0106,Hao Ma,WH,Career Services,Department Head,M2,2019-02-27,active
+E0107,Wei Zhou,WH,Campus Operations,Department Head,M2,2016-05-19,active
+E0108,Peng Li,WH,Academic,Junior Instructor,I1,2026-04-10,active
+E0109,Yan Huang,WH,Academic,Junior Instructor,I1,2025-09-23,active
+E0110,Chen Zhu,WH,Academic,Instructor,I2,2020-11-18,active
+E0111,Jing Yang,WH,Academic,Instructor,I2,2021-10-06,active
+E0112,Ling Guo,WH,Academic,Instructor,I2,2021-01-21,active
+E0113,Yan Gao,WH,Academic,Senior Instructor,I3,2022-10-18,active
+E0114,Peng Lin,WH,Academic,Senior Instructor,I3,2018-07-28,active
+E0115,Ling He,WH,Academic,Lead Instructor,I4,2020-11-19,active
+E0116,Mei Gao,WH,Admissions and Student Services,Admissions Advisor,S2,2021-04-22,active
+E0117,Jun Zhou,WH,Admissions and Student Services,Admissions Advisor,S2,2024-02-02,active
+E0118,Tao Zhang,WH,Career Services,Career Coach,S2,2020-04-15,active
+E0119,Lei Zhang,WH,Campus Operations,Operations Assistant,S1,2020-01-25,active
+E0120,Hao Zhu,XA,Campus Management,Campus Director,M3,2020-02-25,active
+E0121,Lei Hu,XA,Academic,Department Head,M2,2021-02-23,active
+E0122,Peng Zhao,XA,Admissions and Student Services,Department Head,M2,2017-04-29,active
+E0123,Min Liu,XA,Career Services,Department Head,M2,2018-05-29,active
+E0124,Qing Zhu,XA,Campus Operations,Department Head,M2,2020-11-10,active
+E0125,Fang Zhao,XA,Academic,Junior Instructor,I1,2016-04-24,active
+E0126,Tao Hu,XA,Academic,Junior Instructor,I1,2021-10-14,active
+E0127,Fang Huang,XA,Academic,Instructor,I2,2026-08-09,active
+E0128,Kai Guo,XA,Academic,Instructor,I2,2017-06-22,active
+E0129,Jun Luo,XA,Academic,Instructor,I2,2026-03-02,active
+E0130,Tao Sun,XA,Academic,Senior Instructor,I3,2017-08-24,active
+E0131,Lei Huang,XA,Academic,Senior Instructor,I3,2024-01-16,active
+E0132,Hui Li,XA,Academic,Lead Instructor,I4,2022-10-28,active
+E0133,Jing Zhao,XA,Admissions and Student Services,Admissions Advisor,S2,2022-02-10,active
+E0134,Chen Sun,XA,Admissions and Student Services,Admissions Advisor,S2,2023-05-02,active
+E0135,Xin Hu,XA,Career Services,Career Coach,S2,2023-01-23,active
+E0136,Peng Zhu,XA,Campus Operations,Operations Assistant,S1,2022-01-18,active
+E0137,Qing Luo,CD,Human Resources,HR Business Partner,S3,2022-07-12,active
+E0138,Ning Hu,CD,Finance,Finance Controller,M2,2019-07-28,active
+E0139,Lei Li,CD,Finance,Accountant,S2,2018-08-26,active
+E0140,Tao Wu,CD,IT and Technical Support,Helpdesk Engineer,S2,2018-10-13,active
+E0141,Min Wang,CD,Academic Office,Principal Instructor,I5,2015-11-14,active
