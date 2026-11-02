@@ -1,0 +1,51 @@
+[project]
+name = "starit-ai-module"
+version = "0.0.0"
+description = "StarEdu AI module: enterprise knowledge assistant and agents (uv workspace root)"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/core", "apps/api", "apps/worker", "apps/mcp-server"]
+
+[tool.uv.sources]
+starit-core = { workspace = true }
+starit-api = { workspace = true }
+starit-worker = { workspace = true }
+starit-mcp-server = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "mypy>=1.11",
+    "pre-commit>=3.8",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["sample-data", "web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "apps"]
+addopts = ["--import-mode=importlib"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["integration: needs the Compose services (Postgres) to be running"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = ["packages/core/src", "apps/api/src", "apps/worker/src", "apps/mcp-server/src"]
+explicit_package_bases = true
+exclude = ["migrations/", "sample-data/", "web/"]

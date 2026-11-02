@@ -1,0 +1,1 @@
+"""StarEdu AI module API."""
