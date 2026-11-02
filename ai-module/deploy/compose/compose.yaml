@@ -48,6 +48,35 @@ services:
       timeout: 5s
       retries: 20
 
+  # Identity provider. Demo realm (roles, test accounts) is imported on first start.
+  # start-dev with the built-in file database is for local use only.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HOSTNAME: http://localhost:${STARIT_KEYCLOAK_PORT:-8080}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${STARIT_KEYCLOAK_PORT:-8080}:8080"
+    volumes:
+      - ./keycloak/starit-realm.json:/opt/keycloak/data/import/starit-realm.json:ro
+      - keycloakdata:/opt/keycloak/data
+    healthcheck:
+      # The image has no curl; use bash's /dev/tcp against the management port.
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   api:
     build:
       context: ../..
@@ -64,6 +93,9 @@ services:
       STARIT_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-starit}
       STARIT_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-starit-secret}
       STARIT_S3_BUCKET: ${STARIT_S3_BUCKET:-starit-documents}
+      # Tokens are issued for localhost; keys are fetched over the Compose network.
+      STARIT_OIDC_ISSUER: http://localhost:${STARIT_KEYCLOAK_PORT:-8080}/realms/starit
+      STARIT_OIDC_JWKS_URL: http://keycloak:8080/realms/starit/protocol/openid-connect/certs
     ports:
       - "${STARIT_API_PORT:-8000}:8000"
     depends_on:
@@ -72,6 +104,8 @@ services:
       redis:
         condition: service_healthy
       objectstore:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/healthz', timeout=3)"]
@@ -83,3 +117,4 @@ volumes:
   pgdata:
   redisdata:
   objectdata:
+  keycloakdata:

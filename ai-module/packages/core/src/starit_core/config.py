@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     s3_secret_key: str = Field(default="starit-secret", repr=False)
     s3_bucket: str = "starit-documents"
 
+    # Tokens are issued for the public (localhost) address; keys may be fetched over an
+    # internal address, so the issuer to check and the JWKS URL are separate settings.
+    oidc_issuer: str = "http://localhost:8080/realms/starit"
+    oidc_jwks_url: str = "http://localhost:8080/realms/starit/protocol/openid-connect/certs"
+    oidc_audience_api: str = "starit-api"
+    oidc_audience_mcp: str = "starit-mcp"
+
 
 @lru_cache
 def get_settings() -> Settings:

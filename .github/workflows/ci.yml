@@ -37,5 +37,10 @@ jobs:
       - run: uv run mypy packages apps
       - name: Migrations run on an empty database
         run: uv run alembic upgrade head
+      - name: Start Keycloak (demo realm is imported on first start)
+        run: docker compose --env-file .env.example -f deploy/compose/compose.yaml up -d --wait keycloak
       - name: Tests (unit and integration)
         run: uv run pytest
+      - name: Keycloak logs (on failure)
+        if: failure()
+        run: docker compose --env-file .env.example -f deploy/compose/compose.yaml logs keycloak --tail 100
