@@ -1,0 +1,85 @@
+name: starit-ai
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-starit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-starit}
+      POSTGRES_DB: ${POSTGRES_DB:-starit}
+    ports:
+      - "${STARIT_PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${STARIT_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object storage. The official MinIO images are no longer published,
+  # so this uses the MinIO-compatible community fork. The code only uses the S3 API.
+  objectstore:
+    image: pgsty/silo:RELEASE.2026-08-06T00-00-00Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-starit}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-starit-secret}
+    ports:
+      - "${STARIT_S3_PORT:-9000}:9000"
+      - "${STARIT_S3_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - objectdata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/python.Dockerfile
+      args:
+        APP: api
+    command: ["uvicorn", "starit_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      STARIT_ENV: ${STARIT_ENV:-dev}
+      STARIT_LOG_LEVEL: ${STARIT_LOG_LEVEL:-INFO}
+      STARIT_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-starit}:${POSTGRES_PASSWORD:-starit}@postgres:5432/${POSTGRES_DB:-starit}
+      STARIT_REDIS_URL: redis://redis:6379/0
+      STARIT_S3_ENDPOINT_URL: http://objectstore:9000
+      STARIT_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-starit}
+      STARIT_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-starit-secret}
+      STARIT_S3_BUCKET: ${STARIT_S3_BUCKET:-starit-documents}
+    ports:
+      - "${STARIT_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
+  objectdata:
