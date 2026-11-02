@@ -22,3 +22,6 @@ dist/
 
 # local-only design notes
 Design.md
+
+# Word lock files created when a .docx is open
+~$*
