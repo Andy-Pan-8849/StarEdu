@@ -44,6 +44,19 @@
 | Prometheus、Grafana、Loki、Tempo、OTel | 合计约 1–1.5 GB |
 | Langfuse（含其依赖的存储） | 可能 2 GB 以上，**未核实** |
 
+**实测记录（M1，Mac 上空闲状态，`docker stats`，2026-11-02）**：
+
+| 服务 | 实测内存 |
+|---|---|
+| Keycloak（`start-dev`） | 约 650–675 MiB，启动约 10 秒 |
+| api | 约 70 MiB |
+| 对象存储（pgsty/silo） | 约 190 MiB |
+| Postgres | 约 32 MiB（空库） |
+| Redis | 约 10 MiB |
+| 合计 | 约 1 GB |
+
+Keycloak 比上面粗估的 1–1.5 GB 低，这是开发模式、空闲状态的数字，有负载时会更高。
+
 核心服务能跑在 4 GB 以内，完整的可观测性和 Langfuse 另加。**学习者可以分层启动**，这是 2.1 要把可选组件拆开的原因。
 
 ## 3. lite profile（Oracle k3s）

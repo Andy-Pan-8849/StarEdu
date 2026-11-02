@@ -1,0 +1,337 @@
+{
+  "realm": "starit",
+  "displayName": "StarIT Education (demo)",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      {
+        "name": "student",
+        "description": "Student of a StarIT campus"
+      },
+      {
+        "name": "staff",
+        "description": "Employee (instructor or staff)"
+      },
+      {
+        "name": "manager",
+        "description": "Campus or department manager"
+      },
+      {
+        "name": "hr",
+        "description": "Human Resources"
+      },
+      {
+        "name": "finance",
+        "description": "Finance"
+      },
+      {
+        "name": "Admin",
+        "description": "Manages users, roles and system configuration; no default access to restricted content"
+      },
+      {
+        "name": "RAGETLAdmin",
+        "description": "Manages knowledge-base documents (upload, delete, re-index)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "starit-web",
+      "name": "StarIT web front end",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-starit-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starit-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-starit-mcp",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starit-mcp",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "campus_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "campus_id",
+            "claim.name": "campus_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "level",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "level",
+            "claim.name": "level",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "starit-api",
+      "enabled": true,
+      "bearerOnly": true
+    },
+    {
+      "clientId": "starit-mcp",
+      "enabled": true,
+      "bearerOnly": true
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"campus_id\", \"displayName\": \"Campus\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}, {\"name\": \"level\", \"displayName\": \"Level\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}]}"
+          ]
+        }
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "student.sh",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "student.sh@starit.example",
+      "firstName": "Student",
+      "lastName": "Shanghai",
+      "attributes": {
+        "campus_id": [
+          "SH"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "student"
+      ]
+    },
+    {
+      "username": "staff.bj",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "staff.bj@starit.example",
+      "firstName": "Staff",
+      "lastName": "Beijing",
+      "attributes": {
+        "campus_id": [
+          "BJ"
+        ],
+        "level": [
+          "S2"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "staff"
+      ]
+    },
+    {
+      "username": "staff.sh",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "staff.sh@starit.example",
+      "firstName": "Staff",
+      "lastName": "Shanghai",
+      "attributes": {
+        "campus_id": [
+          "SH"
+        ],
+        "level": [
+          "I2"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "staff"
+      ]
+    },
+    {
+      "username": "manager.sh",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "manager.sh@starit.example",
+      "firstName": "Manager",
+      "lastName": "Shanghai",
+      "attributes": {
+        "campus_id": [
+          "SH"
+        ],
+        "level": [
+          "M3"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "manager"
+      ]
+    },
+    {
+      "username": "hr.bj",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "hr.bj@starit.example",
+      "firstName": "HR",
+      "lastName": "Beijing",
+      "attributes": {
+        "campus_id": [
+          "BJ"
+        ],
+        "level": [
+          "M2"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "hr"
+      ]
+    },
+    {
+      "username": "finance.bj",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "finance.bj@starit.example",
+      "firstName": "Finance",
+      "lastName": "Beijing",
+      "attributes": {
+        "campus_id": [
+          "BJ"
+        ],
+        "level": [
+          "S2"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "finance"
+      ]
+    },
+    {
+      "username": "admin.bj",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin.bj@starit.example",
+      "firstName": "Admin",
+      "lastName": "Beijing",
+      "attributes": {
+        "campus_id": [
+          "BJ"
+        ],
+        "level": [
+          "S2"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "Admin"
+      ]
+    },
+    {
+      "username": "ragetl.bj",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "ragetl.bj@starit.example",
+      "firstName": "RagEtl",
+      "lastName": "Beijing",
+      "attributes": {
+        "campus_id": [
+          "BJ"
+        ],
+        "level": [
+          "S1"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "RAGETLAdmin"
+      ]
+    }
+  ]
+}

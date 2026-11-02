@@ -137,6 +137,16 @@ ai-module/
 - 决定：full profile 的 S3 兼容存储使用 MinIO 的社区分支 **`pgsty/silo`**（固定版本标签，amd64 / arm64 均有，RAGFlow 试用时已在本机运行）；端口和环境变量与 MinIO 相同（9000 / 9001）。
 - **代码只依赖 S3 API**，所以以后换成别的 S3 兼容实现（如 SeaweedFS、云厂商的对象存储）只改配置。lite profile 的对象存储仍为【待定】。
 
+### 4.8 身份实现（M1 实际做法，2026-11-02）
+
+- Keycloak `26.8.1`，`start-dev` + 内置文件数据库（容器卷），realm 文件 `deploy/compose/keycloak/starit-realm.json` 在首次启动时导入。仅用于本地 full profile；lite 的身份方案仍为【待定】。
+- 令牌的签发者固定为 `http://localhost:8080/realms/starit`（`KC_HOSTNAME`）。后端用两个配置：`STARIT_OIDC_ISSUER`（校验签发者）和 `STARIT_OIDC_JWKS_URL`（拉取公钥，容器内走 Compose 网络）。
+- 令牌携带 `realm_access.roles`、`campus_id`、`level`，受众同时包含 `starit-api` 和 `starit-mcp`。`campus_id`、`level` 在 realm 的用户属性（declarative user profile）里**显式声明**，没有开启"非托管属性"。
+- 后端只接受 RS256 / ES256，检查签名、过期时间、签发者、受众，要求 `sub`；拒绝 `alg: none` 和 HS256（防算法混淆）；只认 7 个已知角色，其余（Keycloak 默认角色）忽略。
+- 取不到公钥（身份服务不可用）返回 503，不当作 401。
+- 统一错误格式（03 第 1 节）已落实：401 / 403 / 404 / 422 都带 `request_id`。
+- `starit-web` 客户端开启了密码模式，只为本地脚本和测试取令牌；真实部署必须关闭。
+
 ## 5. 两个 Profile 的差异（AI 模块）
 
 | 项 | full（本地 Compose） | lite（Oracle k3s） |

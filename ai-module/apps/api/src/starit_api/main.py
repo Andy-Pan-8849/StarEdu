@@ -5,12 +5,16 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncEngine
+from starit_core.auth import Identity, TokenVerifier, jwks_key_resolver
 from starit_core.config import get_settings
 from starit_core.db import check_database, create_engine
 from starit_core.logging import configure_logging, request_id_var
+
+from starit_api.deps import get_identity
+from starit_api.errors import register_error_handlers
 
 logger = logging.getLogger("starit.api")
 
@@ -21,6 +25,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.log_level)
     engine = create_engine(settings)
     app.state.engine = engine
+    app.state.verifier = TokenVerifier(
+        issuer=settings.oidc_issuer,
+        audience=settings.oidc_audience_api,
+        key_resolver=jwks_key_resolver(settings.oidc_jwks_url),
+    )
     logger.info("api started (env=%s)", settings.env)
     try:
         yield
@@ -30,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="StarEdu AI API", version="0.0.0", lifespan=lifespan)
+    register_error_handlers(app)
 
     @app.middleware("http")
     async def request_id_middleware(
@@ -53,6 +63,16 @@ def create_app() -> FastAPI:
             "checks": {"database": "ok" if database_ok else "failed"},
         }
         return JSONResponse(body, status_code=200 if database_ok else 503)
+
+    @app.get("/me")
+    async def me(identity: Identity = Depends(get_identity)) -> dict[str, object]:
+        return {
+            "user_id": identity.user_id,
+            "name": identity.name or identity.username,
+            "roles": sorted(identity.roles),
+            "campus_id": identity.campus_id,
+            "level": identity.level,
+        }
 
     return app
 

@@ -31,6 +31,26 @@ make lint      # ruff and mypy
 curl http://localhost:8000/healthz
 ```
 
+### Demo accounts (local only)
+
+`make up` also starts Keycloak with a demo realm (`starit`). All accounts use the password `demo-pass-123`. They exist only for local demos; never reuse them or the password anywhere else.
+
+| Account | Role | Campus |
+|---|---|---|
+| `student.sh` | student | SH |
+| `staff.bj`, `staff.sh` | staff | BJ, SH |
+| `manager.sh` | manager | SH |
+| `hr.bj` | hr | BJ |
+| `finance.bj` | finance | BJ |
+| `admin.bj` | Admin | BJ |
+| `ragetl.bj` | RAGETLAdmin | BJ |
+
+```bash
+curl -H "Authorization: Bearer $(make -s token ACCOUNT=staff.sh)" localhost:8000/me
+```
+
+The Keycloak admin console is at http://localhost:8080 (user `admin`, password `admin`, set in `.env`). The realm file is `deploy/compose/keycloak/starit-realm.json`; it enables the password grant for the `starit-web` client so scripts and tests can fetch tokens, which a real deployment should turn off.
+
 The services use the usual default ports (Postgres 5432, Redis 6379, object storage 9000/9001, API 8000). If one is taken on your machine, change it in `.env` (created from `.env.example` by `make up`). `make down` stops the services and keeps the data; `make clean` also deletes the data volumes.
 
 The design documents are in [`../docs/design/`](../docs/design/).

@@ -65,7 +65,7 @@ curl localhost:8000/healthz
 
 ## M1 身份
 
-状态：**进行中**（分支 `m1-identity`）。
+状态：**已完成，待合并**（分支 `m1-identity`）。
 
 ### 计划的文件（`ai-module/` 下，除非另写）
 
@@ -80,7 +80,7 @@ curl localhost:8000/healthz
 | `packages/core/tests/test_auth.py`（新） | JWT 校验单元测试（本地生成密钥，不需要 Keycloak） |
 | `apps/api/tests/test_me.py`（新） | `/me` 单元测试 |
 | `apps/api/tests/integration/test_keycloak.py`（新） | 用真实 Keycloak 取令牌，验证每个账号的 `/me` |
-| `scripts/token.sh`（新） | `make token USER=staff.sh` 取测试令牌 |
+| `scripts/token.sh`（新） | `make token ACCOUNT=staff.sh` 取测试令牌 |
 | `.env.example`、`Makefile`、`README.md`（改） | 新增变量和命令说明 |
 | `.github/workflows/ci.yml`（改） | CI 中启动 Keycloak 并运行集成测试 |
 | `docs/design/01-architecture-and-repo.md`（改） | 记录 M1 的实现决定 |
@@ -100,7 +100,7 @@ curl localhost:8000/healthz
 git switch -c m1-identity
 uv sync --all-packages
 make up
-make token USER=staff.sh
+make token ACCOUNT=staff.sh
 curl -H "Authorization: Bearer $(make -s token USER=staff.sh)" localhost:8000/me
 make lint && make test
 ```
@@ -121,4 +121,15 @@ make lint && make test
 
 ### 实际结果
 
-（完成后填写）
+| 项 | 结果 |
+|---|---|
+| 验证标准 1 | 8 个账号都取到令牌，`/me` 返回正确的角色、校区和级别（集成测试逐个验证，容器里的 api 也用真实令牌验证过） |
+| 验证标准 2 | 无令牌、乱码令牌、过期、签名被改、签发者错、受众错、缺少 `sub`、`alg: none`、HS256 算法混淆，均为 401（单元测试 + 真实令牌篡改的集成测试） |
+| 验证标准 3 | 单元测试不需要 Keycloak，用本地生成的 RSA 密钥 |
+| 验证标准 4 | 本地 43 个测试全部通过（含集成）；CI 结果见推送后的记录 |
+| 验证标准 5 | 已回填到设计文档 06 的 2.2 节（Keycloak 约 650–675 MiB，启动约 10 秒） |
+| **与计划不一致** | 命令参数名由 `USER` 改为 `ACCOUNT`（`USER` 会和系统环境变量混淆） |
+| **与计划不一致** | 没有开启"非托管属性"，而是在用户属性配置里显式声明 `campus_id`、`level`，更明确 |
+| **新增（计划外）** | `starit_api/errors.py` 和 `deps.py`：统一错误格式、`get_identity`、`require_roles`；取不到公钥时返回 503；`pyproject.toml` 里对 FastAPI 的 `Depends` 放宽了 ruff 的 B008 |
+| 开始前不确定的事 | Keycloak 26.8.1 的 realm 导入一次成功；健康检查用管理端口 9000 加 bash 的 `/dev/tcp`，有效；`make up` 现在多等约 10–30 秒 |
+| 镜像版本 | `quay.io/keycloak/keycloak:26.8.1` |

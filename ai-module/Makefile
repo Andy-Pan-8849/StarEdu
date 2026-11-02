@@ -1,7 +1,7 @@
 # Developer commands for the AI module. Run from the ai-module/ directory.
 COMPOSE = docker compose --env-file .env -f deploy/compose/compose.yaml
 
-.PHONY: help env sync lint fmt test up down logs migrate ps clean
+.PHONY: help env sync lint fmt test up down logs migrate ps token clean
 
 help:
 	@echo "make env      create .env from .env.example if missing"
@@ -11,6 +11,7 @@ help:
 	@echo "make test     run tests (integration tests need make up + make migrate)"
 	@echo "make up       start Postgres, Redis, object storage and the API"
 	@echo "make migrate  apply database migrations"
+	@echo "make token ACCOUNT=staff.sh   print an access token for a demo account"
 	@echo "make down     stop the services (data volumes are kept)"
 	@echo "make clean    stop the services AND delete their data volumes"
 
@@ -46,6 +47,9 @@ ps: env
 
 logs: env
 	$(COMPOSE) logs -f --tail=100
+
+token: env
+	@set -a; . ./.env; set +a; scripts/token.sh $(ACCOUNT)
 
 clean: env
 	$(COMPOSE) down -v
