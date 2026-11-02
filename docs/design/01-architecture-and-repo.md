@@ -45,7 +45,7 @@ JWT 由 Keycloak 签发；api、MCP Server 都用 JWKS 校验。
 | mcp-server | 以 MCP 暴露工具，校验同一个 JWT | 独立进程，**【建议】** 端口 8100 |
 | core | 共享库：配置、数据库、权限、检索、LLM 客户端、模型定义 | 不单独部署 |
 | Postgres | 业务元数据、分块、向量、会话、审计 | 单实例，按 schema 区分 |
-| 对象存储 | 原始文档 | full：MinIO；lite：【待定】 |
+| 对象存储 | 原始文档 | full：MinIO 兼容（pgsty/silo，见 4.7）；lite：【待定】 |
 | Redis | 缓存、限流 | **不承载任务队列**，见 4.1 |
 
 ## 3. 代码结构【建议】
@@ -130,6 +130,12 @@ ai-module/
 | MinIO | 9000 / 9001 |
 
 **使用各组件的常用默认端口，方便学习者**；主机端口同时做成环境变量，本机端口被占用时只改 `.env`，容器之间用服务名通信，不受影响。
+
+### 4.7 对象存储【M0 修订，2026-11-02】
+
+- 核实结果：官方 MinIO 的 Docker 镜像（`minio/minio`、`quay.io/minio/minio`）已无法从官方仓库拉取。
+- 决定：full profile 的 S3 兼容存储使用 MinIO 的社区分支 **`pgsty/silo`**（固定版本标签，amd64 / arm64 均有，RAGFlow 试用时已在本机运行）；端口和环境变量与 MinIO 相同（9000 / 9001）。
+- **代码只依赖 S3 API**，所以以后换成别的 S3 兼容实现（如 SeaweedFS、云厂商的对象存储）只改配置。lite profile 的对象存储仍为【待定】。
 
 ## 5. 两个 Profile 的差异（AI 模块）
 
