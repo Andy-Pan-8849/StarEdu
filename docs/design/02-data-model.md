@@ -129,7 +129,7 @@
 |---|---|
 | `id`、`conversation_id`、`user_id` | |
 | `started_at`、`ended_at` | |
-| `end_state`、`end_reason` | 显式 End 状态和原因码（`answered` / `need_clarification` / `no_permission` / `not_found` / `error`，详见文档 04） |
+| `end_state`、`end_reason` | 显式 End 状态和原因码（`answered` / `need_clarification` / `no_permission` / `not_found` / `refused` / `error`，详见文档 04） |
 | `model`、`tokens_in`、`tokens_out`、`latency_ms` | 第二阶段的成本统计从这里汇总 |
 | `trace_id` | 对应 Langfuse / OTel 的 trace |
 
