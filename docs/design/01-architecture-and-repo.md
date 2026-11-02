@@ -125,8 +125,11 @@ ai-module/
 | Keycloak | 8080 |
 | LiteLLM | 4100（避开 NestJS 的 4000） |
 | Langfuse web | 3100（避开 3000） |
-| Postgres / Redis | 5432 / 6379 |
-| MinIO | 9000 / 9001 |
+| Postgres | 5432 |
+| Redis | 6380（本机常已有 Redis 占用 6379） |
+| MinIO | 9100 / 9101（RAGFlow 的 MinIO 占用 9000 / 9001） |
+
+主机端口全部做成环境变量，默认值如上，冲突时只改 `.env`；容器之间用服务名通信，不受影响。
 
 ## 5. 两个 Profile 的差异（AI 模块）
 
