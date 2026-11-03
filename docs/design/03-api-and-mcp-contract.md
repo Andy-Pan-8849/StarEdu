@@ -6,7 +6,7 @@
 
 ## 1. 通用约定【建议】
 
-- 路径前缀 `/api/v1`；JSON；时间用 ISO 8601（UTC）；ID 用 uuid（业务编号如 `doc_code` 单独字段）。
+- 路径**没有**前缀（M7 修订：M5 起就是 `/conversations`、`/documents`……，需要版本化时再加 `/api/v1`）；JSON；时间用 ISO 8601（UTC）；ID 用 uuid（业务编号如 `doc_code` 单独字段）。
 - **认证**：`Authorization: Bearer <JWT>`，由 Keycloak 签发，api 用 JWKS 校验；身份只来自 JWT，请求体里的任何 `user`、`role` 字段一律忽略。
 - **统一错误格式**：
 
@@ -123,6 +123,8 @@
 | `supersedes` | 否 | 被取代的旧版本 `id` |
 
 行为：写入对象存储、写 `ai.documents`（`ingest_status = queued`）、插入 `ingestion_jobs`，**立即返回 202**，包含文档和任务 ID。相同 `content_hash` 且相同 `(doc_code, version)` 返回 409 并给出已有文档 ID。
+
+> **M7 修订（2026-11-03）**：实际实现与上面的差异：`min_level` 是 1–7 的等级序号；`domain` 取 `hr`、`finance`、`tech-support`；单文件 ≤ 20 MB，扩展名与文件头必须一致；相同 `(doc_code, version)` 已存在即返回 409（消息里带已有文档的 `id`）；列表用 `limit` + 不透明的 `cursor`（编码的是偏移量）；文档类引用带 `document_id`，用它请求 `GET /documents/{id}/chunks?around={chunk_id}&window=1` 得到被引用的块和前后各 1 块；`GET /documents/{id}/file` 返回原文件（`Content-Disposition: inline`）。浏览器跨域访问由 `STARIT_CORS_ORIGINS` 控制（默认 `http://localhost:3000`，只允许 `Authorization`、`Content-Type`、`X-Request-Id` 头，不带 cookie）。
 
 ### 其余端点
 

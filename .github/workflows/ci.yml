@@ -45,3 +45,22 @@ jobs:
       - name: Keycloak logs (on failure)
         if: failure()
         run: docker compose --env-file .env.example -f deploy/compose/compose.yaml logs keycloak --tail 100
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-module/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ai-module/web/.nvmrc
+          cache: npm
+          cache-dependency-path: ai-module/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build

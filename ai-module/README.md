@@ -90,6 +90,18 @@ curl -s -X POST localhost:8000/conversations/$CID/messages \
 
 The reply carries the answer with `[n]` citations, the `end_state` (`answered`, `need_clarification`, `no_permission`, `not_found`, `refused` or `error`) and an `end_reason`. Every run is recorded in `ai.runs`, `ai.messages` and the audit log. Users are limited to 20 messages a minute (`STARIT_RATE_LIMIT_CHAT_PER_MINUTE`). `make eval ARGS="agent --compare-generate openai/gpt-4o-mini"` asks a set of representative questions for real and reports what happens (it prints the estimated cost and asks first).
 
+### Documents and the web app
+
+The web app (`web/`, Next.js 15) is part of the stack: after `make up`, open <http://localhost:3000> and sign in with a demo account. Everyone gets the assistant: ask a question, and click a `[n]` in the answer to read the source passage (or, for an answer built from business data, which views and how many rows it used). The `Documents` page appears only for `RAGETLAdmin` (`min.ragetl.bj`): upload a file with its access rules, watch it go from `queued` to `ready` (or see why it failed), edit its metadata and permissions, queue it again, or delete it. The API checks the role on every request; the menu is only a convenience.
+
+```bash
+make web-dev      # the front end with hot reload on :3000 (the API from `make up` on :8000)
+make web-check    # lint, types, formatting, unit tests and a production build
+make e2e          # browser smoke tests with Playwright (needs `make up`; installs Chromium on first use)
+```
+
+`make e2e` switches the worker to fake embeddings while it runs, so uploading costs nothing. The browser talks to the API directly, so the API allows the web origin (`STARIT_CORS_ORIGINS`), and the front end reads its addresses from `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_OIDC_AUTHORITY` and `NEXT_PUBLIC_OIDC_CLIENT_ID` (set at build time).
+
 ### Database accounts
 
 Three Postgres accounts are used, so that grants and the append-only audit log mean something:
