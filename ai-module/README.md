@@ -27,6 +27,8 @@ make sync      # install dependencies
 make up        # start Postgres (pgvector), Redis, object storage, Keycloak and the API
                # (a one-shot container applies the database migrations first)
 make seed-biz  # load the sample business tables into the biz schema
+make ingest-samples ARGS="--wait"   # register the 28 sample documents; the worker container
+                                     # parses, chunks, embeds and stores them
 make test      # unit tests, plus integration tests when the services are up
 make lint      # ruff and mypy
 curl http://localhost:8000/healthz
@@ -54,6 +56,12 @@ curl -H "Authorization: Bearer $(make -s token ACCOUNT=wei.acad.sh)" localhost:8
 
 The Keycloak admin console is at http://localhost:8080 (user `admin`, password `admin`, set in `.env`). The realm file is `deploy/compose/keycloak/starit-realm.json`; it enables the password grant for the `starit-web` client so scripts and tests can fetch tokens, which a real deployment should turn off.
 
+### Ingesting documents
+
+`make ingest-samples` stores the original files in object storage, records each document with its access rules and queues an ingestion job. The `worker` container takes the jobs, one document at a time: parse (md, txt, docx, pdf), clean, chunk, embed and store, replacing the document's old chunks in one transaction. Running it again changes only what changed; `ARGS="--force"` queues every document again, which is how you re-embed after changing the embedding model.
+
+Embeddings need `OPENAI_API_KEY` in `.env` (the model is `EMBEDDING_MODEL`, 1536 dimensions). For a free dry run with meaningless vectors set `EMBEDDING_PROVIDER=fake`. A failed job shows its stage and reason in `ai.ingestion_jobs` (`stage`, `error_code`, `error_message`). The first run downloads the tokenizer vocabulary, so it needs internet access once.
+
 ### Database accounts
 
 Three Postgres accounts are used, so that grants and the append-only audit log mean something:
@@ -64,7 +72,7 @@ Three Postgres accounts are used, so that grants and the append-only audit log m
 | `ai_app` | the application | ordinary privileges; may only insert into the audit log |
 | `ai_sql_ro` | SQL Agent queries | cannot log in; the application switches to it inside a transaction, and it can read only the whitelisted `ai_sql` views, which filter rows by the caller's identity |
 
-If you already have an `.env` from an earlier milestone, copy the new variables from `.env.example` (`STARIT_APP_DB_PASSWORD`, `STARIT_MIGRATION_DATABASE_URL`) and set `STARIT_DATABASE_URL` to the `ai_app` URL. After the demo accounts change, run `make clean` once so Keycloak imports the new realm (this removes local demo data only).
+If you already have an `.env` from an earlier milestone, copy the new variables from `.env.example` (`STARIT_APP_DB_PASSWORD`, `STARIT_MIGRATION_DATABASE_URL`, `EMBEDDING_*`) and set `STARIT_DATABASE_URL` to the `ai_app` URL. After the demo accounts change, run `make clean` once so Keycloak imports the new realm (this removes local demo data only).
 
 The services use the usual default ports (Postgres 5432, Redis 6379, object storage 9000/9001, API 8000). If one is taken on your machine, change it in `.env` (created from `.env.example` by `make up`). `make down` stops the services and keeps the data; `make clean` also deletes the data volumes.
 

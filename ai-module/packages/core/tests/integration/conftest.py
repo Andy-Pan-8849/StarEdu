@@ -36,6 +36,9 @@ async def owner_conn() -> AsyncIterator[AsyncConnection]:
         await conn.close()
         await engine.dispose()
         pytest.skip("database is not migrated to head (make migrate)")
+    # Start from an empty knowledge base even when the dev database holds ingested documents;
+    # the rollback at the end brings them back.
+    await conn.execute(text("DELETE FROM ai.documents"))
     try:
         yield conn
     finally:
