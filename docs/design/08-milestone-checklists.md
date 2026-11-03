@@ -254,7 +254,7 @@ make lint
 
 ## M3 入库管线
 
-状态：**已完成，待合并**（分支 `m3-ingestion`）。本里程碑开始使用 OpenAI 密钥（本地 `.env` 里已配置，不会提交；检查时只确认非空，没有显示）。
+状态：**已完成并合并**（标签 `ai-m3`，合并提交 `9dd000a`，2026-11-03）。本里程碑开始使用 OpenAI 密钥（本地 `.env` 里已配置，不会提交；检查时只确认非空，没有显示）。
 
 ### 开始前的调研结果（已核对）
 
@@ -387,3 +387,114 @@ make test && make lint
 - worker 镜像因为 litellm、pdfplumber 等依赖变大，构建时间变长。
 - 真实 embedding 只确认了"写入成功、维度和模长正常"，检索效果在 M4 评测。
 - 本机的 `ai.ingestion_jobs` 里有 56 条记录：28 条是先用假 embedding 干跑的，28 条是真实运行；不影响后续（向量已被真实模型的结果替换）。
+
+
+---
+
+## M4 检索与首个评测切片
+
+状态：**清单待用户确认**（分支 `m4-retrieval`）。这是第一次能看到检索的实际效果：关键词、向量、hybrid、hybrid + Rerank 四种模式的对比，也是项目的学习目标之一。
+
+### 开始前的调研结果（已核对）
+
+| 项 | 结果 |
+|---|---|
+| 评测集 `qa-set.jsonl` | 54 题：single 31、multi 7、access 7、keyword 3、unanswerable 3、version 2、paraphrase 1；每题 1 个来源文档的 43 题，2 个来源的 8 题，没有来源（无答案）的 3 题；`should_answer = false` 共 6 题（3 道 access：DOC-46、47、50；3 道 unanswerable） |
+| 知识库现状 | 28 份文档、**只有 39 个块**，平均 286 token。候选列表（各 30 个）几乎覆盖全部块，Rerank 的输入（20 个）超过一半的知识库——**这个规模下四种模式的差距会被压缩，很多题会直接命中**，要如实看待结果；更有说服力的对比要等 M8 扩充评测题和文档之后 |
+| 关键词查询 | 问题文本用 `plainto_tsquery('english', 问题)` 再把 `&` 换成 `\|` 得到"任一词命中"的查询，例如 `What does ERR-PORTAL-403 mean?` 变成 `'err-port' \| 'err' \| 'portal' \| '403' \| 'mean'`（已在数据库里验证）；用 AND 会因为问句里的虚词而几乎查不到 |
+| 排序 | `ts_rank_cd`（设计 05 已定方案 A），再给 `identifiers` 精确命中的块加分 |
+| 评测身份 | 评测集只有角色没有账号；按角色对应到演示账号：student → `wei.stu.sh`、staff → `ning.adm.bj`、manager → `ling.mgr.bj`、hr → `qing.hr.bj`、finance → `ning.fin.bj`（样例文档的校区范围都是 `all`，所以校区不影响结果） |
+
+### 需要先确认的问题
+
+1. **评测运行器作为 uv 工作区的新成员 `eval/`**（设计 01 的目录结构里就有 `eval/`），命令行 `starit-eval`。
+2. **现在就加一个最小的聊天模型客户端 `starit_core/llm.py`**（只做"发消息、取文本"，带假实现）。Rerank 需要它，M5 再扩展成流式和工具调用。
+3. **Rerank 默认模型 `openai/gpt-4o-mini`**（环境变量 `STARIT_MODEL_RERANK` 可改）。开始前我会先查你的密钥能用哪些模型（列出模型的接口是免费的），不能用就换。
+4. **在 M4 里实现"被权限过滤的内容"探测**（设计 04 的 5.1，用来区分 `no_permission` 和 `not_found`）：只返回数量和最高分，**绝不返回文本**，不进提示词，只用于审计和统计。
+5. **评测的权限回归扫描**：把 54 个问题分别用 7 个角色（5 个业务角色 + `Admin` + `RAGETLAdmin`）各问一遍，检查返回的每个块是否都被独立的 Python 规则允许，**零容忍**。这一项用关键词、向量、hybrid 三种模式做（只查数据库，几乎不花钱）；Rerank 只重新排序已通过过滤的候选，不改变权限，所以不重复扫。
+6. **分块大小对比实验（目标 400 与一节一块）是否放在 M4 做？** 重新入库一次约 0.0002 美元，然后重跑评测。我的建议是**放在基线出来之后做一次**，结果写进报告；你也可以推到 M8。
+
+### 计划的文件（`ai-module/` 下，除非另写）
+
+| 文件 | 作用 |
+|---|---|
+| `packages/core/src/starit_core/permissions.py`（改） | `chunks` 表对象补全检索需要的列（文本、标题路径、页码、编号、`tsv` 等），保证权限条件和检索查询用**同一个表对象**，避免生成笛卡尔积 |
+| `packages/core/src/starit_core/retrieval/models.py`（新） | `Candidate`、`RetrievedChunk`（含各路得分）、`RetrievalResult`（块、诊断信息） |
+| `packages/core/src/starit_core/retrieval/keyword.py`（新） | `KeywordSearcher` 接口；`ts_rank_cd` 实现（OR 查询 + 编号加分） |
+| `packages/core/src/starit_core/retrieval/vector.py`（新） | 向量检索（余弦距离，精确扫描） |
+| `packages/core/src/starit_core/retrieval/fusion.py`（新） | RRF 融合 |
+| `packages/core/src/starit_core/retrieval/rerank.py`（新） | `Reranker` 接口；LLM 列表式重排（要求返回 JSON，容错解析；失败时退回融合顺序并标记） |
+| `packages/core/src/starit_core/retrieval/assemble.py`（新） | 上下文组装：去重、按分数取前 N、token 预算、附带文档标题、版本、状态、标题路径 |
+| `packages/core/src/starit_core/retrieval/probe.py`（新） | 被权限过滤内容的探测：只返回数量和最高分 |
+| `packages/core/src/starit_core/retrieval/search.py`（新） | 入口 `retrieve(identity, query, mode, ...)`：所有检索都必须带身份 |
+| `packages/core/src/starit_core/llm.py`（新） | 最小聊天客户端接口 + litellm 实现 + 假实现 |
+| `packages/core/src/starit_core/config.py`（改） | `retrieval_mode`、各路候选数、`rrf_k`、`rerank_in`、`final_k`、上下文预算、`model_rerank` |
+| `eval/pyproject.toml`、`eval/src/starit_eval/`（新）：`cli.py`、`dataset.py`、`metrics.py`、`runner.py`、`report.py` | 评测运行器：读取评测集，按角色换成演示账号身份，逐题检索，计算指标，写 `ai.eval_runs` / `ai.eval_results` 和 Markdown、JSON 报告 |
+| `pyproject.toml`（改）、`Makefile`（改） | 工作区成员；`make eval ARGS="..."` |
+| `packages/core/tests/retrieval/`（新，单元）、`packages/core/tests/integration/test_retrieval*.py`（新） | 见验证标准 |
+| `eval/tests/`（新） | 指标计算和报告的测试 |
+| `docs/eval/`（新） | 基线报告（Markdown），随结果提交 |
+| `docs/design/05`、`ai-module/README.md`（改） | 实现记录、使用方式 |
+
+### 检索流程（沿用设计 05 的 2.1，默认参数不变）
+
+```
+问题 ─┬─▶ 关键词检索（权限过滤后）前 30 ─┐
+      │                                    ├─▶ RRF（k=60）─▶ Rerank 前 20 取前 6 ─▶ 上下文组装（预算 3500 token）
+      └─▶ 向量检索（权限过滤后）前 30 ───┘
+```
+
+- 四种模式 `keyword`、`vector`、`hybrid`、`hybrid_rerank`（默认）；所有数值都是配置项。
+- 过滤放在两路检索各自的 `WHERE` 里，**先过滤再排序**；旧版本默认参与检索并带 `status`，草稿不参与。
+- Rerank 失败（输出不是合法 JSON、漏了编号、重复编号、模型报错）：退回 RRF 顺序，结果上标记 `rerank_failed`，不让一次重排失败变成整次检索失败。
+
+### 评测指标（设计 05 的 4.3，检索部分）
+
+- `hit@k`（`k` 取 1、3、6：前 k 个结果里是否出现任一来源文档）、`recall@k`（多来源的题，来源文档出现的比例）、MRR；按题型分别统计。
+- `unanswerable` 和 `should_answer = false` 的题不算召回，单独记录它们的最高分（M5 的 `grade_retrieval` 阈值要用）。
+- **权限回归**：见确认问题 5；任何泄露都算失败。
+- 延迟：检索（数据库）和 Rerank 的 p50 / p95。
+- 每次运行记录配置（模式、参数、模型、git 提交号）和每道题的结果，可以横向对比。
+
+### 计划的命令
+
+```bash
+git switch -c m4-retrieval                       # 已创建
+uv sync --all-packages
+make test && make lint
+make eval ARGS="retrieval --all-modes"          # 先打印调用数和估算费用，等确认
+make eval ARGS="retrieval --leak-sweep"         # 权限回归扫描（只查数据库）
+```
+
+### 验证标准
+
+1. 四种模式都能运行，每次返回不超过 `final_k` 个块，字段齐全（文档标题、版本、状态、标题路径、页码、各路得分）。
+2. **权限回归零泄露**：54 个问题 × 7 个角色，关键词、向量、hybrid 三种模式返回的每个块都被独立规则允许（自动化测试里用合成数据覆盖更多情形，评测里用真实数据）。
+3. **关键词题**：`ERR-PORTAL-403`、`ERR-PORTAL-429`、税号三题，hybrid 前 3 个结果里有来源文档（自动化测试里用假向量也能通过，因为靠的是关键词一路）。
+4. **访问题**：学员问只有 HR 看得到的问题，返回里没有该文档的任何块，且探测显示"有被过滤的高相关内容"；HR 问同一问题能得到该文档。
+5. **旧版本**：员工问旧招聘政策，返回里 v1.0（`superseded`）和 v2.1（`active`）的块都有，且带状态标注。
+6. **Rerank 容错**：输出乱码、缺编号、重复编号、模型报错的情况（假的聊天客户端）都退回融合顺序并标记。
+7. **探测只返回数字**：测试断言探测的返回值里没有任何文本字段。
+8. **真实评测**：先打印调用数和估算费用（查询向量化、Rerank 的输入 token），你确认后运行四种模式；产出基线报告，写入 `docs/eval/` 并提交；报告里写明局限（39 个块的知识库）。
+9. 本地测试、lint、mypy 通过，CI 通过。
+
+### 开始前不确定的事
+
+- 你的密钥能用哪些聊天模型（接口免费，开始时先查）；Rerank 默认的 `gpt-4o-mini` 如果不可用就换。
+- LLM 列表式重排的提示词写法和 JSON 输出的稳定性，需要实测；每个问题的输入约 20 个块（最多 9,000 token），54 题一轮约 49 万 token。费用按 `gpt-4o-mini` 的价格估算时我会先联网核对价格，**现在不报数字**。
+- `ts_rank_cd` 用 OR 查询的排序质量、对连字符编号的分词行为，需要实测（编号另有 `identifiers` 加分兜底）。
+- 评测规模很小（54 题，39 个块），差距可能不明显，也可能因个别题而波动，不能据此下结论；M8 会补充评测题和文档。
+- 评测要写 `ai.eval_runs` / `ai.eval_results`：应用账号对它们有读写权限（已授权），但主键是 `(run_id, question_id, role)`，同一题同一角色在同一次运行里只能有一行，多个模式要分成多次运行。
+
+### 需要你确认
+
+1. 评测运行器作为工作区成员 `eval/`。
+2. 现在加最小的聊天模型客户端 `llm.py`。
+3. Rerank 默认模型 `openai/gpt-4o-mini`（先查可用性）。
+4. 实现"被过滤内容"的探测（只返回数字）。
+5. 权限回归扫描：54 题 × 7 个角色 × 三种模式。
+6. 分块大小对比实验：放在 M4 基线之后做一次，还是推到 M8？
+
+### 实际结果
+
+（完成后填写）
