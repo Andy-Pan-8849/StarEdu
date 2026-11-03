@@ -100,6 +100,32 @@
             "id.token.claim": "true",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "employee_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "employee_id",
+            "claim.name": "employee_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "student_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "student_id",
+            "claim.name": "student_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ]
     },
@@ -121,7 +147,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"campus_id\", \"displayName\": \"Campus\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}, {\"name\": \"level\", \"displayName\": \"Level\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}]}"
+            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}}, {\"name\": \"campus_id\", \"displayName\": \"campus_id\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}, {\"name\": \"level\", \"displayName\": \"level\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}, {\"name\": \"employee_id\", \"displayName\": \"employee_id\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}, {\"name\": \"student_id\", \"displayName\": \"student_id\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}}]}"
           ]
         }
       }
@@ -129,15 +155,18 @@
   },
   "users": [
     {
-      "username": "student.sh",
+      "username": "wei.stu.sh",
       "enabled": true,
       "emailVerified": true,
-      "email": "student.sh@starit.example",
-      "firstName": "Student",
-      "lastName": "Shanghai",
+      "email": "wei.stu.sh@starit.example",
+      "firstName": "Wei",
+      "lastName": "Hu",
       "attributes": {
         "campus_id": [
           "SH"
+        ],
+        "student_id": [
+          "S0018"
         ]
       },
       "credentials": [
@@ -152,18 +181,21 @@
       ]
     },
     {
-      "username": "staff.bj",
+      "username": "ning.adm.bj",
       "enabled": true,
       "emailVerified": true,
-      "email": "staff.bj@starit.example",
-      "firstName": "Staff",
-      "lastName": "Beijing",
+      "email": "ning.adm.bj@starit.example",
+      "firstName": "Ning",
+      "lastName": "Ma",
       "attributes": {
         "campus_id": [
           "BJ"
         ],
         "level": [
           "S2"
+        ],
+        "employee_id": [
+          "E0014"
         ]
       },
       "credentials": [
@@ -178,18 +210,21 @@
       ]
     },
     {
-      "username": "staff.sh",
+      "username": "wei.acad.sh",
       "enabled": true,
       "emailVerified": true,
-      "email": "staff.sh@starit.example",
-      "firstName": "Staff",
-      "lastName": "Shanghai",
+      "email": "wei.acad.sh@starit.example",
+      "firstName": "Wei",
+      "lastName": "He",
       "attributes": {
         "campus_id": [
           "SH"
         ],
         "level": [
           "I2"
+        ],
+        "employee_id": [
+          "E0025"
         ]
       },
       "credentials": [
@@ -204,18 +239,21 @@
       ]
     },
     {
-      "username": "manager.sh",
+      "username": "ling.mgr.bj",
       "enabled": true,
       "emailVerified": true,
-      "email": "manager.sh@starit.example",
-      "firstName": "Manager",
-      "lastName": "Shanghai",
+      "email": "ling.mgr.bj@starit.example",
+      "firstName": "Ling",
+      "lastName": "Liu",
       "attributes": {
         "campus_id": [
-          "SH"
+          "BJ"
         ],
         "level": [
           "M3"
+        ],
+        "employee_id": [
+          "E0001"
         ]
       },
       "credentials": [
@@ -230,18 +268,50 @@
       ]
     },
     {
-      "username": "hr.bj",
+      "username": "peng.mgr.sh",
       "enabled": true,
       "emailVerified": true,
-      "email": "hr.bj@starit.example",
-      "firstName": "HR",
-      "lastName": "Beijing",
+      "email": "peng.mgr.sh@starit.example",
+      "firstName": "Peng",
+      "lastName": "Liu",
+      "attributes": {
+        "campus_id": [
+          "SH"
+        ],
+        "level": [
+          "M3"
+        ],
+        "employee_id": [
+          "E0018"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "manager"
+      ]
+    },
+    {
+      "username": "qing.hr.bj",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "qing.hr.bj@starit.example",
+      "firstName": "Qing",
+      "lastName": "Luo",
       "attributes": {
         "campus_id": [
           "BJ"
         ],
         "level": [
-          "M2"
+          "S3"
+        ],
+        "employee_id": [
+          "E0137"
         ]
       },
       "credentials": [
@@ -256,18 +326,21 @@
       ]
     },
     {
-      "username": "finance.bj",
+      "username": "ning.fin.bj",
       "enabled": true,
       "emailVerified": true,
-      "email": "finance.bj@starit.example",
-      "firstName": "Finance",
-      "lastName": "Beijing",
+      "email": "ning.fin.bj@starit.example",
+      "firstName": "Ning",
+      "lastName": "Hu",
       "attributes": {
         "campus_id": [
           "BJ"
         ],
         "level": [
-          "S2"
+          "M2"
+        ],
+        "employee_id": [
+          "E0138"
         ]
       },
       "credentials": [
@@ -282,18 +355,21 @@
       ]
     },
     {
-      "username": "admin.bj",
+      "username": "tao.admin.bj",
       "enabled": true,
       "emailVerified": true,
-      "email": "admin.bj@starit.example",
-      "firstName": "Admin",
-      "lastName": "Beijing",
+      "email": "tao.admin.bj@starit.example",
+      "firstName": "Tao",
+      "lastName": "Wu",
       "attributes": {
         "campus_id": [
           "BJ"
         ],
         "level": [
           "S2"
+        ],
+        "employee_id": [
+          "E0140"
         ]
       },
       "credentials": [
@@ -308,18 +384,21 @@
       ]
     },
     {
-      "username": "ragetl.bj",
+      "username": "min.ragetl.bj",
       "enabled": true,
       "emailVerified": true,
-      "email": "ragetl.bj@starit.example",
-      "firstName": "RagEtl",
-      "lastName": "Beijing",
+      "email": "min.ragetl.bj@starit.example",
+      "firstName": "Min",
+      "lastName": "Wang",
       "attributes": {
         "campus_id": [
           "BJ"
         ],
         "level": [
-          "S1"
+          "I5"
+        ],
+        "employee_id": [
+          "E0141"
         ]
       },
       "credentials": [

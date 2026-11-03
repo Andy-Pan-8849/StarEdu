@@ -1,0 +1,144 @@
+"""Conversations, runs, the append-only audit log, evaluation tables and the drift view.
+
+Revision ID: 0003
+Revises: 0002
+Create Date: 2026-11-02
+"""
+
+from alembic import op
+
+revision = "0003"
+down_revision = "0002"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.execute(
+        """
+        CREATE TABLE ai.conversations (
+            id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id     text NOT NULL,
+            title       text,
+            archived    boolean NOT NULL DEFAULT false,
+            created_at  timestamptz NOT NULL DEFAULT now(),
+            updated_at  timestamptz NOT NULL DEFAULT now()
+        )
+        """
+    )
+    op.execute("CREATE INDEX conversations_user_idx ON ai.conversations (user_id, updated_at DESC)")
+
+    op.execute(
+        """
+        CREATE TABLE ai.runs (
+            id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            conversation_id  uuid NOT NULL REFERENCES ai.conversations (id) ON DELETE CASCADE,
+            user_id          text NOT NULL,
+            started_at       timestamptz NOT NULL DEFAULT now(),
+            ended_at         timestamptz,
+            end_state        text CHECK (end_state IN (
+                                 'answered', 'need_clarification', 'no_permission',
+                                 'not_found', 'refused', 'error')),
+            end_reason       text,
+            model            text,
+            tokens_in        int,
+            tokens_out       int,
+            latency_ms       int,
+            trace_id         text
+        )
+        """
+    )
+
+    op.execute(
+        """
+        CREATE TABLE ai.messages (
+            id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            conversation_id  uuid NOT NULL REFERENCES ai.conversations (id) ON DELETE CASCADE,
+            run_id           uuid REFERENCES ai.runs (id) ON DELETE SET NULL,
+            role             text NOT NULL CHECK (role IN ('user', 'assistant')),
+            content          text NOT NULL,
+            citations        jsonb NOT NULL DEFAULT '[]',
+            created_at       timestamptz NOT NULL DEFAULT now()
+        )
+        """
+    )
+    op.execute(
+        "CREATE INDEX messages_conversation_idx ON ai.messages (conversation_id, created_at)"
+    )
+
+    op.execute(
+        """
+        CREATE TABLE ai.audit_log (
+            id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            ts              timestamptz NOT NULL DEFAULT now(),
+            user_id         text,
+            roles           jsonb NOT NULL DEFAULT '[]',
+            action          text NOT NULL,
+            run_id          uuid,
+            query_text      text,
+            doc_ids         text[] NOT NULL DEFAULT '{}',
+            filtered_count  int,
+            ip              text,
+            details         jsonb NOT NULL DEFAULT '{}'
+        )
+        """
+    )
+    op.execute("CREATE INDEX audit_user_idx ON ai.audit_log (user_id, ts)")
+    op.execute("CREATE INDEX audit_action_idx ON ai.audit_log (action, ts)")
+
+    op.execute(
+        """
+        CREATE TABLE ai.eval_runs (
+            id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            started_at  timestamptz NOT NULL DEFAULT now(),
+            git_sha     text,
+            config      jsonb NOT NULL DEFAULT '{}',
+            summary     jsonb NOT NULL DEFAULT '{}'
+        )
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE ai.eval_results (
+            run_id             uuid NOT NULL REFERENCES ai.eval_runs (id) ON DELETE CASCADE,
+            question_id        text NOT NULL,
+            role               text,
+            answer             text,
+            passed             boolean,
+            retrieved_doc_ids  text[] NOT NULL DEFAULT '{}',
+            latency_ms         int,
+            notes              text,
+            PRIMARY KEY (run_id, question_id, role)
+        )
+        """
+    )
+
+    # Chunks must carry the same permission, status and version fields as their document.
+    op.execute(
+        """
+        CREATE VIEW ai.v_chunk_permission_drift AS
+        SELECT c.id AS chunk_id, c.document_id
+        FROM ai.document_chunks c
+        JOIN ai.documents d ON d.id = c.document_id
+        WHERE (c.allowed_roles, c.allowed_users, c.campus_scope, c.min_level_rank,
+               c.status, c.effective_date, c.doc_code, c.version)
+              IS DISTINCT FROM
+              (d.allowed_roles, d.allowed_users, d.campus_scope, d.min_level_rank,
+               d.status, d.effective_date, d.doc_code, d.version)
+        """
+    )
+
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ai TO ai_app")
+    # The audit log is append-only for the application: it may insert and nothing else.
+    op.execute("REVOKE ALL ON ai.audit_log FROM ai_app")
+    op.execute("GRANT INSERT ON ai.audit_log TO ai_app")
+
+
+def downgrade() -> None:
+    op.execute("DROP VIEW IF EXISTS ai.v_chunk_permission_drift")
+    op.execute("DROP TABLE IF EXISTS ai.eval_results")
+    op.execute("DROP TABLE IF EXISTS ai.eval_runs")
+    op.execute("DROP TABLE IF EXISTS ai.audit_log")
+    op.execute("DROP TABLE IF EXISTS ai.messages")
+    op.execute("DROP TABLE IF EXISTS ai.runs")
+    op.execute("DROP TABLE IF EXISTS ai.conversations")

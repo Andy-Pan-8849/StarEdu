@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Print an access token for a demo account. Local demo only (password grant).
-# Usage: scripts/token.sh staff.sh   (or: make -s token USER=staff.sh)
+# Usage: scripts/token.sh wei.acad.sh   (or: make -s token ACCOUNT=wei.acad.sh)
 set -euo pipefail
 
 user="${1:?usage: token.sh <username>}"

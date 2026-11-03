@@ -425,7 +425,7 @@ ask(SHS, "What is the total amount in CNY of paid expense claims for the Beijing
 ask(SHM, "How many students are enrolled at the Beijing campus?", None, ["students"], scope="campus")
 ask(STU, "How many expense claims were submitted more than 30 days after the expense date?", None,
     ["expense_claims"], scope="own")
-ask(STU, "How many students are enrolled at my campus?", None, ["students"], scope="own")
+ask(STU, "How many instructors (levels I1 to I5) work at my campus?", None, ["employees"], scope="own")
 ask("admin.bj", "How many employees in total are in the employees table?", None, ["employees"], scope="none")
 ask("ragetl.bj", "How many active students are enrolled in the Java program?", None, ["students"], scope="none")
 

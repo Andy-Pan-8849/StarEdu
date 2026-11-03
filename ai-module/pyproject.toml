@@ -35,6 +35,10 @@ extend-exclude = ["sample-data", "web"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 
+[tool.ruff.lint.per-file-ignores]
+# Test data and SQL strings are clearer on one line.
+"**/tests/**" = ["E501"]
+
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency injection is written as Depends(...) in argument defaults.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Security"]

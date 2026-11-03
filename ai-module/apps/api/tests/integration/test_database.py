@@ -21,16 +21,24 @@ async def engine() -> AsyncIterator[AsyncEngine]:
     await engine.dispose()
 
 
-async def test_baseline_migration_applied(engine: AsyncEngine) -> None:
+async def test_migrations_applied(engine: AsyncEngine) -> None:
     async with engine.connect() as conn:
-        schemas = {
-            row[0]
-            for row in await conn.execute(
-                text("SELECT schema_name FROM information_schema.schemata")
-            )
-        }
+        schemas = {row[0] for row in await conn.execute(text("SELECT nspname FROM pg_namespace"))}
         extensions = {
             row[0] for row in await conn.execute(text("SELECT extname FROM pg_extension"))
         }
-    assert {"ai", "biz"} <= schemas
+    assert {"ai", "biz", "ai_sql", "ai_auth"} <= schemas
     assert "vector" in extensions
+
+
+async def test_application_connects_as_an_ordinary_role(engine: AsyncEngine) -> None:
+    async with engine.connect() as conn:
+        user, is_super = (
+            await conn.execute(
+                text(
+                    "SELECT current_user, (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)"
+                )
+            )
+        ).one()
+    assert user == "ai_app"
+    assert is_super is False

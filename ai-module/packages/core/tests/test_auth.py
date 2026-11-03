@@ -31,6 +31,7 @@ def claims(**overrides: Any) -> dict[str, Any]:
         "realm_access": {"roles": ["staff", "offline_access", "default-roles-starit"]},
         "campus_id": "SH",
         "level": "I2",
+        "employee_id": "E0025",
     }
     base.update(overrides)
     return {k: v for k, v in base.items() if v is not None}
@@ -54,6 +55,8 @@ def test_valid_token_gives_identity(verifier: TokenVerifier) -> None:
     assert identity.roles == {"staff"}  # default Keycloak roles are dropped
     assert identity.campus_id == "SH"
     assert identity.level == "I2"
+    assert identity.employee_id == "E0025"
+    assert identity.student_id is None
 
 
 def test_unknown_roles_are_ignored_and_no_roles_is_allowed(verifier: TokenVerifier) -> None:

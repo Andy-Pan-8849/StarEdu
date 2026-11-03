@@ -77,6 +77,22 @@ services:
       retries: 30
       start_period: 30s
 
+  # Applies the database migrations as the owner, then exits. The API waits for it.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/python.Dockerfile
+      args:
+        APP: api
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      STARIT_MIGRATION_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-starit}:${POSTGRES_PASSWORD:-starit}@postgres:5432/${POSTGRES_DB:-starit}
+      STARIT_APP_DB_PASSWORD: ${STARIT_APP_DB_PASSWORD:-starit-app}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: ../..
@@ -87,7 +103,7 @@ services:
     environment:
       STARIT_ENV: ${STARIT_ENV:-dev}
       STARIT_LOG_LEVEL: ${STARIT_LOG_LEVEL:-INFO}
-      STARIT_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-starit}:${POSTGRES_PASSWORD:-starit}@postgres:5432/${POSTGRES_DB:-starit}
+      STARIT_DATABASE_URL: postgresql+psycopg://ai_app:${STARIT_APP_DB_PASSWORD:-starit-app}@postgres:5432/${POSTGRES_DB:-starit}
       STARIT_REDIS_URL: redis://redis:6379/0
       STARIT_S3_ENDPOINT_URL: http://objectstore:9000
       STARIT_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-starit}
@@ -99,6 +115,8 @@ services:
     ports:
       - "${STARIT_API_PORT:-8000}:8000"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:

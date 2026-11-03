@@ -1,7 +1,7 @@
 # Developer commands for the AI module. Run from the ai-module/ directory.
 COMPOSE = docker compose --env-file .env -f deploy/compose/compose.yaml
 
-.PHONY: help env sync lint fmt test up down logs migrate ps token clean
+.PHONY: help env sync lint fmt test up down logs migrate seed-biz ps token clean
 
 help:
 	@echo "make env      create .env from .env.example if missing"
@@ -10,7 +10,8 @@ help:
 	@echo "make fmt      format code with ruff"
 	@echo "make test     run tests (integration tests need make up + make migrate)"
 	@echo "make up       start Postgres, Redis, object storage and the API"
-	@echo "make migrate  apply database migrations"
+	@echo "make migrate  apply database migrations (as the database owner)"
+	@echo "make seed-biz load the sample business tables (sample-data/structured) into the biz schema"
 	@echo "make token ACCOUNT=staff.sh   print an access token for a demo account"
 	@echo "make down     stop the services (data volumes are kept)"
 	@echo "make clean    stop the services AND delete their data volumes"
@@ -38,6 +39,9 @@ up: env
 
 migrate: env
 	set -a; . ./.env; set +a; uv run alembic upgrade head
+
+seed-biz: env
+	set -a; . ./.env; set +a; uv run python scripts/seed_biz.py
 
 down: env
 	$(COMPOSE) down

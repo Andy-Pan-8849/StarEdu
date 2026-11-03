@@ -29,6 +29,8 @@ class Identity:
     roles: frozenset[str]
     campus_id: str | None
     level: str | None
+    employee_id: str | None = None
+    student_id: str | None = None
 
 
 class AuthError(Exception):
@@ -83,6 +85,8 @@ def _identity_from_claims(claims: dict[str, Any]) -> Identity:
         roles=roles,
         campus_id=_optional_str(claims.get("campus_id")),
         level=_optional_str(claims.get("level")),
+        employee_id=_optional_str(claims.get("employee_id")),
+        student_id=_optional_str(claims.get("student_id")),
     )
 
 

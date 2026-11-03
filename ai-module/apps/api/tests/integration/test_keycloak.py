@@ -1,6 +1,8 @@
 """Needs the Compose stack with Keycloak (make up). Skipped when Keycloak is unreachable."""
 
+import csv
 from collections.abc import Iterator
+from pathlib import Path
 
 import httpx
 import pytest
@@ -12,17 +14,10 @@ pytestmark = pytest.mark.integration
 
 PASSWORD = "demo-pass-123"
 
-# username -> (roles, campus_id, level)
-ACCOUNTS = {
-    "student.sh": (["student"], "SH", None),
-    "staff.bj": (["staff"], "BJ", "S2"),
-    "staff.sh": (["staff"], "SH", "I2"),
-    "manager.sh": (["manager"], "SH", "M3"),
-    "hr.bj": (["hr"], "BJ", "M2"),
-    "finance.bj": (["finance"], "BJ", "S2"),
-    "admin.bj": (["Admin"], "BJ", "S2"),
-    "ragetl.bj": (["RAGETLAdmin"], "BJ", "S1"),
-}
+# The demo accounts are defined once, in the sample data (a real person each).
+ACCOUNTS_CSV = Path(__file__).resolve().parents[4] / "sample-data" / "demo-accounts.csv"
+with open(ACCOUNTS_CSV, newline="", encoding="utf-8") as _handle:
+    ACCOUNTS = {row["username"]: row for row in csv.DictReader(_handle)}
 
 
 def token_url() -> str:
@@ -56,17 +51,21 @@ def client() -> Iterator[TestClient]:
 
 @pytest.mark.parametrize("username", sorted(ACCOUNTS))
 def test_me_for_every_demo_account(client: TestClient, username: str) -> None:
-    roles, campus, level = ACCOUNTS[username]
+    account = ACCOUNTS[username]
     response = client.get("/me", headers={"Authorization": f"Bearer {fetch_token(username)}"})
     assert response.status_code == 200
     body = response.json()
-    assert body["roles"] == roles
-    assert body["campus_id"] == campus
-    assert body["level"] == level
+    assert body["roles"] == [account["role"]]
+    assert body["campus_id"] == account["campus_id"]
+    assert body["level"] == (account["level"] or None)
+    if account["subject_type"] == "student":
+        assert body["student_id"] == account["subject_id"] and body["employee_id"] is None
+    else:
+        assert body["employee_id"] == account["subject_id"] and body["student_id"] is None
 
 
 def test_tampered_real_token_is_rejected(client: TestClient) -> None:
-    header, payload, signature = fetch_token("staff.sh").split(".")
+    header, payload, signature = fetch_token("wei.acad.sh").split(".")
     flipped = ("A" if signature[0] != "A" else "B") + signature[1:]
     response = client.get("/me", headers={"Authorization": f"Bearer {header}.{payload}.{flipped}"})
     assert response.status_code == 401
