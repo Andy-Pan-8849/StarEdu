@@ -104,6 +104,7 @@ async def add_chunk(
     heading_path: list[str] | None = None,
     page: int | None = None,
     identifiers: list[str] | None = None,
+    token_count: int = 0,
 ) -> UUID:
     """Insert a chunk and copy the document's permission fields onto it in the same statement."""
     chunk_id = (
@@ -111,8 +112,9 @@ async def add_chunk(
             text(
                 f"""
                 INSERT INTO ai.document_chunks
-                    (document_id, chunk_index, text, heading_path, page, identifiers, {_SYNCED})
-                SELECT d.id, :chunk_index, :text, :heading_path, :page, :identifiers,
+                    (document_id, chunk_index, text, heading_path, page, identifiers, token_count,
+                     {_SYNCED})
+                SELECT d.id, :chunk_index, :text, :heading_path, :page, :identifiers, :token_count,
                        d.allowed_roles, d.allowed_users, d.campus_scope, d.min_level_rank,
                        d.status, d.effective_date, d.doc_code, d.version
                 FROM ai.documents d WHERE d.id = :document_id
@@ -126,6 +128,7 @@ async def add_chunk(
                 "heading_path": heading_path or [],
                 "page": page,
                 "identifiers": identifiers or [],
+                "token_count": token_count,
             },
         )
     ).scalar_one()
@@ -223,3 +226,50 @@ async def delete_document(conn: AsyncConnection, document_id: UUID, *, actor: Id
         if deleted.rowcount == 0:
             raise LookupError(f"document {document_id} not found")
         await write_audit(conn, action="doc.delete", actor=actor, doc_ids=[str(document_id)])
+
+
+async def find_document(
+    conn: AsyncConnection, doc_code: str, version: str
+) -> dict[str, object] | None:
+    row = (
+        (
+            await conn.execute(
+                text(
+                    "SELECT id, content_hash, ingest_status, status, access_level, object_key "
+                    "FROM ai.documents WHERE doc_code = :c AND version = :v"
+                ),
+                {"c": doc_code, "v": version},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None
+
+
+async def set_content(
+    conn: AsyncConnection,
+    document_id: UUID,
+    *,
+    object_key: str,
+    content_hash: str,
+    actor: Identity,
+) -> None:
+    """Record that a document's original file was replaced; the caller queues re-ingestion."""
+    async with conn.begin_nested():
+        updated = await conn.execute(
+            text(
+                "UPDATE ai.documents SET object_key = :k, content_hash = :h, updated_at = now() "
+                "WHERE id = :id"
+            ),
+            {"k": object_key, "h": content_hash, "id": document_id},
+        )
+        if updated.rowcount == 0:
+            raise LookupError(f"document {document_id} not found")
+        await write_audit(
+            conn,
+            action="doc.replace_content",
+            actor=actor,
+            doc_ids=[str(document_id)],
+            details={"content_hash": content_hash},
+        )
