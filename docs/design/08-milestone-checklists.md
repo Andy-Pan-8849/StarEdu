@@ -138,7 +138,7 @@ make lint && make test
 
 ## M2 数据模型与权限核心
 
-状态：**已完成，待合并**（分支 `m2-data-permissions`）。这是整个项目最关键的安全基础，不需要 OpenAI 密钥。
+状态：**已完成并合并**（标签 `ai-m2`，合并提交 `bf6fd4d`，2026-11-02）。这是整个项目最关键的安全基础，不需要 OpenAI 密钥。
 
 ### 用户的决定（2026-11-02，对本清单初稿的回复）
 
@@ -248,3 +248,142 @@ make lint
 - Postgres 无法用权限禁止对自定义配置项 `app.*` 的 `SET` 语句。当前防线是：`set_config` 只授予 `ai_app`；执行入口只接受单条 `SELECT`（测试覆盖了拒绝多语句和 `SET` 的入口检查，**不是数据库本身拒绝 `SET`**）。语句校验（视图和函数白名单）在 M6 加入。
 - 评测集中 9 道应回答的题（SQL-01、02、04、05、06、08、09、10、13）的答案核对留到 M6，那时 SQL Agent 才会生成对应的查询。
 - 旧版 `.env` 里的 `STARIT_DATABASE_URL` 仍指向库所有者，需要手动改（README 已说明）。
+
+
+---
+
+## M3 入库管线
+
+状态：**已完成，待合并**（分支 `m3-ingestion`）。本里程碑开始使用 OpenAI 密钥（本地 `.env` 里已配置，不会提交；检查时只确认非空，没有显示）。
+
+### 开始前的调研结果（已核对）
+
+| 项 | 结果 |
+|---|---|
+| 样例文档 | 28 份：docx 10、pdf 7、md 6、txt 5；全部 `campus_scope = all`；`HR-REC-001` 有两个版本（v1.0 superseded、v2.1 active）；文本总量约 9,000 词、55 KB |
+| md / txt | 开头是元数据块（`key: value`，md 用 `---` 包起来），与 `manifest.csv` 重复；md 有标题和表格；txt 用 `1. 标题` 这样的编号行做标题，**列表项也用同样的编号**，需要靠规则区分 |
+| **docx（问题）** | 抽查两份：**没有任何标题样式**（全部是 `Normal`），**表格被压成了单独的段落**（`tables: 0`）。原因是样例用 macOS `textutil` 转换，丢失了结构。标题只能靠字号和加粗推测，表格要从相邻的小字号段落还原 |
+| pdf | 用 pdfplumber 可以抽取：字号 20 为标题、14 为小节标题、11 为正文，**表格能被识别**（第一页 3 个） |
+| tiktoken | 可用（`cl100k_base`，首次使用需要联网下载词表） |
+| litellm | 1.106.6 能在本机（arm64）安装，导入约 5 秒 |
+| boto3 | 可用 |
+| 费用估算 | 全部文档约 9,000 词，折合 1.2–1.5 万 token；`text-embedding-3-small` 的价格我记得是每百万 token 0.02 美元（**未联网核对**），所以整套入库的 embedding 费用不到 0.01 美元；实际调用前会先打印精确 token 数和估算，等你确认 |
+
+### 需要先确认的问题
+
+1. **docx 样例要不要重新生成？** 现在的 docx 没有标题样式和真实表格，解析器只能靠字号猜。真实企业的 docx 通常有标题样式和表格。建议把 `build_documents.py` 的 docx 部分改用 `python-docx` 生成（真实的 Heading 样式、真实的表格），10 个 docx 会被重新生成，内容不变，也不再依赖 macOS 的 `textutil`。解析器两种情况都处理：优先用标题样式，没有样式时用"加粗、较大字号、编号开头"的规则兜底。**建议这样做。**
+2. **embedding 用 litellm 库**（设计 01 的 4.2 决定：代码依赖统一接口，lite 用进程内的 litellm），提供方和模型都由变量配置。备选是直接用 `openai` SDK，更轻但绑定供应商。**建议 litellm。**
+3. **派生内容（摘要、假设性问题、关键词）在 M3 只留阶段占位，默认不生成**。它需要聊天用的 LLM 客户端（M5 才有），而且设计 05 规定要用评测证明有用再开启。**建议放到 M8 实现并评测。**
+4. **对象存储**：原始文件上传到本地的 S3 兼容存储（`starit-documents` 桶），数据库里记 `object_key`。用 `boto3`，桶在 worker 启动时自动创建。
+
+### 计划的文件（`ai-module/` 下，除非另写）
+
+| 文件 | 作用 |
+|---|---|
+| `sample-data/tools/build_documents.py`（改） | docx 改用 python-docx 生成（真实标题样式和表格）；重新生成 10 个 docx |
+| `packages/core/src/starit_core/ingest/models.py`（新） | `Block`（标题、段落、列表项、表格、代码）、`ParsedDocument`、`Chunk` 数据类 |
+| `packages/core/src/starit_core/ingest/parsers/`（新）：`base.py`、`markdown.py`、`text.py`、`docx.py`、`pdf.py`、`registry.py` | 解析器接口和四种实现，按扩展名选择；去掉与 `manifest.csv` 重复的元数据块 |
+| `packages/core/src/starit_core/ingest/clean.py`（新） | 清洗：多余空白、不可见字符、页眉页脚重复行；**不改写正文** |
+| `packages/core/src/starit_core/ingest/chunker.py`（新） | 结构化分块：按标题切分，300–500 token、重叠约 50；表格和代码块不拆；`heading_path`、页码 |
+| `packages/core/src/starit_core/ingest/identifiers.py`（新） | 编号抽取（连字符大写编号、18 位编号），并加入文档自己的 `doc_code` |
+| `packages/core/src/starit_core/ingest/tokens.py`（新） | 用 tiktoken 计数 |
+| `packages/core/src/starit_core/embeddings.py`（新） | `EmbeddingClient` 接口；litellm 实现；确定性的假实现（测试用，不花钱） |
+| `packages/core/src/starit_core/storage.py`（新） | S3 客户端：确保桶存在、上传、下载 |
+| `packages/core/src/starit_core/ingest/pipeline.py`（新） | 阶段：parse → clean → chunk → derive（占位）→ embed → write；**写入在一个事务里替换旧分块**；每个阶段更新 `ingestion_jobs.stage` |
+| `packages/core/src/starit_core/ingest/queue.py`（新） | 任务队列：`FOR UPDATE SKIP LOCKED` 领取、重试与退避、失败记录阶段和原因 |
+| `apps/worker/src/starit_worker/main.py`（改） | 轮询循环；`--once` 处理完队列就退出 |
+| `scripts/ingest_samples.py`（新）、`Makefile`（改：`make ingest-samples`） | 读取 `manifest.csv`，登记文档、上传原文件、创建任务（与以后的上传接口走同一条路径） |
+| `deploy/compose/compose.yaml`、`.env.example`（改） | 增加 `worker` 服务；增加 embedding 相关变量 |
+| `packages/core/src/starit_core/config.py`（改） | `embedding_provider`、`embedding_model`、`embedding_dimensions`、批大小、分块参数 |
+| `packages/core/pyproject.toml`、`apps/worker/pyproject.toml`（改） | 依赖：`python-docx`、`pdfplumber`、`markdown-it-py`、`tiktoken`、`litellm`、`boto3` |
+| `packages/core/tests/ingest/`（新，单元）、`packages/core/tests/integration/test_ingest_*.py`（新） | 见验证标准 |
+| `sample-data/README.md`、`ai-module/README.md`、设计 05（改） | 说明 docx 的变化、入库命令 |
+
+### 关键设计决定（建议）
+
+- **编号抽取**：正则覆盖 `ERR-PORTAL-403`、`TS-NET-009` 这类连字符大写编号，以及税号这类 18 位字母数字编号；用评测集里的关键词题（`ERR-PORTAL-403`、`ERR-PORTAL-429`、税号 `91510000FAKE00001X`）作为测试用例。
+- **向量化文本**：`标题路径 + 正文`；存储的 `text` 是纯原文（设计 05 的 1.4）。
+- **元数据块**：解析时去掉，不进入分块；但文档标题进入标题路径，`doc_code` 进入 `identifiers`，所以按文档编号检索仍然有效。
+- **幂等**：同一 `(doc_code, version)` 且 `content_hash` 相同则跳过；内容变了则更新并重新入库；新分块在同一事务里替换旧分块，失败时旧分块保持不变。
+- **并发**：两个 worker 同时运行，同一个任务只会被其中一个领取。
+- **embedding 的批量和重试**：批大小可配；单批失败按退避重试，超过次数则任务失败，记录阶段 `embed` 和原因。
+- **模型与维度**：每个向量行记录 `model` 和 `dimensions`；入库时若配置的维度与列的 1536 不一致则直接失败并提示（换维度需要新的迁移，见设计 02 的 2.4）。
+- **测试不花钱**：自动化测试和 CI 使用假的 embedding；真实调用只在我手动运行的一次（先估算、你确认）。
+
+### 计划的命令
+
+```bash
+git switch -c m3-ingestion                 # 已创建
+uv sync --all-packages
+(cd sample-data && uv run --with python-docx python tools/build_documents.py)   # 重新生成 docx（需要 macOS 和 Chrome）
+make up                                    # 现在包含 worker
+make ingest-samples                        # 登记 28 份文档、上传、创建任务
+make test && make lint
+```
+
+### 验证标准
+
+1. **解析**：28 份样例文档全部解析成功；每份至少有一个标题和一个分块；docx 与 pdf 里的表格在分块里保持为完整的表格文本。
+2. **分块**：没有分块超过上限；表格不在行中间被切开；md 的代码围栏不丢失；`heading_path` 与文档结构一致（用样例做断言）。
+3. **编号**：评测集关键词题里的编号都出现在对应分块的 `identifiers` 里，且全文检索能精确命中。
+4. **入库**：28 份文档全部入库成功，文档数与 `manifest.csv` 一致；每个分块的 `allowed_roles` 与展开表一致；一致性检查视图为空；`HR-REC-001` 的两个版本都在，状态分别为 `superseded` 和 `active`。
+5. **幂等**：同一份文档重复入库，分块数和内容不变；修改内容后重新入库，旧分块被替换。
+6. **失败处理**：放一个损坏的文件，任务以明确的阶段和原因失败；embedding 失败时，旧分块保持不变（原子替换）；超过最大重试次数后任务为 `failed`。
+7. **并发**：两个 worker 同时领取任务，每个任务只被处理一次。
+8. **模型记录**：每个向量行都有 `model` 和 `dimensions`；维度不一致时入库失败。
+9. **真实 embedding**：先打印精确的 token 数和估算费用，你确认后，对 28 份文档运行一次，确认向量维度为 1536、数据写入成功（只确认这件事，不评估检索效果；检索评测在 M4）。
+10. 本地测试、lint、mypy 通过，CI 通过。
+
+### 开始前不确定的事
+
+- pdfplumber 对表格的识别能否覆盖 7 份 pdf 的所有表格，需要逐份检查；识别不到的表格会退化成普通文字行，会在测试里列出。
+- txt 里标题与编号列表项的区分规则，需要在 5 份 txt 上逐一验证。
+- litellm 导入较慢（约 5 秒），worker 启动时间会受影响；若影响测试速度，embedding 的 litellm 实现只在真正调用时才导入。
+- 容器里的 worker 镜像会因为 litellm、pdfplumber 等依赖变大，构建时间变长。
+- tiktoken 首次使用要联网下载词表，CI 和 Docker 构建里也一样；离线环境需要预先缓存。
+
+### 需要你确认
+
+1. docx 样例重新生成（python-docx，真实标题样式和表格）。
+2. embedding 用 litellm 库。
+3. 派生内容在 M3 只留占位，放到 M8 评测后实现。
+4. 对象存储用 boto3，桶自动创建。
+
+### 用户的确认（2026-11-03）
+
+四条全部接受：docx 样例用 python-docx 重新生成；embedding 用 litellm 库；派生内容 M3 只留占位、M8 评测后实现；对象存储用 boto3，桶自动创建。
+
+### 实际结果
+
+**验证标准**（全部满足；本地 316 个测试全部通过，含集成测试；M2 为 117 个）：
+
+| # | 结果 |
+|---|---|
+| 1 解析 | 28 份样例全部解析成功；四种格式的标题、章节、小节、表格数量与 Markdown 原稿完全一致；原稿的每一行文字都在解析结果里；pdf 的表格全部识别（7 份 pdf 无遗漏）；元数据块没有混进正文 |
+| 2 分块 | 39 块（目标 400 token），中位数 358、最大 453，没有超过 500；每个块都和原文逐段对得上（没有丢内容）；每个表格完整地在某个块里；表格太大时按行拆开并重复表头、代码块拆开时围栏保持成对（样例里没有这两种情况，由合成数据的测试覆盖） |
+| 3 编号 | 原稿里的每个编号在四种格式的解析结果里都完整保留；评测集关键词题（`ERR-PORTAL-403`、`ERR-PORTAL-429`、税号）都能由全文索引精确命中，且命中的文档在对应的 `source_docs` 里 |
+| 4 入库 | 28 份文档全部 `ready`；每个块的 `allowed_roles` 与展开表一致；一致性检查视图为空；`HR-REC-001` 的 v1.0（`superseded`）和 v2.1（`active`）都在，v2.1 的 `supersedes_id` 指向 v1.0 |
+| 5 幂等 | 重复运行：28 份全部 `unchanged`、没有新任务、块完全不变；修改一份文档后只有它被更新，其他文档的块行保持原样；`--force` 会重新向量化 |
+| 6 失败处理 | 损坏的 pdf：任务 `failed`，阶段 `parse`，原因 `parse_failed`，只尝试 1 次；找不到存储的文件：`object_missing`；向量化失败：按退避重试，3 次后 `failed`，**旧块始终保持不变**（原子替换）；没有文本、文档被删除等也有对应的原因码 |
+| 7 并发 | 两个 worker 同时处理 6 个任务：各自都领到任务，每个任务只尝试 1 次，只有 6 条入库审计 |
+| 8 模型记录 | 每个向量行记录 `model` 和 `dimensions`；配置的维度（768）与列（1536）不一致时任务直接失败，原因 `unsupported_dimensions`，不重试 |
+| 9 真实 embedding | 先精确计数：**11,537 token**，估算费用约 **0.00023 美元**（价格 0.02 美元 / 百万 token，来自 OpenAI 模型页面，经搜索核对）；你确认后重新入库一次（28 次调用，每份文档一次）：39 个向量，模型 `text-embedding-3-small`，宽度 1536，模长在 0.9995–1.0005 之间，没有零向量，没有失败、没有告警 |
+| 10 工程检查 | lint、mypy 通过；GitHub CI 通过（含 Keycloak 和全部集成测试，用时约 2 分 38 秒） |
+
+**与计划不一致或新增的地方：**
+
+| 项 | 说明 |
+|---|---|
+| 分块目标 | 样例文档很短，按章节切分只有 50 token 的中位数，所以实现了"章节边界在达到目标大小后才断开"，默认目标 400；`chunk_target_tokens=0` 即一节一块，留给 M4 做分块大小的对比实验 |
+| pdf 编号换行 | 覆盖测试发现 `FIN-TAX-008` 会在连字符处换行并被拼成 `FIN- TAX-008`，已修复并加了专门的测试 |
+| 变量名 | embedding 变量按设计 06 不带 `STARIT_` 前缀（`EMBEDDING_PROVIDER` 等） |
+| 新增 | `make ingest-samples` 的 `--force`（换模型后全部重新向量化）、`--process`（在本机直接处理队列）；`register_from_manifest` 可复用于以后的上传接口 |
+| 测试隔离 | 真实入库之后，开发数据库里有了真实的文档，M2 的几个集成测试（权限差分、编号检索）一度因此失败；现在这些测试在各自回滚的事务里先清空知识库再开始，真实数据不受影响（测试后仍是 28 份文档、39 个块） |
+| 测试方式 | 入库的集成测试在一次性的 scratch 数据库里运行（流水线自己提交事务，不能放进回滚的事务）；自动化测试和 CI 一律使用假 embedding，不花钱 |
+
+**已知限制（诚实记录）：**
+- pdf 的段落拼接和 txt 的小标题识别靠版面和规则，只在这 28 份样例上验证过；换一种排版的真实文档可能需要调整。
+- 第一次运行需要联网下载分词词表（tiktoken），离线环境要预先缓存。
+- worker 镜像因为 litellm、pdfplumber 等依赖变大，构建时间变长。
+- 真实 embedding 只确认了"写入成功、维度和模长正常"，检索效果在 M4 评测。
+- 本机的 `ai.ingestion_jobs` 里有 56 条记录：28 条是先用假 embedding 干跑的，28 条是真实运行；不影响后续（向量已被真实模型的结果替换）。

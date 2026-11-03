@@ -121,7 +121,8 @@ Each question in `sql-qa.jsonl` names the `asker` (a demo account) and its `scop
 ## Rebuilding
 
 ```bash
-python3 tools/build_documents.py       # needs macOS textutil and Google Chrome for docx and pdf
+uv run python tools/build_documents.py            # docx via python-docx; pdf needs macOS and Google Chrome
+uv run python tools/build_documents.py --only docx   # rebuild only the docx files
 python3 tools/generate_structured.py   # standard library only
 ```
 

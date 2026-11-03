@@ -93,6 +93,35 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Processes ingestion jobs from the Postgres queue.
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/python.Dockerfile
+      args:
+        APP: worker
+    command: ["starit-worker"]
+    restart: unless-stopped
+    environment:
+      STARIT_ENV: ${STARIT_ENV:-dev}
+      STARIT_LOG_LEVEL: ${STARIT_LOG_LEVEL:-INFO}
+      STARIT_DATABASE_URL: postgresql+psycopg://ai_app:${STARIT_APP_DB_PASSWORD:-starit-app}@postgres:5432/${POSTGRES_DB:-starit}
+      STARIT_S3_ENDPOINT_URL: http://objectstore:9000
+      STARIT_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-starit}
+      STARIT_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-starit-secret}
+      STARIT_S3_BUCKET: ${STARIT_S3_BUCKET:-starit-documents}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+
   api:
     build:
       context: ../..

@@ -5,11 +5,16 @@ Reads  ../_markdown-source/<domain>/*.md   (YAML-ish front matter + Markdown)
 Writes ../documents/<domain>/<doc_id>_<slug>.<ext>   (ext chosen by `format:` in front matter)
        ../documents/manifest.csv                     (metadata for the ingestion pipeline)
 
-Only the Python standard library is used. Converters:
-  docx -> macOS `textutil` (HTML -> DOCX)
+Converters:
+  docx -> python-docx (real Title / Heading styles, list styles and tables)
   pdf  -> headless Google Chrome (HTML -> PDF)
   md / txt -> written directly
-On a non-macOS machine, set the format to md/txt, or swap the two converter functions.
+python-docx is needed only for docx (run with `uv run python tools/build_documents.py` from
+ai-module/, or `uv run --with python-docx python ...`). PDF output needs macOS and Google Chrome.
+On another system, set the format to md/txt or swap the converter functions.
+
+Usage:  build_documents.py            rebuild every document and the manifest
+        build_documents.py --only docx   rebuild only the documents of that format
 """
 import csv
 import html
@@ -120,11 +125,72 @@ def to_plain(meta, body):
     return head + "\n\n" + t
 
 
-def build_docx(htm, dest):
-    with tempfile.TemporaryDirectory() as td:
-        src = Path(td) / "d.html"
-        src.write_text(htm, encoding="utf-8")
-        subprocess.run(["textutil", "-convert", "docx", str(src), "-output", str(dest)], check=True)
+META_FIELDS = [("Document ID", "doc_id"), ("Version", "version"), ("Status", "status"),
+               ("Effective", "effective_date"), ("Audience", "access"), ("Campus scope", "campus_scope")]
+
+
+def add_runs(paragraph, text):
+    """Add text to a paragraph, turning **bold** and `code` into formatted runs."""
+    for part in re.split(r"(\*\*.+?\*\*|`.+?`)", text):
+        if len(part) > 4 and part.startswith("**") and part.endswith("**"):
+            paragraph.add_run(part[2:-2]).bold = True
+        elif len(part) > 2 and part.startswith("`") and part.endswith("`"):
+            paragraph.add_run(part[1:-1]).font.name = "Consolas"
+        elif part:
+            paragraph.add_run(part)
+
+
+def build_docx(meta, body, dest):
+    """Write a docx with real styles: # is the Title, ## Heading 1, ### Heading 2."""
+    try:
+        from docx import Document
+    except ImportError:
+        sys.exit("python-docx is needed for docx output: uv run python tools/build_documents.py")
+    doc = Document()
+    doc.core_properties.author = "StarIT Education (synthetic sample)"
+    doc.core_properties.title = meta.get("title", "")
+
+    meta_tbl = doc.add_table(rows=0, cols=2)
+    meta_tbl.style = "Table Grid"
+    for label, key in META_FIELDS:
+        cells = meta_tbl.add_row().cells
+        cells[0].paragraphs[0].add_run(label).bold = True
+        cells[1].paragraphs[0].add_run(meta.get(key, ""))
+
+    lines, i = body.splitlines(), 0
+    while i < len(lines):
+        ln = lines[i]
+        if ln.startswith("|"):
+            rows = []
+            while i < len(lines) and lines[i].startswith("|"):
+                rows.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
+                i += 1
+            head, rest = rows[0], rows[2:]
+            tbl = doc.add_table(rows=1, cols=len(head))
+            tbl.style = "Table Grid"
+            for cell, text in zip(tbl.rows[0].cells, head):
+                add_runs(cell.paragraphs[0], text)
+                for run in cell.paragraphs[0].runs:
+                    run.bold = True
+            for row in rest:
+                for cell, text in zip(tbl.add_row().cells, row):
+                    add_runs(cell.paragraphs[0], text)
+            doc.add_paragraph()
+            continue
+        h = re.match(r"^(#{1,3}) (.*)", ln)
+        b = re.match(r"^- (.*)", ln)
+        n = re.match(r"^\d+\. (.*)", ln)
+        if h:
+            level = len(h.group(1))
+            doc.add_paragraph(style="Title" if level == 1 else f"Heading {level - 1}")
+            add_runs(doc.paragraphs[-1], h.group(2))
+        elif b or n:
+            para = doc.add_paragraph(style="List Bullet" if b else "List Number")
+            add_runs(para, (b or n).group(1))
+        elif ln.strip():
+            add_runs(doc.add_paragraph(), ln)
+        i += 1
+    doc.save(str(dest))
 
 
 def build_pdf(htm, dest):
@@ -137,13 +203,16 @@ def build_pdf(htm, dest):
 
 
 def main():
-    if OUT.exists():
+    only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
+    if only is None and OUT.exists():
         shutil.rmtree(OUT)
     manifest = []
     for md in sorted(SRC.glob("*/*.md")):
         meta, body, raw = parse(md)
         domain = md.parent.name
         fmt = meta.get("format", "md")
+        if only and fmt != only:
+            continue
         dest_dir = OUT / domain
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f"{md.stem}.{fmt}"
@@ -152,7 +221,7 @@ def main():
         elif fmt == "txt":
             dest.write_text(to_plain(meta, body), encoding="utf-8")
         elif fmt == "docx":
-            build_docx(full_html(meta, body), dest)
+            build_docx(meta, body, dest)
         elif fmt == "pdf":
             build_pdf(full_html(meta, body), dest)
         else:
@@ -162,6 +231,9 @@ def main():
                             ["doc_id", "version", "status", "effective_date", "access", "campus_scope"]},
                          "format": fmt})
         print("built", dest.relative_to(ROOT))
+    if only:
+        print(f"{len(manifest)} {only} documents rebuilt; manifest left unchanged")
+        return
     with open(OUT / "manifest.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(manifest[0].keys()))
         w.writeheader()
