@@ -73,48 +73,11 @@ def make_identity() -> Callable[..., Identity]:
     return _make_identity
 
 
-# --- a scratch database, for tests whose code commits its own transactions -------------------
+# The scratch database fixture (`scratch_urls`) is in the conftest.py at the root of ai-module.
 # The ingestion pipeline and the worker commit as they go, so they cannot run inside the
 # rolled-back transaction above. They run in a throwaway database instead.
 
-import os  # noqa: E402
-import subprocess  # noqa: E402
-import sys  # noqa: E402
-import uuid  # noqa: E402
-from collections.abc import Iterator  # noqa: E402
-
-import psycopg  # noqa: E402
-from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncEngine  # noqa: E402
-
-
-@pytest.fixture(scope="module")
-def scratch_urls() -> Iterator[tuple[str, str]]:
-    """(owner URL, application URL) of a freshly migrated scratch database."""
-    settings = get_settings()
-    owner = make_url(settings.migration_database_url)
-    admin_dsn = owner.set(drivername="postgresql", database="postgres").render_as_string(False)
-    name = f"scratch_{uuid.uuid4().hex[:8]}"
-    try:
-        with psycopg.connect(admin_dsn, autocommit=True, connect_timeout=3) as admin:
-            admin.execute(f'CREATE DATABASE "{name}"')
-    except psycopg.OperationalError:
-        pytest.skip("database is not reachable")
-    owner_url = owner.set(database=name).render_as_string(False)
-    app_url = make_url(settings.database_url).set(database=name).render_as_string(False)
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            cwd=AI_MODULE,
-            env={**os.environ, "STARIT_MIGRATION_DATABASE_URL": owner_url},
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        yield owner_url, app_url
-    finally:
-        with psycopg.connect(admin_dsn, autocommit=True) as admin:
-            admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
 @pytest.fixture
@@ -124,7 +87,9 @@ async def engines(scratch_urls: tuple[str, str]) -> AsyncIterator[tuple[AsyncEng
     app = create_async_engine(scratch_urls[1])
     async with owner.begin() as conn:
         await conn.execute(
-            text("TRUNCATE ai.documents, ai.audit_log, ai.ingestion_jobs RESTART IDENTITY CASCADE")
+            text(
+                "TRUNCATE ai.documents, ai.audit_log, ai.ingestion_jobs, ai.conversations RESTART IDENTITY CASCADE"
+            )
         )
     try:
         yield owner, app

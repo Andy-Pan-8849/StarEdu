@@ -393,7 +393,7 @@ make test && make lint
 
 ## M4 检索与首个评测切片
 
-状态：**已完成，待合并**（分支 `m4-retrieval`）。这是第一次能看到检索的实际效果：关键词、向量、hybrid、hybrid + Rerank 四种模式的对比，也是项目的学习目标之一。
+状态：**已完成并合并**（标签 `ai-m4`，合并提交 `9bdcacc`，2026-11-03）。这是第一次能看到检索的实际效果：关键词、向量、hybrid、hybrid + Rerank 四种模式的对比，也是项目的学习目标之一。
 
 ### 开始前的调研结果（已核对）
 
@@ -535,9 +535,176 @@ make eval ARGS="retrieval --leak-sweep"         # 权限回归扫描（只查数
 | 新增 | `eval/` 作为 uv 工作区成员；`make eval`；`--dry-run`（假模型演练）、`--no-db` |
 | 评测记录 | 数据库里有 8 次评测运行（2 个标签 × 4 种模式），432 行结果；知识库已恢复为默认分块（39 个块、真实向量、一致性检查为空），worker 容器已重新启动 |
 
-**待你决定（M5 之前）：** 默认分块要不要改成一节一块？检索排名上更细的块对向量和混合有帮助，重排下两者持平，且重排输入更便宜；但一节一块时 6 个块只有约 350 token，给生成答案的上下文可能太少，而这次没有衡量答案质量。**我的建议是先保持 400 token，M5 有了答案之后，M8 再用答案质量一起对比。**
+**用户的决定（2026-11-03）：保持目标 400 token 一块。** （以下是当时提出的问题）默认分块要不要改成一节一块？检索排名上更细的块对向量和混合有帮助，重排下两者持平，且重排输入更便宜；但一节一块时 6 个块只有约 350 token，给生成答案的上下文可能太少，而这次没有衡量答案质量。**我的建议是先保持 400 token，M5 有了答案之后，M8 再用答案质量一起对比。**
 
 **已知限制（诚实记录）：**
 - 知识库太小、评测题太少（每种题型只有几道），数字只能说明流程正确和方向，不能说明各方法在真实规模上的优劣。
 - 价格来自第三方价格表，没有直接核对 OpenAI 的价格页。
 - 重排的稳定性只在这 108 次调用上验证；换模型或换文档风格需要重新评估。
+
+
+---
+
+## M5 Agent 图与对话 API
+
+状态：**已完成，待合并**（分支 `m5-agent`）。这是项目最核心的一块：用户提问，经过固定的图，得到带引用的回答或一个明确的拒绝，每次运行都有显式的 End 状态。本里程碑会调用 OpenAI 的聊天模型（`understand` 和 `generate` 两个节点，加上 M4 已有的重排）。
+
+### 开始前的调研结果（已核对）
+
+| 项 | 结果 |
+|---|---|
+| LangGraph | `langgraph 1.2.19` 和 `langgraph-checkpoint-postgres 3.2.0` 能在本机（Python 3.12、arm64）安装并导入；`redis 8.1.0` 同样可用 |
+| M4 留下的东西 | `retrieve(...)` 已经能按身份检索并返回重排分数和"被过滤内容"的探测数字；最小的聊天客户端 `llm.py` 已有 JSON 模式；`gpt-6-luna` 验证可用 |
+| 可用的聊天模型 | 这把密钥能看到 `gpt-6-luna`、`gpt-6-sol`、`gpt-6.1-sol`、`gpt-6.1-terra`、`gpt-6-astra`、`gpt-4o-mini` 等。查到的标价（二手来源）：Luna 每百万 token 输入 0.10 / 输出 0.50 美元，Sol 2 / 10 美元，Astra 10 / 50 美元 |
+| 数据库已有的表 | `ai.conversations`、`ai.messages`、`ai.runs`、`ai.audit_log`（02 里已建好，M2 迁移） |
+| M4 的评测数据 | 重排分数在 48 道可回答题上全部是 10，在 6 道无答案或应拒绝的题上是 0–8，用来定 `grade_retrieval` 的初始阈值 |
+
+### 需要先确认的问题
+
+1. **不使用 LangGraph 的 Postgres checkpointer，会话状态存在 `ai.conversations` 里**（新增迁移 0005，加三列：`session_mode`、`pending_question`、`clarify_count`）。理由：第一阶段每次运行都是一次完整的、没有中断的运行（"需要澄清"也是以 End 结束，下一轮再带着补充进来），checkpointer 用不上，却要多一套表、一次 `setup()` 和版本耦合。第二阶段做"写操作确认"（`interrupt`）时再启用。这改变了设计 04 里"由 checkpointer 保存"的说法，我会同步修改设计 04。**建议这样做。**
+2. **`data_query` 在 M5 先拒绝**，End 状态 `refused`，原因码临时用 `not_available_yet`（M6 实现数据查询后去掉）；`action` 意图按设计 04 返回 `refused / write_not_enabled`。
+3. **历史只保留最近 6 轮（截断），暂不做滚动摘要**。设计 04 写的是"更早的用滚动摘要"，摘要要多一次 LLM 调用，样例里没有长对话，建议放到之后。
+4. **默认模型**：`understand`、`generate` 都用 `openai/gpt-6-luna`（可由环境变量分别改）。生成答案对质量最敏感（RAGFlow 试用里小模型算错了迟交扣分），所以真实检查时会用同一批难题对比 `gpt-6-sol`，按结果选默认值。
+5. **会话标题**用第一个问题的前 60 个字符，不调用 LLM。
+6. **限流**（设计 03 第 7 节：对话接口每用户每分钟 20 次）在 M5 一起做，用 Redis 计数，超出返回 `429 rate_limited`。
+7. **`grade_retrieval` 分两道关**：第一道用重排分数（初始阈值 6，参考 M4 的分布，可配置，用评测集标定）；第二道是生成节点自己返回的 `sufficient` 标志，模型判断片段不足以回答时以 `not_found / no_relevant_documents` 结束。这样阈值不用定得太紧，也不会让一个"相关但没答案"的片段（M4 里 DOC-47 得了 8 分）变成瞎编的回答。
+8. **真实检查**：约 12 个代表性的问题（迟交扣分计算、旧政策版本、两个错误码、学员问 HR 文件、无答案、需要澄清、越界、问候），先给出调用数和估算费用，确认后运行。
+
+### 计划的文件（`ai-module/` 下，除非另写）
+
+| 文件 | 作用 |
+|---|---|
+| `migrations/versions/0005_conversation_state.py` | `ai.conversations` 增加 `session_mode`、`pending_question`、`clarify_count` |
+| `packages/core/src/starit_core/agent/state.py` | 图状态（身份只读、会话状态、意图、检索结果、预算、答案、End 状态） |
+| `packages/core/src/starit_core/agent/prompts/understand.md`、`generate.md` + `prompts.py` | 提示词文件和版本号（设计 04 第 6 节的生成规则） |
+| `packages/core/src/starit_core/agent/nodes.py` | 各节点：`load_context`、`guard_input`、`understand`、`retrieve_docs`、`grade_retrieval`、`rewrite_query`、`generate`、`verify_answer` |
+| `packages/core/src/starit_core/agent/graph.py` | 构建 LangGraph 图；6 个 End 节点；路由；预算与步数上限 |
+| `packages/core/src/starit_core/agent/finish.py` | `finish_run`：一次事务里写 `ai.runs`、`ai.messages`、`ai.audit_log`，更新会话（时间、标题、会话状态） |
+| `packages/core/src/starit_core/agent/runtime.py` | `AgentRuntime.run(identity, conversation_id, text)`：组装依赖、60 秒总超时、保证无论怎样都走到 `finish_run` |
+| `packages/core/src/starit_core/conversations.py` | 会话与消息的读写（只能访问自己的会话；归档不删除） |
+| `packages/core/src/starit_core/ratelimit.py` | Redis 限流（带内存版本供测试） |
+| `packages/core/src/starit_core/llm.py`（改） | 返回 token 数；每次调用的超时；结构化输出辅助 |
+| `packages/core/src/starit_core/config.py`（改） | `model_understand`、`model_generate`、各项上限（步数、LLM 调用数、澄清次数、重试）、`grade_min_rerank_score`、历史轮数、限流 |
+| `apps/api/src/starit_api/conversations.py`（新） | 路由：`POST/GET /conversations`、`GET/PATCH/DELETE /conversations/{id}`、`POST/GET /conversations/{id}/messages` |
+| `apps/api/src/starit_api/main.py`（改） | 在 lifespan 里构建运行时；注册路由；限流中间件 |
+| `packages/core/pyproject.toml`（改） | 依赖：`langgraph`、`redis` |
+| `packages/core/tests/agent/`（新，单元）、`packages/core/tests/integration/test_agent*.py`（新）、`apps/api/tests/test_conversations*.py`（新） | 见验证标准 |
+| `eval/` 或 `scripts/`（改） | 一个小工具：把约 12 个问题真实地问一遍并打印每次的 End 状态、引用和耗时 |
+| `docs/design/04`、`02`、`03`、`ai-module/README.md`（改） | 同步实现记录 |
+
+### 图（沿用设计 04，M5 实现的部分）
+
+```
+load_context → guard_input → understand ─┬─ 需要澄清且未超限 → END_NEED_CLARIFICATION
+                                          ├─ out_of_scope / action / data_query → END_REFUSED
+                                          ├─ chitchat → generate
+                                          └─ doc_qa → retrieve_docs → grade_retrieval
+        grade_retrieval ─┬─ 足够 → generate → verify_answer → END_ANSWERED
+                         ├─ 不足且可重试 → rewrite_query → retrieve_docs
+                         ├─ 无内容但探测到被过滤的强匹配 → END_NO_PERMISSION
+                         └─ 无内容 → END_NOT_FOUND
+        generate 返回 sufficient=false → END_NOT_FOUND；校验失败重试一次，仍失败 → END_ERROR(llm_error)
+        任何异常或超时 → END_ERROR
+```
+
+### 关键设计决定（建议）
+
+- **身份只读**，来自 JWT；`understand` 只做意图、独立问题和反问，**不判断身份**。
+- **同一个问题的 `no_permission` 与 `not_found` 对用户使用相同文案**（设计 04 的 5.1），差别只记在 `ai.runs` 和审计里；探测的数字只进审计，不进提示词。
+- **会话状态**：`session_mode` 为 `need_clarification` 时，下一条消息被视为对 `pending_question` 的补充，合并成独立问题；连续澄清 2 次后以 `not_found / clarification_limit` 结束。
+- **预算**：一次运行 LLM 调用不超过 6 次（含重排）、检索重试 1 次、校验重试 1 次、总时长 60 秒、`recursion_limit` 20；超出以 `error` 结束并带原因码。
+- **检索模式**：默认 `hybrid_rerank`；重排失败退回融合顺序，此时 `grade_retrieval` 只看有没有结果，把判断交给生成节点。
+- **引用**：只来自本轮检索到的、用户有权看到的块；`n` 与正文里的 `[n]` 对应；答案里引用了不存在的编号会被校验拦下。
+- **提示词**：放在文件里，带版本号，写进审计记录的 `details`，方便以后对照。
+- **输入防护**（`guard_input`）：空输入、过长（初始上限 2,000 字符）、明显的提示词注入特征（一份简短的规则列表）；这只是第一层，真正的防线是权限在数据库里过滤，模型拿不到无权的内容。
+
+### 计划的命令
+
+```bash
+git switch -c m5-agent                      # 已创建
+uv sync --all-packages
+make migrate                                # 新的迁移 0005
+make test && make lint
+make up                                     # API 带上新路由
+# 真实检查（先打印估算并确认）
+uv run python scripts/ask_samples.py        # 约 12 个问题
+```
+
+### 验证标准
+
+1. **每个 End 状态都有场景测试**（假的聊天客户端和检索桩）：`answered`、`need_clarification`（含连续 2 次后的 `clarification_limit`）、`no_permission`、`not_found`（检索为空、证据不足、生成返回 `sufficient=false`）、`refused`（越界、输入被拦、写操作、数据查询暂未开放）、`error`（超时、LLM 出错、检索出错、步数超限、校验失败）。
+2. **图结构测试**：遍历图的所有边，断言每个节点都能到达某个 End 节点；文档里的流程图由图定义导出，不手工维护。
+3. **`finish_run` 的完整性**：任何一次运行（含异常和超时）都写了一行 `ai.runs`（带 `end_state` 和 `end_reason`）、对应的消息和一条 `chat.query` 审计记录；写入在一个事务里，失败时不留半截记录。
+4. **API**：会话的创建、列表、读取、改名、归档、发消息、读历史；别人的会话 ID 返回 404；未登录 401；错误格式统一；响应结构与设计 03 一致（`run_id`、`message`、`citations`、`end_state`、`end_reason`）；限流超出返回 429。
+5. **权限**：用真实的样例文档（假 embedding 的检索 + 脚本化的聊天模型）：学员问 HR 文件，回答里没有该文档的任何内容、没有引用、`end_state` 是 `no_permission`；HR 问同一问题得到引用；`Admin` 提问得到 `no_permission` / `not_found`，不会读到受限内容；引用只包含用户有权看到的文档。
+6. **澄清的两轮**：第一轮含糊的问题得到反问（`need_clarification`），第二轮的补充被合并后得到回答；会话状态在两次请求之间保存在数据库里。
+7. **真实检查**（确认费用后）：约 12 个问题真实地问一遍，报告每个的 End 状态、引用、耗时和费用；其中迟交扣分那道（DOC-40）必须算对（先判断落在哪个区间）；`ERR-PORTAL-429` 的回答必须是配额用完，不是设备数量；学员问 HR 文件必须被拒绝且不泄露内容。
+8. 本地测试、lint、mypy 通过，CI 通过。
+
+### 开始前不确定的事
+
+- 生成节点的结构化输出（`sufficient`、`answer`、`citations`）在 `gpt-6-luna` 上是否稳定；不稳定时的退路是校验失败重试一次，再失败就 `error`。
+- 评分阈值 6 和"不足就重试一次"的效果，需要用评测集和真实检查标定；样本很小，M4 里无答案题的最高分达到过 8。
+- LangGraph 1.x 的异步调用、`recursion_limit` 和图导出（用于可达性测试和流程图）的具体接口，开始时对照文档确认。
+- 60 秒总超时和每次模型调用 30 秒超时在 `gpt-6-luna` 上够不够；重排平均 2 秒，加上理解和生成，预计总时长 5–8 秒。
+- 提示词注入的规则列表只能拦住最明显的写法，不是安全边界；已在上面说明。
+
+### 需要你确认
+
+1. 会话状态存在 `ai.conversations`（迁移 0005），不用 LangGraph 的 checkpointer。
+2. `data_query` 暂时以 `not_available_yet` 拒绝。
+3. 历史只截断最近 6 轮，不做摘要。
+4. 默认模型 `gpt-6-luna`，真实检查时对比 `gpt-6-sol` 再定。
+5. 会话标题用第一个问题的前 60 个字符。
+6. 限流（每用户每分钟 20 次）一起做。
+7. `grade_retrieval` 两道关（重排分数阈值 6 + 生成节点的 `sufficient`）。
+8. 真实检查约 12 个问题。
+
+### 用户的确认（2026-11-03）
+
+- 默认聊天模型 `openai/gpt-6-luna`；真实检查时**对比 `gpt-4o-mini`**（不是 `gpt-6-sol`），按结果选默认值。
+- 其余 7 条全部接受：会话状态存在 `ai.conversations`（迁移 0005）、不用 LangGraph 的 checkpointer；`data_query` 暂时以 `not_available_yet` 拒绝；历史只截断最近 6 轮；会话标题用第一个问题的前 60 个字符；限流（每用户每分钟 20 次）一起做；`grade_retrieval` 两道关；真实检查约 12 个问题（先估算再确认）。
+
+### 实际结果
+
+**验证标准**（全部满足；本地 437 个测试通过；M4 为 378 个）：
+
+| # | 结果 |
+|---|---|
+| 1 每个 End 状态都有场景测试 | 在真实数据库上用脚本化的模型和检索替身：`answered`（含问候、答案被拒后重试一次成功）、`need_clarification`（含连续 2 次后的 `clarification_limit`）、`no_permission`、`not_found`（检索为空、证据不足、重试成功、生成返回 `sufficient=false`）、`refused`（越界、写操作、数据查询暂未开放、输入被拦的 4 种情形）、`error`（模型出错、检索出错、生成不是 JSON、答案没有引用或引用不存在的编号、工具出错、调用次数超限、60 秒超时） |
+| 2 图结构测试 | 遍历图的所有边：每个节点都能到达某个 End 节点；绘制出的图与文档里列出的路由完全一致；6 个 End 节点正好对应 6 个 End 状态；图可以导出为 mermaid |
+| 3 `finish_run` 完整性 | 每次运行（含异常、超时）都写了一行 `ai.runs`、两条消息、一条 `chat.query` 审计记录，并更新会话；写入在同一个事务里，审计写入失败时什么都不留下；出错不会丢失"正在等待澄清"的状态 |
+| 4 API | 会话创建、列表（分页、最新在前）、读取、改名、归档（归档后发消息返回 409）、发消息、读历史（分页）；别人的会话返回 404（和不存在一样）；未登录 401；格式错误的 ID 或游标 422；空消息和超长消息 422；响应结构与设计 03 一致；限流超出返回 429 带 `Retry-After`，按用户计数 |
+| 5 权限 | 真实的样例文档加真实检索：学员问只有 HR 看得到的问题得到 `no_permission`，回答不含任何内容，模型看到的全部文本里没有 `HR-REC-002`，审计记录了"有被隐藏的内容"（只有数量）；HR 问同一问题得到来自该文档的回答和引用；`Admin`、`RAGETLAdmin` 什么都读不到；5 个业务角色 × 12 个问题的引用和模型看到的片段，全部是该角色有权读的文档 |
+| 6 澄清两轮 | 第一轮含糊的问题得到反问，会话状态存在数据库里；第二轮的补充和待澄清的问题合并后得到回答，状态重置；历史也带进了理解步骤 |
+| 7 真实检查 | 15 轮、两个版本（见下）；容器冒烟：真实令牌经 HTTP 问 `ERR-PORTAL-429` 得到正确回答并引用 `TS-CRS-005`、问候、历史、他人读取返回 404、Redis 限流 200 / 200 / 429 / 429（按用户分开） |
+| 8 工程检查 | lint、mypy 通过；GitHub CI 通过（含全部集成测试，用时约 2 分 38 秒） |
+
+**真实检查结果**（详见 [`docs/eval/README.md`](../eval/README.md)）：
+
+- 第一次运行：默认版本（生成用 `gpt-6-luna`）14/15，`gpt-4o-mini` 11/15。失败暴露了**两个真实的问题**：重排提示词把片段截在 350 token，隐藏了 `ERR-PORTAL-429` 那一行（重排只给 2 分，第一道关拒绝作答）；理解步骤把 Maven 问题当越界。都已修复并加了回归测试。
+- 修复后重跑：默认 14/15，`gpt-4o-mini` 12/15。默认版本剩下的一道（DOC-43）是我的判定条件过严，不是助手答错；`gpt-4o-mini` 在迟交扣分题上稳定答错（说得 0 分，答案没有引用标记所以被校验拦下），在 DOC-47 上过于积极地用全员可读的文档作答（没有引用保密文档，不是泄露）。
+- **默认模型保持 `gpt-6-luna`。**
+- 费用：两次运行合计估算不到 0.06 美元（含第一次因为我的脚本读审计表被拒而中途停止之前已经发出的少量调用）。
+
+**与计划不一致或新增的地方：**
+
+| 项 | 说明 |
+|---|---|
+| 重排截断 | `rerank_passage_tokens` 默认从 350 改为 600，必须不小于块的上限；这是 M4 的基线没发现的问题，因为基线只看排名，不看绝对分数 |
+| 理解提示词 | 版本 2，明确技术支持范围 |
+| 隐藏内容阈值 | 初始的 0.3 在实测后改为 0.5：问受限文档的问题得分 0.57–0.74，无答案的问题 0.09–0.41（样本小，间隔窄） |
+| `finish_run` 的位置 | 由运行时包装层调用，而不是每个 End 节点（异常和超时也一定会被记录）；已写入设计 04 |
+| 问候 | 用固定回复，不调用模型 |
+| 流程图 | 图可以导出为 mermaid，但设计 04 里的流程图仍是手写的，还没有改成自动导出 |
+| 测试替身 | `ScriptedChat`、`StubRetrieval`、`Harness` 放在 `starit_core/testing.py`，两个测试目录共用；共享的临时数据库夹具移到了 `ai-module/conftest.py` |
+| 容器配置 | API 容器现在传入 `OPENAI_API_KEY`、embedding 变量和 `STARIT_RATE_LIMIT_CHAT_PER_MINUTE` |
+| 我的一个失误 | 提交回归测试时其中一个测试是失败的（我估错了测试数据的 token 数，而它自己的前置断言抓住了这一点），我提交之后才发现，没有在当时的汇报里说明；已在下一个提交里修正，并让它同时断言旧的 350 上限确实会隐藏那一行 |
+
+**已知限制（诚实记录）：**
+- 答案校验只做确定性检查（引用编号存在、有引用、不为空、不超长）。**带着引用的错误答案会通过**（例如把事实说错但仍标了 `[1]`）。让模型核对事实的做法放到评测之后再决定。
+- 提示词注入的规则列表只能拦住最明显的写法，不是安全边界；真正的防线是权限在数据库里过滤，模型拿不到无权读的内容。
+- 固定回复只有英文；历史只保留最近 6 轮；会话标题是第一个问题的前 60 个字符。
+- 真实检查每个场景只问一次，模型每次的回答可能略有不同（理解步骤的分类就曾在两次运行里不一样），样本很小，不能据此断定模型的优劣。
+- 隐藏内容的阈值和重排分数的阈值（6）都是在几十道题上标定的，换一批文档或问法可能需要重新标定。
+- 数据查询（M6）和写操作确认（第二阶段）尚未实现，以固定的拒绝回答。

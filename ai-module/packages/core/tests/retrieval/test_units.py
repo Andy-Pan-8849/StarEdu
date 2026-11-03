@@ -187,3 +187,37 @@ def test_the_probe_result_holds_only_numbers() -> None:
         assert value is None or isinstance(value, int | float)
     for annotation in (f.type for f in dataclasses.fields(ProbeResult)):
         assert "str" not in str(annotation)
+
+
+# --- regressions found by the live check -----------------------------------------------------
+
+
+def test_the_default_rerank_limit_shows_a_whole_chunk() -> None:
+    """A passage cut shorter than a chunk hides its end. The answer to ERR-PORTAL-429 sat at token
+    365 of its chunk, which a 350-token cut hid; the model then scored it 2 out of 10."""
+    from starit_core.config import Settings
+    from starit_core.ingest.tokens import count_tokens
+
+    settings = Settings(_env_file=None)
+    assert settings.rerank_passage_tokens >= settings.chunk_max_tokens
+
+    filler = "Courseware downloads are limited per month. " * 45  # 361 tokens
+    tail = "ERR-PORTAL-429 | Download quota used up | Wait for the 1st of the month"
+    chunk = candidate(text=filler + tail)
+    assert 350 < count_tokens(filler) < settings.chunk_max_tokens  # the tail is past the old cut
+    user = build_messages(
+        "What does ERR-PORTAL-429 mean?", [chunk, candidate()], settings.rerank_passage_tokens
+    )[1]["content"]
+    assert "Download quota used up" in user
+    # ...and the old limit really would have hidden it, so this test fails if the limit is lowered.
+    cut = build_messages("What does ERR-PORTAL-429 mean?", [chunk, candidate()], 350)[1]["content"]
+    assert "Download quota used up" not in cut
+
+
+def test_the_understanding_prompt_keeps_technical_support_in_scope() -> None:
+    """Slow Maven downloads were once refused as out of scope."""
+    from starit_core.agent.prompts import prompt_text
+
+    prompt = prompt_text("understand")
+    assert "Maven" in prompt and "is NOT out of scope" in prompt
+    assert "learning portal" in prompt and "loaner laptops" in prompt

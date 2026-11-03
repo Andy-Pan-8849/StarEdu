@@ -47,6 +47,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     retrieval.add_argument(
         "--dry-run", action="store_true", help="fake embeddings and reranker, no cost"
     )
+    agent = sub.add_parser("agent", help="ask the assistant representative questions for real")
+    agent.add_argument(
+        "--compare-generate", default=None, help="a second model for the answer step"
+    )
+    agent.add_argument("--yes", action="store_true", help="do not ask before spending")
+    agent.add_argument("--out", type=Path, default=DEFAULT_OUT, help="report directory")
     args = parser.parse_args(argv)
     if args.command == "retrieval" and not (args.mode or args.all_modes or args.leak_sweep):
         parser.error("choose --mode, --all-modes or --leak-sweep")
@@ -108,6 +114,10 @@ def estimate(
     }
 
 
+def _proceed() -> bool:
+    return input("Proceed? [y/N] ").strip().lower() in ("y", "yes")
+
+
 def _confirm(args: argparse.Namespace, figures: dict[str, float | int | None]) -> bool:
     usd = "unknown" if figures["usd"] is None else f"about ${figures['usd']}"
     print(
@@ -120,7 +130,7 @@ def _confirm(args: argparse.Namespace, figures: dict[str, float | int | None]) -
     )
     if args.yes:
         return True
-    return input("Proceed? [y/N] ").strip().lower() in ("y", "yes")
+    return _proceed()
 
 
 async def run_retrieval(args: argparse.Namespace) -> int:
@@ -190,9 +200,66 @@ async def run_retrieval(args: argparse.Namespace) -> int:
     return 0
 
 
+async def run_agent(args: argparse.Namespace) -> int:
+    from starit_eval import agent_check
+
+    settings = get_settings()
+    engine = create_engine(settings)
+    corpus = await corpus_stats(engine)
+    variants_spec = [("default", settings)]
+    if args.compare_generate:
+        variants_spec.append(
+            (
+                args.compare_generate.split("/")[-1],
+                settings.model_copy(update={"model_generate": args.compare_generate}),
+            )
+        )
+    calls = agent_check.estimate_calls(agent_check.CASES)
+    per_variant = [
+        agent_check.estimate_cost(s, calls, corpus["avg_tokens"], s.model_generate)
+        for _, s in variants_spec
+    ]
+    total = (
+        None
+        if any(c is None for c in per_variant)
+        else float(sum(c for c in per_variant if c is not None))
+    )
+    print(
+        f"\nThis run asks {sum(len(c.turns) for c in agent_check.CASES)} questions per version, "
+        f"{len(variants_spec)} version(s).\n"
+        f"  model calls per version (upper bound): {calls['understand']} understand, "
+        f"{calls['rerank']} rerank, {calls['generate']} generate\n"
+        f"  estimated cost at list price: {'unknown' if total is None else f'about ${total:.3f}'}\n"
+    )
+    if not args.yes and not _proceed():
+        print("Cancelled.")
+        await engine.dispose()
+        return 1
+    identities = load_identities()
+    results = []
+    for label, variant_settings in variants_spec:
+        print(f"asking with generate model {variant_settings.model_generate} ...", flush=True)
+        results.append(
+            await agent_check.run_variant(
+                label,
+                engine,
+                variant_settings,
+                embedding_client(variant_settings),
+                LiteLLMChatClient(),
+                identities,
+            )
+        )
+    path = agent_check.write(args.out, results, total)
+    await engine.dispose()
+    print(agent_check.summarize_for_console(results))
+    print(f"report: {path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
-    sys.exit(asyncio.run(run_retrieval(args)))
+    runner = run_agent if args.command == "agent" else run_retrieval
+    sys.exit(asyncio.run(runner(args)))
 
 
 if __name__ == "__main__":

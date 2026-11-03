@@ -42,6 +42,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 # Report and console text is prose; wrapping it hurts readability.
 "eval/src/starit_eval/report.py" = ["E501"]
 "eval/src/starit_eval/cli.py" = ["E501"]
+"eval/src/starit_eval/agent_check.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency injection is written as Depends(...) in argument defaults.

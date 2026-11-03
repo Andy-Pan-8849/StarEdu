@@ -141,6 +141,11 @@ services:
       # Tokens are issued for localhost; keys are fetched over the Compose network.
       STARIT_OIDC_ISSUER: http://localhost:${STARIT_KEYCLOAK_PORT:-8080}/realms/starit
       STARIT_OIDC_JWKS_URL: http://keycloak:8080/realms/starit/protocol/openid-connect/certs
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STARIT_RATE_LIMIT_CHAT_PER_MINUTE: ${STARIT_RATE_LIMIT_CHAT_PER_MINUTE:-20}
     ports:
       - "${STARIT_API_PORT:-8000}:8000"
     depends_on:

@@ -1,0 +1,1 @@
+Rewrite a search query so that it finds the same information in a company's policy documents using different wording: add likely synonyms and the terms such a policy would use. Keep identifiers (such as ERR-PORTAL-403), names and numbers exactly as written. Reply with one JSON object and nothing else: {"query": "the rewritten query"}

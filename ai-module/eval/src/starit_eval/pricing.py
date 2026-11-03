@@ -7,6 +7,8 @@ the figures as estimates. A model that is not listed has an unknown cost.
 PRICES_PER_MILLION: dict[str, tuple[float, float]] = {  # (input, output)
     "text-embedding-3-small": (0.02, 0.0),
     "gpt-6-luna": (0.10, 0.50),
+    # From memory, not re-checked in this project: confirm before relying on the estimate.
+    "gpt-4o-mini": (0.15, 0.60),
 }
 
 
