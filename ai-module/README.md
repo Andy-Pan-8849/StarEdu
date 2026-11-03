@@ -62,6 +62,20 @@ The Keycloak admin console is at http://localhost:8080 (user `admin`, password `
 
 Embeddings need `OPENAI_API_KEY` in `.env` (the model is `EMBEDDING_MODEL`, 1536 dimensions). For a free dry run with meaningless vectors set `EMBEDDING_PROVIDER=fake`. A failed job shows its stage and reason in `ai.ingestion_jobs` (`stage`, `error_code`, `error_message`). The first run downloads the tokenizer vocabulary, so it needs internet access once.
 
+### Retrieval and evaluation
+
+Retrieval lives in `starit_core.retrieval`: `retrieve(conn, identity, query, mode=...)` with four modes (`keyword`, `vector`, `hybrid`, `hybrid_rerank`). There is no way to search without an identity, and the permission filter is applied inside the database query before ranking.
+
+`make eval` runs the evaluation (`eval/`). A real run calls hosted models, so it first prints how many calls and tokens that is and what it should cost, then asks:
+
+```bash
+make eval ARGS="retrieval --all-modes --leak-sweep"        # four modes + every question as every role
+make eval ARGS="retrieval --mode hybrid --label try-1"     # one mode
+make eval ARGS="retrieval --all-modes --dry-run"           # fake models, no cost, the numbers mean nothing
+```
+
+Reports go to `docs/eval/` (see the baseline there) and each mode's run is recorded in `ai.eval_runs` / `ai.eval_results`. The rerank model is `STARIT_MODEL_RERANK` (default `openai/gpt-6-luna`).
+
 ### Database accounts
 
 Three Postgres accounts are used, so that grants and the append-only audit log mean something:
