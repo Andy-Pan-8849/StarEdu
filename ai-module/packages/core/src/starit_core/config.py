@@ -50,7 +50,10 @@ class Settings(BaseSettings):
     retrieval_rerank_in: int = 20
     retrieval_final_k: int = 6
     retrieval_context_tokens: int = 3500
-    rerank_passage_tokens: int = 350  # each passage is cut to this many tokens in the rerank prompt
+    # Each passage is cut to this many tokens in the rerank prompt. It must be at least the chunk
+    # size limit (500): a cut passage hides what is at its end, and the answer to ERR-PORTAL-429
+    # sat at token 365 of its chunk, which a 350-token cut scored 2 out of 10.
+    rerank_passage_tokens: int = 600
     model_rerank: str = "openai/gpt-6-luna"
 
     # The assistant (docs/design/04-agent-flow.md). One model per step, so each can be changed.

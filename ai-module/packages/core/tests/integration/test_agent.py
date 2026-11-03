@@ -90,7 +90,7 @@ async def test_a_question_with_enough_evidence_is_answered_with_citations(harnes
     details = (await harness.rows("SELECT details FROM ai.audit_log WHERE action = 'chat.query'"))[
         0
     ][0]
-    assert details["prompt_versions"] == {"understand": "1", "generate": "1", "rewrite": "1"}
+    assert details["prompt_versions"] == {"understand": "2", "generate": "1", "rewrite": "1"}
     assert details["llm_calls"] == 2
     state = await harness.conversation_state()
     assert state[0] == "answering" and state[3] == "What is the referral bonus?"

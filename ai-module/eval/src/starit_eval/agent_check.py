@@ -14,7 +14,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime, RunResult
 from starit_core.auth import Identity
@@ -196,6 +195,24 @@ class VariantResult:
         return sum(t.ok for t in self.turns)
 
 
+class CountingChat:
+    """Counts the model calls and tokens of a variant (the application role cannot read the
+    audit log, by design, so the run records are not used for this)."""
+
+    def __init__(self, inner: ChatClient) -> None:
+        self._inner = inner
+        self.calls = 0
+        self.input_tokens = 0
+        self.output_tokens = 0
+
+    async def complete(self, *args: Any, **kwargs: Any) -> Any:
+        result = await self._inner.complete(*args, **kwargs)
+        self.calls += 1
+        self.input_tokens += result.input_tokens
+        self.output_tokens += result.output_tokens
+        return result
+
+
 def judge(turn: Turn, result: RunResult) -> list[str]:
     problems = []
     if result.end_state not in turn.states:
@@ -243,7 +260,8 @@ async def run_variant(
     identities: dict[str, Identity],
     cases: Sequence[Case] = CASES,
 ) -> VariantResult:
-    runtime = AgentRuntime(engine=engine, settings=settings, embedder=embedder, chat=chat)
+    counting = CountingChat(chat)
+    runtime = AgentRuntime(engine=engine, settings=settings, embedder=embedder, chat=counting)
     variant = VariantResult(
         label,
         {
@@ -269,19 +287,9 @@ async def run_variant(
                     seconds=seconds, answer=result.content,
                 )
             )  # fmt: skip
-            async with engine.connect() as conn:
-                row = (
-                    await conn.execute(
-                        text(
-                            "SELECT tokens_in, tokens_out, details->>'llm_calls' FROM ai.runs r "
-                            "JOIN ai.audit_log a ON a.run_id = r.id AND a.action = 'chat.query' WHERE r.id = :r"
-                        ),
-                        {"r": result.run_id},
-                    )
-                ).one()
-            variant.input_tokens += row[0] or 0
-            variant.output_tokens += row[1] or 0
-            variant.llm_calls += int(row[2] or 0)
+    variant.llm_calls = counting.calls
+    variant.input_tokens = counting.input_tokens
+    variant.output_tokens = counting.output_tokens
     return variant
 
 

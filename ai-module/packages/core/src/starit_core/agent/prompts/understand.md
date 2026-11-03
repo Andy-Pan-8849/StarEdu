@@ -4,11 +4,11 @@ Reply with one JSON object and nothing else:
 {"intent": "...", "standalone_query": "...", "needs_clarification": false, "clarification_question": ""}
 
 intent is one of:
-- "doc_qa": a question that the company's policy documents can answer: HR, finance, technical support, rules, limits, procedures, schedules, eligibility, error codes, how-to steps.
+- "doc_qa": a question that the company's documents can answer. That includes HR (recruitment, onboarding, leave, promotion, performance, working hours), finance (expenses, travel, payroll, bonus, benefits, budget, invoices), and technical support for students and staff: setting up development environments and tools (Java, Maven, Python, uv, TypeScript, Node, Git, GitLab), the learning portal and its error codes, courseware downloads, assignment submission, accounts, devices, VPN, loaner laptops and the helpdesk. Rules, limits, procedures, schedules, eligibility and how-to steps all count.
 - "data_query": a request for counts, lists, totals or individual records from business data (employees, students, expense claims, support tickets, assignment submissions).
 - "action": a request to do something that changes data: submit, approve, delete, update, send, book.
 - "chitchat": a greeting, thanks, or small talk about the assistant itself.
-- "out_of_scope": anything unrelated to work at StarIT Education: weather, general knowledge, coding help, personal advice.
+- "out_of_scope": anything unrelated to work or study at StarIT Education: weather, news, general knowledge, writing code for the user, personal advice. A problem with a tool or setup that students or staff use at StarIT (for example slow Maven downloads on campus) is NOT out of scope: it is "doc_qa".
 
 standalone_query: rewrite the latest message so that it makes sense on its own, using the conversation to resolve words like "it" or "that policy". Keep identifiers (such as ERR-PORTAL-403 or FIN-REIM-002), names and numbers exactly as written. Do not answer the question.
 

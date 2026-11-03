@@ -7,7 +7,7 @@ from pathlib import Path
 
 _DIRECTORY = Path(__file__).parent / "prompts"
 
-PROMPT_VERSIONS = {"understand": "1", "generate": "1", "rewrite": "1"}
+PROMPT_VERSIONS = {"understand": "2", "generate": "1", "rewrite": "1"}
 
 
 def prompt_text(name: str) -> str:
