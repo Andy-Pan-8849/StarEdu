@@ -9,7 +9,6 @@ leaves the previous version of the document searchable and unchanged.
 import asyncio
 import logging
 import tempfile
-from collections.abc import Sequence
 from pathlib import Path
 
 from sqlalchemy import text
@@ -18,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.audit import write_audit
 from starit_core.config import Settings
 from starit_core.documents import add_chunk
-from starit_core.embeddings import EmbeddingClient
+from starit_core.embeddings import EmbeddingClient, vector_literal
 from starit_core.ingest import queue
 from starit_core.ingest.chunker import chunk_document
 from starit_core.ingest.clean import clean_document
@@ -37,10 +36,6 @@ def embedding_input(title: str, chunk: Chunk) -> str:
     """What is embedded: the document title and section path give the text its context."""
     context = "\n".join(part for part in (title, " > ".join(chunk.heading_path)) if part)
     return f"{context}\n\n{chunk.text}" if context else chunk.text
-
-
-def vector_literal(vector: Sequence[float]) -> str:
-    return "[" + ",".join(repr(float(x)) for x in vector) + "]"
 
 
 async def process_job(

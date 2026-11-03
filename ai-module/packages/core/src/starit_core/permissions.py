@@ -6,9 +6,9 @@ query here without an identity.
 
 from collections.abc import Iterable
 
-from sqlalchemy import ColumnElement, and_, any_, column, literal, or_, table
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
-from sqlalchemy.types import SmallInteger, Text
+from sqlalchemy import ColumnElement, Date, Integer, and_, any_, column, literal, or_, table
+from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR, UUID
+from sqlalchemy.types import SmallInteger, Text, UserDefinedType
 
 from starit_core.auth import Identity
 
@@ -61,14 +61,49 @@ def has_all_campuses(roles: Iterable[str]) -> bool:
     return bool(COMPANY_WIDE_ROLES & set(roles))
 
 
+class Vector(UserDefinedType[list[float]]):
+    """pgvector's `vector` column type (1536 wide, see ai.chunk_embeddings)."""
+
+    cache_ok = True
+
+    def get_col_spec(self, **_kw: object) -> str:
+        return "vector(1536)"
+
+
+# The one table object every chunk query is built on, so the access condition and the rest of
+# the query always refer to the same table.
 chunks = table(
     "document_chunks",
     column("id", UUID),
+    column("document_id", UUID),
+    column("chunk_index", Integer),
+    column("text", Text),
+    column("heading_path", ARRAY(Text)),
+    column("page", Integer),
+    column("token_count", Integer),
+    column("identifiers", ARRAY(Text)),
+    column("tsv", TSVECTOR),
     column("allowed_roles", ARRAY(Text)),
     column("allowed_users", ARRAY(Text)),
     column("campus_scope", ARRAY(Text)),
     column("min_level_rank", SmallInteger),
     column("status", Text),
+    column("effective_date", Date),
+    column("doc_code", Text),
+    column("version", Text),
+    schema="ai",
+)
+documents = table(
+    "documents",
+    column("id", UUID),
+    column("title", Text),
+    schema="ai",
+)
+chunk_embeddings = table(
+    "chunk_embeddings",
+    column("chunk_id", UUID),
+    column("model", Text),
+    column("embedding", Vector),
     schema="ai",
 )
 

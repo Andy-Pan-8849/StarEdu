@@ -41,6 +41,18 @@ class Settings(BaseSettings):
     )
     embedding_batch_size: int = 64
 
+    # Retrieval (docs/design/05-retrieval-etl-and-evaluation.md, section 2).
+    retrieval_mode: str = "hybrid_rerank"  # keyword, vector, hybrid or hybrid_rerank
+    keyword_searcher: str = "ts_rank_cd"
+    retrieval_keyword_k: int = 30
+    retrieval_vector_k: int = 30
+    retrieval_rrf_k: int = 60
+    retrieval_rerank_in: int = 20
+    retrieval_final_k: int = 6
+    retrieval_context_tokens: int = 3500
+    rerank_passage_tokens: int = 350  # each passage is cut to this many tokens in the rerank prompt
+    model_rerank: str = "openai/gpt-6-luna"
+
     # Chunking (tokens counted with the cl100k_base tokenizer).
     chunk_target_tokens: int = 400
     chunk_max_tokens: int = 500

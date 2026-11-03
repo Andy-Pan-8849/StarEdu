@@ -35,7 +35,7 @@ jobs:
       - run: uv sync --all-packages --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy packages apps
+      - run: uv run mypy packages apps eval
       - name: Migrations run on an empty database
         run: uv run alembic upgrade head
       - name: Start Keycloak (demo realm is imported on first start)

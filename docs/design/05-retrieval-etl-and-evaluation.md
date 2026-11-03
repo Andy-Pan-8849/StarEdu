@@ -180,3 +180,15 @@ standalone_query ──┬─▶ 关键词检索（权限过滤后）top 30 ─�
 - **编号字段**：`identifiers` 记录连字符编号和长字母数字编号，并加入文档自己的 `doc_code`，全文索引里可以精确命中。
 - **向量化**：litellm 库，模型、维度由 `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` 设置（与设计 06 一致，不带 `STARIT_` 前缀）；向量列为 1536 维，配置的维度不一致时任务直接失败；向量化的输入是"文档标题 + 章节路径 + 正文"。
 - **队列与重试**：`FOR UPDATE SKIP LOCKED`；失败后按 30 秒、2 分钟、10 分钟退避，最多 3 次；损坏的文件、维度不匹配、没有文本这类失败不重试；停滞的任务（worker 被杀）会被放回队列。写入阶段在一个事务里替换旧分块，失败时旧分块保持不变。
+
+## 8. M4 实现记录（2026-11-03）
+
+- **入口**：`starit_core.retrieval.retrieve(conn, identity, query, mode=...)`，必须带身份；四种模式 `keyword`、`vector`、`hybrid`、`hybrid_rerank`；参数都在配置里（设计 05 的 2.1 默认值）。
+- **关键词**：`plainto_tsquery` 的 AND 换成 OR（问句里有很多虚词，AND 几乎查不到），`ts_rank_cd` 排序；问题里含有编号时，列出该编号的块加分（`identifiers` 命中），**属于被点名文档本身的块再加一份**，这样"FIN-REIM-002 说了什么"会先返回该文档，而不是只在正文里提到它的另一份文档（测试时发现的问题）。
+- **向量**：余弦距离、精确扫描；只和同一个模型生成的向量比较。
+- **融合**：RRF，`k = 60`。RRF 只看名次，不看得分，所以**向量一路和关键词一路意见不一致时，唯一的精确命中可能被压下去**（基线里 `ERR-PORTAL-429` 就是例子）。目前由重排解决；如果以后不用重排，可以考虑在融合之后给精确编号命中优先权。
+- **重排**：`LLMReranker`，聊天模型 `openai/gpt-6-luna`（`STARIT_MODEL_RERANK`）；提示词要求返回 JSON 排名，容错解析（代码围栏、漏掉的编号补在后面、重复和越界编号忽略）；模型报错或输出无法解析时保持融合顺序并标记 `rerank_failed`。聊天客户端对 `gpt-6-luna` 设置 `temperature = 0` 和 `reasoning_effort = "none"`（这个模型在推理开启时只接受 `temperature = 1`），不支持这些参数的模型由 `drop_params` 忽略。
+- **上下文组装**：去重（按块和按文本）、取前 `final_k` 个、不超过 token 预算（至少保留第一个）。
+- **探测**：`probe_restricted` 是唯一不带权限过滤的查询，只返回数字（被过滤的强匹配数量和最高分），不返回任何文本，不进提示词；用于审计和 `no_permission` / `not_found` 的区分。
+- **评测运行器**：`eval/`（`starit-eval`）。每次真实运行先打印调用数、token 数和估算费用并询问；写 `ai.eval_runs` / `ai.eval_results`（每种模式一次运行）和 `docs/eval/` 下的报告；`--leak-sweep` 做全角色的权限回归；`--dry-run` 用假模型演练整个流程。
+- **基线结果和解读**见 [`docs/eval/README.md`](../eval/README.md)。
