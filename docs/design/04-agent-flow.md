@@ -29,7 +29,7 @@
 | `answer`、`citations` | |
 | `end_state`、`end_reason` | |
 
-状态由 LangGraph 的 Postgres checkpointer 保存，`thread_id = conversation_id`。
+会话级的状态（`session_mode`、`pending_question`、`clarify_count`）保存在 `ai.conversations` 的三列里（迁移 0005），不使用 LangGraph 的 Postgres checkpointer【M5 修订，2026-11-03】：第一阶段每次运行都是一次完整、没有中断的运行（"需要澄清"也是以 End 结束，下一轮再带着补充进来），checkpointer 用不上，却要多一套表、一次初始化和版本耦合。第二阶段做"写操作确认"（`interrupt`）时再启用它。
 
 ## 3. 图
 
@@ -183,3 +183,12 @@ flowchart TD
 ## 12. 确认结果（2026-11-02）
 
 8 个确认点全部接受：新增 `refused` 状态；`no_permission` 与 `not_found` 内部区分、对用户同文案；`understand` 不判断身份；数据查询优先 MCP 参数化工具；第一阶段 `verify_answer` 只做确定性检查；各项上限；生成规则；每个 LLM 节点单独配置模型。
+
+## 13. M5 修订记录（2026-11-03）
+
+- 会话状态存在 `ai.conversations`，不用 checkpointer（见第 2 节）。
+- `finish_run` 由运行时包装层调用，而不是由每个 End 节点调用：End 节点只设置最终状态，这样异常和超时也一定会被记录。"每个节点都能到达某个 End 节点"的图结构测试不变。
+- 数据查询（`data_query`）在 M6 之前以 `refused / not_available_yet` 结束（临时原因码，M6 实现后移除）。
+- 历史只截断最近 6 轮，暂不做滚动摘要。
+- `chitchat`（问候）用固定回复，不调用模型。
+- `grade_retrieval` 分两道关：重排分数阈值（可配置）和生成节点的 `sufficient` 标志。

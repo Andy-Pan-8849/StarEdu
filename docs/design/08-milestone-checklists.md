@@ -547,7 +547,7 @@ make eval ARGS="retrieval --leak-sweep"         # 权限回归扫描（只查数
 
 ## M5 Agent 图与对话 API
 
-状态：**清单待用户确认**（分支 `m5-agent`）。这是项目最核心的一块：用户提问，经过固定的图，得到带引用的回答或一个明确的拒绝，每次运行都有显式的 End 状态。本里程碑会调用 OpenAI 的聊天模型（`understand` 和 `generate` 两个节点，加上 M4 已有的重排）。
+状态：**进行中**（分支 `m5-agent`）。这是项目最核心的一块：用户提问，经过固定的图，得到带引用的回答或一个明确的拒绝，每次运行都有显式的 End 状态。本里程碑会调用 OpenAI 的聊天模型（`understand` 和 `generate` 两个节点，加上 M4 已有的重排）。
 
 ### 开始前的调研结果（已核对）
 
@@ -662,7 +662,8 @@ uv run python scripts/ask_samples.py        # 约 12 个问题
 
 ### 用户的确认（2026-11-03）
 
-（待确认）
+- 默认聊天模型 `openai/gpt-6-luna`；真实检查时**对比 `gpt-4o-mini`**（不是 `gpt-6-sol`），按结果选默认值。
+- 其余 7 条全部接受：会话状态存在 `ai.conversations`（迁移 0005）、不用 LangGraph 的 checkpointer；`data_query` 暂时以 `not_available_yet` 拒绝；历史只截断最近 6 轮；会话标题用第一个问题的前 60 个字符；限流（每用户每分钟 20 次）一起做；`grade_retrieval` 两道关；真实检查约 12 个问题（先估算再确认）。
 
 ### 实际结果
 
