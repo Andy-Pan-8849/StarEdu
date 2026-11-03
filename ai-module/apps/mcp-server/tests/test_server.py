@@ -68,6 +68,7 @@ def server(scratch_urls: tuple[str, str]) -> Iterator[str]:
         database_url=app_url,
         embedding_provider="fake",
         mcp_url=url,
+        mcp_allowed_hosts=f"127.0.0.1:{port},mcp-server:8100",
         oidc_issuer=ISSUER,
     )
     from starit_core.db import create_engine as app_engine
@@ -153,3 +154,34 @@ async def test_no_token_means_no_call(server: str) -> None:
 
 def test_health_needs_no_token(server: str) -> None:
     assert httpx2.get(server.replace("/mcp", "/health")).json() == {"status": "ok"}
+
+
+def _initialize(server: str, host: str) -> httpx2.Response:
+    return httpx2.post(
+        server,
+        headers={
+            "Host": host,
+            "Authorization": f"Bearer {token()}",
+            "Accept": "application/json, text/event-stream",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "t", "version": "0"},
+            },
+        },
+    )
+
+
+def test_the_compose_service_name_is_an_accepted_host(server: str) -> None:
+    """Regression: the API reaches the server as mcp-server:8100, which the SDK's host check
+    refused until the allowed hosts were configured. A valid token, so only the host decides."""
+    assert _initialize(server, "mcp-server:8100").status_code == 200
+
+
+def test_an_unknown_host_is_refused_even_with_a_valid_token(server: str) -> None:
+    assert _initialize(server, "evil.example").status_code in (400, 421)

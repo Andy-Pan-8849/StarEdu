@@ -5,6 +5,7 @@ import logging
 import uvicorn
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.auth import TokenVerifier, jwks_key_resolver
 from starit_core.config import Settings, get_settings
@@ -37,7 +38,12 @@ def build_app(settings: Settings, engine: AsyncEngine, verifier: TokenVerifier) 
     async def health(request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
-    return server.streamable_http_app()
+    hosts = [h.strip() for h in settings.mcp_allowed_hosts.split(",") if h.strip()]
+    return server.streamable_http_app(
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True, allowed_hosts=hosts
+        )
+    )
 
 
 def main() -> None:
