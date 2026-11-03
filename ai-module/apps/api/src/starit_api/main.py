@@ -72,6 +72,8 @@ def create_app() -> FastAPI:
             "roles": sorted(identity.roles),
             "campus_id": identity.campus_id,
             "level": identity.level,
+            "employee_id": identity.employee_id,
+            "student_id": identity.student_id,
         }
 
     return app

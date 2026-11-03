@@ -24,8 +24,9 @@ Prerequisites: [uv](https://docs.astral.sh/uv/), Docker with Compose, and `make`
 ```bash
 cd ai-module
 make sync      # install dependencies
-make up        # start Postgres (pgvector), Redis, object storage and the API
-make migrate   # apply database migrations
+make up        # start Postgres (pgvector), Redis, object storage, Keycloak and the API
+               # (a one-shot container applies the database migrations first)
+make seed-biz  # load the sample business tables into the biz schema
 make test      # unit tests, plus integration tests when the services are up
 make lint      # ruff and mypy
 curl http://localhost:8000/healthz
@@ -35,22 +36,38 @@ curl http://localhost:8000/healthz
 
 `make up` also starts Keycloak with a demo realm (`starit`). All accounts use the password `demo-pass-123`. They exist only for local demos; never reuse them or the password anywhere else.
 
-| Account | Role | Campus |
+| Account | Role | Who in the sample data |
 |---|---|---|
-| `student.sh` | student | SH |
-| `staff.bj`, `staff.sh` | staff | BJ, SH |
-| `manager.sh` | manager | SH |
-| `hr.bj` | hr | BJ |
-| `finance.bj` | finance | BJ |
-| `admin.bj` | Admin | BJ |
-| `ragetl.bj` | RAGETLAdmin | BJ |
+| `wei.stu.sh` | student | student S0018, Shanghai |
+| `ning.adm.bj`, `wei.acad.sh` | staff | Admissions Advisor (Beijing), Instructor (Shanghai) |
+| `ling.mgr.bj`, `peng.mgr.sh` | manager | Campus Directors of Beijing and Shanghai |
+| `qing.hr.bj` | hr | HR Business Partner, headquarters (Beijing) |
+| `ning.fin.bj` | finance | Finance Controller, headquarters |
+| `tao.admin.bj` | Admin | Helpdesk Engineer, headquarters |
+| `min.ragetl.bj` | RAGETLAdmin | Principal Instructor, headquarters |
+
+The name is `<given name>.<function>.<campus>`. Each account is a real person in the sample CSV tables, so "own records" and "own campus" can be tested; see [`sample-data/README.md`](sample-data/README.md).
 
 ```bash
-curl -H "Authorization: Bearer $(make -s token ACCOUNT=staff.sh)" localhost:8000/me
+curl -H "Authorization: Bearer $(make -s token ACCOUNT=wei.acad.sh)" localhost:8000/me
 ```
 
 The Keycloak admin console is at http://localhost:8080 (user `admin`, password `admin`, set in `.env`). The realm file is `deploy/compose/keycloak/starit-realm.json`; it enables the password grant for the `starit-web` client so scripts and tests can fetch tokens, which a real deployment should turn off.
 
+### Database accounts
+
+Three Postgres accounts are used, so that grants and the append-only audit log mean something:
+
+| Account | Used for | Notes |
+|---|---|---|
+| `starit` | migrations and seeding | the database owner; the application never uses it |
+| `ai_app` | the application | ordinary privileges; may only insert into the audit log |
+| `ai_sql_ro` | SQL Agent queries | cannot log in; the application switches to it inside a transaction, and it can read only the whitelisted `ai_sql` views, which filter rows by the caller's identity |
+
+If you already have an `.env` from an earlier milestone, copy the new variables from `.env.example` (`STARIT_APP_DB_PASSWORD`, `STARIT_MIGRATION_DATABASE_URL`) and set `STARIT_DATABASE_URL` to the `ai_app` URL. After the demo accounts change, run `make clean` once so Keycloak imports the new realm (this removes local demo data only).
+
 The services use the usual default ports (Postgres 5432, Redis 6379, object storage 9000/9001, API 8000). If one is taken on your machine, change it in `.env` (created from `.env.example` by `make up`). `make down` stops the services and keeps the data; `make clean` also deletes the data volumes.
 
 The design documents are in [`../docs/design/`](../docs/design/).
+
+The job levels used in the sample data (I, S and M ladders and the 1 to 7 grade), the demo accounts and the data-scope rules are explained in [`sample-data/README.md`](sample-data/README.md).

@@ -103,7 +103,7 @@ standalone_query ──┬─▶ 关键词检索（权限过滤后）top 30 ─�
 | 数据集 | 数量 | 构成 |
 |---|---|---|
 | `qa-set.jsonl` | 54 | 类型：single 31、multi 7、access 7、keyword 3、unanswerable 3、version 2、paraphrase 1；提问角色：staff 35、student 15、finance 2、manager 1、hr 1；`should_answer = false` 共 6 条 |
-| `sql-qa.jsonl` | 16 | 访问等级：finance-and-hr 10、staff 6 |
+| `sql-qa.jsonl` | 33（M2.0 修订） | 每题指定提问账号和数据范围：应回答 26 题（全公司 16、本校区 7、仅本人 3），越权应拒绝 7 题（见 `sample-data/README.md`） |
 
 **问题**：`keyword`、`version`、`paraphrase`、`unanswerable` 的题目太少，`manager`、`hr` 角色的题也很少，不足以得出可靠的结论。**建议在评测运行器完成后补充**（每类至少 8–10 题，并给每个受限文档配对"有权限 / 无权限"的问题），补充内容同样是合成数据。【建议】
 

@@ -13,7 +13,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Defaults match deploy/compose/compose.yaml so a local run works without configuration.
-    database_url: str = "postgresql+psycopg://starit:starit@localhost:5432/starit"
+    # The application connects as the ordinary role ai_app; only migrations use the owner.
+    database_url: str = "postgresql+psycopg://ai_app:starit-app@localhost:5432/starit"
+    migration_database_url: str = "postgresql+psycopg://starit:starit@localhost:5432/starit"
+    # Password given to the ai_app role when the migrations create it.
+    app_db_password: str = Field(default="starit-app", repr=False)
     redis_url: str = "redis://localhost:6379/0"
     s3_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "starit"

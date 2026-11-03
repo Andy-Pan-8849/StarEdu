@@ -26,6 +26,7 @@ def token(roles: list[str], **overrides: Any) -> str:
         "realm_access": {"roles": roles},
         "campus_id": "BJ",
         "level": "M2",
+        "employee_id": "E0137",
     }
     payload.update(overrides)
     return jwt.encode(payload, KEY, algorithm="RS256")
@@ -60,6 +61,8 @@ def test_me_returns_identity_from_token(client: TestClient) -> None:
         "roles": ["hr"],
         "campus_id": "BJ",
         "level": "M2",
+        "employee_id": "E0137",
+        "student_id": None,
     }
 
 

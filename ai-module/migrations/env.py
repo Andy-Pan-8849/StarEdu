@@ -1,4 +1,7 @@
-"""Alembic environment: synchronous migrations against STARIT_DATABASE_URL."""
+"""Alembic environment: synchronous migrations as the database owner.
+
+The connection URL is STARIT_MIGRATION_DATABASE_URL.
+"""
 
 from logging.config import fileConfig
 
@@ -16,7 +19,7 @@ target_metadata = None
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=get_settings().database_url,
+        url=get_settings().migration_database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -26,7 +29,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(get_settings().database_url, poolclass=pool.NullPool)
+    engine = create_engine(get_settings().migration_database_url, poolclass=pool.NullPool)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

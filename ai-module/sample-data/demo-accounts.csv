@@ -1,0 +1,10 @@
+username,role,subject_type,subject_id,name,campus_id,level,level_rank,title
+wei.stu.sh,student,student,S0018,Wei Hu,SH,,,student
+ning.adm.bj,staff,employee,E0014,Ning Ma,BJ,S2,2,Admissions Advisor
+wei.acad.sh,staff,employee,E0025,Wei He,SH,I2,2,Instructor
+ling.mgr.bj,manager,employee,E0001,Ling Liu,BJ,M3,7,Campus Director
+peng.mgr.sh,manager,employee,E0018,Peng Liu,SH,M3,7,Campus Director
+qing.hr.bj,hr,employee,E0137,Qing Luo,BJ,S3,3,HR Business Partner
+ning.fin.bj,finance,employee,E0138,Ning Hu,BJ,M2,6,Finance Controller
+tao.admin.bj,Admin,employee,E0140,Tao Wu,BJ,S2,2,Helpdesk Engineer
+min.ragetl.bj,RAGETLAdmin,employee,E0141,Min Wang,BJ,I5,5,Principal Instructor

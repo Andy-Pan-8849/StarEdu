@@ -25,7 +25,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      STARIT_DATABASE_URL: postgresql+psycopg://starit:starit@localhost:5432/starit
+      STARIT_DATABASE_URL: postgresql+psycopg://ai_app:starit-app@localhost:5432/starit
+      STARIT_MIGRATION_DATABASE_URL: postgresql+psycopg://starit:starit@localhost:5432/starit
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

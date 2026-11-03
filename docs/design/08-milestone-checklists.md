@@ -133,3 +133,118 @@ make lint && make test
 | **新增（计划外）** | `starit_api/errors.py` 和 `deps.py`：统一错误格式、`get_identity`、`require_roles`；取不到公钥时返回 503；`pyproject.toml` 里对 FastAPI 的 `Depends` 放宽了 ruff 的 B008 |
 | 开始前不确定的事 | Keycloak 26.8.1 的 realm 导入一次成功；健康检查用管理端口 9000 加 bash 的 `/dev/tcp`，有效；`make up` 现在多等约 10–30 秒 |
 | 镜像版本 | `quay.io/keycloak/keycloak:26.8.1` |
+
+---
+
+## M2 数据模型与权限核心
+
+状态：**已完成，待合并**（分支 `m2-data-permissions`）。这是整个项目最关键的安全基础，不需要 OpenAI 密钥。
+
+### 用户的决定（2026-11-02，对本清单初稿的回复）
+
+| # | 问题 | 决定 |
+|---|---|---|
+| 1 | 数据库账号 | `starit`（所有者，迁移）、`ai_app`（应用）、`ai_sql_ro`（只读，不能登录，`SET LOCAL ROLE` 切换）。**通过** |
+| 2 | 视图可见范围 | 坚持"员工只看本校区"，并据此**修改评测集和样本数据**。同时澄清：**政策文件**全公司一份，只按角色控制，与校区无关；**结构化数据和校区资料**按数据范围（全公司 / 本校区 / 仅本人）控制。`hr`、`finance`（总部职能）为全公司范围。这与企业后台常见的"数据权限"一致，**采纳** |
+| 3 | 账号命名 | `<名>.<职能>.<校区>`，对应真实员工。**通过**（9 个账号，见 sample-data README） |
+| 4 | 职级对照 | 1：S1、I1；2：S2、I2；3：S3、I3；4：I4；5：I5；6：M2；7：M3。**写入 README**（已写入 `sample-data/README.md`，并在设计 02 第 4 节） |
+| 5 | 行级过滤 | 只用视图 `WHERE`，不用 RLS。**通过**（RLS 与视图的区别已向用户解释，以后可作为第二道保险） |
+
+### M2.0 样本数据与评测集修订（已完成）
+
+| 项 | 内容 |
+|---|---|
+| 样本数据 | HR、财务、IT、教务办 5 名总部职能员工从成都（CD）改到总部北京（BJ）；工单的校区改为**开单人所在校区**（只改 `campus_id` 列，其余随机数据不变，用校验证实） |
+| 新增 | `demo-accounts.csv`：9 个演示账号，对应真实员工或学员；职级档位 |
+| 评测集 | `sql-qa.jsonl` 从 16 题增加到 33 题：每题带 `asker`（账号）、`role`、`scope`、`should_answer`；全公司 16、本校区 7、仅本人 3、越权应拒绝 7；答案只按该账号可见的行计算 |
+| 生成器 | `tools/generate_structured.py` 增加数据范围函数 `visible()`（与视图规则一致）；脚本带断言，演示账号指向的人变了会立即报错；运行两次结果相同（确定性） |
+| README | `sample-data/README.md` 新增"Who can see what""Job levels""Demo accounts"；顶层与 AI 模块 README 加了指引；评测题总数 87 |
+| 设计文档 | 02（三个账号、两类访问控制、过滤条件、职级对照表、视图规则、防篡改）、01（令牌增加 `employee_id` / `student_id`、账号命名）、03（`/me`）、05（评测集构成）已更新 |
+
+### 计划的文件（`ai-module/` 下，除非另写）
+
+| 文件 | 作用 |
+|---|---|
+| `migrations/versions/0002_knowledge_tables.py` | `ai.documents`、`document_chunks`（`tsv`、`identifiers`、反规范化的权限字段、`min_level_rank`）、`chunk_embeddings`、`chunk_derived`、`ingestion_jobs`，及索引 |
+| `migrations/versions/0003_conversation_audit_eval.py` | `ai.conversations`、`messages`、`runs`、`audit_log`、`eval_runs`、`eval_results`；创建 `ai_app`；授权（`audit_log` 只 INSERT）；一致性检查视图 `ai.v_chunk_permission_drift` |
+| `migrations/versions/0004_biz_and_sql_views.py` | `biz` 的 7 张表；`ai_sql` 的白名单视图；`ai_sql_ro` 角色（不能登录）及授权；撤销 `set_config` 的 `PUBLIC` 执行权限 |
+| `packages/core/src/starit_core/permissions.py` | 访问等级展开表、职级档对照、`COMPANY_WIDE_ROLES`、**统一的检索权限过滤函数**（SQLAlchemy 表达式，不拼字符串） |
+| `packages/core/src/starit_core/documents.py` | 文档服务：登记文档、修改权限或状态时**同一事务**更新文档和全部分块，并写审计 |
+| `packages/core/src/starit_core/audit.py` | 写审计记录 |
+| `packages/core/src/starit_core/sqlaccess.py` | 在事务里设置身份变量并 `SET LOCAL ROLE ai_sql_ro` |
+| `packages/core/src/starit_core/auth.py`（改） | `Identity` 增加 `employee_id`、`student_id` |
+| `packages/core/src/starit_core/config.py`（改） | `migration_database_url`、应用账号密码 |
+| `migrations/env.py`（改） | 迁移用库所有者连接 |
+| `scripts/seed_biz.py`（新）、`Makefile`（改） | `make seed-biz`：导入 `sample-data/structured/*.csv` |
+| `scripts/build_realm.py`（新） | 从 `demo-accounts.csv` 生成 `starit-realm.json`，保证账号与样本数据一致 |
+| `deploy/compose/compose.yaml`、`.env.example`（改） | api 用 `ai_app` 连接；增加迁移连接和应用账号密码变量 |
+| `deploy/compose/keycloak/starit-realm.json`（重新生成） | 9 个账号，新属性 `employee_id` / `student_id` |
+| `apps/api/tests/integration/test_keycloak.py`、`README.md`（改） | 账号改名后的测试和文档 |
+| `packages/core/tests/test_permissions.py`（新，单元） | 展开表与 `manifest.csv` 逐行对照；职级档对照 |
+| `packages/core/tests/integration/`（新，需要数据库） | 权限矩阵、文档服务、审计、视图、安全防线 |
+
+### 计划的命令
+
+```bash
+git switch -c m2-data-permissions        # 已创建
+make up && make migrate                  # 迁移现在以库所有者身份运行
+make seed-biz
+make test
+make lint
+```
+
+### 验证标准
+
+1. **迁移**：全新数据库上从头升级成功；降级再升级也成功。
+2. **展开表**：`manifest.csv` 的 28 行逐行展开后，等于评测集的访问模型（单元测试）。
+3. **权限矩阵（差分测试）**：往数据库写入覆盖各访问等级、校区范围、`allowed_users`、职级档、状态的分块，对 7 个角色 × 多个校区 × 多个职级档，用**独立写的 Python 判定**与 SQL 过滤函数比对，必须完全一致，包括 `hr`、`finance` 的全公司范围。
+4. **最小权限**：`Admin`、`RAGETLAdmin`（没有其他业务角色）查不到任何文档分块；没有角色或只有未知角色的身份什么也查不到。
+5. **文档服务**：修改权限或状态后，文档与所有分块同一事务一致；中途抛异常整体回滚；一致性检查视图为空。
+6. **审计**：`ai_app` 能插入，**不能 UPDATE 或 DELETE**。
+7. **SQL 视图**：对 9 个演示账号，各视图返回的行数与用 CSV 独立计算的预期一致（按"数据范围"表）；`ai_sql_ro` 读不到 `biz` 原表和 `ai` 的任何表；没有身份变量时视图返回空；评测集里答案可由视图查询得到的题，视图结果与 `expected_answer` 一致。
+8. **防篡改**：以 `ai_sql_ro` 身份执行 `SELECT set_config('app.roles','hr',true)` 被权限拒绝；`SET LOCAL ROLE ai_sql_ro` 流程可用。
+9. M1 的集成测试在账号改名和新增属性后仍通过；CI 通过。
+
+### 开始前不确定的事
+
+- `tsv` 做成生成列时，Postgres 要求表达式 immutable，`array_to_string` 可能不满足；若被拒绝，改用触发器维护 `tsv`。
+- 在 `pg_catalog` 里撤销系统函数的执行权限，需要确认在 pgvector 镜像里可行，并且不影响 Alembic 与应用的正常使用（测试里验证）。
+- 迁移里读取环境变量创建 `ai_app` 的密码，需要确认写法在本地和 CI 都可用。
+- `ai_app` 成为非超级用户后，`/healthz` 与 M1 的测试是否需要补授权。
+- 已有的 `starit-ai_pgdata` 数据卷里是 M0、M1 的旧库：迁移是向前的，不需要清空；但 Keycloak 的卷里旧 realm 不会重新导入，账号改名后需要 `make clean` 或删除 `keycloakdata` 卷（只丢失演示数据）。
+
+### 实际结果
+
+**验证标准**（全部满足；本地 117 个测试全部通过，含集成测试；M1 为 43 个）：
+
+| # | 结果 |
+|---|---|
+| 1 迁移 | 全新数据库上升级、降级到 0001、再升级成功（自动化测试，用临时数据库）；干净环境 `make clean && make up` 也成功 |
+| 2 展开表 | `manifest.csv` 28 行逐行与评测集的访问模型一致，管理角色不在任何展开结果里 |
+| 3 权限矩阵 | 216 份文档（访问等级 × 校区 × 状态 × 职级要求 × 点名用户）和 384 种调用者（角色组合 × 校区 × 职级 × 用户）逐一比对，SQL 过滤与独立的 Python 规则**完全一致**，查询以 `ai_app` 角色执行 |
+| 4 最小权限 | 只有 `Admin` / `RAGETLAdmin`、没有角色或只有未知角色时，查不到任何分块；被文档点名的用户除外（按设计） |
+| 5 文档服务 | 修改权限或状态后文档与所有分块一致；中途失败整体回滚且不留审计记录；一致性检查视图能发现直接改库造成的不一致 |
+| 6 审计 | `ai_app` 能插入；UPDATE、DELETE、TRUNCATE、SELECT 均被权限拒绝 |
+| 7 SQL 视图 | 9 个演示账号 × 7 个视图，返回的行与独立计算的预期**完全一致**；评测集 26 道应回答的题中，17 道（SQL-03、07、11、12、14–26）能由视图查询得出与 `expected_answer` 相同的结果；7 道应拒绝的题，对应数据对提问者不可见（行数为 0） |
+| 8 防篡改 | 查询里调用 `set_config` 被拒绝；`ai_sql_ro` 读不到 `biz` 原表、`ai` 的任何表、`public` 的表 |
+| 9 M1 与 CI | M1 的集成测试在账号改名后通过；GitHub CI 通过（含 Keycloak、全部集成测试，用时约 1 分 49 秒） |
+
+**变异检查**：临时削弱过滤规则（去掉职级、让所有人享有全公司范围、放行草稿、忽略点名用户），差分测试每次都失败，说明测试能发现这类退化；之后已恢复。
+
+**与计划不一致或新增的地方：**
+
+| 项 | 说明 |
+|---|---|
+| 迁移划分 | 数据库角色在 0002 创建（计划在 0003）；降级**不删除**集群共享的角色 |
+| `up` 流程 | compose 新增一次性的 `migrate` 服务，API 等它完成；否则全新环境里应用账号还不存在，API 无法通过健康检查 |
+| 辅助函数授权 | 视图里调用的 `ai_auth` 函数以调用者权限执行，所以对 `ai_sql_ro` 开放了 `USAGE` / `EXECUTE`（它们只读调用者自己的身份）；因此去掉了"不能调用 `ai_auth.has_role`"的测试项 |
+| 生成列 | `array_to_string` 非 IMMUTABLE，用声明为 IMMUTABLE 的包装函数解决（开始前的不确定项，已验证可行） |
+| `set_config` 限制 | 撤销 PUBLIC 的执行权限可行，已被测试证明有效 |
+| 评测题 SQL-31 | 学员问"我的校区有多少讲师"，原题（学员数）会被学员自己的一行数据误答，改成员工表的问题，并重新生成评测集 |
+| 命令 | `make seed-biz` 为本地开发新增；账号改名后，已有环境需要 `make clean` 重新导入 Keycloak realm |
+| 新增脚本 | `scripts/build_realm.py` 从 `demo-accounts.csv` 生成 realm，账号与样本数据始终一致 |
+
+**已知限制（诚实记录）：**
+- Postgres 无法用权限禁止对自定义配置项 `app.*` 的 `SET` 语句。当前防线是：`set_config` 只授予 `ai_app`；执行入口只接受单条 `SELECT`（测试覆盖了拒绝多语句和 `SET` 的入口检查，**不是数据库本身拒绝 `SET`**）。语句校验（视图和函数白名单）在 M6 加入。
+- 评测集中 9 道应回答的题（SQL-01、02、04、05、06、08、09、10、13）的答案核对留到 M6，那时 SQL Agent 才会生成对应的查询。
+- 旧版 `.env` 里的 `STARIT_DATABASE_URL` 仍指向库所有者，需要手动改（README 已说明）。

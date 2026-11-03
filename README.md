@@ -22,7 +22,7 @@ The goals are to show how the pieces fit together in a realistic business settin
 - A synthetic data set for the fictional company StarIT Education (see [Sample data](#sample-data)):
   - 28 documents in HR, Finance and Technical Support, in mixed formats (docx, pdf, md, txt)
   - 7 structured tables (campuses, employees, expense claims, support tickets, students, assignments, submissions)
-  - 70 evaluation questions with expected answers
+  - 87 evaluation questions with expected answers
   - Deliberate retrieval challenges: superseded policy versions, role-based access, exact identifiers, paraphrases, multi-document reasoning, unanswerable questions
 
 **Planned**
@@ -96,7 +96,7 @@ The embedding model is configurable by provider, model name and dimensions. Chan
 
 Everything in [`ai-module/sample-data/`](ai-module/sample-data/) is **synthetic**. StarIT Education is fictional; names, numbers, policies, URLs (`*.starit.example`) and the tax ID are invented. The policies follow common practice in the IT training industry and do not describe any real company. The English data set comes first; a Chinese version is planned.
 
-See the [sample-data README](ai-module/sample-data/README.md) for the file list, the built-in retrieval challenges and the access model.
+See the [sample-data README](ai-module/sample-data/README.md) for the file list, the built-in retrieval challenges, the access model (role-based for policy documents, data scope for campus data), the job levels and the demo accounts.
 
 ## Testing and validation
 
