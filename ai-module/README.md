@@ -54,3 +54,5 @@ The Keycloak admin console is at http://localhost:8080 (user `admin`, password `
 The services use the usual default ports (Postgres 5432, Redis 6379, object storage 9000/9001, API 8000). If one is taken on your machine, change it in `.env` (created from `.env.example` by `make up`). `make down` stops the services and keeps the data; `make clean` also deletes the data volumes.
 
 The design documents are in [`../docs/design/`](../docs/design/).
+
+The job levels used in the sample data (I, S and M ladders and the 1 to 7 grade), the demo accounts and the data-scope rules are explained in [`sample-data/README.md`](sample-data/README.md).

@@ -96,11 +96,12 @@ ai-module/
   - 业务角色：`student`、`staff`、`manager`、`hr`、`finance`，与评测集的访问模型一一对应。
   - 管理角色：`Admin`、`RAGETLAdmin`。
 - **不设 `SchoolAdmin`**：校区管理者用 `manager` 角色 + `campus_id` 属性表达（样例中的 Campus Director，职级 M3）。
-- 属性（JWT 声明）：用户 ID、角色、`campus_id`、`level`（来自 `employees.csv`）；部门等其余字段预留。
+- 属性（JWT 声明）：用户 ID、角色、`campus_id`、`level`（来自 `employees.csv`）、`employee_id` 或 `student_id`（用于"只看本人"）；部门等其余字段预留。
+- 数据范围：政策文件按角色控制，结构化数据和校区资料按数据范围（全公司 / 本校区 / 仅本人）控制；`hr`、`finance` 为全公司范围。详见 02。
 - `Admin`：管理用户、分配角色、系统配置。**默认不读受限文档内容**（最小权限）；需要读内容时必须同时拥有相应业务角色。
 - `RAGETLAdmin`：上传、删除、重新入库文档，查看入库状态；读取文档内容仍按其业务角色。
 - api 与 MCP Server 各自校验 JWT，不信任前端传来的任何身份字段。
-- 测试账号：每个角色至少一个，另加针对校区的账号（北京 staff、上海 staff、上海 manager），用于测"同角色不同校区"。第二阶段可加 `Auditor`（只读审计日志）。
+- 测试账号命名为 `<名>.<职能>.<校区>`，每个账号对应样本数据里真实的人（见 `ai-module/sample-data/demo-accounts.csv`）：`wei.stu.sh`、`ning.adm.bj`、`wei.acad.sh`、`ling.mgr.bj`、`peng.mgr.sh`、`qing.hr.bj`、`ning.fin.bj`、`tao.admin.bj`、`min.ragetl.bj`，用于测"同角色不同校区"。M1 时的旧账号名在 M2 中替换。第二阶段可加 `Auditor`（只读审计日志）。
 
 ### 4.4 流程控制：LangGraph 状态图【建议】
 
