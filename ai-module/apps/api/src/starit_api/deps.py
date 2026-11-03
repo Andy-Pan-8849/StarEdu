@@ -4,12 +4,30 @@ from collections.abc import Callable
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncEngine
+from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import AuthError, AuthUnavailableError, Identity, TokenVerifier
+from starit_core.ratelimit import RateLimiter
 
 from starit_api.errors import ApiError
 
 _bearer = HTTPBearer(auto_error=False)
 _CHALLENGE = {"WWW-Authenticate": "Bearer"}
+
+
+def get_engine(request: Request) -> AsyncEngine:
+    engine: AsyncEngine = request.app.state.engine
+    return engine
+
+
+def get_runtime(request: Request) -> AgentRuntime:
+    runtime: AgentRuntime = request.app.state.runtime
+    return runtime
+
+
+def get_limiter(request: Request) -> RateLimiter:
+    limiter: RateLimiter = request.app.state.limiter
+    return limiter
 
 
 def get_verifier(request: Request) -> TokenVerifier:

@@ -53,6 +53,27 @@ class Settings(BaseSettings):
     rerank_passage_tokens: int = 350  # each passage is cut to this many tokens in the rerank prompt
     model_rerank: str = "openai/gpt-6-luna"
 
+    # The assistant (docs/design/04-agent-flow.md). One model per step, so each can be changed.
+    model_understand: str = "openai/gpt-6-luna"
+    model_generate: str = "openai/gpt-6-luna"
+    agent_history_turns: int = 6  # earlier turns are dropped, not summarised
+    agent_max_input_chars: int = 2000
+    agent_max_llm_calls: int = 6  # per run, including the reranker
+    agent_max_clarifications: int = 2
+    agent_retrieval_retries: int = 1
+    agent_verify_retries: int = 1
+    agent_run_timeout_seconds: float = 60.0
+    agent_llm_timeout_seconds: float = 30.0
+    agent_recursion_limit: int = 20
+    # The first of two gates before answering: the best passage must score at least this much
+    # in the rerank (0-10). The second gate is the answer step saying the passages are enough.
+    grade_min_rerank_score: float = 6.0
+    # Hidden matches count as "there is restricted content" above this keyword score. On the
+    # sample questions, questions about restricted documents scored 0.57-0.74 and unanswerable
+    # ones 0.09-0.41 (docs/design/08-milestone-checklists.md, M5).
+    grade_restricted_min_keyword_score: float = 0.5
+    rate_limit_chat_per_minute: int = 20
+
     # Chunking (tokens counted with the cl100k_base tokenizer).
     chunk_target_tokens: int = 400
     chunk_max_tokens: int = 500

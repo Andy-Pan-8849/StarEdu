@@ -4,6 +4,8 @@ Milestone M5 extends this with streaming and tool calls. For now it serves the r
 only needs one short answer per call.
 """
 
+import json
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -28,6 +30,7 @@ class ChatClient(Protocol):
         model: str,
         json_mode: bool = False,
         max_tokens: int | None = None,
+        request_timeout: float | None = None,
     ) -> ChatResult: ...
 
 
@@ -41,6 +44,7 @@ class LiteLLMChatClient:
         model: str,
         json_mode: bool = False,
         max_tokens: int | None = None,
+        request_timeout: float | None = None,
     ) -> ChatResult:
         import litellm  # imported here: it is slow to import
 
@@ -56,6 +60,8 @@ class LiteLLMChatClient:
             options["response_format"] = {"type": "json_object"}
         if max_tokens is not None:
             options["max_tokens"] = max_tokens
+        if request_timeout is not None:
+            options["timeout"] = request_timeout
         try:
             response = await litellm.acompletion(
                 model=model, messages=[dict(m) for m in messages], **options
@@ -86,6 +92,7 @@ class FakeChatClient:
         model: str,
         json_mode: bool = False,
         max_tokens: int | None = None,
+        request_timeout: float | None = None,
     ) -> ChatResult:
         self.calls.append([dict(m) for m in messages])
         if callable(self._answer):
@@ -97,3 +104,17 @@ class FakeChatClient:
             input_tokens=sum(len(m["content"]) // 4 for m in messages),
             output_tokens=len(text) // 4,
         )
+
+
+_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+
+
+def parse_json_object(text: str) -> dict[str, Any]:
+    """Read a model's answer as one JSON object (code fences tolerated)."""
+    try:
+        data = json.loads(_FENCE.sub("", text.strip()))
+    except json.JSONDecodeError as exc:
+        raise ChatError(f"the answer is not valid JSON: {exc.msg}") from exc
+    if not isinstance(data, dict):
+        raise ChatError("the answer is not a JSON object")
+    return data
