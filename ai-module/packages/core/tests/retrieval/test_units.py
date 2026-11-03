@@ -201,14 +201,17 @@ def test_the_default_rerank_limit_shows_a_whole_chunk() -> None:
     settings = Settings(_env_file=None)
     assert settings.rerank_passage_tokens >= settings.chunk_max_tokens
 
-    filler = "Courseware downloads are limited per month. " * 45  # about 450 tokens
+    filler = "Courseware downloads are limited per month. " * 45  # 361 tokens
     tail = "ERR-PORTAL-429 | Download quota used up | Wait for the 1st of the month"
     chunk = candidate(text=filler + tail)
-    assert 400 < count_tokens(filler) < settings.chunk_max_tokens
+    assert 350 < count_tokens(filler) < settings.chunk_max_tokens  # the tail is past the old cut
     user = build_messages(
         "What does ERR-PORTAL-429 mean?", [chunk, candidate()], settings.rerank_passage_tokens
     )[1]["content"]
     assert "Download quota used up" in user
+    # ...and the old limit really would have hidden it, so this test fails if the limit is lowered.
+    cut = build_messages("What does ERR-PORTAL-429 mean?", [chunk, candidate()], 350)[1]["content"]
+    assert "Download quota used up" not in cut
 
 
 def test_the_understanding_prompt_keeps_technical_support_in_scope() -> None:
