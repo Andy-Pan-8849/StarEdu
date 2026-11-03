@@ -118,6 +118,7 @@ def citation_info(number: int, c: Candidate) -> dict[str, Any]:
         "heading_path": c.heading_path,
         "page": c.page,
         "chunk_id": str(c.chunk_id),
+        "document_id": str(c.document_id),
         "kind": "document",
     }
 

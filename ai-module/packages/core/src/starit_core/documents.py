@@ -7,14 +7,15 @@ change the document and all of its chunks in one transaction.
 
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from starit_core.audit import write_audit
 from starit_core.auth import Identity
-from starit_core.permissions import expand_access_level
+from starit_core.permissions import chunk_access_clause, chunks, expand_access_level
 
 STATUSES = ("active", "superseded", "draft")
 
@@ -273,3 +274,152 @@ async def set_content(
             doc_ids=[str(document_id)],
             details={"content_hash": content_hash},
         )
+
+
+# --- reading and managing documents through the API -------------------------------------------
+
+_LISTED = (
+    "id, doc_code, title, domain, version, status, effective_date, access_level, allowed_users, "
+    "campus_scope, min_level_rank, format, ingest_status, content_hash, uploaded_by, "
+    "supersedes_id, created_at, updated_at"
+)
+
+
+async def list_documents(
+    conn: AsyncConnection,
+    *,
+    domain: str | None = None,
+    status: str | None = None,
+    ingest_status: str | None = None,
+    q: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Document metadata (never content), newest first. Asks for one row more than `limit`'s worth
+    is the caller's job: pass limit + 1 to learn whether another page exists."""
+    pattern = None
+    if q:
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+    rows = await conn.execute(
+        text(
+            f"SELECT {_LISTED} FROM ai.documents "
+            "WHERE (CAST(:domain AS text) IS NULL OR domain = :domain) "
+            "AND (CAST(:status AS text) IS NULL OR status = :status) "
+            "AND (CAST(:ingest AS text) IS NULL OR ingest_status = :ingest) "
+            "AND (CAST(:q AS text) IS NULL OR title ILIKE :q OR doc_code ILIKE :q) "
+            "ORDER BY created_at DESC, id LIMIT :limit OFFSET :offset"
+        ),
+        {
+            "domain": domain,
+            "status": status,
+            "ingest": ingest_status,
+            "q": pattern,
+            "limit": limit,
+            "offset": offset,
+        },
+    )
+    return [dict(r) for r in rows.mappings()]
+
+
+async def get_document(conn: AsyncConnection, document_id: UUID) -> dict[str, Any] | None:
+    row = (
+        (
+            await conn.execute(
+                text(f"SELECT {_LISTED}, object_key FROM ai.documents WHERE id = :id"),
+                {"id": document_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None
+
+
+async def list_jobs(conn: AsyncConnection, document_id: UUID) -> list[dict[str, Any]]:
+    rows = await conn.execute(
+        text(
+            "SELECT id, status, stage, attempt, max_attempts, error_code, error_message, "
+            "started_at, finished_at FROM ai.ingestion_jobs WHERE document_id = :d "
+            "ORDER BY coalesce(started_at, run_after) DESC, id"
+        ),
+        {"d": document_id},
+    )
+    return [dict(r) for r in rows.mappings()]
+
+
+async def update_document(
+    conn: AsyncConnection,
+    document_id: UUID,
+    *,
+    actor: Identity,
+    title: str | None = None,
+    status: str | None = None,
+    access_level: str | None = None,
+    allowed_users: list[str] | None = None,
+    campus_scope: list[str] | None = None,
+    min_level_rank: int | None = None,
+    clear_min_level: bool = False,
+) -> int:
+    """Change metadata and permissions in one step: the document and every chunk together."""
+    sets: dict[str, object] = {}
+    if title is not None:
+        sets["title"] = title
+    if status is not None:
+        if status not in STATUSES:
+            raise ValueError(f"unknown status: {status!r}")
+        sets["status"] = status
+    if access_level is not None:
+        sets["access_level"] = access_level
+        sets["allowed_roles"] = expand_access_level(access_level)
+    if allowed_users is not None:
+        sets["allowed_users"] = allowed_users
+    if campus_scope is not None:
+        sets["campus_scope"] = campus_scope
+    if min_level_rank is not None:
+        sets["min_level_rank"] = min_level_rank
+    elif clear_min_level:
+        sets["min_level_rank"] = None
+    return await _change_document(conn, document_id, sets, actor, "doc.update")
+
+
+async def readable_chunks(
+    conn: AsyncConnection,
+    identity: Identity,
+    document_id: UUID,
+    *,
+    around: UUID | None = None,
+    window: int = 2,
+    limit: int = 50,
+) -> list[dict[str, Any]] | None:
+    """The chunks of a document that `identity` may read (the same condition retrieval uses),
+    or None when there are none: a document you may not read looks like one that does not exist.
+    With `around`, only that chunk and `window` chunks on each side."""
+    statement = (
+        select(
+            chunks.c.id,
+            chunks.c.chunk_index,
+            chunks.c.text,
+            chunks.c.heading_path,
+            chunks.c.page,
+        )
+        .where(chunks.c.document_id == document_id, chunk_access_clause(identity))
+        .order_by(chunks.c.chunk_index)
+    )
+    rows = [dict(r) for r in (await conn.execute(statement)).mappings()]
+    if not rows:
+        return None
+    if around is not None:
+        position = next((i for i, r in enumerate(rows) if r["id"] == around), None)
+        if position is not None:
+            return rows[max(0, position - window) : position + window + 1]
+    return rows[:limit]
+
+
+async def can_read_document(conn: AsyncConnection, identity: Identity, document_id: UUID) -> bool:
+    found = await conn.execute(
+        select(chunks.c.id)
+        .where(chunks.c.document_id == document_id, chunk_access_clause(identity))
+        .limit(1)
+    )
+    return found.first() is not None

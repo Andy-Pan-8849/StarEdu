@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime
@@ -19,8 +20,9 @@ from starit_core.embeddings import embedding_client
 from starit_core.llm import LiteLLMChatClient
 from starit_core.logging import configure_logging, request_id_var
 from starit_core.ratelimit import RedisRateLimiter
+from starit_core.storage import S3Storage
 
-from starit_api import conversations
+from starit_api import conversations, documents
 from starit_api.deps import get_identity
 from starit_api.errors import register_error_handlers
 
@@ -41,6 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.log_level)
     engine = create_engine(settings)
     app.state.engine = engine
+    app.state.storage = S3Storage(settings)
     app.state.verifier = TokenVerifier(
         issuer=settings.oidc_issuer,
         audience=settings.oidc_audience_api,
@@ -68,6 +71,15 @@ def create_app() -> FastAPI:
     app = FastAPI(title="StarEdu AI API", version="0.0.0", lifespan=lifespan)
     register_error_handlers(app)
     app.include_router(conversations.router)
+    app.include_router(documents.router)
+    origins = [o.strip() for o in get_settings().cors_origins.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
+        expose_headers=["X-Request-Id", "Content-Disposition"],
+    )
 
     @app.middleware("http")
     async def request_id_middleware(

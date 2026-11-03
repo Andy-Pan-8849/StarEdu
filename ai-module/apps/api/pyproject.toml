@@ -7,6 +7,7 @@ dependencies = [
     "fastapi>=0.115",
     "starit-core",
     "uvicorn>=0.30",
+    "python-multipart>=0.0.20",
 ]
 
 [build-system]
