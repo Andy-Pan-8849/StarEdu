@@ -17,7 +17,7 @@ sample-data/
 ├── demo-accounts.csv     the demo users: who they are in the data, their role, campus and job level
 ├── eval/
 │   ├── qa-set.jsonl      54 questions about the documents, with expected answers and sources
-│   └── sql-qa.jsonl      33 questions answerable from the CSV tables, each asked by a named account,
+│   └── sql-qa.jsonl      41 questions answerable from the CSV tables, each asked by a named account,
 │                         with reference answers computed from the rows that account may see
 ├── _markdown-source/     editable Markdown sources of the documents
 └── tools/

@@ -49,7 +49,9 @@ class AgentRuntime:
         embedder: EmbeddingClient,
         chat: ChatClient,
         retrieve_fn: RetrieveFn = retrieve,
+        data_tools: Any = None,
     ) -> None:
+        self._data_tools = data_tools
         self._engine = engine
         self._settings = settings
         self._chat = chat
@@ -61,7 +63,14 @@ class AgentRuntime:
     def graph(self) -> Any:
         return self._graph
 
-    async def run(self, identity: Identity, conversation_id: UUID, user_text: str) -> RunResult:
+    async def run(
+        self,
+        identity: Identity,
+        conversation_id: UUID,
+        user_text: str,
+        *,
+        access_token: str | None = None,
+    ) -> RunResult:
         settings = self._settings
         run_id = uuid4()
         started_at = datetime.now(UTC)
@@ -77,6 +86,8 @@ class AgentRuntime:
             totals=totals,
             chat=chat,
             reranker=LLMReranker(chat, settings.model_rerank, settings.rerank_passage_tokens),
+            data_tools=self._data_tools,
+            access_token=access_token,
         )
         config: dict[str, Any] = {
             "configurable": {"ctx": ctx},

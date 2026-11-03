@@ -429,6 +429,48 @@ ask(STU, "How many instructors (levels I1 to I5) work at my campus?", None, ["em
 ask("admin.bj", "How many employees in total are in the employees table?", None, ["employees"], scope="none")
 ask("ragetl.bj", "How many active students are enrolled in the Java program?", None, ["students"], scope="none")
 
+# Questions that one of the assistant's data tools answers directly (an id or a plain filter), and
+# two that it must not: a student asking about claims, a staff member asking about a colleague's claim.
+def ask_tool(who_key, question, answer, tool, tables, *, scope):
+    who = WHO[who_key]
+    qa.append({"id": f"SQL-{len(qa) + 1:02d}", "type": "tool" if answer is not None else "tool-scope",
+               "tool": tool, "question": question,
+               "expected_answer": REFUSE if answer is None else str(answer),
+               "tables": tables, "asker": who["username"], "role": who["role"], "scope": scope,
+               "should_answer": answer is not None})
+
+
+a_by_id = {a["assignment_id"]: a for a in assignments}
+first = sorted(mine, key=lambda x: x["assignment_id"])[0]
+ask_tool(STU, f"What was my final score on assignment {first['assignment_id']}?", first["final_score"],
+         "get_student_progress", ["submissions"], scope="own")
+ask_tool(STU, "List the Python assignments and their due dates.",
+         len([a for a in assignments if a["program"] == "python"]), "list_assignments",
+         ["assignments"], scope="all")
+own_claims = visible("expense_claims", WHO[BJS])
+claim = sorted(own_claims, key=lambda c: c["claim_id"])[0]
+ask_tool(BJS, f"What is the status of my expense claim {claim['claim_id']}?", claim["status"],
+         "get_expense_claim_status", ["expense_claims"], scope="own")
+status = sorted({c["status"] for c in own_claims})[0]
+ask_tool(BJS, f"List my expense claims with status {status}.",
+         ", ".join(sorted(c["claim_id"] for c in own_claims if c["status"] == status)),
+         "list_my_expense_claims", ["expense_claims"], scope="own")
+sh_students = visible("students", WHO[SHM])
+ask_tool(SHM, "How many active TypeScript students are at my campus? List them.",
+         len([s for s in sh_students if s["status"] == "active" and s["program"] == "typescript"]),
+         "list_students", ["students"], scope="campus")
+one = sorted(sh_students, key=lambda x: x["student_id"])[0]
+one_subs = [s for s in visible("submissions", WHO[SHM]) if s["student_id"] == one["student_id"]]
+ask_tool(SHM, f"How many assignments has student {one['student_id']} submitted late?",
+         len([s for s in one_subs if s["hours_late"] > 0]), "get_student_progress",
+         ["students", "submissions"], scope="campus")
+ask_tool(STU, "What is the status of expense claim C0001?", None, "get_expense_claim_status",
+         ["expense_claims"], scope="own")
+other = sorted((c for c in claims if c["employee_id"] != WHO[BJS]["subject_id"]),
+               key=lambda c: c["claim_id"])[0]
+ask_tool(BJS, f"What is the status of expense claim {other['claim_id']}?", None,
+         "get_expense_claim_status", ["expense_claims"], scope="own")
+
 with open(EVAL / "sql-qa.jsonl", "w", encoding="utf-8") as f:
     for r in qa:
         f.write(json.dumps(r, ensure_ascii=False) + "\n")

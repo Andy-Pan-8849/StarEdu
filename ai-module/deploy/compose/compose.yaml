@@ -122,6 +122,41 @@ services:
       objectstore:
         condition: service_healthy
 
+  mcp-server:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/python.Dockerfile
+      args:
+        APP: mcp-server
+    command: ["starit-mcp-server"]
+    restart: unless-stopped
+    environment:
+      STARIT_ENV: ${STARIT_ENV:-dev}
+      STARIT_LOG_LEVEL: ${STARIT_LOG_LEVEL:-INFO}
+      STARIT_DATABASE_URL: postgresql+psycopg://ai_app:${STARIT_APP_DB_PASSWORD:-starit-app}@postgres:5432/${POSTGRES_DB:-starit}
+      STARIT_OIDC_ISSUER: http://localhost:${STARIT_KEYCLOAK_PORT:-8080}/realms/starit
+      STARIT_OIDC_JWKS_URL: http://keycloak:8080/realms/starit/protocol/openid-connect/certs
+      STARIT_MCP_PORT: 8100
+      STARIT_MCP_URL: http://localhost:${STARIT_MCP_PORT:-8100}/mcp
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "${STARIT_MCP_PORT:-8100}:8100"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8100/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: ../..
@@ -146,6 +181,8 @@ services:
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       STARIT_RATE_LIMIT_CHAT_PER_MINUTE: ${STARIT_RATE_LIMIT_CHAT_PER_MINUTE:-20}
+      STARIT_DATA_TOOLS_BACKEND: mcp
+      STARIT_MCP_URL: http://mcp-server:8100/mcp
     ports:
       - "${STARIT_API_PORT:-8000}:8000"
     depends_on:
@@ -158,6 +195,8 @@ services:
       objectstore:
         condition: service_healthy
       keycloak:
+        condition: service_healthy
+      mcp-server:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/healthz', timeout=3)"]

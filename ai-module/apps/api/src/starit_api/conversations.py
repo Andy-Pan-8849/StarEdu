@@ -13,7 +13,7 @@ from starit_core.auth import Identity
 from starit_core.config import get_settings
 from starit_core.ratelimit import RateLimiter
 
-from starit_api.deps import get_engine, get_identity, get_limiter, get_runtime
+from starit_api.deps import get_access_token, get_engine, get_identity, get_limiter, get_runtime
 from starit_api.errors import ApiError
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -157,6 +157,7 @@ async def post_message(
     engine: AsyncEngine = Depends(get_engine),
     runtime: AgentRuntime = Depends(get_runtime),
     limiter: RateLimiter = Depends(get_limiter),
+    access_token: str | None = Depends(get_access_token),
 ) -> dict[str, Any]:
     conversation = await _owned(engine, identity, conversation_id)
     if conversation["archived"]:
@@ -166,7 +167,9 @@ async def post_message(
         raise ApiError(
             429, "rate_limited", "Too many messages; wait a minute", {"Retry-After": "60"}
         )
-    result = await runtime.run(identity, conversation_id, body.content.strip())
+    result = await runtime.run(
+        identity, conversation_id, body.content.strip(), access_token=access_token
+    )
     return {
         "run_id": str(result.run_id),
         "message": {

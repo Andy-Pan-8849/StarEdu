@@ -49,6 +49,18 @@ def generate_json(
     return json.dumps({"sufficient": sufficient, "answer": answer, "citations": list(citations)})
 
 
+def plan_json(path: str = "sql", tool: str = "", **arguments: Any) -> str:
+    return json.dumps({"path": path, "tool": tool, "arguments": arguments})
+
+
+def sql_json(sql: str = "SELECT count(*) AS n FROM ai_sql.students") -> str:
+    return json.dumps({"sql": sql})
+
+
+def answer_data_json(answer: str = "The data shows 3 [1].") -> str:
+    return json.dumps({"answer": answer})
+
+
 def step_of(messages: Sequence[Mapping[str, str]]) -> str:
     system = messages[0]["content"]
     if "intake step" in system:
@@ -59,6 +71,12 @@ def step_of(messages: Sequence[Mapping[str, str]]) -> str:
         return "rewrite"
     if "rank passages" in system:
         return "rerank"
+    if "data access planner" in system:
+        return "plan"
+    if "Write one SQL" in system:
+        return "sql"
+    if "You answer from data" in system:
+        return "answer_data"
     return "unknown"
 
 
@@ -171,13 +189,16 @@ class Harness:
         self.owner, self.app, self.identity = owner, app, identity
         self.conversation_id: UUID | None = None
 
-    async def runtime(self, chat: Any, retrieval: Any, **settings: Any) -> AgentRuntime:
+    async def runtime(
+        self, chat: Any, retrieval: Any, *, data_tools: Any = None, **settings: Any
+    ) -> AgentRuntime:
         return AgentRuntime(
             engine=self.app,
             settings=Settings(_env_file=None, embedding_provider="fake", **settings),
             embedder=FakeEmbeddingClient(),
             chat=chat,
             retrieve_fn=retrieval,
+            data_tools=data_tools,
         )
 
     async def conversation(self) -> UUID:

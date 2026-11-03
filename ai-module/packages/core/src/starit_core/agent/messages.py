@@ -9,6 +9,11 @@ NOT_FOUND = (
     "answer that. Please check the wording, or ask the relevant team."
 )
 
+NO_MATCHING_ROWS = (
+    "I could not find any records matching that among the data available to your account. "
+    "Please check the wording, or ask the relevant team."
+)
+
 CLARIFICATION_LIMIT = (
     "I still could not work out what you are asking. Please rephrase the question with more "
     "detail, or contact support."
@@ -23,17 +28,13 @@ CHITCHAT = (
 
 REFUSED = {
     "out_of_scope": (
-        "I can only help with questions about StarIT Education's policies and procedures: "
-        "HR, finance and technical support."
+        "I can only help with questions about StarIT Education's policies and procedures "
+        "(HR, finance and technical support) and with looking up your business data."
     ),
     "input_blocked": "I cannot process that message. Please ask your question in plain words.",
     "write_not_enabled": (
         "I cannot make changes or submit anything for you yet. I can explain the policy or "
         "the steps to do it yourself."
-    ),
-    "not_available_yet": (
-        "Looking up business data (such as employee, student or claim records) is not "
-        "available yet. I can answer questions about policies and procedures."
     ),
 }
 

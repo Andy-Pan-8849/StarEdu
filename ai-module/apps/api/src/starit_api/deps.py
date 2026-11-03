@@ -49,6 +49,13 @@ def get_identity(
         raise ApiError(401, "unauthenticated", "Invalid or expired token", _CHALLENGE) from exc
 
 
+def get_access_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> str | None:
+    """The caller's raw token, to be forwarded to the data service. Kept in memory only."""
+    return credentials.credentials if credentials else None
+
+
 def require_roles(*roles: str) -> Callable[[Identity], Identity]:
     """Allow the call only when the caller has at least one of the given roles."""
     wanted = frozenset(roles)

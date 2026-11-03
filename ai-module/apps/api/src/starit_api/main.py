@@ -4,13 +4,16 @@ import logging
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import Identity, TokenVerifier, jwks_key_resolver
-from starit_core.config import get_settings
+from starit_core.config import Settings, get_settings
+from starit_core.dataaccess.client import McpDataTools
+from starit_core.dataaccess.tools import DataTools, DataToolsClient
 from starit_core.db import check_database, create_engine
 from starit_core.embeddings import embedding_client
 from starit_core.llm import LiteLLMChatClient
@@ -24,6 +27,14 @@ from starit_api.errors import register_error_handlers
 logger = logging.getLogger("starit.api")
 
 
+def data_tools(settings: Settings, engine: AsyncEngine, embedder: Any) -> DataToolsClient:
+    """Production calls the MCP server with the user's own token; "local" runs the same tools
+    in this process (single-container setups, tests)."""
+    if settings.data_tools_backend == "mcp":
+        return McpDataTools(settings.mcp_url)
+    return DataTools(engine, settings, embedder)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -35,11 +46,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         audience=settings.oidc_audience_api,
         key_resolver=jwks_key_resolver(settings.oidc_jwks_url),
     )
+    embedder = embedding_client(settings)
     app.state.runtime = AgentRuntime(
         engine=engine,
         settings=settings,
-        embedder=embedding_client(settings),
+        embedder=embedder,
         chat=LiteLLMChatClient(),
+        data_tools=data_tools(settings, engine, embedder),
     )
     limiter = RedisRateLimiter(settings.redis_url)
     app.state.limiter = limiter

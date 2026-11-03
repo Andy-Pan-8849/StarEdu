@@ -9,6 +9,7 @@ and function whitelist) is added with the agent in milestone M6.
 """
 
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from sqlalchemy import text
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from starit_core.auth import Identity
 
 _READ_ONLY = re.compile(r"^\s*(select|with)\b", re.IGNORECASE)
+_COLON = re.compile(r"(?<!:):(?!:)")
 
 
 async def run_as_identity(
@@ -24,6 +26,7 @@ async def run_as_identity(
     identity: Identity,
     sql: str,
     *,
+    params: Mapping[str, Any] | None = None,
     max_rows: int = 200,
     timeout_ms: int = 5000,
 ) -> list[dict[str, Any]]:
@@ -46,7 +49,9 @@ async def run_as_identity(
     await conn.execute(text(f"SET LOCAL statement_timeout = {int(timeout_ms)}"))
     await conn.execute(text("SET LOCAL ROLE ai_sql_ro"))
     # If the query fails the transaction is aborted and SET LOCAL ends with it.
-    result = await conn.execute(text(statement))
+    # Without parameters, a colon in a string literal ('12:30') must not be read as a bind name.
+    statement = statement if params else _COLON.sub(r"\\:", statement)
+    result = await conn.execute(text(statement), params or {})
     rows = [dict(row) for row in result.mappings().fetchmany(max_rows)]
     await conn.execute(text("RESET ROLE"))
     return rows

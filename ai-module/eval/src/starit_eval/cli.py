@@ -53,6 +53,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     agent.add_argument("--yes", action="store_true", help="do not ask before spending")
     agent.add_argument("--out", type=Path, default=DEFAULT_OUT, help="report directory")
+    data = sub.add_parser("data", help="ask the assistant the structured-data questions for real")
+    data.add_argument("--only", action="append", help="a question id (SQL-07); repeatable")
+    data.add_argument("--yes", action="store_true", help="do not ask before spending")
+    data.add_argument("--out", type=Path, default=DEFAULT_OUT, help="report directory")
     args = parser.parse_args(argv)
     if args.command == "retrieval" and not (args.mode or args.all_modes or args.leak_sweep):
         parser.error("choose --mode, --all-modes or --leak-sweep")
@@ -256,9 +260,45 @@ async def run_agent(args: argparse.Namespace) -> int:
     return 0
 
 
+async def run_data(args: argparse.Namespace) -> int:
+    from starit_eval import data_check
+
+    settings = get_settings()
+    questions = data_check.load_data_questions()
+    if args.only:
+        questions = [q for q in questions if q.id in set(args.only)]
+    calls, total = data_check.estimate(settings, questions)
+    print(
+        f"\nThis run asks {len(questions)} questions.\n"
+        f"  model calls (upper bound, no retries): {sum(calls.values())} "
+        f"({calls['understand']} understand, {calls['plan']} plan, {calls['sql']} sql, "
+        f"{calls['answer']} answer)\n"
+        f"  models: understand {settings.model_understand}, plan {settings.model_plan}, "
+        f"sql {settings.model_sql}, answer {settings.model_generate}\n"
+        f"  estimated cost at list price: {'unknown' if total is None else f'about ${total:.3f}'}\n"
+    )
+    if not args.yes and not _proceed():
+        print("Cancelled.")
+        return 1
+    engine = create_engine(settings)
+    run = await data_check.run_data_check(
+        engine,
+        settings,
+        embedding_client(settings),
+        LiteLLMChatClient(),
+        data_check.load_askers(),
+        questions,
+    )
+    path = data_check.write(args.out, run, total)
+    await engine.dispose()
+    print(data_check.summarize_for_console(run))
+    print(f"report: {path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
-    runner = run_agent if args.command == "agent" else run_retrieval
+    runner = {"agent": run_agent, "data": run_data}.get(args.command, run_retrieval)
     sys.exit(asyncio.run(runner(args)))
 
 

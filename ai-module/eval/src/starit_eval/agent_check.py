@@ -158,11 +158,11 @@ CASES: tuple[Case, ...] = (
         (
             Turn(
                 "How many employees work at the Shanghai campus?",
-                ("refused",),
-                ("not_available_yet",),
+                ("no_permission",),
+                ("restricted_data",),
             ),
         ),
-        "Data queries arrive with milestone M6.",
+        "A manager of another campus: the query is refused before it runs (M6).",
     ),
 )
 
