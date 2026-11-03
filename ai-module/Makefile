@@ -1,7 +1,7 @@
 # Developer commands for the AI module. Run from the ai-module/ directory.
 COMPOSE = docker compose --env-file .env -f deploy/compose/compose.yaml
 
-.PHONY: help env sync lint fmt test up down logs migrate seed-biz ingest-samples ps token clean
+.PHONY: help env sync lint fmt test up down logs migrate seed-biz ingest-samples eval ps token clean
 
 help:
 	@echo "make env      create .env from .env.example if missing"
@@ -14,6 +14,7 @@ help:
 	@echo "make seed-biz load the sample business tables (sample-data/structured) into the biz schema"
 	@echo "make token ACCOUNT=staff.sh   print an access token for a demo account"
 	@echo "make ingest-samples [ARGS=--wait]   register and queue the 28 sample documents (the worker container processes them)"
+	@echo "make eval ARGS=\"retrieval --all-modes\"   run the retrieval evaluation (prints the estimated cost and asks first)"
 	@echo "make down     stop the services (data volumes are kept)"
 	@echo "make clean    stop the services AND delete their data volumes"
 
@@ -26,7 +27,7 @@ sync:
 lint:
 	uv run ruff check .
 	uv run ruff format --check .
-	uv run mypy packages apps
+	uv run mypy packages apps eval
 
 fmt:
 	uv run ruff check --fix .
@@ -46,6 +47,9 @@ seed-biz: env
 
 ingest-samples: env
 	set -a; . ./.env; set +a; uv run python scripts/ingest_samples.py $(ARGS)
+
+eval: env
+	set -a; . ./.env; set +a; uv run starit-eval $(ARGS)
 
 down: env
 	$(COMPOSE) down

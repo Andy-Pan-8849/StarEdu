@@ -1,10 +1,10 @@
 import pytest
-from starit_core.embeddings import FakeEmbeddingClient, LiteLLMEmbeddingClient
+from starit_core.embeddings import FakeEmbeddingClient, LiteLLMEmbeddingClient, vector_literal
 from starit_core.ingest.clean import clean_document, clean_text
 from starit_core.ingest.errors import IngestError
 from starit_core.ingest.identifiers import extract_identifiers
 from starit_core.ingest.models import Block, Chunk, ParsedDocument
-from starit_core.ingest.pipeline import embedding_input, vector_literal
+from starit_core.ingest.pipeline import embedding_input
 from starit_core.ingest.tokens import count_tokens
 
 

@@ -79,6 +79,11 @@ class FakeEmbeddingClient:
         return [v / norm for v in values]
 
 
+def vector_literal(vector: Sequence[float]) -> str:
+    """A vector in pgvector's text form, for use in a CAST(... AS vector)."""
+    return "[" + ",".join(repr(float(x)) for x in vector) + "]"
+
+
 def embedding_client(settings: Settings) -> EmbeddingClient:
     if settings.embedding_provider == "fake":
         return FakeEmbeddingClient(settings.embedding_dimensions)

@@ -13,3 +13,9 @@ def _encoding() -> tiktoken.Encoding:
 
 def count_tokens(text: str) -> int:
     return len(_encoding().encode(text, disallowed_special=()))
+
+
+def truncate_to_tokens(text: str, limit: int) -> str:
+    """The start of `text`, at most `limit` tokens long."""
+    tokens = _encoding().encode(text, disallowed_special=())
+    return text if len(tokens) <= limit else _encoding().decode(tokens[:limit])

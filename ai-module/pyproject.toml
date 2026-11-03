@@ -9,13 +9,14 @@ dependencies = []
 package = false
 
 [tool.uv.workspace]
-members = ["packages/core", "apps/api", "apps/worker", "apps/mcp-server"]
+members = ["packages/core", "apps/api", "apps/worker", "apps/mcp-server", "eval"]
 
 [tool.uv.sources]
 starit-core = { workspace = true }
 starit-api = { workspace = true }
 starit-worker = { workspace = true }
 starit-mcp-server = { workspace = true }
+starit-eval = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -38,13 +39,16 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 [tool.ruff.lint.per-file-ignores]
 # Test data and SQL strings are clearer on one line.
 "**/tests/**" = ["E501"]
+# Report and console text is prose; wrapping it hurts readability.
+"eval/src/starit_eval/report.py" = ["E501"]
+"eval/src/starit_eval/cli.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency injection is written as Depends(...) in argument defaults.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Security"]
 
 [tool.pytest.ini_options]
-testpaths = ["packages", "apps"]
+testpaths = ["packages", "apps", "eval"]
 addopts = ["--import-mode=importlib"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -54,7 +58,7 @@ markers = ["integration: needs the Compose services (Postgres) to be running"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-mypy_path = ["packages/core/src", "apps/api/src", "apps/worker/src", "apps/mcp-server/src"]
+mypy_path = ["packages/core/src", "apps/api/src", "apps/worker/src", "apps/mcp-server/src", "eval/src"]
 explicit_package_bases = true
 
 exclude = ["migrations/", "sample-data/", "web/"]
