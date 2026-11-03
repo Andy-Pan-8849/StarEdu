@@ -32,6 +32,7 @@ class Turn:
     reasons: tuple[str | None, ...] | None = None
     contains: tuple[str, ...] = ()  # facts the answer must contain (case-insensitive)
     excludes: tuple[str, ...] = ()
+    forbidden_docs: tuple[str, ...] = ()  # documents the answer must not cite (restricted ones)
 
 
 @dataclass(frozen=True)
@@ -224,6 +225,10 @@ def judge(turn: Turn, result: RunResult) -> list[str]:
     lowered = result.content.lower()
     problems += [f"answer lacks {fact!r}" for fact in turn.contains if fact.lower() not in lowered]
     problems += [f"answer contains {word!r}" for word in turn.excludes if word.lower() in lowered]
+    cited = {c["doc_code"] for c in result.citations}
+    problems += [
+        f"cites the restricted document {doc}" for doc in turn.forbidden_docs if doc in cited
+    ]
     return problems
 
 

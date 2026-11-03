@@ -76,6 +76,20 @@ make eval ARGS="retrieval --all-modes --dry-run"           # fake models, no cos
 
 Reports go to `docs/eval/` (see the baseline there) and each mode's run is recorded in `ai.eval_runs` / `ai.eval_results`. The rerank model is `STARIT_MODEL_RERANK` (default `openai/gpt-6-luna`).
 
+### Chatting with the assistant
+
+With the stack up (`make up`), get a demo token and talk to the API:
+
+```bash
+TOKEN=$(make -s token ACCOUNT=wei.stu.sh)
+CID=$(curl -s -X POST localhost:8000/conversations -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+curl -s -X POST localhost:8000/conversations/$CID/messages \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"content": "What does ERR-PORTAL-429 mean?"}'
+```
+
+The reply carries the answer with `[n]` citations, the `end_state` (`answered`, `need_clarification`, `no_permission`, `not_found`, `refused` or `error`) and an `end_reason`. Every run is recorded in `ai.runs`, `ai.messages` and the audit log. Users are limited to 20 messages a minute (`STARIT_RATE_LIMIT_CHAT_PER_MINUTE`). `make eval ARGS="agent --compare-generate openai/gpt-4o-mini"` asks a set of representative questions for real and reports what happens (it prints the estimated cost and asks first).
+
 ### Database accounts
 
 Three Postgres accounts are used, so that grants and the append-only audit log mean something:
