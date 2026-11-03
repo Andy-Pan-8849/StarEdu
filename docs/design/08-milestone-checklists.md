@@ -547,7 +547,7 @@ make eval ARGS="retrieval --leak-sweep"         # 权限回归扫描（只查数
 
 ## M5 Agent 图与对话 API
 
-状态：**已完成，待合并**（分支 `m5-agent`）。这是项目最核心的一块：用户提问，经过固定的图，得到带引用的回答或一个明确的拒绝，每次运行都有显式的 End 状态。本里程碑会调用 OpenAI 的聊天模型（`understand` 和 `generate` 两个节点，加上 M4 已有的重排）。
+状态：**已完成并合并**（标签 `ai-m5`，合并提交 `1e3d4dd`，2026-11-03）。这是项目最核心的一块：用户提问，经过固定的图，得到带引用的回答或一个明确的拒绝，每次运行都有显式的 End 状态。本里程碑会调用 OpenAI 的聊天模型（`understand` 和 `generate` 两个节点，加上 M4 已有的重排）。
 
 ### 开始前的调研结果（已核对）
 
@@ -708,3 +708,140 @@ uv run python scripts/ask_samples.py        # 约 12 个问题
 - 真实检查每个场景只问一次，模型每次的回答可能略有不同（理解步骤的分类就曾在两次运行里不一样），样本很小，不能据此断定模型的优劣。
 - 隐藏内容的阈值和重排分数的阈值（6）都是在几十道题上标定的，换一批文档或问法可能需要重新标定。
 - 数据查询（M6）和写操作确认（第二阶段）尚未实现，以固定的拒绝回答。
+
+
+---
+
+## M6 数据访问：MCP 与 SQL Agent
+
+状态：**进行中**（分支 `m6-data-access`）。把现在被固定拒绝的"查数据"问题接上：固定的参数化工具（经 MCP）加自由问法的只读 SQL。本里程碑会调用 OpenAI 的聊天模型（选工具、生成 SQL、根据结果作答）。
+
+### 开始前的调研结果（已核对）
+
+| 项 | 结果 |
+|---|---|
+| MCP SDK | 最新版是 `mcp 2.3.0`，**API 和旧版不同**（`FastMCP` 改名为 `MCPServer`，客户端也变了）。我做了一个小原型验证：`MCPServer(token_verifier=..., auth=AuthSettings(..., validate_token_resource=False))`、工具里用 `get_access_token()` 取到调用者和原始令牌、客户端用 `Client(streamable_http_client(url, http_client=httpx2.AsyncClient(headers={"Authorization": ...})))`。**有效令牌能调用工具；错误令牌和没有令牌都被拒绝（401）** |
+| SQL 解析 | `sqlglot 30.27.0`（MIT），按 PostgreSQL 方言解析，能取出表名（含 schema）、CTE、函数、语句条数、语句类型；用来做语句校验 |
+| 视图 | `ai_sql` 里 7 个视图：`campuses`、`assignments`、`students`、`submissions`、`support_tickets`、`employees`、`expense_claims`（列见 M2）。行级范围已由视图保证，这是真正的边界 |
+| 评测集 | 26 道应回答的题，M2 只核对了 17 道的答案；**其余 9 道（SQL-01、02、04、05、06、08、09、10、13）要由真实生成的查询核对**。其中 SQL-01、02 问"超过 FIN-REIM-002 的酒店限额"，限额（一线城市 600、二线 450）写在政策文件里，**只靠表无法回答，需要把政策片段也给 SQL 生成步骤** |
+| 设计 03 的约定 | 工具使用固定的参数化查询；**自由问法的 SQL 由 Agent 内部的只读 SQL 工具处理，不经过 MCP**；工具错误码 `forbidden`、`not_found`、`invalid_argument`、`internal_error`；每次调用写 `mcp.<tool>` 审计 |
+
+### 需要先确认的问题
+
+1. **使用 MCP SDK 2.x**（`MCPServer`），依赖固定为 `mcp>=2.3,<3`。SDK 很新，2.x 的接口以我验证过的为准。
+2. **Agent 调用 MCP 工具的方式**：生产环境经 HTTP，**转发用户自己的 JWT**，由 MCP Server 自己校验签名和受众 `starit-mcp`（设计 03 的 6.1）；这需要把原始令牌从 API 一路传给运行时（只留在内存里，不写日志、不写审计）。测试和评测不起 HTTP 服务，使用**进程内实现**（和 MCP 服务端共用同一套工具函数）。
+3. **SQL 生成步骤带政策片段**：数据类问题先做一次检索（混合模式、不重排、取前 3 个片段，权限过滤照常）把相关政策放进提示，这样"酒店限额"这类题才答得出来。多一次检索（数据库加一次向量化），不多一次模型调用。
+4. **数据类回答的引用**：引用数据来源而不是文档。设计 03 的引用结构新增 `kind` 字段：`"document"`（现有的，补上这个字段）或 `"data"`（带 `views` 和 `row_count`）。回答里仍用 `[n]` 标记，校验照常要求有引用。
+5. **超出范围的数据问题怎么拒绝**（评测里 7 道"应拒绝"的题）：视图返回空结果分不清"没有"和"没权限"，所以在执行前加两道**尽力而为的检查**：(a) 角色对这张视图本来就没有访问权（例如学员查员工表、Admin 查任何数据）→ `no_permission / restricted_data`；(b) 查询里 `campus_id` 的字面值不是提问者自己的校区，且角色不是全公司范围（hr、finance）→ 同样结束。这两道检查只能识别写在 SQL 里的字面值，真正的保护仍然是视图。
+6. **给 MCP 工具补评测题**：在评测集里新增约 8 道工具类的题（查自己的报销单状态、某门作业有哪些、某个学员的进度等），由样本数据生成器算出答案，因为现有的 33 题几乎都需要聚合，走的是 SQL。
+7. **`search_documents` 工具**默认用混合模式、不重排（MCP 服务端不带聊天模型）；需要重排的场景走助手本身。
+8. **真实检查**：评测集 33 题加新增的工具题约 41 题，先给调用数和估算费用，确认后运行。
+
+### 计划的文件（`ai-module/` 下，除非另写）
+
+| 文件 | 作用 |
+|---|---|
+| `packages/core/src/starit_core/dataaccess/sqlguard.py`（新） | SQL 语句校验：单条 `SELECT`/`WITH`、只能访问 `ai_sql` 视图、函数白名单、禁止 `INTO`、加锁、CTE 里的写操作、`pg_*` 等；校验"校区字面值"与提问者校区的一致性 |
+| `packages/core/src/starit_core/dataaccess/schema.py`（新） | 视图说明（给 SQL 生成的提示用）、校区代码表、角色对视图的访问表 |
+| `packages/core/src/starit_core/dataaccess/tools.py`（新） | 6 个工具的实现（固定的参数化查询，经 `run_as_identity`）、参数校验、错误码、`mcp.<tool>` 审计 |
+| `packages/core/src/starit_core/dataaccess/client.py`（新） | `DataTools` 接口；`McpDataTools`（HTTP 调 MCP，转发用户令牌）和 `LocalDataTools`（进程内） |
+| `packages/core/src/starit_core/sqlaccess.py`（改） | 支持绑定参数 |
+| `packages/core/src/starit_core/agent/nodes.py`、`graph.py`、`state.py`、`messages.py`（改） | 新节点：`plan_data_access`、`call_data_tool`、`run_sql`（生成→校验→执行→重试）、`answer_from_data`；`data_query` 不再以 `not_available_yet` 结束；新增的原因码 `restricted_data`、`no_matching_rows`、`sql_failed`、`tool_error` |
+| `packages/core/src/starit_core/agent/prompts/plan_data.md`、`sql.md`、`answer_data.md`（新） | 提示词和版本号 |
+| `packages/core/src/starit_core/agent/runtime.py`（改） | 接收用户的原始令牌；构造数据工具 |
+| `apps/mcp-server/src/starit_mcp_server/`（改）：`main.py`、`auth.py`、`tools.py` | MCP 服务：`MCPServer`、令牌校验（沿用 `TokenVerifier`，受众 `starit-mcp`）、6 个工具、健康检查 |
+| `apps/api/src/starit_api/conversations.py`（改） | 把令牌交给运行时 |
+| `deploy/compose/compose.yaml`、`.env.example`（改） | `mcp-server` 服务（端口 8100）；API 依赖它；`STARIT_MCP_URL` |
+| `packages/core/src/starit_core/config.py`（改） | `model_plan`、`model_sql`、各项上限（SQL 重试 2 次、工具调用 ≤ 3 次、行数上限、超时）、`mcp_url` |
+| `ai-module/sample-data/tools/generate_structured.py`、`eval/sql-qa.jsonl`（改） | 新增约 8 道工具类的题 |
+| `eval/src/starit_eval/data_check.py`、`cli.py`（改） | `starit-eval data`：把数据题真实地问一遍并按期望答案核对，写报告 |
+| `packages/core/tests/dataaccess/`、`packages/core/tests/integration/test_data_*.py`、`apps/mcp-server/tests/`（新） | 见验证标准 |
+| `docs/design/03`、`04`、`ai-module/README.md`（改） | 引用的 `kind` 字段、数据路径、MCP 使用方式 |
+
+### 图的变化（设计 04）
+
+```
+understand ── data_query ──▶ plan_data_access ─┬─ 参数化工具 ──▶ call_data_tool ─┐
+                                               └─ 自由问法 ───▶ run_sql ────────┤
+        结果：无权限（访问表或校区检查） ──▶ END_NO_PERMISSION (restricted_data)
+              空结果 ───────────────────▶ END_NOT_FOUND (no_matching_rows)
+              校验或执行连续失败 ────────▶ END_ERROR (sql_failed / tool_error)
+              有数据 ──────────────────▶ answer_from_data ──▶ verify_answer ──▶ END_ANSWERED
+```
+
+`run_sql` 内部：检索政策片段 → 生成 SQL → 校验 → 执行 → 失败时把错误告诉模型再生成，最多重试 2 次。
+
+### 关键设计决定（建议）
+
+- **边界仍是数据库**：模型生成的 SQL 只会在 `ai_sql_ro` 角色下对视图执行，视图只返回该用户有权看到的行；`sqlguard` 是第二层，目的是在到达数据库之前拦下明显有问题的语句，并给出明确的拒绝原因。
+- **校验用白名单而不是黑名单**：只允许 `SELECT`（含 `WITH`）；表必须带 `ai_sql.` 前缀且在 7 个视图之内；函数必须在白名单里（计数、求和、平均、最值、`round`、`coalesce`、`nullif`、`lower`、`upper`、日期函数、`cast` 等）。
+- **回答只基于结果**：`answer_from_data` 只拿到问题、执行的 SQL（用于说明依据）和结果行；被告知"结果只包含用户有权看到的数据，不要把它说成全公司的总数"。
+- **结果行数上限 200、语句超时 5 秒**（沿用 M2 的 `run_as_identity`）；结果很大时只把前几十行交给模型并说明被截断。
+- **审计**：每次数据查询写 `data.sql` 或 `mcp.<tool>` 审计（用户、语句或参数摘要、行数），不写结果内容。
+- **令牌只在内存里**：不进日志、不进审计、不进错误信息。
+
+### 计划的命令
+
+```bash
+git switch -c m6-data-access                      # 已创建
+uv sync --all-packages
+(cd sample-data && python3 tools/generate_structured.py)   # 新增工具类的题
+make test && make lint
+make up                                           # 现在包含 mcp-server
+make eval ARGS="data --yes"                       # 数据题真实评测（先打印估算并确认）
+```
+
+### 验证标准
+
+1. **SQL 校验**：一批（60 条以上）人工构造的语句逐条断言放行或拒绝：合法的聚合、连接、CTE、日期运算放行；多条语句、非 `SELECT`、`biz.*`、`ai.*`、`pg_catalog.*`、`public.*`、不带前缀的表名、`set_config`、`pg_sleep`、`current_setting`、`INTO`、`FOR UPDATE`、CTE 里的 `DELETE` 等全部拒绝，并给出原因。
+2. **校区与访问表检查**：校区字面值（`=`、`IN`、别名列）不一致的情形有测试矩阵；**角色对视图的访问表与数据库里的视图行为一致**（对 9 个演示账号 × 7 个视图：访问表说"无权"的，视图一定返回空）。
+3. **每个数据路径的结束状态都有测试**（脚本化的模型）：`answered`、`no_permission / restricted_data`、`not_found / no_matching_rows`、SQL 第一次无效第二次修正、连续三次无效 → `error / sql_failed`、数据库超时 → `error / sql_failed`、工具参数错误或工具出错 → `error / tool_error`、调用次数超限 → `step_limit`。
+4. **敌意输出的测试**：模型返回 `SELECT * FROM biz.students`、多条语句、`set_config` 等，在到达数据库之前被拦下，没有任何查询被执行。
+5. **MCP 服务**：真实启动服务端做集成测试：有效令牌可调用；签名被改、过期、受众只有 `starit-api` 的令牌、没有令牌都被拒绝；6 个工具对演示账号返回与视图一致的数据；`list_students` 对学员只返回自己、对员工只返回本校区；查别人的报销单返回 `not_found`；参数错误返回 `invalid_argument`；每次调用都有 `mcp.<tool>` 审计记录。
+6. **图结构**：每个节点仍能到达某个 End 节点；绘制出的图与文档里的路由一致。
+7. **真实检查**（确认费用后）：评测集的数据题（26 道应回答的 + 7 道应拒绝的 + 新增的工具题）真实地问一遍，**应回答的按期望答案核对，应拒绝的必须以 `no_permission` 或 `not_found` 结束且不泄露数字**；报告里写明每一道的结果、失败的原因、费用；**不预设通过率**，先看结果再决定怎么调。
+8. **容器冒烟**：`mcp-server` 容器健康；经 HTTP 用真实令牌问一个数据题，确认 API → MCP 的令牌转发有效。
+9. 本地测试、lint、mypy 通过，CI 通过。
+
+### 开始前不确定的事
+
+- **MCP SDK 2.x 很新**（2.3.0），接口以原型验证的为准，可能还会变；固定版本，并在 README 里写明。
+- **模型生成 SQL 的质量**：日期运算（`submitted_date - expense_date`）、"超过 30 天"之类的口径、`CASE` 分档，`gpt-6-luna` 能答对多少我不知道，以真实评测为准；调不好的话退路是改提示词、给更多例子，而不是放宽校验。
+- **`sqlglot` 的 PostgreSQL 方言与数据库的实际语义有细微差异**，可能误拒合法语句或漏掉冷僻写法；漏掉的不会造成越权（数据库角色只能读视图），但可能让模型执行到不该执行的函数，所以用函数白名单，并由数据库角色兜底。
+- **每次调用 MCP 都新建会话**，会增加一点延迟（预计 100–300 毫秒）；以后可以改成复用连接。
+- **把原始令牌传进运行时**会扩大令牌的暴露面，需要保证任何异常信息和日志里都不含令牌（有测试）。
+- 校区检查只能识别 SQL 里写明的字面值；用子查询、连接绕过的写法它看不出来，但视图仍然只返回有权看到的行。
+
+### 需要你确认
+
+1. 使用 MCP SDK 2.x（`mcp>=2.3,<3`）。
+2. 生产环境 Agent 经 HTTP 调 MCP 并转发用户令牌；测试和评测用进程内实现。
+3. SQL 生成步骤带检索到的政策片段（不重排）。
+4. 引用结构新增 `kind`（`document` / `data`）。
+5. 执行前的两道检查：角色访问表、校区字面值。
+6. 评测集新增约 8 道工具类的题。
+7. `search_documents` 工具默认混合模式、不重排。
+8. 真实检查约 41 题（先估算再确认）。
+
+### 用户的确认（2026-11-03）
+
+8 条全部接受：MCP SDK 2.x（`mcp>=2.3,<3`）；生产环境经 HTTP 调 MCP 并转发用户令牌，测试和评测用进程内实现；SQL 生成步骤带检索到的政策片段（不重排）；引用结构新增 `kind`；执行前的两道检查（角色访问表、校区字面值）；评测集新增约 8 道工具类的题；`search_documents` 默认混合模式不重排；真实检查约 41 题（先估算再确认）。
+
+### 实际结果
+
+**状态：代码完成，真实检查已跑；CI 待检查，待你确认合并。**
+
+- **自动测试**：615 个全部通过（M5 结束时 437 个）。新增：SQL 校验 100 多条语句（放行/拒绝/视图白名单/函数白名单/角色与校区检查）、角色访问表与视图一致性（逐账号）、视图列与结构描述一致性、6 个工具（各角色、越权、参数错误、审计）、真实 MCP 服务（线程中的 uvicorn、真实签名校验；无令牌、乱码、错误密钥、过期、受众不符都得到 401）、Agent 数据路径（工具路径、SQL 路径、重试、拒绝、空结果、令牌不落盘）、评测判分。lint 和 mypy 干净。
+- **容器冒烟**：`mcp-server` 容器健康；用 Keycloak 签发的真实令牌调用工具：经理查本校学员成功，查别校（`campus_id=BJ`）得 `forbidden`，学员调用报销工具得 `forbidden`，员工查自己的报销单成功、查别人的得 `not_found`，乱码令牌被拒；`ai.audit_log` 里有对应的 `mcp.*` 记录（含被拒的），容器日志里没有令牌。
+- **经 API 容器的整条链路**（真实模型）：问"我的报销单 C0107 状态是什么"，API 把用户令牌转发给 `mcp-server` 容器，工具返回 `paid`，回答带 `kind: "data"` 的引用，审计里有 `mcp.get_expense_claim_status`，容器日志里没有令牌。**这次检查发现了一个真实的缺陷**：SDK 的主机头检查（防 DNS 重绑定）拒绝了 Compose 内的服务名 `mcp-server:8100`，API 得到 `tool_error`。之前的服务测试用 `127.0.0.1` 访问，没覆盖到。已加配置项 `mcp_allowed_hosts`（保持防护开启，只放行列出的主机），并加了两条回归测试（放行服务名、拒绝陌生主机，都带有效令牌，使判定只取决于主机头）。第一次问的"我校区有多少学员"走的是 SQL 路径，答案 5，没有经过 MCP。过程中 Docker 磁盘写满（清理了构建缓存 6 GB 后重建）。
+- **真实数据检查**（`starit-eval data`，默认模型 `openai/gpt-6-luna`，41 题）：第一次 39/41，151 次模型调用，约 $0.03（估算 $0.027）。报告：`docs/eval/data-check-20261103-1733.md`。
+  - **SQL-26**（学员平均分）：答案正确（81.5000…），是**我的判分太严**——只接受写成 `81.5` 的数字。已改为按数值比较。
+  - **SQL-29**（上海经理问北京学员数）：**真实的缺口**。模型写的是 `campuses.name = 'Beijing'` 之类的条件，我的校区检查只认 `campus_id` 的字面值，没拦住，用户得到"0 个学员"。视图没有泄露任何数据，但这不是设计要求的结果（应当拒绝）。已补：语句读取 `campuses` 视图时，字符串里出现别的校区的城市名，同样按 `campus_scope` 拒绝；`expense_claims.city` 是出差城市，不受影响（有测试）。
+  - 修复后只重跑这两题：2/2 通过，7 次模型调用，约 $0.001。报告：`docs/eval/data-check-20261103-1737.md`。**41 题没有整体重跑**，所以"41/41"没有在同一次运行里出现过。
+- **与设计的差异**：
+  - `search_documents` 的 `top_k` 最大 8（设计写 10）；没有 `doc_code` 参数；`domain` 是对 `doc_code` 前缀（HR-/FIN-/TS-）的过滤，在检索之后做；返回的字段里没有 `status`、`page`、`chunk_id`、`score`（只有 `doc_code`、`title`、`version`、`heading_path`、`text`）。Agent 的规划步骤不用这个工具（文档问题走原来的检索路径），它主要给其他 MCP 客户端。
+  - 一次运行最多调一个数据工具（清单写的是 ≤3）；工具参数错误时退到 SQL 路径。
+  - `agent_max_llm_calls` 从 6 提到 8，容纳 SQL 重试。
+  - 未用 `doc_code` 前缀以外的方式给 `Candidate` 加 `domain`。
+  - 对 MCP SDK 的 `custom_route` 装饰器加了一处 `type: ignore`（SDK 的类型标注不完整）。
+- **已知限制**：校区检查只能识别写在 SQL 里的校区编码或（读 `campuses` 时的）城市名，换一种写法（比如用子查询按别的列间接指向别校）可能漏过去——真正的保护仍是视图，漏过去的结果是"空数据"，不是别校的数据。空结果统一说"没找到匹配记录"，分不清"没有"和"没权限"，这是有意的。SQL 路径的质量取决于模型；41 题里只有这一次拦截缺口，样本小，不能当作基准。

@@ -61,13 +61,28 @@ class Settings(BaseSettings):
     model_generate: str = "openai/gpt-6-luna"
     agent_history_turns: int = 6  # earlier turns are dropped, not summarised
     agent_max_input_chars: int = 2000
-    agent_max_llm_calls: int = 6  # per run, including the reranker
+    agent_max_llm_calls: int = 8  # per run, including the reranker and SQL retries
     agent_max_clarifications: int = 2
     agent_retrieval_retries: int = 1
     agent_verify_retries: int = 1
     agent_run_timeout_seconds: float = 60.0
     agent_llm_timeout_seconds: float = 30.0
     agent_recursion_limit: int = 20
+
+    # Data questions (docs/design/04-agent-flow.md, the data path).
+    model_plan: str = "openai/gpt-6-luna"
+    model_sql: str = "openai/gpt-6-luna"
+    agent_max_sql_retries: int = 2
+    data_max_rows: int = 200
+    data_rows_to_model: int = 40  # more rows than this are summarised for the model, not sent
+    data_statement_timeout_ms: int = 5000
+    data_tools_backend: str = (
+        "local"  # "mcp": call the MCP server with the user's token; "local": in process
+    )
+    mcp_url: str = "http://localhost:8100/mcp"
+    mcp_port: int = 8100
+    # Host header values the MCP server accepts (DNS-rebinding protection stays on).
+    mcp_allowed_hosts: str = "localhost:8100,127.0.0.1:8100,mcp-server:8100"
     # The first of two gates before answering: the best passage must score at least this much
     # in the rerank (0-10). The second gate is the answer step saying the passages are enough.
     grade_min_rerank_score: float = 6.0

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core import audit
 from starit_core.agent import finish, messages
 from starit_core.agent.nodes import AgentFailure
+from starit_core.agent.prompts import PROMPT_VERSIONS
 from starit_core.auth import Identity
 from starit_core.llm import ChatError
 from starit_core.testing import (
@@ -90,7 +91,7 @@ async def test_a_question_with_enough_evidence_is_answered_with_citations(harnes
     details = (await harness.rows("SELECT details FROM ai.audit_log WHERE action = 'chat.query'"))[
         0
     ][0]
-    assert details["prompt_versions"] == {"understand": "2", "generate": "1", "rewrite": "1"}
+    assert details["prompt_versions"] == PROMPT_VERSIONS
     assert details["llm_calls"] == 2
     state = await harness.conversation_state()
     assert state[0] == "answering" and state[3] == "What is the referral bonus?"
@@ -260,7 +261,6 @@ async def test_after_two_clarifications_a_third_gives_up(harness: Harness) -> No
     [
         ("out_of_scope", "out_of_scope"),
         ("action", "write_not_enabled"),
-        ("data_query", "not_available_yet"),
     ],
 )
 async def test_requests_the_assistant_does_not_handle_are_refused(

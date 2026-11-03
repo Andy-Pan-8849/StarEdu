@@ -31,6 +31,7 @@ ROUTES: dict[str, tuple[str, ...]] = {
     "guard_input": ("understand", "end_refused"),
     "understand": (
         "retrieve_docs",
+        "plan_data_access",
         "chitchat_reply",
         "end_need_clarification",
         "end_not_found",
@@ -40,6 +41,10 @@ ROUTES: dict[str, tuple[str, ...]] = {
     "retrieve_docs": ("grade_retrieval",),
     "grade_retrieval": ("generate", "rewrite_query", "end_no_permission", "end_not_found"),
     "rewrite_query": ("retrieve_docs",),
+    "plan_data_access": ("call_data_tool", "run_sql"),
+    "call_data_tool": ("answer_from_data", "run_sql", "end_no_permission", "end_not_found"),
+    "run_sql": ("run_sql", "answer_from_data", "end_no_permission", "end_not_found"),
+    "answer_from_data": ("end_answered",),
     "generate": ("verify_answer",),
     "verify_answer": ("end_answered", "end_not_found", "generate", "end_error"),
 }

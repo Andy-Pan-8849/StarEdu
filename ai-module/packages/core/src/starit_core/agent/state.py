@@ -34,6 +34,17 @@ class AgentState(TypedDict, total=False):
     citations: list[dict[str, Any]]
     verify_attempts: int
     verify_feedback: str
+    # data access
+    plan_path: str
+    tool_name: str
+    tool_args: dict[str, Any]
+    policy_excerpts: str
+    sql_attempts: int
+    sql_feedback: str
+    data_rows: list[dict[str, Any]]
+    data_row_count: int
+    data_views: list[str]
+    data_sql: str
     # routing and outcome
     route: str
     end_state: str
@@ -65,3 +76,5 @@ class RunContext:
     totals: RunTotals
     chat: Any  # a budget-counting ChatClient
     reranker: Any
+    data_tools: Any = None  # a DataToolsClient
+    access_token: str | None = None  # the caller's raw JWT: in memory only, never logged

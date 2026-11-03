@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncConnection
 from starit_core.auth import Identity
+from starit_core.dataaccess.schema import VIEWS, can_use_view
 from starit_core.seed_biz import load_biz
 from starit_core.sqlaccess import run_as_identity
 
@@ -100,6 +101,33 @@ async def test_every_view_returns_exactly_the_visible_rows(
         assert {r[key] for r in rows} == oracle(table, account), (account["username"], table)
 
 
+@pytest.mark.parametrize("account", accounts(), ids=lambda a: a["username"])
+def test_the_guards_role_table_agrees_with_the_views(account: dict[str, str]) -> None:
+    """The guard refuses early using a role table. Whatever it refuses, the views must return
+    nothing for (it may allow a view that happens to be empty for this person)."""
+    for table in PRIMARY_KEY:
+        if not can_use_view(frozenset({account["role"]}), table):
+            assert not oracle(table, account), (account["username"], table)
+
+
+async def test_the_schema_description_matches_the_views(seeded: AsyncConnection) -> None:
+    for name, view in VIEWS.items():
+        columns = (
+            (
+                await seeded.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = 'ai_sql' AND table_name = :t ORDER BY ordinal_position"
+                    ),
+                    {"t": name},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert [c for c, _, _ in view.columns] == list(columns), name
+
+
 async def test_without_an_identity_every_view_is_empty(seeded: AsyncConnection) -> None:
     await seeded.execute(text("SET LOCAL ROLE ai_sql_ro"))
     for table in PRIMARY_KEY:
@@ -180,6 +208,13 @@ async def test_the_row_limit_is_applied(
 # --- evaluation questions that the views can answer -------------------------------------------
 
 EVAL_SQL = {
+    "SQL-34": "SELECT final_score FROM ai_sql.submissions WHERE assignment_id = 'TY-A01'",
+    "SQL-35": "SELECT count(*) FROM ai_sql.assignments WHERE program = 'python'",
+    "SQL-36": "SELECT status FROM ai_sql.expense_claims WHERE claim_id = 'C0107'",
+    "SQL-37": "SELECT string_agg(claim_id, ', ' ORDER BY claim_id) FROM ai_sql.expense_claims "
+              "WHERE employee_id = 'E0014' AND status = 'paid'",
+    "SQL-38": "SELECT count(*) FROM ai_sql.students WHERE status = 'active' AND program = 'typescript'",
+    "SQL-39": "SELECT count(*) FROM ai_sql.submissions WHERE student_id = 'S0018' AND hours_late > 0",
     "SQL-03": "SELECT count(*) FROM ai_sql.expense_claims WHERE submitted_date - expense_date > 30",
     "SQL-07": "SELECT sum(amount_cny) FROM ai_sql.expense_claims WHERE campus_id = 'BJ' AND status = 'paid'",
     "SQL-11": "SELECT format('students: %s, staff: %s', count(*) FILTER (WHERE requester_type = 'student'), "
@@ -212,6 +247,8 @@ EVAL_NOT_VISIBLE = {
     "SQL-31": "SELECT count(*) FROM ai_sql.employees",
     "SQL-32": "SELECT count(*) FROM ai_sql.employees",
     "SQL-33": "SELECT count(*) FROM ai_sql.students",
+    "SQL-40": "SELECT count(*) FROM ai_sql.expense_claims WHERE claim_id = 'C0001'",
+    "SQL-41": "SELECT count(*) FROM ai_sql.expense_claims WHERE claim_id = 'C0001'",
 }
 
 

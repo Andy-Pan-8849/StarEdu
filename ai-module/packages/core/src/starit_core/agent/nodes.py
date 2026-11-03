@@ -1,5 +1,6 @@
 """The steps of the assistant. Each takes the graph state and returns what changes."""
 
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -14,13 +15,24 @@ from starit_core.agent.prompts import PROMPT_VERSIONS, prompt_text
 from starit_core.agent.state import AgentState, RunContext
 from starit_core.config import Settings
 from starit_core.conversations import recent_turns
+from starit_core.dataaccess.schema import schema_prompt
+from starit_core.dataaccess.sqlguard import AccessDenied, SqlRejected, validate_sql
 from starit_core.embeddings import EmbeddingClient
 from starit_core.llm import ChatClient, ChatError, ChatResult, parse_json_object
 from starit_core.retrieval import RetrievalResult, retrieve
 from starit_core.retrieval.models import Candidate
+from starit_core.sqlaccess import run_as_identity
 
 logger = logging.getLogger("starit.agent")
 
+PLANNED_TOOLS = (
+    "list_assignments",
+    "list_students",
+    "get_student_progress",
+    "get_expense_claim_status",
+    "list_my_expense_claims",
+)
+POLICY_EXCERPTS = 3
 INTENTS = ("doc_qa", "data_query", "action", "chitchat", "out_of_scope")
 MAX_ANSWER_CHARS = 4000
 _CITATION = re.compile(r"\[(\d+)\]")
@@ -106,6 +118,7 @@ def citation_info(number: int, c: Candidate) -> dict[str, Any]:
         "heading_path": c.heading_path,
         "page": c.page,
         "chunk_id": str(c.chunk_id),
+        "kind": "document",
     }
 
 
@@ -208,7 +221,7 @@ class AgentNodes:
         if intent == "action":
             return {**update, "route": "end_refused", "end_reason": "write_not_enabled"}
         if intent == "data_query":
-            return {**update, "route": "end_refused", "end_reason": "not_available_yet"}
+            return {**update, "route": "plan_data_access"}
         if intent == "chitchat":
             return {**update, "route": "chitchat_reply"}
         return {**update, "route": "retrieve_docs"}
@@ -379,6 +392,181 @@ class AgentNodes:
             )
         return None
 
+    # --- business data ---------------------------------------------------------------------
+
+    async def plan_data_access(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        ctx = _ctx(config)
+        try:
+            result = await ctx.chat.complete(
+                [
+                    {"role": "system", "content": prompt_text("plan_data")},
+                    {"role": "user", "content": state["standalone_query"]},
+                ],
+                model=self._settings.model_plan,
+                json_mode=True,
+            )
+        except ChatError as exc:
+            raise AgentFailure("llm_error", str(exc)) from exc
+        try:
+            data = parse_json_object(result.text)
+        except ChatError:
+            data = {}
+        arguments = data.get("arguments")
+        if (
+            data.get("path") == "tool"
+            and data.get("tool") in PLANNED_TOOLS
+            and isinstance(arguments, dict)
+            and ctx.data_tools is not None
+        ):
+            return {
+                "plan_path": "tool",
+                "tool_name": str(data["tool"]),
+                "tool_args": arguments,
+                "route": "call_data_tool",
+            }
+        return {"plan_path": "sql", "sql_attempts": 0, "route": "run_sql"}
+
+    async def call_data_tool(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        ctx = _ctx(config)
+        outcome = await ctx.data_tools.call(
+            ctx.identity, state["tool_name"], state["tool_args"], token=ctx.access_token
+        )
+        if outcome.get("ok"):
+            payload = {k: v for k, v in outcome.items() if k not in ("ok", "row_count", "views")}
+            return {
+                "data_rows": [payload],
+                "data_row_count": int(outcome.get("row_count") or 1),
+                "data_views": list(outcome.get("views", [])),
+                "route": "answer_from_data",
+            }
+        code = outcome.get("error", {}).get("code")
+        if code == "forbidden":
+            return {"route": "end_no_permission", "end_reason": "restricted_data"}
+        if code == "not_found":
+            return {"route": "end_not_found", "end_reason": "no_matching_rows"}
+        if code == "invalid_argument":
+            # The planner's arguments were wrong: let the SQL path try the question itself.
+            return {"plan_path": "sql", "sql_attempts": 0, "route": "run_sql"}
+        raise AgentFailure("tool_error", str(outcome.get("error")))
+
+    async def _policy_excerpts(self, state: AgentState, ctx: RunContext) -> str:
+        if state.get("policy_excerpts") is not None:
+            return state["policy_excerpts"]
+        try:
+            async with self._engine.connect() as conn:
+                found = await self._retrieve(
+                    conn,
+                    ctx.identity,
+                    state["standalone_query"],
+                    mode="hybrid",
+                    settings=self._settings,
+                    embedder=self._embedder,
+                )
+        except Exception:
+            logger.exception("policy excerpts for the SQL step could not be fetched")
+            return ""
+        chunks = found.chunks[:POLICY_EXCERPTS]
+        for chunk in chunks:
+            if str(chunk.document_id) not in ctx.totals.document_ids:
+                ctx.totals.document_ids.append(str(chunk.document_id))
+        return excerpt_block(chunks)
+
+    async def run_sql(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        ctx = _ctx(config)
+        attempts = state.get("sql_attempts", 0)
+        excerpts = await self._policy_excerpts(state, ctx)
+        user = f"{schema_prompt(ctx.identity)}\n\nQuestion: {state['standalone_query']}"
+        if excerpts:
+            user += f"\n\nPolicy excerpts:\n\n{excerpts}"
+        if state.get("sql_feedback"):
+            user += f"\n\nYour previous query failed: {state['sql_feedback']} Write a new one."
+        try:
+            result = await ctx.chat.complete(
+                [
+                    {"role": "system", "content": prompt_text("sql")},
+                    {"role": "user", "content": user},
+                ],
+                model=self._settings.model_sql,
+                json_mode=True,
+            )
+        except ChatError as exc:
+            raise AgentFailure("llm_error", str(exc)) from exc
+        try:
+            written = str(parse_json_object(result.text).get("sql") or "")
+        except ChatError:
+            written = ""
+        retry = {"policy_excerpts": excerpts, "sql_attempts": attempts + 1, "route": "run_sql"}
+        give_up: AgentState = {"route": "end_error", "end_reason": "sql_failed"}
+
+        def failed(feedback: str) -> AgentState:
+            if attempts >= self._settings.agent_max_sql_retries:
+                ctx.totals.failure_detail = f"sql: {feedback}"
+                return give_up
+            return {**retry, "sql_feedback": feedback}  # type: ignore[typeddict-item]
+
+        try:
+            checked = validate_sql(written, ctx.identity)
+        except AccessDenied:
+            return {"route": "end_no_permission", "end_reason": "restricted_data"}
+        except SqlRejected as rejected:
+            return failed(rejected.message)
+        try:
+            async with self._engine.begin() as conn:
+                rows = await run_as_identity(
+                    conn,
+                    ctx.identity,
+                    checked.sql,
+                    max_rows=self._settings.data_max_rows,
+                    timeout_ms=self._settings.data_statement_timeout_ms,
+                )
+        except Exception as exc:
+            return failed(f"the database rejected it: {str(exc).splitlines()[0][:200]}")
+        if not rows:
+            return {"route": "end_not_found", "end_reason": "no_matching_rows"}
+        return {
+            "data_rows": rows,
+            "data_row_count": len(rows),
+            "data_views": list(checked.views),
+            "data_sql": checked.sql,
+            "route": "answer_from_data",
+        }
+
+    async def answer_from_data(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        ctx = _ctx(config)
+        rows = state["data_rows"][: self._settings.data_rows_to_model]
+        payload = json.dumps(
+            {"rows_total": state["data_row_count"], "rows": rows}, default=str, ensure_ascii=False
+        )
+        try:
+            result = await ctx.chat.complete(
+                [
+                    {"role": "system", "content": prompt_text("answer_data")},
+                    {
+                        "role": "user",
+                        "content": f"Question: {state['standalone_query']}\n\nData:\n{payload}",
+                    },
+                ],
+                model=self._settings.model_generate,
+                json_mode=True,
+            )
+        except ChatError as exc:
+            raise AgentFailure("llm_error", str(exc)) from exc
+        try:
+            answer = str(parse_json_object(result.text).get("answer") or "").strip()
+        except ChatError as exc:
+            raise AgentFailure("llm_error", str(exc)) from exc
+        if not answer or len(answer) > MAX_ANSWER_CHARS:
+            raise AgentFailure("llm_error", "the data answer was empty or too long")
+        if "[1]" not in answer:
+            answer += " [1]"
+        citation = {
+            "n": 1,
+            "kind": "data",
+            "views": state["data_views"],
+            "row_count": state["data_row_count"],
+        }
+        return {"answer": answer, "citations": [citation], "route": "end_answered"}
+
     # --- the six ways a run can end --------------------------------------------------------
 
     async def end_answered(self, state: AgentState, config: RunnableConfig) -> AgentState:
@@ -395,14 +583,19 @@ class AgentNodes:
         return {
             "end_state": "no_permission",
             "end_reason": state.get("end_reason") or "restricted_document",
-            "reply": messages.NOT_FOUND,
+            "reply": (
+                messages.NO_MATCHING_ROWS
+                if state.get("end_reason") == "restricted_data"
+                else messages.NOT_FOUND
+            ),
         }
 
     async def end_not_found(self, state: AgentState, config: RunnableConfig) -> AgentState:
         reason = state.get("end_reason") or "no_relevant_documents"
-        reply = (
-            messages.CLARIFICATION_LIMIT if reason == "clarification_limit" else messages.NOT_FOUND
-        )
+        reply = {
+            "clarification_limit": messages.CLARIFICATION_LIMIT,
+            "no_matching_rows": messages.NO_MATCHING_ROWS,
+        }.get(reason, messages.NOT_FOUND)
         return {"end_state": "not_found", "end_reason": reason, "reply": reply}
 
     async def end_refused(self, state: AgentState, config: RunnableConfig) -> AgentState:
