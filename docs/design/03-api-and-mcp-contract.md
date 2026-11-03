@@ -77,7 +77,8 @@
     "content": "50 hours late falls into the 48 to 72 hour band: 30 percent … final score 63. [1]",
     "citations": [
       { "n": 1, "doc_code": "TS-HW-006", "title": "…", "version": "1.0",
-        "status": "active", "heading_path": ["…"], "page": 2, "chunk_id": "…" }
+        "status": "active", "heading_path": ["…"], "page": 2, "chunk_id": "…",
+        "kind": "document" }
     ]
   },
   "end_state": "answered",
@@ -138,6 +139,8 @@
 - 独立进程，端口 8100，Streamable HTTP。
 - Agent 调用工具时**转发当前用户的 JWT**；MCP Server 用同一个 JWKS 自行校验，并检查 `aud` 包含 `starit-mcp`。Keycloak 给前端客户端的访问令牌同时带 `starit-api` 和 `starit-mcp` 两个受众。【待定】更严格的做法是令牌交换（token exchange），第一阶段不做。
 - 所有工具读取身份的方式相同：JWT → 设置数据库会话变量 → 经 `ai_sql_ro` 访问白名单视图，或调用 `core` 的检索函数。工具**不接受**任何身份参数。
+
+> **M6 修订（2026-11-03）**：引用新增 `kind` 字段。`"document"` 如上；`"data"` 表示答案来自业务数据：`{ "n": 1, "kind": "data", "views": ["students"], "row_count": 12 }`。`search_documents` 实际的 `top_k` 最大 8，无 `doc_code` 参数，`domain`（hr/finance/tech）按 `doc_code` 前缀过滤，只返回 `doc_code`、`title`、`version`、`heading_path`、`text`。所有工具返回 `{"ok": true, ...}` 或 `{"ok": false, "error": {"code", "message"}}`，错误码 `forbidden`、`not_found`、`invalid_argument`、`internal_error`。
 
 ### 6.2 首批工具（已确认范围：文档检索、课程与学员只读、报销状态）
 

@@ -200,3 +200,28 @@ def test_own_campus_literal_is_fine() -> None:
 @pytest.mark.parametrize("role", ["hr", "finance"])
 def test_company_wide_roles_may_name_any_campus(role: str) -> None:
     validate_sql("SELECT * FROM ai_sql.employees WHERE campus_id = 'SH'", who(role))
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT count(*) FROM ai_sql.students s JOIN ai_sql.campuses c ON c.campus_id = s.campus_id "
+        "WHERE c.name = 'Beijing'",
+        "SELECT * FROM ai_sql.students WHERE campus_id IN (SELECT campus_id FROM ai_sql.campuses "
+        "WHERE name ILIKE '%shanghai%')",
+    ],
+)
+def test_a_campus_named_by_city_is_caught_when_the_campuses_view_is_read(sql: str) -> None:
+    with pytest.raises(AccessDenied) as caught:
+        validate_sql(sql, who("manager", campus="CD"))
+    assert caught.value.code == "campus_scope"
+
+
+def test_a_travel_city_is_not_mistaken_for_a_campus() -> None:
+    validate_sql("SELECT * FROM ai_sql.expense_claims WHERE city = 'Beijing'", who("manager"))
+
+
+def test_naming_your_own_campus_by_city_is_fine() -> None:
+    validate_sql(
+        "SELECT * FROM ai_sql.campuses WHERE name LIKE 'Chengdu%'", who("manager", campus="CD")
+    )

@@ -36,6 +36,8 @@ def test_the_question_file_has_all_kinds() -> None:
         ("paid", "Its status is Paid [1]", True),
         ("paid", "Its status is pending [1]", False),
         ("82.5", "The average is 82.5 [1]", True),
+        ("81.5", "Your average is 81.5000000000000000. [1]", True),
+        ("81.5", "Your average is 81.6000000000000000. [1]", False),
     ],
 )
 def test_judging_an_answer(expected: str, answer: str, ok: bool) -> None:

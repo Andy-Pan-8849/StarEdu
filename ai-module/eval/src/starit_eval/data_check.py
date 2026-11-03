@@ -125,11 +125,20 @@ def judge(question: DataQuestion, end_state: str, answer: str) -> list[str]:
             if question.expected.lower() in answer.lower()
             else [f"answer lacks {question.expected!r}"]
         )
-    return [
-        f"answer lacks {t!r}"
-        for t in tokens
-        if not re.search(rf"(?<![\w.]){re.escape(t)}(?!\w|\.\d)", flat)
-    ]
+    return [f"answer lacks {t!r}" for t in tokens if not _mentions(flat, t)]
+
+
+def _mentions(answer: str, token: str) -> bool:
+    """The token appears as a whole number or id; a decimal matches its longer spelling too
+    (a reference 81.5 matches an answer of 81.5000000)."""
+    if re.search(rf"(?<![\w.]){re.escape(token)}(?!\w|\.\d)", answer):
+        return True
+    if re.fullmatch(r"\d+\.\d+", token):
+        return any(
+            abs(float(n) - float(token)) < 1e-6
+            for n in re.findall(r"(?<![\w.])\d+\.\d+(?!\w)", answer)
+        )
+    return False
 
 
 def estimate(

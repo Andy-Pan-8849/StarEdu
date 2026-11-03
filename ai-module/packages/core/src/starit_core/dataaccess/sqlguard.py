@@ -15,7 +15,7 @@ from sqlglot import exp
 from sqlglot.errors import SqlglotError
 
 from starit_core.auth import Identity
-from starit_core.dataaccess.schema import VIEW_ROLES, can_use_view
+from starit_core.dataaccess.schema import CAMPUSES, VIEW_ROLES, can_use_view
 from starit_core.permissions import COMPANY_WIDE_ROLES
 
 MAX_SQL_CHARS = 4000
@@ -135,7 +135,10 @@ def _check_access(views: set[str], root: exp.Expression, identity: Identity) -> 
     if identity.roles & COMPANY_WIDE_ROLES:
         return
     own = (identity.campus_id or "").upper()
-    for campus in _campus_literals(root):
+    found = _campus_literals(root)
+    if "campuses" in views:
+        found += _campus_name_literals(root)
+    for campus in found:
         if campus != own:
             raise AccessDenied(
                 "campus_scope",
@@ -158,6 +161,19 @@ def _campus_literals(root: exp.Expression) -> list[str]:
                 for v in node.expressions
                 if isinstance(v, exp.Literal) and v.is_string
             ]
+    return found
+
+
+def _campus_name_literals(root: exp.Expression) -> list[str]:
+    """Campus codes for city names written into a statement that reads the campuses view
+    (`WHERE name = 'Beijing'`, `ILIKE '%shanghai%'`). Only there: a hotel claim's `city` is a
+    travel destination, not the person's campus."""
+    names = {name.split(" (")[0].lower(): code for code, name in CAMPUSES.items()}
+    found = []
+    for node in root.walk():
+        if isinstance(node, exp.Literal) and node.is_string:
+            text = node.name.lower()
+            found += [code for name, code in names.items() if name in text]
     return found
 
 

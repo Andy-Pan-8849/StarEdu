@@ -188,10 +188,21 @@ flowchart TD
 
 - 会话状态存在 `ai.conversations`，不用 checkpointer（见第 2 节）。
 - `finish_run` 由运行时包装层调用，而不是由每个 End 节点调用：End 节点只设置最终状态，这样异常和超时也一定会被记录。"每个节点都能到达某个 End 节点"的图结构测试不变。
-- 数据查询（`data_query`）在 M6 之前以 `refused / not_available_yet` 结束（临时原因码，M6 实现后移除）。
+- 数据查询（`data_query`）在 M6 之前以 `refused / not_available_yet` 结束（临时原因码，已在 M6 移除，见第 14 节）。
 - 历史只截断最近 6 轮，暂不做滚动摘要。
 - `chitchat`（问候）用固定回复，不调用模型。
 - `grade_retrieval` 分两道关：重排分数阈值（可配置）和生成节点的 `sufficient` 标志。
 - **重排的截断**：重排提示词里每个片段的上限（`rerank_passage_tokens`）必须不小于块的上限（500）。截得更短会让模型看不到块尾的内容，给出很低的分数，第一道关就会拒绝作答（`ERR-PORTAL-429` 的实例见 `docs/eval/README.md`）。默认 600。
 - **`restricted` 的判定**：隐藏内容的探测得分 ≥ 0.5 才算"存在受限内容"（样例里受限问题得分 0.57–0.74，无答案问题 0.09–0.41，间隔很窄）。
 - **理解步骤的提示词**列出了技术支持的主题，避免把"工具出问题"当作越界（提示词版本 2）。
+
+## 14. M6 修订记录（2026-11-03）：数据查询路径
+
+`understand` 判为 `data_query` 后进入新节点：
+
+1. `plan_data_access`：一次模型调用（`model_plan`），选择"工具"或"SQL"。可选的 5 个工具：`list_assignments`、`list_students`、`get_student_progress`、`get_expense_claim_status`、`list_my_expense_claims`。输出不可用就走 SQL。
+2. `call_data_tool`：调用工具（生产经 HTTP 转发用户自己的令牌，进程内实现用于测试和评测）。`forbidden` → `no_permission / restricted_data`；`not_found` → `not_found / no_matching_rows`；`invalid_argument` → 退到 SQL；其他 → `error / tool_error`。
+3. `run_sql`：先检索 3 个政策片段（混合模式，不重排，权限过滤照常）和结构描述一起交给 `model_sql` 写一条 SELECT；`sqlglot` 校验（单条语句、只读视图白名单、函数白名单；执行的是解析器重新生成的语句）；**执行前**两道检查：角色对这张视图有没有访问权，非全公司范围的角色写的校区是不是自己的 → 不通过则 `no_permission / restricted_data`；通过后以 `ai_sql_ro` 身份执行。语句被拒或数据库报错时带原因重试，最多 2 次，仍失败 → `error / sql_failed`。无结果 → `not_found / no_matching_rows`。
+4. `answer_from_data`：一次模型调用，只依据返回的行（最多 `data_rows_to_model` 行）回答，引用为 `kind: "data"`，答案里必须有 `[1]`（缺则补上）。
+
+用户看到的文案：`restricted_data` 和 `no_matching_rows` 用同一句话（"在您账号可见的数据里没有找到匹配的记录"），不透露数据存在与否。提示词版本：`plan_data` 1、`sql` 1、`answer_data` 1。一次运行的模型调用上限 8。
