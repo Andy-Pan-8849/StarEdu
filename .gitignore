@@ -29,3 +29,6 @@ Design.md
 
 # Word lock files created when a .docx is open
 ~$*
+
+# Private notes, not uploaded to GitHub
+docs/private/
