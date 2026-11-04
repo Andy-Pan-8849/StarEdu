@@ -1,0 +1,1663 @@
+{
+  "summary": {
+    "questions": 114,
+    "passed": 107,
+    "answerable": {
+      "n": 87,
+      "passed": 81
+    },
+    "must_refuse": {
+      "n": 27,
+      "passed": 26
+    },
+    "clarified_instead_of_answering": 0,
+    "by_type": {
+      "access": [
+        26,
+        26
+      ],
+      "keyword": [
+        13,
+        13
+      ],
+      "multi": [
+        7,
+        7
+      ],
+      "paraphrase": [
+        11,
+        11
+      ],
+      "single": [
+        30,
+        35
+      ],
+      "unanswerable": [
+        11,
+        12
+      ],
+      "version": [
+        9,
+        10
+      ]
+    },
+    "by_role": {
+      "Admin": [
+        1,
+        1
+      ],
+      "RAGETLAdmin": [
+        1,
+        1
+      ],
+      "finance": [
+        6,
+        6
+      ],
+      "hr": [
+        5,
+        5
+      ],
+      "manager": [
+        9,
+        10
+      ],
+      "staff": [
+        52,
+        56
+      ],
+      "student": [
+        33,
+        35
+      ]
+    },
+    "graded_by": {
+      "facts": 39,
+      "judge": 48,
+      "refusal": 27
+    },
+    "legal_end_states": 114,
+    "cites_a_source": [
+      87,
+      87
+    ],
+    "latency_s": {
+      "p50": 7.25,
+      "p95": 12.68
+    },
+    "llm_calls": 394,
+    "tokens": {
+      "input": 1128235,
+      "output": 32128
+    },
+    "cost_usd": 0.1289
+  },
+  "results": [
+    {
+      "id": "DOC-01",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 14.43,
+      "answer": "The referral bonus is CNY 3,000 for an instructor hire. It is paid with payroll after the referred employee completes 90 days of employment. HR staff and the hiring manager for the position are not eligible. [1]"
+    },
+    {
+      "id": "DOC-02",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 8.51,
+      "answer": "A job offer is valid for 7 calendar days under the active policy. [1]"
+    },
+    {
+      "id": "DOC-03",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-ONB-003"
+      ],
+      "seconds": 7.52,
+      "answer": "An instructor’s probation period is 3 months. A manager’s probation period is 6 months (for managers at levels M1 and above). Probation may be extended once by up to 1 month if the manager and HR agree more time is needed. [1]"
+    },
+    {
+      "id": "DOC-04",
+      "role": "staff",
+      "type": "single",
+      "passed": false,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [
+        "the judge found a key fact missing or wrong"
+      ],
+      "cited": [
+        "HR-TRN-004"
+      ],
+      "seconds": 7.09,
+      "answer": "The company pays 80 percent of the exam or course fee, up to CNY 5,000 per calendar year, for certifications related to the instructor’s teaching area. The manager must approve it before registration, and the subsidy is paid after the employee passes and submits the certificate and receipt. University degrees and language courses are not covered. [1]"
+    },
+    {
+      "id": "DOC-05",
+      "role": "staff",
+      "type": "single",
+      "passed": false,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [
+        "the judge found a key fact missing or wrong"
+      ],
+      "cited": [
+        "HR-PRM-005"
+      ],
+      "seconds": 8.3,
+      "answer": "Promotion panels meet twice a year, in April and October. [1]"
+    },
+    {
+      "id": "DOC-06",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-LEV-007"
+      ],
+      "seconds": 7.22,
+      "answer": "6 years of service falls in the “5 to under 10 years” band, which provides 10 days of paid annual leave per year. [1]"
+    },
+    {
+      "id": "DOC-07",
+      "role": "staff",
+      "type": "single",
+      "passed": false,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [
+        "the judge found a key fact missing or wrong"
+      ],
+      "cited": [
+        "HR-LEV-007"
+      ],
+      "seconds": 14.89,
+      "answer": "An instructor must submit the leave request at least 14 days in advance through the HR portal. Emergency sick leave is exempt: the instructor must inform the department head before 7:30 on the day, and the department head arranges cover. [1]"
+    },
+    {
+      "id": "DOC-08",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-WRK-008"
+      ],
+      "seconds": 9.4,
+      "answer": "The standard teaching load is 16 teaching hours per week. [1] The maximum is 24 teaching hours per week; teaching above 24 hours is not allowed, even with the instructor’s consent. [1]"
+    },
+    {
+      "id": "DOC-09",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-004"
+      ],
+      "seconds": 7.79,
+      "answer": "Salary for the previous calendar month is paid on the 10th of each month. If the 10th falls on a weekend or public holiday, it is paid on the last business day before the 10th. [1]"
+    },
+    {
+      "id": "DOC-10",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-PERF-006"
+      ],
+      "seconds": 7.88,
+      "answer": "The performance rating categories and target shares are: A — Outstanding, 10 percent; B+ — Exceeds expectations, 25 percent; B — Meets expectations, 50 percent; C — Below expectations, 15 percent. [1]"
+    },
+    {
+      "id": "DOC-11",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-PERF-006"
+      ],
+      "seconds": 11.09,
+      "answer": "Two consecutive C ratings lead to a 60-day performance improvement plan (PIP). If the PIP goals are not met, employment may be ended with 30 days of notice. [1]"
+    },
+    {
+      "id": "DOC-12",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-001"
+      ],
+      "seconds": 11.21,
+      "answer": "CNY 4,500 falls in the 1,001 to 10,000 band, so the Campus Director approves the claim. [1]"
+    },
+    {
+      "id": "DOC-13",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-001"
+      ],
+      "seconds": 9.86,
+      "answer": "An expense claim must be submitted within 30 calendar days after the expense date. Claims submitted after 30 days need Finance Manager approval; claims older than 90 days are rejected. [1]"
+    },
+    {
+      "id": "DOC-14",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-002"
+      ],
+      "seconds": 6.6,
+      "answer": "The hotel limit per night, including taxes, is CNY 600 in Shenzhen (Tier 1) [1], and CNY 450 in Xi'an (Tier 2) [1]."
+    },
+    {
+      "id": "DOC-15",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-002"
+      ],
+      "seconds": 8.23,
+      "answer": "The meal allowance is a fixed CNY 100 per day for each full travel day, in all cities. No meal receipts are needed; the hotel invoice and transport tickets must support the travel days. [1]"
+    },
+    {
+      "id": "DOC-16",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-002"
+      ],
+      "seconds": 6.34,
+      "answer": "Every business trip needs Department Head approval before booking; inter-campus teaching exchange trips for instructors also need Academic Office approval. Book through the company travel platform. Flights must be economy class and booked at least 7 days in advance; later bookings need Campus Director approval. [1]"
+    },
+    {
+      "id": "DOC-17",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-003"
+      ],
+      "seconds": 7.92,
+      "answer": "The limit is CNY 300 per person per meal. The Campus Director must approve the entertainment in advance, in writing; the claim must list the guests and business purpose, and alcohol is not reimbursable. [1]"
+    },
+    {
+      "id": "DOC-18",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-003"
+      ],
+      "seconds": 9.83,
+      "answer": "An instructor may spend up to CNY 500 per class group per month on teaching supplies without pre-approval. Spending above that requires pre-approval from the Department Head. [1]"
+    },
+    {
+      "id": "DOC-19",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-BEN-006"
+      ],
+      "seconds": 7.96,
+      "answer": "Guangzhou: CNY 30 per working day. Wuhan: CNY 25 per working day.[1]"
+    },
+    {
+      "id": "DOC-20",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-BEN-006"
+      ],
+      "seconds": 6.82,
+      "answer": "The annual health check is worth up to CNY 800 per year at a partner clinic. [1]"
+    },
+    {
+      "id": "DOC-21",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-004"
+      ],
+      "seconds": 9.05,
+      "answer": "Instructors’ pay structure is 70 percent of target monthly pay as fixed base and 30 percent as performance pay. Performance pay is paid quarterly according to the rating: A pays 120 percent of target performance pay, B+ pays 110 percent, B pays 100 percent, and C pays 70 percent. [1]"
+    },
+    {
+      "id": "DOC-22",
+      "role": "staff",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-BEN-006"
+      ],
+      "seconds": 7.55,
+      "answer": "An instructor at level I2 or above who relocates more than 500 km to join a Tier 1 campus receives a housing allowance of CNY 1,500 per month for the first 12 months. [1]"
+    },
+    {
+      "id": "DOC-23",
+      "role": "manager",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-BUD-007"
+      ],
+      "seconds": 9.75,
+      "answer": "An item above CNY 20,000 is a capital item. It requires approval from the Campus Director and the Finance Controller. Capital items above CNY 100,000 also require approval from the CFO. [1]"
+    },
+    {
+      "id": "DOC-24",
+      "role": "staff",
+      "type": "keyword",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-TAX-008"
+      ],
+      "seconds": 9.29,
+      "answer": "Company invoices must show Tax ID: 91510000FAKE00001X (fictional, for demonstration). [1]"
+    },
+    {
+      "id": "DOC-25",
+      "role": "student",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-ENV-001"
+      ],
+      "seconds": 9.96,
+      "answer": "The Java course uses Temurin 21 (LTS); the course material and autograder use Java 21. Do not install JDK 8 or 17. [1] Set up `JAVA_HOME` to the JDK installation folder and add `%JAVA_HOME%\\bin` (Windows) or `$JAVA_HOME/bin` (macOS and Linux) to `PATH`; then open a new terminal and check that `java -version` prints version 21. [1] Also install Maven 3.9.9 and add its `bin` folder to `PATH`, configure the StarIT Maven mirror in `~/.m2/settings.xml`, and install IntelliJ IDEA Community Edition with the project SDK set to Temurin 21 and Maven settings pointed to your Maven folder and `settings.xml`. [1] Install MySQL 8.4, set a root password, and create `starit_course` with `CREATE DATABASE starit_course CHARACTER SET utf8mb4;`. [2]"
+    },
+    {
+      "id": "DOC-26",
+      "role": "student",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-ENV-001",
+        "TS-FAQ-008"
+      ],
+      "seconds": 8.19,
+      "answer": "Add the StarIT campus mirror to `~/.m2/settings.xml` (create the file if needed); it is much faster than Maven Central on campus networks. [1][2]\n\n```xml\n<mirror>\n  <id>starit</id>\n  <mirrorOf>central</mirrorOf>\n  <url>https://maven.starit.example/repository/public/</url>\n</mirror>\n``` [1]"
+    },
+    {
+      "id": "DOC-27",
+      "role": "student",
+      "type": "single",
+      "passed": false,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [
+        "the judge found a key fact missing or wrong"
+      ],
+      "cited": [
+        "TS-ENV-003"
+      ],
+      "seconds": 9.41,
+      "answer": "The TypeScript course uses Node.js 22 LTS and pnpm 9.[1]"
+    },
+    {
+      "id": "DOC-28",
+      "role": "student",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-CRS-005"
+      ],
+      "seconds": 11.19,
+      "answer": "New weekly materials are released every Monday at 09:00 campus time.[1] You can register your account on at most 3 devices.[1]"
+    },
+    {
+      "id": "DOC-29",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-CRS-005",
+        "TS-FAQ-008"
+      ],
+      "seconds": 12.61,
+      "answer": "ERR-PORTAL-403 means you have reached the limit of 3 registered devices. Remove an old device under Profile > Devices. [1][2]"
+    },
+    {
+      "id": "DOC-30",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-CRS-005"
+      ],
+      "seconds": 14.13,
+      "answer": "ERR-PORTAL-429 means your download quota has been used up. Wait until the 1st of the month, when the monthly quota resets, or ask your instructor for an extra quota. [1]"
+    },
+    {
+      "id": "DOC-31",
+      "role": "student",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-HW-006"
+      ],
+      "seconds": 12.95,
+      "answer": "The assignment deadline is 23:59 campus time on the due date shown in the portal. The portal submission time counts, not the time of the commit. [1]"
+    },
+    {
+      "id": "DOC-32",
+      "role": "student",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-PRJ-007"
+      ],
+      "seconds": 12.79,
+      "answer": "A capstone team has 3 to 5 students. Each member must contribute at least 10 merged commits and review at least 5 teammates’ merge requests during the project; members below either minimum receive an individual deduction. [1]"
+    },
+    {
+      "id": "DOC-33",
+      "role": "student",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-NET-009"
+      ],
+      "seconds": 10.04,
+      "answer": "The helpdesk is open from 08:00 to 22:00, Monday to Saturday. Requests received outside these hours are handled on the next opening day. [1] The P1 first response time is 30 minutes. [1]"
+    },
+    {
+      "id": "DOC-34",
+      "role": "student",
+      "type": "single",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-NET-009"
+      ],
+      "seconds": 14.15,
+      "answer": "If your laptop is broken, you can borrow a laptop for up to 14 days. A refundable deposit of CNY 500 is required, and late returns cost CNY 20 per day. [1] Contact the helpdesk by email at helpdesk@starit.example, by phone at extension 8000 on any campus phone, or in person at the IT desk on the first floor of each campus. [1]"
+    },
+    {
+      "id": "DOC-35",
+      "role": "student",
+      "type": "single",
+      "passed": false,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [
+        "the judge found a key fact missing or wrong"
+      ],
+      "cited": [
+        "TS-CRS-005"
+      ],
+      "seconds": 8.22,
+      "answer": "After 5 failed sign-in attempts, your account is locked for 30 minutes. [1]"
+    },
+    {
+      "id": "DOC-36",
+      "role": "staff",
+      "type": "multi",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-PRM-005",
+        "HR-TRN-004"
+      ],
+      "seconds": 10.8,
+      "answer": "The required certificate is STC-2 [1][2]. If the promotion is successful, the instructor can expect a base salary increase of 8 to 15 percent [1]."
+    },
+    {
+      "id": "DOC-37",
+      "role": "staff",
+      "type": "multi",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-001",
+        "HR-TRN-004"
+      ],
+      "seconds": 9.77,
+      "answer": "The reimbursement is 80% of CNY 6,000, which is CNY 4,800; this is below the CNY 5,000 annual cap, assuming the certification is related to the instructor’s teaching area and the manager approved it before registration. [1] The claim amount falls in the CNY 1,001 to 10,000 band, so the Campus Director approves the claim. [3] The subsidy is paid after the instructor passes and submits the certificate and receipt. [1]"
+    },
+    {
+      "id": "DOC-38",
+      "role": "staff",
+      "type": "multi",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-004",
+        "HR-WRK-008"
+      ],
+      "seconds": 8.7,
+      "answer": "20 hours falls within the allowed maximum of 24 teaching hours per week. Overload is the 4 hours above the standard 16 hours; at CNY 120 per hour, the overload pay is 4 × CNY 120 = CNY 480. [1][2]"
+    },
+    {
+      "id": "DOC-39",
+      "role": "staff",
+      "type": "multi",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-002"
+      ],
+      "seconds": 8.36,
+      "answer": "Beijing is Tier 1, so the hotel limit is CNY 600 per night, including taxes. For 3 nights, the maximum hotel reimbursement is 3 × CNY 600 = CNY 1,800. [1] An employee at level M3 (Campus Director) or above may exceed the limit by up to 20 percent, making the maximum CNY 720 per night, or CNY 2,160 for 3 nights; any amount over the applicable limit is paid by the employee. [1]"
+    },
+    {
+      "id": "DOC-40",
+      "role": "student",
+      "type": "multi",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-HW-006"
+      ],
+      "seconds": 7.77,
+      "answer": "50 hours falls in the 48 to 72 hours delay band, which deducts 30 percent from the score.[1] The deduction is 90 × 0.30 = 27 points, so your final score is 90 − 27 = 63.[1]"
+    },
+    {
+      "id": "DOC-41",
+      "role": "staff",
+      "type": "multi",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-ONB-003",
+        "HR-TRN-004"
+      ],
+      "seconds": 8.2,
+      "answer": "A newly hired instructor can teach alone only after completing all three requirements: the 40-hour teaching certification (STC-1), observing 6 classes taught by experienced instructors, and teaching two supervised classes, each followed by written feedback from the mentor. Until then, the instructor is listed as “in training” and does not carry a full teaching load. [1][2]"
+    },
+    {
+      "id": "DOC-42",
+      "role": "staff",
+      "type": "multi",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-001"
+      ],
+      "seconds": 7.88,
+      "answer": "No, not without Finance Manager approval. The claim was submitted 36 calendar days after the expense date, which is after the 30-day deadline; claims submitted after 30 days need Finance Manager approval. It is not older than 90 days, so the 90-day rejection rule does not apply. [1]"
+    },
+    {
+      "id": "DOC-43",
+      "role": "staff",
+      "type": "version",
+      "passed": false,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [
+        "the judge found a key fact missing or wrong"
+      ],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 7.7,
+      "answer": "Under the old recruitment policy, the referral bonus was CNY 2,000 for instructor and engineering hires, paid after the referred employee completed 90 days of employment. [1] Version 1.0 was replaced by version 2.1 on 2026-01-01; version 2.1 is active and applies now. [1][2]"
+    },
+    {
+      "id": "DOC-44",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 7.1,
+      "answer": "Under the old recruitment policy, an offer was valid for 5 calendar days. The old version (v1.0) is superseded; version 2.1 applies now and sets validity at 7 calendar days. [1][2]"
+    },
+    {
+      "id": "DOC-45",
+      "role": "hr",
+      "type": "access",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-002"
+      ],
+      "seconds": 7.54,
+      "answer": "The base salary band for an I3 Senior Instructor at a Tier 1 campus is CNY 20,000 to CNY 28,000 per month. [1]"
+    },
+    {
+      "id": "DOC-46",
+      "role": "student",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 3.8,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-47",
+      "role": "staff",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 5.34,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-48",
+      "role": "finance",
+      "type": "access",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-005"
+      ],
+      "seconds": 8.01,
+      "answer": "Annual bonus = monthly base salary × rating multiplier × company factor. [1] The rating multipliers are: A = 1.5; B+ = 1.2; B = 1.0; C = 0. [1] The company factor is set by the Board in January and lies between 0.5 and 1.5. [1]"
+    },
+    {
+      "id": "DOC-49",
+      "role": "finance",
+      "type": "access",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-005"
+      ],
+      "seconds": 8.01,
+      "answer": "Admissions advisors earn 3 percent of the net tuition collected for each student they enroll. Net tuition excludes refunds and discounts. The commission is paid in the month after the student’s 14-day refund window closes. If the student withdraws within 30 days after the program starts, the commission is clawed back in full from the next payroll. Team leads earn an extra 0.5 percent on their team’s net tuition. [1]"
+    },
+    {
+      "id": "DOC-50",
+      "role": "student",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 3.53,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-51",
+      "role": "staff",
+      "type": "access",
+      "passed": true,
+      "method": "judge",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-IT-010"
+      ],
+      "seconds": 7.4,
+      "answer": "Report a lost company laptop to the helpdesk within 2 hours after you notice it. [1]"
+    },
+    {
+      "id": "DOC-52",
+      "role": "staff",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 7.84,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-53",
+      "role": "student",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 7.28,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-54",
+      "role": "staff",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 7.79,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-55",
+      "role": "staff",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-PRM-005",
+        "HR-TRN-004"
+      ],
+      "seconds": 5.26,
+      "answer": "STC-3 is required for promotion from I3 to I4 (Lead Instructor). [1][2]"
+    },
+    {
+      "id": "DOC-56",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-CRS-005"
+      ],
+      "seconds": 12.02,
+      "answer": "ERR-PORTAL-503 means the portal is under maintenance. Retry later; maintenance windows are Sunday 02:00 to 04:00. [1]"
+    },
+    {
+      "id": "DOC-57",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-NET-009"
+      ],
+      "seconds": 4.2,
+      "answer": "helpdesk@starit.example [1]"
+    },
+    {
+      "id": "DOC-58",
+      "role": "staff",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-TAX-008"
+      ],
+      "seconds": 5.19,
+      "answer": "Invoice questions are answered by Finance Shared Service at finance-help@starit.example on business days. [1]"
+    },
+    {
+      "id": "DOC-59",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-FAQ-008"
+      ],
+      "seconds": 5.01,
+      "answer": "The campus Wi-Fi network for students is called `StarIT-Student`. Sign in with your student ID. [1]"
+    },
+    {
+      "id": "DOC-60",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-ENV-003"
+      ],
+      "seconds": 4.78,
+      "answer": "The TypeScript bootcamp requires Node.js 22 LTS. [1]"
+    },
+    {
+      "id": "DOC-61",
+      "role": "staff",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-001"
+      ],
+      "seconds": 9.17,
+      "answer": "Each claim made with a Lost Receipt Form is limited to CNY 500. The form must be signed by the Campus Director, and each employee may use it at most 2 times per year. [1]"
+    },
+    {
+      "id": "DOC-62",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-ENV-001"
+      ],
+      "seconds": 6.49,
+      "answer": "The Java bootcamp uses Temurin 21 (LTS). The course material and autograder use Java 21; do not install JDK 8 or 17. [1]"
+    },
+    {
+      "id": "DOC-63",
+      "role": "manager",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-PERF-006"
+      ],
+      "seconds": 6.65,
+      "answer": "After two consecutive C ratings, the performance improvement plan lasts 60 days. [1]"
+    },
+    {
+      "id": "DOC-64",
+      "role": "student",
+      "type": "keyword",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-NET-009"
+      ],
+      "seconds": 6.86,
+      "answer": "The refundable deposit is CNY 500, and you can keep the loaner laptop for up to 14 days. Late returns cost CNY 20 per day. [1]"
+    },
+    {
+      "id": "DOC-65",
+      "role": "student",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-NET-009"
+      ],
+      "seconds": 6.91,
+      "answer": "Yes. Students whose laptop is broken can borrow a loaner laptop for up to 14 days. A refundable deposit of CNY 500 is required, and late return costs CNY 20 per day. [1]"
+    },
+    {
+      "id": "DOC-66",
+      "role": "student",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-CRS-005"
+      ],
+      "seconds": 6.56,
+      "answer": "After 5 failed sign-in attempts, your account is locked for 30 minutes. You can reset your password yourself using your student ID and the phone number registered at enrollment. If your phone number has changed, contact the Admissions and Student Services desk at your campus. [1]"
+    },
+    {
+      "id": "DOC-67",
+      "role": "student",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-FAQ-008",
+        "TS-NET-009"
+      ],
+      "seconds": 5.72,
+      "answer": "Request student VPN access by emailing the helpdesk with your student ID. The student VPN provides access to GitLab from outside campus, and access is granted within 1 business day (P3). [1] Git is reachable from home only through the student VPN. [2]"
+    },
+    {
+      "id": "DOC-68",
+      "role": "staff",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-LEV-007"
+      ],
+      "seconds": 5.06,
+      "answer": "After six years of service, you fall in the “5 to under 10 years” band and receive 10 days of paid annual leave per year. Public holidays are in addition to annual leave. [1]"
+    },
+    {
+      "id": "DOC-69",
+      "role": "staff",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-001"
+      ],
+      "seconds": 6.19,
+      "answer": "Yes. If the VAT invoice is lost, you may submit a Lost Receipt Form signed by the Campus Director. You may use this form at most 2 times per year, and each claim is limited to CNY 500. [1] Expenses without a valid invoice are otherwise not reimbursed, except under this lost-receipt procedure. [2]"
+    },
+    {
+      "id": "DOC-70",
+      "role": "staff",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-004"
+      ],
+      "seconds": 6.05,
+      "answer": "Non-exempt staff receive 2 times their hourly rate for weekend overtime, so Sunday work is paid at double the hourly rate. Overtime must be approved in advance. [1]"
+    },
+    {
+      "id": "DOC-71",
+      "role": "student",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-HW-006"
+      ],
+      "seconds": 5.28,
+      "answer": "About 30 hours falls in the 24 to 48 hours band, so 20 percent is deducted from your score. [1]"
+    },
+    {
+      "id": "DOC-72",
+      "role": "staff",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-IT-010"
+      ],
+      "seconds": 6.03,
+      "answer": "Report the stolen phone to the helpdesk within 2 hours after you notice it. [1]"
+    },
+    {
+      "id": "DOC-73",
+      "role": "staff",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-REIM-003"
+      ],
+      "seconds": 5.02,
+      "answer": "Yes. If you are an employee working after 21:00 on a weekday at a manager’s request, you may claim CNY 40 for a meal and a taxi ride home. Weekend work follows the same rule if approved by the Department Head. [1]"
+    },
+    {
+      "id": "DOC-74",
+      "role": "student",
+      "type": "paraphrase",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "TS-HW-006"
+      ],
+      "seconds": 5.66,
+      "answer": "Copying a classmate’s code without a reference is plagiarism. The first offense results in a score of zero and an academic review; a second offense leads to dismissal from the program. [1]"
+    },
+    {
+      "id": "DOC-75",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 5.47,
+      "answer": "Under the current policy, external postings stay open for at least 14 calendar days, unless the position is filled earlier. [1] Under the old policy, postings stayed open for at least 10 calendar days. [2] Version 2.1 is active; version 1.0 is superseded. [1][2]"
+    },
+    {
+      "id": "DOC-76",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 5.2,
+      "answer": "Under version 1.0, instructor candidates gave a teaching demo of 20 minutes. Version 1.0 is superseded by version 2.1, which is active now.[1][2]"
+    },
+    {
+      "id": "DOC-77",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 5.96,
+      "answer": "The current referral bonus for non-instructor roles is CNY 1,500 for all other roles, paid after the referred employee completes 90 days of employment. HR staff and the hiring manager of the position are not eligible for the bonus. [1] Before, it was CNY 1,000 for all other roles, also paid after 90 days; that version was superseded by version 2.1 on 2026-01-01. [2]"
+    },
+    {
+      "id": "DOC-78",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 5.51,
+      "answer": "The active policy keeps records of candidates who were not hired for 12 months, then deletes them [1]. The superseded policy kept candidate records for 24 months [2]. So the retention period is 12 months shorter under the active policy."
+    },
+    {
+      "id": "DOC-79",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 7.44,
+      "answer": "La versión en vigor es HR-REC-001 v2.1, marcada como activa, desde 2026-01-01. La versión anterior, v1.0, está superseded. [1][2]"
+    },
+    {
+      "id": "DOC-80",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 5.55,
+      "answer": "Version 1.0 was in force from 2024-03-01 to 2025-12-31. [1]"
+    },
+    {
+      "id": "DOC-81",
+      "role": "staff",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 5.39,
+      "answer": "Now, the offer must be sent within 5 business days after the final interview [1]. Previously, it had to be sent within 10 business days after the final interview; version 1.0 is superseded by version 2.1 [2][1]."
+    },
+    {
+      "id": "DOC-82",
+      "role": "manager",
+      "type": "version",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-001"
+      ],
+      "seconds": 5.4,
+      "answer": "Yes. The superseded v1.0 policy required a background check for all hires, and the active v2.1 policy also requires a background check for all hires. [1][2]"
+    },
+    {
+      "id": "DOC-83",
+      "role": "staff",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 8.03,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-84",
+      "role": "staff",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 7.23,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-85",
+      "role": "student",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 6.54,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-86",
+      "role": "student",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 7.87,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-87",
+      "role": "staff",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 8.12,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-88",
+      "role": "student",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 5.4,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-89",
+      "role": "student",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 9.5,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-90",
+      "role": "manager",
+      "type": "unanswerable",
+      "passed": false,
+      "method": "refusal",
+      "end": "answered/None",
+      "problems": [
+        "ended as answered, expected a refusal"
+      ],
+      "cited": [
+        "FIN-BUD-007"
+      ],
+      "seconds": 11.02,
+      "answer": "The procurement threshold is based on the purchase value per item or contract: below CNY 5,000, the department may purchase directly; from CNY 5,000 to 50,000, at least three written quotes are required and the Campus Director must approve; above CNY 50,000, the Procurement team organizes a tender. [1] New vendors must also be registered by Procurement with a valid business license and tax registration. [1]"
+    },
+    {
+      "id": "DOC-91",
+      "role": "student",
+      "type": "unanswerable",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 6.31,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-92",
+      "role": "manager",
+      "type": "single",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-BUD-007"
+      ],
+      "seconds": 6.15,
+      "answer": "CNY 30,000 falls in the 5,000 to 50,000 procurement band, so obtain at least three written quotes and have them approved by the Campus Director. [1] Because the purchase is above CNY 20,000, it is also a capital item and requires approval from both the Campus Director and the Finance Controller. [1] If the vendor is new, Procurement must register it with a valid business license and tax registration. [1]"
+    },
+    {
+      "id": "DOC-93",
+      "role": "manager",
+      "type": "single",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-BUD-007"
+      ],
+      "seconds": 7.05,
+      "answer": "CFO approval is needed when the variance against the quarterly budget is more than 20%, before any new spending in that budget line. [1]"
+    },
+    {
+      "id": "DOC-94",
+      "role": "manager",
+      "type": "single",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-BUD-007"
+      ],
+      "seconds": 5.84,
+      "answer": "Campus budget proposals are submitted in October, and the CFO approves the budgets in December. [1]"
+    },
+    {
+      "id": "DOC-95",
+      "role": "manager",
+      "type": "single",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-LEV-007"
+      ],
+      "seconds": 5.94,
+      "answer": "An instructor must submit the leave request at least 14 days in advance for a day with scheduled classes. Emergency sick leave is exempt from this rule; the instructor must inform the department head before 7:30 on the day, and the department head arranges cover. [1]"
+    },
+    {
+      "id": "DOC-96",
+      "role": "hr",
+      "type": "access",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-002"
+      ],
+      "seconds": 7.01,
+      "answer": "The pass threshold for instructor candidates at levels I2 and above is 75 points out of 100. A candidate is rejected if they score below 50 percent of the maximum in any single dimension, regardless of their total score. [1]"
+    },
+    {
+      "id": "DOC-97",
+      "role": "hr",
+      "type": "access",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-002"
+      ],
+      "seconds": 5.96,
+      "answer": "A total score of 85 to 92 places a candidate at I3 (Senior Instructor) if they have at least 5 years of relevant experience; otherwise, they are placed at I2. [1]"
+    },
+    {
+      "id": "DOC-98",
+      "role": "hr",
+      "type": "access",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "HR-REC-002"
+      ],
+      "seconds": 6.86,
+      "answer": "The instructor interview panel has three members: one instructor of level I3 or above, one member of the Academic Office, and one HR representative who does not score technical depth. [1]"
+    },
+    {
+      "id": "DOC-99",
+      "role": "hr",
+      "type": "access",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-005"
+      ],
+      "seconds": 9.83,
+      "answer": "The company factor lies between 0.5 and 1.5.[1]"
+    },
+    {
+      "id": "DOC-100",
+      "role": "finance",
+      "type": "access",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-005"
+      ],
+      "seconds": 8.0,
+      "answer": "An admissions team lead earns an extra 0.5 percent on the net tuition of their team. [1]"
+    },
+    {
+      "id": "DOC-101",
+      "role": "finance",
+      "type": "access",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-005"
+      ],
+      "seconds": 5.56,
+      "answer": "A spot award can be between CNY 500 and CNY 2,000. A campus may grant up to 3 awards per campus per quarter. [1]"
+    },
+    {
+      "id": "DOC-102",
+      "role": "finance",
+      "type": "access",
+      "passed": true,
+      "method": "facts",
+      "end": "answered/None",
+      "problems": [],
+      "cited": [
+        "FIN-PAY-005"
+      ],
+      "seconds": 7.14,
+      "answer": "A full-time employee must have worked at least 6 months by 31 December to be eligible for the annual bonus. [1]"
+    },
+    {
+      "id": "DOC-103",
+      "role": "staff",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 4.22,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-104",
+      "role": "manager",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 3.76,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-105",
+      "role": "finance",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 3.23,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-106",
+      "role": "student",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 3.86,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-107",
+      "role": "manager",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 5.13,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-108",
+      "role": "staff",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "not_found/no_relevant_documents",
+      "problems": [],
+      "cited": [],
+      "seconds": 8.0,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-109",
+      "role": "student",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 6.77,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-110",
+      "role": "staff",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 7.89,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-111",
+      "role": "student",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 2.93,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-112",
+      "role": "student",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 3.32,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-113",
+      "role": "Admin",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 1.49,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    },
+    {
+      "id": "DOC-114",
+      "role": "RAGETLAdmin",
+      "type": "access",
+      "passed": true,
+      "method": "refusal",
+      "end": "no_permission/restricted_document",
+      "problems": [],
+      "cited": [],
+      "seconds": 3.95,
+      "answer": "Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team."
+    }
+  ]
+}
