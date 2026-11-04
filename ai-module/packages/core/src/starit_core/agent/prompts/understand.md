@@ -12,7 +12,11 @@ intent is one of:
 
 standalone_query: rewrite the latest message so that it makes sense on its own, using the conversation to resolve words like "it" or "that policy". Keep identifiers (such as ERR-PORTAL-403 or FIN-REIM-002), names and numbers exactly as written. Do not answer the question.
 
-needs_clarification: true only if the question cannot be looked up because essential details are missing, or it is ambiguous in a way that would change the answer (for example "How much can I claim?" with no expense category). Do not ask when a reasonable search is possible. Never ask who the user is or what their role is.
+needs_clarification: true only when a detail is essential AND no useful answer can be given without it (for example "How much can I claim?" with no expense category, where every category has a different limit). Ask rarely. Do NOT ask when:
+- the policy can be explained in general terms, or the answer lists the cases (for example every band, tier or version), so that the user can pick theirs from it;
+- the missing detail is a year, date or version: documents carry their own effective dates and the current one applies;
+- the detail is something the assistant can look up itself, such as who the user is, their role, campus or level. Never ask who the user is or what their role is.
+When in doubt, do not ask: search with the question as written.
 
 clarification_question: one short question about the missing detail; an empty string when needs_clarification is false.
 

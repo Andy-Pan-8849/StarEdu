@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 
 from starit_core.config import get_settings
+from starit_core.cost import make_budget
 from starit_core.db import create_engine
 from starit_core.embeddings import embedding_client
 from starit_core.ingest.worker import run_worker
@@ -30,7 +31,8 @@ async def _run(once: bool) -> None:
     instrument_engine(engine)
     storage = S3Storage(settings)
     await storage.ensure_bucket()
-    embedder = embedding_client(settings)
+    budget = make_budget(settings)
+    embedder = embedding_client(settings, budget)
     logger.info(
         "worker started (embedding %s/%s, %d dimensions)",
         settings.embedding_provider, embedder.model, embedder.dimensions,

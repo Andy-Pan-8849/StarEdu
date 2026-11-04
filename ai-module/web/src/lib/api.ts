@@ -15,7 +15,7 @@ export type TokenSource = {
   onUnauthorized: () => void;
 };
 
-type Options = { method?: string; json?: unknown; form?: FormData; raw?: boolean };
+type Options = { method?: string; json?: unknown; form?: FormData; raw?: boolean; accept?: string };
 
 /** Calls the API as the signed-in user. A 401 means the token is no longer good: sign in again. */
 export function createApi(source: TokenSource) {
@@ -26,6 +26,7 @@ export function createApi(source: TokenSource) {
       throw new ApiError(401, "unauthenticated", "Not signed in");
     }
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (options.accept) headers.Accept = options.accept;
     let body: BodyInit | undefined;
     if (options.json !== undefined) {
       headers["Content-Type"] = "application/json";
@@ -68,7 +69,12 @@ export function createApi(source: TokenSource) {
     return (await call(path)).blob();
   }
 
-  return { json, blob };
+  /** POST and read the reply as server-sent events (see lib/sse.ts). */
+  async function stream(path: string, payload: unknown): Promise<Response> {
+    return call(path, { method: "POST", json: payload, accept: "text/event-stream" });
+  }
+
+  return { json, blob, stream };
 }
 
 export type Api = ReturnType<typeof createApi>;

@@ -7,9 +7,11 @@ settings, so another model is a configuration change followed by re-ingesting th
 import hashlib
 import math
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Any, Protocol
 
+from starit_core import telemetry
 from starit_core.config import Settings
+from starit_core.cost import DailyBudget, call_cost_usd
 from starit_core.ingest.errors import IngestError
 
 
@@ -30,7 +32,9 @@ class LiteLLMEmbeddingClient:
         dimensions: int,
         gateway_url: str | None = None,
         gateway_key: str = "",
+        budget: DailyBudget | None = None,
     ) -> None:
+        self._budget = budget
         self.provider = provider
         self.model = model
         self.dimensions = dimensions
@@ -56,6 +60,7 @@ class LiteLLMEmbeddingClient:
             )
         except Exception as exc:
             raise IngestError("embed", "embedding_failed", f"{type(exc).__name__}: {exc}") from exc
+        await self._record(response, model)
         vectors = [list(item["embedding"]) for item in response.data]
         if len(vectors) != len(texts):
             raise IngestError(
@@ -70,6 +75,16 @@ class LiteLLMEmbeddingClient:
                     retryable=False,
                 )
         return vectors
+
+    async def _record(self, response: Any, model: str) -> None:
+        usage = getattr(response, "usage", None)
+        tokens = int(getattr(usage, "total_tokens", 0) or getattr(usage, "prompt_tokens", 0) or 0)
+        if not tokens:
+            return
+        cost = call_cost_usd(f"{self.provider}/{self.model}", tokens)
+        telemetry.current().llm_cost.add(cost, {"model": self.model})
+        if self._budget is not None:
+            await self._budget.add(cost)
 
 
 class FakeEmbeddingClient:
@@ -100,7 +115,7 @@ def vector_literal(vector: Sequence[float]) -> str:
     return "[" + ",".join(repr(float(x)) for x in vector) + "]"
 
 
-def embedding_client(settings: Settings) -> EmbeddingClient:
+def embedding_client(settings: Settings, budget: DailyBudget | None = None) -> EmbeddingClient:
     if settings.embedding_provider == "fake":
         return FakeEmbeddingClient(settings.embedding_dimensions)
     proxy = settings.llm_gateway == "litellm_proxy"
@@ -110,4 +125,5 @@ def embedding_client(settings: Settings) -> EmbeddingClient:
         settings.embedding_dimensions,
         settings.llm_gateway_url if proxy else None,
         settings.llm_gateway_key if proxy else "",
+        budget,
     )

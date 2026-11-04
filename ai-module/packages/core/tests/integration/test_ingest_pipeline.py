@@ -465,3 +465,32 @@ async def test_asking_for_derived_content_without_a_model_fails_the_job_plainly(
     await ingest_one(app, tmp_path, settings, FakeEmbeddingClient(), None)
     assert await scalar(owner, "SELECT ingest_status FROM ai.documents") == "failed"
     assert await scalar(owner, "SELECT error_code FROM ai.ingestion_jobs") == "no_model"
+
+
+# --- the daily budget ----------------------------------------------------------------------------
+
+
+async def test_a_spent_budget_pauses_ingestion_and_keeps_the_jobs_queued(
+    engines: tuple[AsyncEngine, AsyncEngine], tmp_path: Path
+) -> None:
+    from starit_core.cost import InMemoryDailyBudget
+
+    owner, app = engines
+    storage = InMemoryStorage()
+    folder = copy_documents(tmp_path / "docs", only={"FIN-TAX-008"})
+    await register_from_manifest(app, storage, folder)
+    budget = InMemoryDailyBudget(0.5)
+    await budget.add(0.5)
+    handled = await run_worker(
+        app, storage, FakeEmbeddingClient(), SETTINGS, once=True, budget=budget
+    )
+    assert handled == 0
+    assert (
+        await scalar(owner, "SELECT count(*) FROM ai.ingestion_jobs WHERE status = 'queued'") == 1
+    )
+    assert await scalar(owner, "SELECT count(*) FROM ai.document_chunks") == 0
+    # The next day's budget lets the same job through.
+    handled = await run_worker(
+        app, storage, FakeEmbeddingClient(), SETTINGS, once=True, budget=InMemoryDailyBudget(0.5)
+    )
+    assert handled == 1 and await scalar(owner, "SELECT ingest_status FROM ai.documents") == "ready"

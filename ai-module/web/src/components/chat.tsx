@@ -6,15 +6,11 @@ import { CitationDrawer } from "@/components/citation-drawer";
 import { MessageBody } from "@/components/message-body";
 import { Button, Input } from "@/components/ui";
 import { userMessage } from "@/lib/api";
+import { readEvents } from "@/lib/sse";
 import type { Citation, Conversation, EndState, Message, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Shown = Message & { endState?: EndState };
-
-type Reply = {
-  message: { id: string; content: string; citations: Citation[] };
-  end_state: EndState;
-};
+type Shown = Message & { endState?: EndState; streaming?: boolean };
 
 export function Chat() {
   const { api } = useAuth();
@@ -23,6 +19,7 @@ export function Chat() {
   const [messages, setMessages] = useState<Shown[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [retracted, setRetracted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [citation, setCitation] = useState<Citation | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -68,8 +65,8 @@ export function Chat() {
 
   async function send(event: FormEvent) {
     event.preventDefault();
-    const text = draft.trim();
-    if (!text || sending) return;
+    const text_ = draft.trim();
+    if (!text_ || sending) return;
     setSending(true);
     setError(null);
     try {
@@ -81,23 +78,45 @@ export function Chat() {
       }
       setMessages((m) => [
         ...m,
-        { id: `local-${Date.now()}`, role: "user", content: text, citations: [] },
+        { id: `local-${Date.now()}`, role: "user", content: text_, citations: [] },
       ]);
       setDraft("");
-      const reply = await api.json<Reply>(`/conversations/${id}/messages`, {
-        method: "POST",
-        json: { content: text },
-      });
-      setMessages((m) => [
-        ...m,
-        {
-          id: reply.message.id,
-          role: "assistant",
-          content: reply.message.content,
-          citations: reply.message.citations,
-          endState: reply.end_state,
-        },
-      ]);
+      let finalCitations: Citation[] = [];
+      const draftId = `draft-${Date.now()}`;
+      let text = "";
+      const patch = (changes: Partial<Shown>) =>
+        setMessages((m) =>
+          m.some((x) => x.id === draftId)
+            ? m.map((x) => (x.id === draftId ? { ...x, ...changes } : x))
+            : [...m, { id: draftId, role: "assistant", content: "", citations: [], ...changes }],
+        );
+      const response = await api.stream(`/conversations/${id}/messages`, { content: text_ });
+      for await (const ev of readEvents(response)) {
+        if (ev.name === "message.delta") {
+          text += String(ev.data.text ?? "");
+          setRetracted(false);
+          patch({ content: text, streaming: true });
+        } else if (ev.name === "message.retract") {
+          // The draft failed its check: take it off the screen and say why it vanished.
+          text = "";
+          setRetracted(true);
+          setMessages((m) => m.filter((x) => x.id !== draftId));
+        } else if (ev.name === "run.ended") {
+          const final: Shown = {
+            id: String(ev.data.message_id),
+            role: "assistant",
+            content: String(ev.data.content ?? text),
+            citations: finalCitations,
+            endState: ev.data.end_state as EndState,
+          };
+          setMessages((m) => [...m.filter((x) => x.id !== draftId), final]);
+          setRetracted(false);
+        } else if (ev.name === "citations") {
+          finalCitations = (ev.data.citations as Citation[]) ?? [];
+        } else if (ev.name === "error") {
+          throw new Error(String(ev.data.message ?? "error"));
+        }
+      }
       void loadConversations();
     } catch (e) {
       setError(userMessage(e));
@@ -219,7 +238,14 @@ export function Chat() {
               </div>
             </div>
           ))}
-          {sending ? <p className="text-sm text-slate-500">Thinking…</p> : null}
+          {retracted ? (
+            <p role="status" className="text-sm text-amber-700">
+              The draft did not pass the check and was withdrawn. Writing a corrected answer…
+            </p>
+          ) : null}
+          {sending && !messages.some((m) => m.streaming) && !retracted ? (
+            <p className="text-sm text-slate-500">Thinking…</p>
+          ) : null}
           <div ref={bottom} />
         </div>
         {error ? (

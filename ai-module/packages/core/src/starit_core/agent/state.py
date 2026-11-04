@@ -64,6 +64,8 @@ class RunTotals:
     restricted_keyword_hits: int = 0
     rerank_failed: bool = False
     failure_detail: str | None = None
+    cost_usd: float = 0.0
+    fallbacks: int = 0
 
 
 @dataclass
@@ -77,4 +79,5 @@ class RunContext:
     chat: Any  # a budget-counting ChatClient
     reranker: Any
     data_tools: Any = None  # a DataToolsClient
+    emitter: Any = None  # a RunEmitter when a client is listening, else None
     access_token: str | None = None  # the caller's raw JWT: in memory only, never logged

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import Identity, TokenVerifier, jwks_key_resolver
 from starit_core.config import Settings, get_settings
+from starit_core.cost import RedisDailyBudget, make_budget
 from starit_core.dataaccess.client import McpDataTools
 from starit_core.dataaccess.tools import DataTools, DataToolsClient
 from starit_core.db import check_database, create_engine
@@ -52,13 +53,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         audience=settings.oidc_audience_api,
         key_resolver=jwks_key_resolver(settings.oidc_jwks_url),
     )
-    embedder = embedding_client(settings)
+    budget = make_budget(settings)
+    app.state.budget = budget
+    embedder = embedding_client(settings, budget)
     app.state.runtime = AgentRuntime(
         engine=engine,
         settings=settings,
         embedder=embedder,
         chat=chat_client(settings),
         data_tools=data_tools(settings, engine, embedder),
+        budget=budget,
     )
     limiter = RedisRateLimiter(settings.redis_url)
     app.state.limiter = limiter
@@ -67,6 +71,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await limiter.close()
+        if isinstance(budget, RedisDailyBudget):
+            await budget.close()
         await engine.dispose()
 
 

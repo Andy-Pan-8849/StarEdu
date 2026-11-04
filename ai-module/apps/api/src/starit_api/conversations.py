@@ -1,20 +1,34 @@
 """Conversations and the chat endpoint (design 03, sections 3 and 4)."""
 
+import asyncio
+import json
+import time
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core import conversations as store
 from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import Identity
 from starit_core.config import get_settings
+from starit_core.cost import DailyBudget
 from starit_core.ratelimit import RateLimiter
 
-from starit_api.deps import get_access_token, get_engine, get_identity, get_limiter, get_runtime
+from starit_api.deps import (
+    get_access_token,
+    get_budget,
+    get_engine,
+    get_identity,
+    get_limiter,
+    get_runtime,
+)
 from starit_api.errors import ApiError
+from starit_api.limits import check_chat_limits
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -149,8 +163,61 @@ async def list_messages(
     }
 
 
-@router.post("/{conversation_id}/messages")
+KEEPALIVE_SECONDS = 15.0
+
+
+def _wants_stream(request: Request) -> bool:
+    return "text/event-stream" in request.headers.get("accept", "")
+
+
+def _sse(name: str, data: dict[str, Any]) -> str:
+    return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+async def _event_stream(
+    runtime: AgentRuntime,
+    identity: Identity,
+    conversation_id: UUID,
+    content: str,
+    access_token: str | None,
+) -> AsyncIterator[str]:
+    """Server-sent events of one run. The run is a task of its own: if the client goes away the
+    run still finishes and its reply is stored, so the answer is there when they come back."""
+    queue: asyncio.Queue[tuple[str, dict[str, Any]] | None] = asyncio.Queue()
+
+    async def sink(name: str, data: dict[str, Any]) -> None:
+        await queue.put((name, data))
+
+    async def work() -> None:
+        try:
+            await runtime.run(
+                identity, conversation_id, content, access_token=access_token, on_event=sink
+            )
+        except Exception as exc:  # the stream must end with an event, not a broken connection
+            await queue.put(("error", {"code": "internal", "message": type(exc).__name__}))
+        finally:
+            await queue.put(None)
+
+    task = asyncio.create_task(work())
+    _running.add(task)
+    task.add_done_callback(_running.discard)
+    while True:
+        try:
+            item = await asyncio.wait_for(queue.get(), KEEPALIVE_SECONDS)
+        except TimeoutError:
+            yield ": keepalive\n\n"
+            continue
+        if item is None:
+            return
+        yield _sse(*item)
+
+
+_running: set[asyncio.Task[None]] = set()  # keeps runs alive when nobody is listening
+
+
+@router.post("/{conversation_id}/messages", response_model=None)
 async def post_message(
+    request: Request,
     conversation_id: UUID,
     body: MessageIn,
     identity: Identity = Depends(get_identity),
@@ -158,14 +225,17 @@ async def post_message(
     runtime: AgentRuntime = Depends(get_runtime),
     limiter: RateLimiter = Depends(get_limiter),
     access_token: str | None = Depends(get_access_token),
-) -> dict[str, Any]:
+    budget: DailyBudget | None = Depends(get_budget),
+) -> Any:
     conversation = await _owned(engine, identity, conversation_id)
     if conversation["archived"]:
         raise ApiError(409, "conflict", "This conversation is archived")
-    limit = get_settings().rate_limit_chat_per_minute
-    if not await limiter.allow(f"chat:{identity.user_id}", limit, 60):
-        raise ApiError(
-            429, "rate_limited", "Too many messages; wait a minute", {"Retry-After": "60"}
+    await check_chat_limits(request, get_settings(), limiter, budget, identity.user_id, time.time())
+    if _wants_stream(request):
+        return StreamingResponse(
+            _event_stream(runtime, identity, conversation_id, body.content.strip(), access_token),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
     result = await runtime.run(
         identity, conversation_id, body.content.strip(), access_token=access_token

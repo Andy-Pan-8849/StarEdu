@@ -1090,3 +1090,118 @@ make eval ARGS="matrix"                             # 先估算并等确认
 - **与确认点的差异**：(a) 种子转储是 `jsonl.gz` 而不是 SQL 文件（不依赖 `pg_dump`；设计 06 第 11 节）；(b) 派生内容只加强向量一侧；(c) Langfuse 4 的"events_only"模式下旧的 trace 接口不可用，读数据用 Observations API v2；(d) 评测里 `Question` 新增可选字段 `facts`；(e) `matrix` 用 `DELETE` 而不是 `TRUNCATE` 清库（应用角色没有 TRUNCATE 权限，这是对的）。
 - **过程中发现并修好的问题**：(1) **我之前漏记的偏差**——设计里 full profile 经 LiteLLM 代理，M5 起一直是进程内库，现在补上；(2) Python 镜像每改一行代码都要重新下载全部依赖（一次构建约 40 分钟，`uv` 默认 30 秒的下载超时还会让它失败），已把依赖单独成层、加 uv 缓存挂载和 `UV_HTTP_TIMEOUT=120`；(3) `opentelemetry-instrumentation-sqlalchemy` 因 SQLAlchemy 2.1 超出它声明的范围而静默地不记录任何数据库 span（日志里只有一条 ERROR）——用 `skip_dep_check` 并加测试证明；(4) 提交时 gitleaks 拦下了我预先算好的 base64 凭据，改成 Collector 的 `basicauth` 扩展现场编码；(5) 我自己的评分脚本不认 `v2.1` 里的 `2.1`，已修，报告里的数字是修之前的，没有改；(6) 我在 shell 里用 `path` 做循环变量，zsh 里它和 `PATH` 绑在一起，把命令查找弄坏了一次。
 - **已知限制**：见验收报告末尾。**20% 人工抽查还没做**，所以判官的结论不能当作事实。
+
+## M9 第二阶段第一批：流式输出、限流补全、模型 fallback、M8 收尾
+
+状态：**进行中**（分支 `m9-streaming-and-limits`）。这一批把你对 `架构图对照验收表` 的决定落地：M8 的尾巴收口、流式输出（先流出，校验不通过时撤回）、限流补成三维、LiteLLM 的多模型 fallback（gpt-6-luna → gpt-4o-mini → Claude Haiku 5.5）。Memory 和写操作确认按你的决定不做（等企业后台）。成本统计按你的决定不做，见下面的核实。会有少量真实模型调用，**先估算再等你确认**。
+
+### 你的 7 条决定（原样记录）
+
+1. M8 的尾巴要做：20% 人工抽查、`understand` 过度反问和"没答案仍标已回答"、Anthropic 与 fallback 验证。
+2. 流式输出要做；成本统计 Langfuse 已经有，先不做。
+3. Memory、写操作确认先不做，等企业后台有了再做。
+4. 流式采用"先流出，校验不通过时撤回"。
+5. 图上有、需求清单里没有的（输出端护栏、Jailbreak 检测、MCP Resources 等）先列入第二阶段。
+6. 限流（3 维）要做，把缺的两维补上。
+7. LiteLLM 多模型 fallback 要做：先 OpenAI 的 gpt-6-luna，再 GPT-4 mini，然后 Claude 最便宜的 Haiku 5.5。
+
+### 我先核实的（只读，没花钱）
+
+| 项 | 结果 |
+|---|---|
+| 成本统计 | 你说得对：Langfuse 已经按我们的模型名算出了成本。实测一次生成调用：输入 2,803 token、输出 59 token，成本 0.00031 美元，单价输入 1e-7、输出 5e-7，与我们 `pricing.py` 里的 gpt-6-luna 一致；同一对话的调用共享 `sessionId`，可以按会话汇总。**限制**：Langfuse 只在 full profile 里（"仅本地"），做 lite 时这件事要重新决定。 |
+| 模型名 | LiteLLM 的价格表里有 `gpt-4o-mini`（输入 1.5e-7、输出 6e-7）和 `claude-haiku-5-5`（输入 1e-7、输出 5e-7，与 gpt-6-luna 相同）。经网关的名字是 `anthropic/claude-haiku-5-5`。你写的"GPT-4 mini"我按 M5 里一直用的 `openai/gpt-4o-mini` 理解——**请确认**。`.env` 里有 Anthropic 密钥，**但它是否有效我没验证过**。 |
+| fallback 的实现位置 | LiteLLM 的 `acompletion` 和网关请求都接受 `fallbacks` 参数，所以不必重做网关配置：聊天客户端在直连和经网关两种模式下都传同一个 `fallbacks` 列表（新设置 `STARIT_LLM_FALLBACKS`）。通配路由 `openai/*`、`anthropic/*` 继续有效。Embedding 不做 fallback。 |
+
+### 要先告诉你的几件事（做起来比看上去麻烦或需要你定的）
+
+1. **流式输出比看上去麻烦**。现在 `generate` 输出的是一段 JSON：`{"sufficient": ..., "answer": "...", "citations": [...]}`。流出来的字符是 JSON，不是回答文字，要在收的过程中解析，把 `answer` 字符串的内容（含转义）边解析边发出去。可行：约定键的顺序是 `sufficient` 在前，`sufficient` 为 false 时一个字也不流出；模型不守顺序时退回"整段收完再发"，不会出错。
+2. **流式不会让总时间变短，只改善"等第一个字"**。一次运行 p50 约 5.5 秒，前面是理解、检索、重排，只有最后的生成能流式。预计首字在 3.5–4 秒，而不是 5.5 秒。我会加一个"首字延迟"指标把真实数字量出来，不预先承诺。
+3. **撤回的体验**。校验不通过时（引用了不存在的摘录、不是合法 JSON 等）用户已经看到了前面的字；撤回是发一个事件，页面把这段字清掉并显示"重新生成中…"，再流出第二次的结果。这是你选的方案，我实现它；**撤回应该很少触发**（我没有统计过，评测里没有一次因它而 `error`），触发时用户会看到一次"回退"。
+4. **限流"3 维"图上没写是哪三维，需要你定**。我的建议：① 每用户每分钟（已有，20 次）；② 每 IP 每分钟（例如 60 次，防止一个来源开很多账号）；③ 全站每日 token 预算（防止费用失控，设计 06 里 `STARIT_DAILY_LLM_BUDGET` 就是这个意思）。注意：**本机 Docker 里所有浏览器请求在 API 眼里都来自同一个网关 IP**（`172.25.0.1`），所以 IP 这一维在本机基本等于"全站每分钟"，只有放到真正的反向代理后面并配置可信代理（`X-Forwarded-For`）才有意义；我会做成配置并写清楚。备选的第 ② 维：每用户每天的消息数。
+5. **20% 人工抽查需要你本人**：114 题的 20% 是 **23 条**，每条是问题、参考答案、助手的回答和判官的结论，你判"对 / 错 / 说不好"，约 20–30 分钟。我会做一个可以直接点选的网页（和对照表一样），你点完，我读结果、算判官和你的一致率。如果这个环境里页面保存不了你的选择，就退化成"你把结果复制回来"。
+6. **`understand`/`generate` 的提示词要改**，改完要重跑评测才知道好没好：`understand` 版本 2 → 3（只在确实缺少关键信息、且没有可用的通用答案时才反问；"哪一年"这类不问），`generate` 版本 1 → 2（材料里没有被问的内容时必须 `sufficient: false`，即使有相关内容）。重跑 `starit-eval answers`（114 题，约 $0.13）和助手抽查（约 $0.01），**先打印估算再等你确认**。验收要看：4 道被反问的题改为直接回答；DOC-108 变成拒绝状态；"How much can I claim?" 这类真正含糊的题仍然反问；权限回归越权仍是 0；通过数不下降（M8 基线 99/114，其中 1 题是评分脚本的错，修后 100/114）。
+7. **fallback 之后"哪个模型答的"要看得见**：现在 span 和指标里记的是请求的模型名；fallback 后要记实际答题的模型，并加一个 `starit.llm.fallbacks` 计数和 span 属性，否则 Grafana 里看不出主模型挂了。fallback 只在**报错**时触发（供应商错误、超时、限流、模型不存在），不在"回答质量差"或"JSON 不合法"时触发。
+8. **换成 Haiku 之后行为会不一样**（JSON 的写法、遵守"键的顺序"的程度、重排打分）。我建议用 Haiku 做主模型把 114 题跑一遍，知道它作为兜底靠不靠得住，约 $0.13；**可选**，放在确认点里问你。
+9. **第 5 条"先列入第二阶段"我这次只记录、不实现**：写进新文档 `docs/design/09-phase2-plan.md`（决定、范围、顺序，列出每一项和它在图上的位置）。你点名的三项是输出端护栏（PII 脱敏、敏感词）、Jailbreak 检测、MCP Resources；"等"字我理解为图上其余"没规划"的项也列为**候选（未排期）**：Analytics Agent、Web Search Agent、Local vLLM、Redis 的缓存与黑名单、Vault 与 Sentry、边缘反向代理与 WAF、PITR 备份。**请确认这个范围。**
+
+### 计划的文件（`ai-module/` 下，除非另写）
+
+| 文件 | 作用 |
+|---|---|
+| `docs/design/09-phase2-plan.md`（新）、`07`（改） | 第二阶段规划：你的决定、已排期的、候选的、明确不做的 |
+| `packages/core/src/starit_core/streaming.py`（新） | 增量解析：从流出的 JSON 里取出 `answer` 的文字（处理转义、跨块切分、键顺序） |
+| `packages/core/src/starit_core/llm.py`（改） | `stream()`：litellm `stream=True` 和 token 用量；`fallbacks` 参数；记录实际答题的模型 |
+| `packages/core/src/starit_core/agent/nodes.py`、`runtime.py`、`state.py`、`prompts/*.md`（改） | `generate` 和 `answer_from_data` 流式；`verify_answer` 失败时发撤回；`understand` 3、`generate` 2 |
+| `apps/api/src/starit_api/conversations.py`、`deps.py`、`main.py`（改） | `Accept: text/event-stream` 时返回 SSE（`run.started`、`message.delta`、`message.retract`、`citations`、`run.ended`，每 15 秒一个保活注释）；不带该请求头时行为不变（评测、脚本、测试照旧）；三维限流 |
+| `packages/core/src/starit_core/ratelimit.py`、`config.py`（改） | 每 IP、全站每日 token 预算；`STARIT_RATE_LIMIT_IP_PER_MINUTE`、`STARIT_DAILY_TOKEN_BUDGET`、`STARIT_TRUSTED_PROXIES` |
+| `packages/core/src/starit_core/telemetry.py`（改） | `starit.llm.time_to_first_token`、`starit.llm.fallbacks`、`starit.rate_limited` |
+| `web/src/lib/sse.ts`、`web/src/components/chat.tsx`（改） | 用 `fetch` + `ReadableStream`（`EventSource` 不能带 `Authorization` 头）；逐字显示、撤回提示、引用在结束时出现 |
+| `eval/`（改） | 评测仍走非流式路径；加"流式与非流式的最终内容一致"的检查；review 页面的生成脚本和一致率计算 |
+| `deploy/compose/compose.yaml`、`.env.example`（改） | `STARIT_LLM_FALLBACKS`、限流相关变量 |
+| 各层测试；`docs/design/03`、`04`、`README`（改） | 事件格式加 `message.retract`；流式在图里的位置 |
+
+### 计划的命令
+
+```bash
+git switch -c m9-streaming-and-limits              # 已创建
+uv sync --all-packages
+make test && make lint && make web-check
+make up
+make eval ARGS="answers"                           # 提示词改动后重跑（先打印估算并确认）
+make e2e                                           # 流式在真浏览器里的冒烟
+```
+
+### 验证标准
+
+1. **增量解析**：几十种切分方式（在转义、`\uXXXX`、多字节字符中间切开；`sufficient` 为 false；键顺序颠倒；不合法的 JSON；超长回答）逐一断言：流出的文字拼起来等于最终的 `answer`；`sufficient: false` 时没有任何文字流出；键顺序颠倒时退回整段发送。
+2. **流式运行**（脚本化模型，真实数据库）：事件顺序 `run.started` → `message.delta`×N → `citations` → `run.ended`；最终内容与非流式路径完全一致；校验失败时先 `message.retract` 再重新流出；重试用尽时撤回后以 `error` 结束；澄清、拒绝、闲聊、数据路径各有一个场景。
+3. **断线**：客户端中途断开，运行在服务端继续跑完，`ai.runs`、`ai.messages`、审计记录完整（测试断言）。
+4. **API**：带 `Accept: text/event-stream` 得到 SSE，不带得到和现在一样的 JSON；未登录 401；限流 429 在流开始**之前**返回（是普通 HTTP 响应，不是事件）；令牌不出现在任何事件和日志里。
+5. **三维限流**：每个维度各有测试（超限、窗口过去后恢复、Redis 不可用时放行并告警）；IP 维度在没配置可信代理时用对端地址、配置后用 `X-Forwarded-For` 的最后一个可信跳，**伪造的头不起作用**（测试）；每日预算按运行结束时的实际 token 累加，超出时新请求得 429 并带到次日零点的 `Retry-After`。
+6. **fallback**：单元测试（主模型报错 → 第二个 → 第三个；三个都失败 → `llm_error`；非错误情况不触发）；**真实检查**（先估算）：把主模型临时设成不存在的名字，确认回答来自 `gpt-4o-mini`；再把前两个都设成不存在，确认回答来自 Haiku 5.5；span 和指标里记的是实际答题的模型。
+7. **提示词改动的评测**：见上面第 6 点的 5 项验收；报告写清楚前后对比和样本量，**不事先承诺通过数**。
+8. **20% 人工抽查**：23 条全部有你的判断；报告里写判官与你的一致率和不一致的是哪几条，**一致率低就说明判官不可信**。
+9. **前端**：Vitest 覆盖 SSE 解析（跨块的事件、保活注释、撤回、`run.ended` 里的最终内容兜底）和撤回时的界面；Playwright 用拦截的 SSE 响应走一遍提问、撤回、引用；真实浏览器里用真实模型问一次，看逐字出现。
+10. 本地测试、lint、mypy、前端检查通过，CI 通过。
+
+### 开始前不确定的事
+
+- **LiteLLM 网关转发流式 + `response_format: json_object`** 对 gpt-6-luna 是否一切正常，我没试过；先用一次真实调用验证（不到 $0.001）。
+- **`stream_options: include_usage`** 经网关是否能拿到最终的 token 用量；拿不到的话流式运行的 token 统计会缺，我会退回到用估算并明确标出。
+- **`fallbacks` 参数经网关传递**，在通配路由（`openai/*`）下的实际行为我还没验证；验证不通过的话改用网关的 `router_settings.fallbacks` 并为三个模型各建一个具名条目（这会改变模型名的约定，到时再告诉你）。
+- **Haiku 对 JSON 模式、`reasoning_effort` 的处理**：LiteLLM 会转换或丢弃不支持的参数（`drop_params: true`），但转换后的行为没验证。
+- **撤回的前端体验**需要真实用一用才知道合不合适；做完我会用真浏览器看一次，但"合不合适"是你的判断。
+- **IP 限流在本机几乎没有意义**（见上），验收时只能用测试证明逻辑，不能在真实多来源下证明。
+
+### 需要你确认
+
+1. 模型链：`openai/gpt-6-luna` → `openai/gpt-4o-mini`（你写的"GPT-4 mini"）→ `anthropic/claude-haiku-5-5`；Anthropic 密钥是否有效由真实检查来验证。
+2. 限流三维：每用户每分钟（已有）、每 IP 每分钟（建议 60）、全站每日 token 预算（数值你定，或我先给个保守默认）——或者把第 ② 维换成"每用户每天消息数"。
+3. 流式：先流出、校验不通过时撤回；`answer_from_data`（数据路径）也流式；澄清、拒绝、闲聊的固定文案作为一个 `message.delta` 发出，保持前端逻辑统一；本期**不做**"停止生成"按钮。
+4. 成本统计不做，用 Langfuse（full profile 里有；lite 没有）。
+5. 提示词改动（`understand` 3、`generate` 2）并重跑评测，先估算后确认。
+6. 20% 人工抽查：我做点选页面，你花 20–30 分钟判 23 条。
+7. 第二阶段规划文档的范围（上面第 9 点：你点名的三项 + 其余候选）。
+8. 是否用 Haiku 做主模型把 114 题跑一遍（约 $0.13，可选）。
+
+### 用户的确认（2026-11-04）
+
+- **限流三维**：IP / 用户 / token。其中 token 这一维定为**全栈每日不超过 0.5 美元**（按实际用量和模型价格累计；"全栈"= api、worker、mcp-server 的所有模型调用，包括对话、重排、向量化、派生内容）；IP 每分钟 60 次、用户每分钟 20 次沿用我的建议。
+- **20% 人工抽查**：我先做完其它功能，**用户最后做这项检查**（样本取自提示词改动后重跑的结果，这样测的是最终的系统）。
+- **Haiku**：不用把 114 题用 Haiku 跑一遍，**只验证 Haiku 可用**。
+- 其余确认点全部接受：模型链 `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`；流式（`answer_from_data` 也流式、固定文案作为一个 `message.delta`、本期不做停止按钮）；成本统计用 Langfuse；提示词改动并重跑评测（**先估算后确认**）；第二阶段规划文档范围。
+
+### 实际结果
+
+状态：**功能、评测与人工抽查均已完成，CI 通过，等待合并**。
+
+- **多模型 fallback + 每日预算 + 三维限流**（提交 c87d0b8）：模型链 `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`；全栈每日预算 0.5 美元（api、worker、mcp-server 共用 Redis 当日计数，超出时聊天 429、worker 暂停取任务）；限流 IP 60/分钟、用户 20/分钟，IP 取自连接，只有来源在 `STARIT_TRUSTED_PROXIES` 内才读 `X-Forwarded-For`。
+- **流式输出**：`Accept: text/event-stream` 时返回 SSE（事件见文档 03 的 4.1）。`generate` 先输出 `sufficient`，确认为 true 才开始流出 `answer`；`answer_from_data` 也流式；固定文案作为一个 `message.delta`；校验不通过时发 `message.retract` 并在网页上显示"草稿未通过检查，已撤回"；客户端断开后运行继续并存档；15 秒保活。新增首字延迟指标（`run_first_token`、`llm_first_token`）。
+- **提示词**：`understand` 2→3、`generate` 1→2。
+- **真实检查**（约 $0.15 以内）：经 LiteLLM 网关流式 + JSON 模式 + 用量统计正常（gpt-6-luna、gpt-4o-mini）；备用链实测：主模型无效→`gpt-4o-mini`，前两级无效→`claude-haiku-5-5`，返回结果记录实际用到的模型；Haiku 直连流式与非流式均可用、JSON 合法。检查脚本：`ai-module/scripts/m9_real_check.py`。没有用 Haiku 跑 114 题（按你的决定）。
+- **答案评测重跑**（`docs/eval/answers-20261104-1722.md`，花费约 $0.129，估算 $0.140）：**107/114**（M8 基线 99/114；应回答 81/87，应拒绝 26/27）。原先被反问的 DOC-04/31/42/69 中，31、42、69 现在通过，DOC-04 现在直接回答但被判官以"漏了 12 个月服务期"判不通过；DOC-108 通过；应回答里"反问而没回答"为 0 题。剩下 7 题：6 题是判官嫌回答漏了次要事实（DOC-04/05/07/27/35/43），1 题是 DOC-90（问题本身含糊，助手引用了采购门槛作答）。
+- **助手抽查**：14/15，与 M8 相同，唯一未过的仍是 DOC-43（没写出当前版本的 3,000）；权限回归越权为 0 题。
+- **未验证 / 如实说明**：流式在真实浏览器里的观感还没看；生成延迟 p50 7.25 秒（M8 约 5.5 秒，本次包含更长的回答与网络波动，没有单独对比），流式主要改善首字时间；本地 Docker 下 IP 限流几乎没有区分度（所有浏览器都显示为 Docker 网关地址）。
+- **20% 人工抽查（用户已完成，`docs/eval/answers-20261104-1722-reviewed.csv`）**：23 题，判官与人工一致 **21/23**。判官判通过的 21 题人工全部认可（没有"误放行"）；判官判不通过的 2 题（DOC-04 漏了 12 个月服务期、DOC-27 漏了镜像地址）人工认为应通过，即判官偏严、会因漏掉次要事实而误杀。结论：判官给出的通过数是偏保守的下限，107/114 不会高估；样本只有 23 题，判官偏严的比例（2/23）只是粗略估计。（用户事后说明：抽查时曾把"参考答案"和"助手回答"两列看反，复核后确认助手的回答是对的，结果仍按 21/23 计，CSV 不改。）
+- **测试**：875 个 Python 测试、62 个前端测试通过；ruff、mypy 严格干净。

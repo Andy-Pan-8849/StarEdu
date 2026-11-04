@@ -44,12 +44,29 @@ class Telemetry:
         self.llm_calls = meter.create_counter("starit.llm.calls", description="Model calls")
         self.llm_tokens = meter.create_counter("starit.llm.tokens", description="Model tokens")
         self.llm_duration = meter.create_histogram("starit.llm.duration", unit="s")
+        self.llm_first_token = meter.create_histogram(
+            "starit.llm.time_to_first_token", unit="s", description="Streamed model calls"
+        )
+        self.run_first_token = meter.create_histogram(
+            "starit.run.time_to_first_token",
+            unit="s",
+            description="From the request to the first answer text the user can see",
+        )
         self.node_duration = meter.create_histogram("starit.agent.node.duration", unit="s")
         self.retrievals = meter.create_counter("starit.retrieval.queries")
         self.retrieval_duration = meter.create_histogram("starit.retrieval.duration", unit="s")
         self.retrieval_restricted = meter.create_counter(
             "starit.retrieval.restricted_hits",
             description="Matching chunks the asker may not read (a number, never their text)",
+        )
+        self.llm_cost = meter.create_counter(
+            "starit.llm.cost_usd", unit="USD", description="Model spend at list price"
+        )
+        self.llm_fallbacks = meter.create_counter(
+            "starit.llm.fallbacks", description="Chat calls answered by a fallback model"
+        )
+        self.rate_limited = meter.create_counter(
+            "starit.rate_limited", description="Chat requests refused by a limit"
         )
         self.tool_calls = meter.create_counter("starit.tool.calls", description="Data tool calls")
         self.ingest_jobs = meter.create_counter("starit.ingest.jobs", description="Ingestion jobs")

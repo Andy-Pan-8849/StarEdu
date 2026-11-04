@@ -10,6 +10,7 @@ from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.auth import TokenVerifier, jwks_key_resolver
 from starit_core.config import Settings, get_settings
+from starit_core.cost import make_budget
 from starit_core.dataaccess.tools import DataTools
 from starit_core.db import create_engine
 from starit_core.embeddings import embedding_client
@@ -39,7 +40,11 @@ def build_app(
             validate_token_resource=False,  # the audience is checked by TokenVerifier
         ),
     )
-    register_tools(server, DataTools(engine, settings, embedding_client(settings)), jwt_verifier)
+    register_tools(
+        server,
+        DataTools(engine, settings, embedding_client(settings, make_budget(settings))),
+        jwt_verifier,
+    )
 
     @server.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]
     async def health(request: Request) -> JSONResponse:

@@ -206,3 +206,44 @@ def test_messages_are_limited_per_user_per_minute(api: TestClient) -> None:
     # A refused message left no trace.
     history = api.get(f"/conversations/{cid}/messages?limit=100", headers=ALICE).json()["items"]
     assert len(history) == 6
+
+
+def sse_events(text: str) -> list[tuple[str, dict[str, Any]]]:
+    import json
+
+    events = []
+    for block in text.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
+        if "event" in lines:
+            events.append((lines["event"], json.loads(lines["data"])))
+    return events
+
+
+def test_a_message_can_be_streamed_as_server_sent_events(api: TestClient) -> None:
+    cid = create(api)
+    response = api.post(
+        f"/conversations/{cid}/messages",
+        json={"content": "hello"},
+        headers={**ALICE, "Accept": "text/event-stream"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = sse_events(response.text)
+    names = [name for name, _ in events]
+    assert names[0] == "run.started" and names[-1] == "run.ended"
+    ended = events[-1][1]
+    shown = "".join(d["text"] for n, d in events if n == "message.delta")
+    assert shown == ended["content"] and ended["end_state"] == "answered"
+    # The stored message is the one that was streamed.
+    stored = api.get(f"/conversations/{cid}/messages", headers=ALICE).json()["items"]
+    assert stored[-1]["content"] == ended["content"]
+
+
+def test_a_streamed_message_is_still_limited_and_owned(api: TestClient) -> None:
+    cid = create(api, ALICE)
+    other = api.post(
+        f"/conversations/{cid}/messages",
+        json={"content": "hello"},
+        headers={**BOB, "Accept": "text/event-stream"},
+    )
+    assert other.status_code == 404

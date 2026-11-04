@@ -17,12 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from starit_core import telemetry
 from starit_core.agent import messages
+from starit_core.agent.events import RunEmitter, Sink
 from starit_core.agent.finish import finish_run
 from starit_core.agent.graph import build_graph
 from starit_core.agent.nodes import AgentNodes, BudgetedChat, RetrieveFn
 from starit_core.agent.state import AgentState, RunContext, RunTotals
 from starit_core.auth import Identity
 from starit_core.config import Settings
+from starit_core.cost import DailyBudget
 from starit_core.embeddings import EmbeddingClient
 from starit_core.llm import ChatClient
 from starit_core.logging import run_id_var
@@ -52,8 +54,10 @@ class AgentRuntime:
         chat: ChatClient,
         retrieve_fn: RetrieveFn = retrieve,
         data_tools: Any = None,
+        budget: DailyBudget | None = None,
     ) -> None:
         self._data_tools = data_tools
+        self._budget = budget
         self._engine = engine
         self._settings = settings
         self._chat = chat
@@ -72,10 +76,16 @@ class AgentRuntime:
         user_text: str,
         *,
         access_token: str | None = None,
+        on_event: Sink | None = None,
     ) -> RunResult:
+        """Run the assistant for one message. With `on_event` a client is listening: the run says
+        what it is doing as it goes (see agent/events.py) and ends with `run.ended`."""
         run_id = uuid4()
+        emitter = RunEmitter(on_event) if on_event is not None else None
         token = run_id_var.set(str(run_id))
         try:
+            if emitter is not None:
+                await emitter.event("run.started", {"run_id": str(run_id)})
             with telemetry.span(
                 "agent.run",
                 {
@@ -86,7 +96,11 @@ class AgentRuntime:
                     "langfuse.trace.name": "assistant run",
                 },
             ) as active:
-                result = await self._run(identity, conversation_id, user_text, run_id, access_token)
+                result = await self._run(
+                    identity, conversation_id, user_text, run_id, access_token, emitter
+                )
+                if emitter is not None:
+                    await self._finish_stream(emitter, result)
                 active.set_attribute("agent.end_state", result.end_state)
                 active.set_attribute("agent.end_reason", result.end_reason or "")
                 if result.end_state == "error":
@@ -105,13 +119,18 @@ class AgentRuntime:
         user_text: str,
         run_id: UUID,
         access_token: str | None,
+        emitter: RunEmitter | None = None,
     ) -> RunResult:
         settings = self._settings
         started_at = datetime.now(UTC)
         clock = time.perf_counter()
         totals = RunTotals()
         chat = BudgetedChat(
-            self._chat, totals, settings.agent_max_llm_calls, settings.agent_llm_timeout_seconds
+            self._chat,
+            totals,
+            settings.agent_max_llm_calls,
+            settings.agent_llm_timeout_seconds,
+            self._budget,
         )
         ctx = RunContext(
             identity=identity,
@@ -122,6 +141,7 @@ class AgentRuntime:
             reranker=LLMReranker(chat, settings.model_rerank, settings.rerank_passage_tokens),
             data_tools=self._data_tools,
             access_token=access_token,
+            emitter=emitter,
         )
         config: dict[str, Any] = {
             "configurable": {"ctx": ctx},
@@ -165,6 +185,36 @@ class AgentRuntime:
             citations=final.get("citations", []),
             end_state=final["end_state"],
             end_reason=final.get("end_reason"),
+        )
+
+    @staticmethod
+    async def _finish_stream(emitter: RunEmitter, result: RunResult) -> None:
+        """Make what the client was shown equal to the recorded reply, then end the run.
+
+        A reply that was never streamed (a clarification, a refusal, an error text) goes out as one
+        piece. Streamed text that the reply continues is topped up; text that the run did not
+        keep is retracted first. Trailing whitespace the run trimmed is not worth a retraction."""
+        shown, reply = emitter.open_text, result.content
+        if not shown:
+            await emitter.delta(reply)
+        elif shown == shown.lstrip() and shown.strip() == reply:
+            pass
+        elif shown == shown.lstrip() and reply.startswith(shown):
+            await emitter.delta(reply[len(shown) :])
+        else:
+            await emitter.retract("replaced")
+            await emitter.delta(reply)
+        if result.citations:
+            await emitter.event("citations", {"citations": result.citations})
+        await emitter.event(
+            "run.ended",
+            {
+                "run_id": str(result.run_id),
+                "message_id": str(result.message_id),
+                "end_state": result.end_state,
+                "end_reason": result.end_reason,
+                "content": reply,
+            },
         )
 
     @staticmethod
