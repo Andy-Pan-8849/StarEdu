@@ -43,6 +43,8 @@
 - **结果**：本机 793 个 Python 测试（含需要数据库的集成测试）、61 个前端测试、3 个浏览器测试全部通过；ruff、mypy（严格）、前端 lint、类型检查、格式检查、生产构建都干净。GitHub CI 的 `ai-module` 和 `web` 两个作业在 `m8-eval-observability` 分支上成功（最后一次推送 4 分 08 秒）。CI 不跑真实模型的评测，不跑 Playwright（没有完整的 Compose 栈）。
 - **没验证到**：CI 在 Linux 上跑 Python 部分，没有在 Windows 上跑过。
 
+另见：[架构图对照验收表](架构图对照验收表.md)——把基准架构图的每个 AI 相关格子、需求清单 A–H 和第二阶段（P1）条目逐项对照。
+
 ## 已知的限制（没有解决，也不假装解决了）
 
 - 令牌放在浏览器的 `sessionStorage`；`npm audit` 有几条开发工具和 Next.js 自带 PostCSS 的提示（只涉及不可信 CSS 输入，本项目不处理），没有强制升级。
