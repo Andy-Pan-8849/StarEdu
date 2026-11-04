@@ -130,3 +130,39 @@ Keycloak 比上面粗估的 1–1.5 GB 低，这是开发模式、空闲状态�
 ## 10. 确认结果（2026-11-02）
 
 6 个确认点全部接受：分层启动；第一阶段先完成 full、lite 的身份方案单独排期；预置向量库转储；可观测性范围；工程规范；验收标准。
+
+## 11. M8 修订与实测（2026-11-04）
+
+### 11.1 实测内存（Mac，Docker Desktop 上限约 11.7 GiB，空闲状态，`docker stats`）
+
+| 服务 | 实测 |
+|---|---|
+| Keycloak（`start-dev`） | 约 730 MiB |
+| LiteLLM 代理 | 约 580–590 MiB |
+| Grafana | 约 340–680 MiB |
+| api | 约 330–350 MiB |
+| 对象存储（pgsty/silo） | 约 220–250 MiB |
+| Tempo | 约 60–195 MiB |
+| OTel Collector | 约 70–120 MiB |
+| worker | 约 100 MiB |
+| mcp-server | 约 90 MiB |
+| Postgres、Redis、Prometheus、web | 约 60 + 10 + 50 + 40 MiB |
+| **核心服务合计（含 LiteLLM）** | **约 2.1 GiB** |
+| **核心 + 可观测性（Collector、Tempo、Prometheus、Grafana，约 0.85 GiB）** | **约 3.0 GiB** |
+| Langfuse（web 约 880、worker 约 770、ClickHouse 约 700、MinIO、Postgres、Redis 约 185 MiB） | 约 2.5 GiB |
+| **全部一起** | **约 5.4 GiB（占上限的 47%）** |
+
+比第 2.2 节的粗估低；这是空闲数字，有负载时更高（尤其 ClickHouse 和 Langfuse）。Langfuse 官方文档对自己推荐 "4 核 16 GiB" 的虚拟机，是给生产用的；本地演示在 11.7 GiB 的 Docker 内存里能和其余服务一起跑，没有更多余量给别的东西。lite profile 不含 Langfuse，这个数字不影响它。
+
+### 11.2 与第 5 节的差异：种子转储的格式
+
+预置转储不是 SQL 文件，而是 `seed/ai-seed.jsonl.gz`（gzip 压缩的 JSON 行：一行头部，之后每行一条记录）。原因：不依赖宿主机上有 `pg_dump`/`psql`，用 `uv run` 即可读写；列由 `information_schema` 现取，后续迁移加的列不用改脚本；生成的列（全文索引向量）不写入、由数据库重算。内容：28 份文档、39 个块、39 个向量（`text-embedding-3-small`）、0 条派生内容，约 270 KB，直接放在仓库里。**不含**会话、审计、评测记录。`make seed` = 导入业务表 + 恢复转储（一个事务，先清掉已有文档）+ 把样例原文件放进对象存储（点击引用才能打开原文）；`make seed ARGS=--ingest` 走真实的入库管线。
+
+### 11.3 与第 6 节的差异
+
+- 追踪后端用 **Tempo**，指标用 **Prometheus**（Collector 把 OTLP 指标暴露给它抓取），仪表盘用 **Grafana**（4 个：运行概览、End 状态、检索与模型延迟、入库）。**没有做 Loki**：日志仍是 JSON，带 `request_id`、`run_id`、`trace_id`，用 `docker logs` 看，省约 0.5 GB。
+- 跨服务的 trace：API 调 MCP 时通过 W3C `traceparent` 头把 trace 接起来（一次数据类提问在 Tempo 里是 api 和 mcp-server 两个服务的同一个 trace）。
+- **span 里放什么是决定出来的**：运行 ID、会话 ID、模型名、token 数、状态、耗时；**不放**令牌、问题原文和回答原文（设置 `STARIT_OTEL_CAPTURE_CONTENT=true` 才把每次模型调用输入输出的前 2000 个字符加进去，供 Langfuse 显示，默认关闭）。有测试断言令牌、问题文本不出现在任何 span、事件、指标属性里。数据库 span 带语句文本，不带参数值（有测试）。
+- Langfuse 通过 OTLP/HTTP 接收（它不支持 gRPC）；Collector 用 `basicauth` 扩展从项目的公钥和私钥现场编码认证头，仓库里没有编码后的凭据（提交时 gitleaks 拦下了我最初预先算好的 base64，改成了这种做法）。Langfuse 的项目、用户和密钥由 `LANGFUSE_INIT_*` 在首次启动时创建，凭据是仅限本地的固定值，对外暴露前必须改。Langfuse 4 的"events_only"模式下旧的 `/api/public/traces` 不可用，读数据用 Observations API v2。
+- 版本（均已核对镜像存在）：OTel Collector contrib 0.164.0、Tempo 3.1.1、Prometheus v3.15.1、Grafana 13.3.0、Langfuse 4、ClickHouse 26.3.62.3、LiteLLM v1.106.6。
+- 已知的坑：`opentelemetry-instrumentation-sqlalchemy` 声明只支持 SQLAlchemy < 2.1，而本项目用 2.1.6，它会拒绝启动（日志里一条 ERROR，**没有数据库 span**）；用它的 `skip_dep_check` 绕过，并有测试证明语句确实被记录。

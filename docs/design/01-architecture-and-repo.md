@@ -174,3 +174,9 @@ ai-module/
 3. 目录结构（含 `web/` 放在 `ai-module/` 下）：**接受**。
 4. 端口规划：**接受**。
 5. 角色：按第九轮讨论修订，见 4.3。
+
+## 11. M8 修订记录（2026-11-04）
+
+- **LiteLLM 代理在 M8 才补上**：第 4.2 节（已确认）写的是 full profile 经 LiteLLM 代理服务调用模型。M5 起实际一直是进程内的 litellm 库，Compose 里没有这个服务——这是 M5 漏记的偏差。M8 补上：Compose 增加 `litellm` 服务（镜像 `ghcr.io/berriai/litellm:v1.106.6`，与锁定的库版本一致；主机端口 4100；配置 `deploy/litellm/config.yaml`，每个供应商一条通配 `openai/*`、`anthropic/*`，换模型只改设置）。`STARIT_LLM_GATEWAY=litellm_proxy`（Compose 里 api、worker、mcp-server 的设置）时所有聊天和向量化请求都发给它；宿主机直接运行（`uv run`、评测）默认仍是 `litellm_lib`。**供应商密钥只在 `litellm` 容器里**，其余三个服务的环境变量里没有（有测试和实测）。服务之间用 `LITELLM_MASTER_KEY` 认证（本地默认值，对外暴露前要改）。
+- **端口**补充：Grafana 3300（避开 web 的 3000）、Prometheus 9090、Tempo 3200、OTLP/HTTP 4318、Langfuse 3100（与上面规划一致）；主机端口都是环境变量。
+- **可观测性的范围**：api、worker、mcp-server 接入 OpenTelemetry；Compose 里是可选的 `observability.yaml`（OTel Collector、Tempo、Prometheus、Grafana）和 `langfuse.yaml`，核心服务不依赖它们。

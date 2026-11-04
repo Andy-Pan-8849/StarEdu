@@ -1,0 +1,523 @@
+[
+  {
+    "experiment": "baseline",
+    "group": "baseline",
+    "overrides": {},
+    "chunks": 39,
+    "avg_tokens": 286,
+    "derived_rows": 0,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8621,
+        "hit@3": 0.9425,
+        "hit@6": 1.0,
+        "mrr": 0.9155
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.8851,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.9397
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.931,
+        "hit@3": 1.0,
+        "hit@6": 1.0,
+        "mrr": 0.9655
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 0.8571,
+        "mrr": 0.9286
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 0.7273,
+        "mrr": 0.8636
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9714,
+        "mrr": 0.9857
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  {
+    "experiment": "chunk-300",
+    "group": "chunk size",
+    "overrides": {
+      "chunk_target_tokens": 300,
+      "chunk_max_tokens": 375
+    },
+    "chunks": 53,
+    "avg_tokens": 212,
+    "derived_rows": 0,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8391,
+        "hit@3": 0.977,
+        "hit@6": 1.0,
+        "mrr": 0.9075
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.954,
+        "hit@3": 1.0,
+        "hit@6": 1.0,
+        "mrr": 0.977
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.954,
+        "hit@3": 1.0,
+        "hit@6": 1.0,
+        "mrr": 0.977
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 0.9231,
+        "mrr": 0.9615
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9714,
+        "mrr": 0.9857
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 0.9,
+        "mrr": 0.95
+      }
+    }
+  },
+  {
+    "experiment": "chunk-500",
+    "group": "chunk size",
+    "overrides": {
+      "chunk_target_tokens": 500,
+      "chunk_max_tokens": 625
+    },
+    "chunks": 30,
+    "avg_tokens": 371,
+    "derived_rows": 0,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8621,
+        "hit@3": 0.9425,
+        "hit@6": 1.0,
+        "mrr": 0.9138
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.908,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.9506
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.9425,
+        "hit@3": 1.0,
+        "hit@6": 1.0,
+        "mrr": 0.9713
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 0.8571,
+        "mrr": 0.9286
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 0.7273,
+        "mrr": 0.8636
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9714,
+        "mrr": 0.9857
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  {
+    "experiment": "chunk-800",
+    "group": "chunk size",
+    "overrides": {
+      "chunk_target_tokens": 800,
+      "chunk_max_tokens": 1000
+    },
+    "chunks": 28,
+    "avg_tokens": 398,
+    "derived_rows": 0,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8851,
+        "hit@3": 0.9425,
+        "hit@6": 1.0,
+        "mrr": 0.9276
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.908,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.9487
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.9195,
+        "hit@3": 1.0,
+        "hit@6": 1.0,
+        "mrr": 0.9598
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 0.8462,
+        "mrr": 0.9231
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 0.8571,
+        "mrr": 0.9286
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 0.8182,
+        "mrr": 0.9091
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9429,
+        "mrr": 0.9714
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  {
+    "experiment": "identifiers-off",
+    "group": "identifier weighting",
+    "overrides": {
+      "retrieval_identifier_boost": false
+    },
+    "chunks": 39,
+    "avg_tokens": 286,
+    "derived_rows": 0,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8621,
+        "hit@3": 0.9425,
+        "hit@6": 1.0,
+        "mrr": 0.9151
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.8851,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.9397
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.9195,
+        "hit@3": 1.0,
+        "hit@6": 1.0,
+        "mrr": 0.9598
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 0.8462,
+        "mrr": 0.9231
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 0.8571,
+        "mrr": 0.9286
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 0.8182,
+        "mrr": 0.9091
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9714,
+        "mrr": 0.9857
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  {
+    "experiment": "derive-summary",
+    "group": "derived content",
+    "overrides": {
+      "ingest_derive": "summary"
+    },
+    "chunks": 39,
+    "avg_tokens": 286,
+    "derived_rows": 39,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8506,
+        "hit@3": 0.954,
+        "hit@6": 1.0,
+        "mrr": 0.9113
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.8736,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.932
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.931,
+        "hit@3": 1.0,
+        "hit@6": 1.0,
+        "mrr": 0.9655
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 0.7692,
+        "mrr": 0.8846
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 0.8571,
+        "mrr": 0.9286
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9714,
+        "mrr": 0.9857
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  {
+    "experiment": "derive-questions",
+    "group": "derived content",
+    "overrides": {
+      "ingest_derive": "questions"
+    },
+    "chunks": 39,
+    "avg_tokens": 286,
+    "derived_rows": 117,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8506,
+        "hit@3": 0.954,
+        "hit@6": 1.0,
+        "mrr": 0.9084
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.8966,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.9425
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.9195,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.9569
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 0.8462,
+        "mrr": 0.9231
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 0.8571,
+        "mrr": 0.9286
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9429,
+        "mrr": 0.9643
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  {
+    "experiment": "derive-all",
+    "group": "derived content",
+    "overrides": {
+      "ingest_derive": "all"
+    },
+    "chunks": 39,
+    "avg_tokens": 286,
+    "derived_rows": 156,
+    "overall": {
+      "keyword": {
+        "n": 87,
+        "hit@1": 0.8506,
+        "hit@3": 0.954,
+        "hit@6": 1.0,
+        "mrr": 0.9119
+      },
+      "vector": {
+        "n": 87,
+        "hit@1": 0.8736,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.931
+      },
+      "hybrid": {
+        "n": 87,
+        "hit@1": 0.9425,
+        "hit@3": 0.9885,
+        "hit@6": 1.0,
+        "mrr": 0.9684
+      }
+    },
+    "by_type": {
+      "access": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "keyword": {
+        "n": 13,
+        "hit@1": 0.9231,
+        "mrr": 0.9615
+      },
+      "multi": {
+        "n": 7,
+        "hit@1": 0.8571,
+        "mrr": 0.9286
+      },
+      "paraphrase": {
+        "n": 11,
+        "hit@1": 0.9091,
+        "mrr": 0.9545
+      },
+      "single": {
+        "n": 35,
+        "hit@1": 0.9714,
+        "mrr": 0.9786
+      },
+      "version": {
+        "n": 10,
+        "hit@1": 1.0,
+        "mrr": 1.0
+      }
+    }
+  }
+]

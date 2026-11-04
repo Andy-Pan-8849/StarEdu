@@ -192,3 +192,12 @@ standalone_query ──┬─▶ 关键词检索（权限过滤后）top 30 ─�
 - **探测**：`probe_restricted` 是唯一不带权限过滤的查询，只返回数字（被过滤的强匹配数量和最高分），不返回任何文本，不进提示词；用于审计和 `no_permission` / `not_found` 的区分。
 - **评测运行器**：`eval/`（`starit-eval`）。每次真实运行先打印调用数、token 数和估算费用并询问；写 `ai.eval_runs` / `ai.eval_results`（每种模式一次运行）和 `docs/eval/` 下的报告；`--leak-sweep` 做全角色的权限回归；`--dry-run` 用假模型演练整个流程。
 - **基线结果和解读**见 [`docs/eval/README.md`](../eval/README.md)。
+
+## 9. M8 实现记录（2026-11-04）
+
+- **评测题**从 54 道增加到 114 道（合成，我读文档后写）：keyword 13、paraphrase 11、version 10、unanswerable 12、access 26（含 Admin 和 RAGETLAdmin 各一道）、single 35、multi 7；manager 10、hr 5、finance 6 道。每道可回答的题带 `facts`（答案必须包含的数字、编号或词），`sample-data/tools/check_qa_facts.py` 证明每个 fact 确实出现在来源文档里（测试和 CI 都跑）。每个受限文档（HR-REC-002、FIN-PAY-005、FIN-BUD-007、TS-IT-010）至少有一道被禁角色问它的题。**样本仍然很小**，补完也不对准确率下结论。
+- **答案评分**（`starit-eval answers`）：应拒绝的题——结束状态必须是 `no_permission`/`not_found`/`refused`，且引用里没有那份受限文档；应回答的题——结束状态必须是 `answered`，有 `facts` 的做确定性比对（逗号分隔的数字视为同一个，版本号的前缀 `v` 容许），没有 `facts` 的由模型判官对照参考答案判断；每次运行的（状态，原因）必须合法。**随机抽 20% 导出成 CSV（固定种子，可重现）供人工核对，核对之前判官的结论不当作事实。**
+- **`starit-eval all`** 把检索（4 种模式 + 权限扫描）、答案、数据题合成一份报告；**权限回归是门槛**：任何越权都使整次运行失败（退出码 2）。运行写入 `ai.eval_runs` / `ai.eval_results`。
+- **派生内容**（`ingest/derive.py`）：每个块一次模型调用，产出一句摘要和 3 个"这个块能回答的问题"；写入 `ai.chunk_derived`，并**加到被嵌入的文本后面**（不替换原文）。只加强向量一侧，关键词一侧不使用它。模型失败只丢这个块的派生内容，文档照常入库。默认关闭（`STARIT_INGEST_DERIVE=none`）。
+- **`identifiers` 加权开关**（`STARIT_RETRIEVAL_IDENTIFIER_BOOST`，默认开）。关闭时问题里的编号既不加分，也不再让块无条件成为候选。
+- **实验矩阵**（`starit-eval matrix`）：每个实验把样例文档重新入库到一个**临时数据库**（开发库不受影响），在 keyword / vector / hybrid 三种模式下检索；不含重排（重排在完整评测里测）。没有做：专用重排接口（没有接入）、BM25 扩展（没有安装也没有验证，决定：第一阶段不引入）。结果和读法见 `docs/eval/README.md`。
