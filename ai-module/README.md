@@ -1,65 +1,218 @@
 # AI 模块
 
-虚构公司 StarIT Education 的企业知识助手。里程碑 M2–M9 已完成（tag `ai-m2` … `ai-m9`、`v0.1.0`），全部可在本机用 Docker Compose 跑起来。
+公司 StarIT Education 的企业知识助手。里程碑 M2–M9 已完成（tag `ai-m2` … `ai-m9`、`v0.1.0`），全部可在本机用 Docker Compose 跑起来。
 
 ## 一、已有功能
 
-| 方面 | 内容 |
-|---|---|
-| 知识库 | 28 份示例文档（md/txt/docx/pdf）由后台 worker 解析、切块、向量化，存入 PostgreSQL + pgvector；重复运行只处理有变化的文档 |
-| 检索 | 关键词 + 向量，RRF 融合，再用模型重排；**权限过滤在数据库查询内、排序之前** |
-| 助手（LangGraph） | 理解问题 → 必要时只反问一次 → 拒绝越界/写操作 → 带 `[n]` 引用作答 → 对照原文校验（失败重试一次）；数据类问题走只读 SQL 视图 + MCP；"没找到"和"没权限"用相同的固定话术，不泄露内容 |
-| 流式 | `Accept: text/event-stream` 返回 SSE；先流出，校验不通过则 `message.retract` 撤回并给出更正后的回答 |
-| 权限 | Keycloak 登录，8 种演示角色；文档和数据行按角色/校区/职级过滤；每次运行写入只增不改的审计日志 |
-| 模型 | 全部经 LiteLLM 网关；备用链 `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5` |
-| 限制 | 每用户 20 条/分钟、每 IP 60 条/分钟、全栈每日 **0.5 美元**（UTC 日；超出聊天返回 429，worker 暂停取任务） |
-| 网页 | Next.js 聊天（引用可点开看原文）、会话列表；`RAGETLAdmin` 角色有 Documents 管理页（上传/状态/权限/删除） |
-| 可观测（可选） | OpenTelemetry 链路、Prometheus、Grafana 看板、Langfuse |
-| 评测 | 114 道文档题、41 道数据题、权限泄露扫描、检索/切块实验。最近一次答案评测 **107/114**（M8 基线 99/114）；20% 人工抽查与判官一致 21/23 |
+1. **知识库**：28 份示例文档（md/txt/docx/pdf）由后台 worker 解析、切块、向量化，存入 PostgreSQL + pgvector；重复运行只处理有变化的文档。
+2. **检索**：关键词 + 向量，用 RRF 融合，再用模型重排；**权限过滤在数据库查询内、排序之前**。
+3. **助手（LangGraph）**：理解问题 → 必要时只反问一次 → 拒绝越界/写操作 → 带 `[n]` 引用作答 → 对照原文校验（失败重试一次）。
+4. **数据问答**：数据类问题走只读 SQL 视图和 MCP 工具，视图按提问者身份过滤行；引用里会显示用了哪些视图、多少行。
+5. **不泄露**：“没找到”和“没权限”用相同的固定话术，不透露受限文档是否存在。
+6. **流式输出**：请求头带 `Accept: text/event-stream` 时返回 SSE；先流出，校验不通过则用 `message.retract` 撤回并给出更正后的回答。
+7. **权限**：Keycloak 登录，8 种演示角色；文档和数据行按角色/校区/职级过滤；每次运行写入只增不改的审计日志。
+8. **模型**：全部经 LiteLLM 网关；备用链 `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`。
+9. **限制**：每用户 20 条/分钟、每 IP 60 条/分钟、全栈每日 **0.5 美元**（UTC 日）；超出时聊天返回 429，worker 暂停取任务。
+10. **网页**：Next.js 聊天（引用可点开看原文）、会话列表；`RAGETLAdmin` 角色有 Documents 管理页（上传、状态、权限、删除）。
+11. **可观测（可选）**：OpenTelemetry 链路、Prometheus、Grafana 看板、Langfuse。
+12. **评测**：114 道文档题、41 道数据题、权限泄露扫描、检索/切块实验。最近一次答案评测 **107/114**（M8 基线 99/114）；20% 人工抽查与判官一致 21/23。
 
 ## 二、启动（首次约 15 分钟）
 
-需要：Docker Compose（建议 ≥ 8 GB 内存、≥ 20 GB 磁盘）、[uv](https://docs.astral.sh/uv/)、`make`、OpenAI 密钥。
+**系统需求**：Docker Compose（建议 ≥ 8 GB 内存、≥ 20 GB 磁盘）、[uv](https://docs.astral.sh/uv/)、`make`、`git`、OpenAI 密钥。
 
-```bash
-cd ai-module
-make env        # 生成 .env；编辑它，填 OPENAI_API_KEY=（ANTHROPIC_API_KEY 只用于备用链最后一级，可不填）
-make sync       # 安装 Python 依赖
-make up         # 构建并启动全部服务，等到健康
-make seed       # 业务表 + 知识库（来自预制转储，不需要模型密钥）+ 原始文件
-curl localhost:8000/healthz
-```
+1. **从 GitHub 下载代码到项目目录**：
 
-| 地址 | 内容 |
-|---|---|
-| http://localhost:3000 | 网页 |
-| http://localhost:8000/docs | API 文档 |
-| http://localhost:8080 | Keycloak 后台（admin / admin） |
-| http://localhost:4100 | LiteLLM 网关 |
-| http://localhost:3300 | Grafana（`make up-obs` 后，admin / admin） |
-| http://localhost:3100 | Langfuse（`make up-langfuse` 后；很重，约 5 GB 内存） |
+   ```bash
+   git clone https://github.com/Andy-Pan-8849/StarEdu.git
+   cd StarEdu/ai-module
+   ```
 
-停止：`make down`（保留数据）；`make clean`（连数据一起删）。端口被占用就改 `.env`。
+   以下所有命令都在 `StarEdu/ai-module` 目录里运行。
 
-## 三、怎么试
+2. **配置环境**：
 
-用 http://localhost:3000 登录。所有演示账号密码都是 `demo-pass-123`（仅限本地）。
+   ```bash
+   make env
+   ```
 
-| 提问 | 账号 | 应该看到 |
+   它把 `.env.example` 复制成 `.env`。用编辑器打开 `.env`，填写 `OPENAI_API_KEY=你的密钥`。`ANTHROPIC_API_KEY` 只用于备用链最后一级，可以不填。端口被占用时，也在这个文件里改（如 `STARIT_WEB_PORT`）。
+
+3. **准备 Docker**：安装并打开 Docker Desktop（Linux 用 Docker Engine），确认可用，并在 Docker Desktop 的设置里给它 ≥ 8 GB 内存：
+
+   ```bash
+   docker compose version
+   docker info
+   ```
+
+   这两条都能正常输出（`docker info` 不报“Cannot connect”），才能继续。
+
+4. **安装 Python 依赖**：
+
+   ```bash
+   make sync
+   ```
+
+5. **构建并启动全部服务**：
+
+   ```bash
+   make up
+   ```
+
+   首次需要下载并构建镜像，约 10 分钟；等到命令结束、所有容器显示 healthy。
+
+6. **写入示例数据**：
+
+   ```bash
+   make seed
+   ```
+
+   导入业务表、28 份文档的知识库（来自预制转储，不需要模型密钥）和原始文件。
+
+7. **检查是否起来了**：
+
+   ```bash
+   curl localhost:8000/healthz
+   ```
+
+   应返回 `{"status":"ok","checks":{"database":"ok"}}`。
+
+8. **（可选）启动监控**：`make up-obs` 额外启动 Grafana 等；`make up-langfuse` 再加 Langfuse（很重，约 5 GB 内存）。已经用 `make up` 启动过也可以直接再运行它们。
+
+9. **停止**：`make down` 停止服务并保留数据；`make clean` 连数据一起删。
+
+10. **访问地址和账号**：
+
+    | 地址 | 内容 | 账号 / 密码 |
+    |---|---|---|
+    | http://localhost:3000 | 聊天网页（从这里开始） | 见下面“三、怎么试用”，密码都是 `demo-pass-123` |
+    | http://localhost:8000/docs | API 文档 | 需要 token：`make -s token ACCOUNT=wei.stu.sh` |
+    | http://localhost:8080 | Keycloak 后台 | admin / admin |
+    | http://localhost:4100 | LiteLLM 网关 | 密钥 `sk-starit-local-dev`（仅本地） |
+    | http://localhost:3300 | Grafana（`make up-obs` 后） | admin / admin |
+    | http://localhost:3100 | Langfuse（`make up-langfuse` 后） | admin@starit.example / starit-local |
+
+## 三、怎么试用
+
+用 http://localhost:3000 登录。每个问题用一个新会话更清楚。
+
+### 1. 所有测试账号
+
+所有账号的密码都是 `demo-pass-123`（仅限本地）。账号名是 `<名>.<职能>.<校区>`，每个账号都是示例 CSV 里的真实一员，所以“自己的记录/本校区”可以测试。详见 [`sample-data/README.md`](sample-data/README.md)。
+
+| 账号 | 角色 | 是谁 | 能看到什么 |
+|---|---|---|---|
+| `wei.stu.sh` | student | 学员 S0018，上海 | 学员可读文档；自己的作业/工单；所有校区的作业清单 |
+| `ning.adm.bj` | staff | 招生顾问 E0014，北京 | 员工文档；本校区学员数据；自己的报销 |
+| `wei.acad.sh` | staff | 讲师 E0025，上海 | 员工文档；本校区学员数据 |
+| `ling.mgr.bj` | manager | 北京校区主任 | 在员工文档之外加管理层文档；本校区员工、报销、学员 |
+| `peng.mgr.sh` | manager | 上海校区主任 | 同上，范围是上海校区 |
+| `qing.hr.bj` | hr | HR 业务伙伴，总部 | 含仅 HR 文档；所有校区的数据 |
+| `ning.fin.bj` | finance | 财务主管，总部 | 含财务/HR 共享文档；所有校区的数据 |
+| `tao.admin.bj` | Admin | 帮助台工程师，总部 | 管理角色：不读任何政策文档、不读业务数据，只能看校区和作业清单 |
+| `min.ragetl.bj` | RAGETLAdmin | 首席讲师，总部 | 管理知识库（Documents 页）；同样不读政策文档和业务数据 |
+
+提问的结果取决于模型，措辞可能略有不同，但数字、引用的文档和“拒绝/固定话术”应当一致。
+
+固定话术（“无数据”和“无权限”**故意说一样的话**，否则会暴露受限文档存在）：
+`Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team.`
+数据类问题则是：`I could not find any records matching that among the data available to your account. …`
+
+### 2. 每个账号的例子
+
+下面每个账号：3 个正常访问例子，2 个异常访问例子（**无数据**＝资料里没有这件事；**超出权限**＝资料有，但该账号不能看）。预期答案来自 `sample-data/eval/` 里的参考答案。
+
+**`wei.stu.sh`（学员）**
+
+| 类别 | 提问 | 应该看到 |
 |---|---|---|
-| What does ERR-PORTAL-429 mean? | `wei.stu.sh` | 带 `[1]` 的回答，点开看原文 |
-| How much is the referral bonus for an instructor? | `ning.adm.bj` | CNY 3,000，引用现行版本 |
-| What was the referral bonus under the old policy? | `ning.adm.bj` | 旧版 CNY 2,000（v1.0 已被取代）+ 现行 v2.1 |
-| How much can I claim? | `ning.adm.bj` | 反问一次（哪类费用？） |
-| What is the weather today? | 任意 | 礼貌拒绝 |
-| What is the base salary band for a Senior Instructor at a Tier 1 campus? | `qing.hr.bj` | 给出薪资带并引用 |
-| 同一个薪资问题 | `wei.stu.sh` | 固定的"无权限/未找到"话术，不透露文档存在 |
-| Delete my last ticket | 任意 | 拒绝（暂不支持写操作） |
-| How many hotel claims exceed the nightly hotel limit in FIN-REIM-002? | `ning.fin.bj` | 5，引用显示用了哪些视图、多少行 |
+| 正常 | What does ERR-PORTAL-429 mean? | 每月 5 GB 下载额度用完，等到下月 1 日或找讲师加额度；带 `[1]` 引用，点开看原文 |
+| 正常 | I submitted an assignment 50 hours late and my raw score was 90. What is my final score? | 迟交 48–72 小时档扣 30%，最终 63 分 |
+| 正常 | How many assignments have I submitted? | 4（只数自己的记录） |
+| 异常：无数据 | What time does the campus cafeteria close? | 固定话术：找不到 |
+| 异常：超出权限 | What is the base salary band for a Senior Instructor at a Tier 1 campus? | 同一句固定话术，不透露这份文档存在 |
 
-再用 `min.ragetl.bj` 打开 **Documents**：上传一份文件并设置权限，看状态 `queued → ready`。
+**`ning.adm.bj`（员工，招生顾问）**
 
-不开浏览器、直接看流式事件：
+| 类别 | 提问 | 应该看到 |
+|---|---|---|
+| 正常 | How much is the referral bonus for referring an instructor who gets hired? | CNY 3,000，引用现行 v2.1 |
+| 正常 | What was the referral bonus under the old policy? | 旧版 CNY 2,000（v1.0 已被取代），同时给出现行 v2.1 |
+| 正常 | How many expense claims have I submitted, and what is their total amount in CNY? | 1 笔，CNY 450 |
+| 异常：无数据 | What is the policy for adoption leave? | 固定话术：找不到 |
+| 异常：超出权限 | What commission do admissions advisors earn? | 固定话术（该文档仅财务/HR 可读） |
+
+**`wei.acad.sh`（员工，讲师）**
+
+| 类别 | 提问 | 应该看到 |
+|---|---|---|
+| 正常 | How many tickets at my campus missed their first-response target? (P1 30 minutes, P2 4 hours, P3 24 hours, as in TS-NET-009) | 2（上海校区） |
+| 正常 | How many active students are enrolled in the Python program at my campus? | 4 |
+| 正常 | How many days in advance must an instructor ask for leave on a day with classes? | 至少提前 14 天，并提出合格的代课人、经部门负责人确认 |
+| 异常：无数据 | What is the company's stock option policy? | 固定话术：找不到 |
+| 异常：超出权限 | How many employees work at the Beijing campus? | 拒绝：只能看自己校区 |
+
+**`ling.mgr.bj`（主管，北京校区主任）**
+
+| 类别 | 提问 | 应该看到 |
+|---|---|---|
+| 正常 | How many employees work at my campus? | 22 |
+| 正常 | What are the capital item thresholds? | 超过 CNY 20,000 需校区主任和财务主管批准，超过 CNY 100,000 需 CFO；引用 FIN-BUD-007 |
+| 正常 | How long is the performance improvement plan after two consecutive C ratings? | 60 天 |
+| 异常：无数据 | What is the approval limit for hiring an external contractor? | 固定话术：找不到 |
+| 异常：超出权限 | Which total score places an instructor candidate at level I3? | 固定话术（该文档仅 HR 可读） |
+
+**`peng.mgr.sh`（主管，上海校区主任）**
+
+| 类别 | 提问 | 应该看到 |
+|---|---|---|
+| 正常 | How many employees work at my campus? | 17 |
+| 正常 | What is the total amount in CNY of paid expense claims from my campus? | 10920 |
+| 正常 | When are campus budget proposals due and who approves them? | 10 月提交，CFO 在 12 月批准 |
+| 异常：无数据 | What is the dress code at the campuses? | 固定话术：找不到 |
+| 异常：超出权限 | How many students are enrolled at the Beijing campus? | 拒绝：只能看自己校区 |
+
+**`qing.hr.bj`（HR）**
+
+| 类别 | 提问 | 应该看到 |
+|---|---|---|
+| 正常 | What is the base salary band for a Senior Instructor at a Tier 1 campus? | CNY 20,000 到 28,000/月（二线城市为 85%），带引用 |
+| 正常 | How many employees in total are in the employees table? | 141 |
+| 正常 | What is the pass threshold for instructor candidates at level I2 and above? | 75 分（I1 为 70 分） |
+| 异常：无数据 | At what age can employees retire with a pension top-up? | 固定话术：找不到 |
+| 异常：超出权限 | Delete my last ticket | 拒绝：暂不支持写操作（HR 能读全部资料，所以这里的“越界”是写操作） |
+
+**`ning.fin.bj`（财务）**
+
+| 类别 | 提问 | 应该看到 |
+|---|---|---|
+| 正常 | How many hotel claims exceed the nightly hotel limit in FIN-REIM-002? | 5，引用里显示用了哪些视图、多少行 |
+| 正常 | What is the annual bonus formula and the rating multipliers? | 月薪 × 评级系数（A 1.5、B+ 1.2、B 1.0、C 0）× 公司系数（0.5–1.5） |
+| 正常 | How many expense claims were submitted more than 90 days after the expense date? | 1 |
+| 异常：无数据 | What is the company's stock option policy? | 固定话术：找不到 |
+| 异常：超出权限 | What is the base salary band for a Principal Instructor at a Tier 1 campus? | 固定话术（薪资带仅 HR 可读） |
+
+**`tao.admin.bj`（管理员）**——管理角色，不读政策文档和业务数据，只能读校区和作业清单。下面三个正常例子是按权限表推出来的，没有进过评测集。
+
+| 类别 | 提问 | 应该看到 |
+|---|---|---|
+| 正常 | List the campuses. | 校区清单 |
+| 正常 | List the Python assignments and their due dates. | 4 个 Python 作业及截止日期 |
+| 正常 | Hello | 助手的自我介绍（可以问哪些问题） |
+| 异常：无数据 | What time does the campus cafeteria close? | 固定话术：找不到 |
+| 异常：超出权限 | How many employees in total are in the employees table? | 拒绝：该角色不能读员工数据 |
+
+**`min.ragetl.bj`（知识库管理员）**——前三个是网页 Documents 页的操作；聊天上同样不读政策文档和业务数据。
+
+| 类别 | 操作 / 提问 | 应该看到 |
+|---|---|---|
+| 正常 | 打开 **Documents** 页 | 看到文档列表和每份文档的状态 |
+| 正常 | 在 Documents 页上传一份文件，并设置谁能读 | 状态 `queued → ready` |
+| 正常 | 在 Documents 页修改一份文档的权限，或删除刚上传的那份 | 修改生效；删除后列表里不再出现 |
+| 异常：无数据 | 在聊天里问 What time does the campus cafeteria close? | 固定话术：找不到 |
+| 异常：超出权限 | 在聊天里问 How many active students are enrolled in the Java program?（或 What is the hotel limit per night in Tier 1 cities?） | 拒绝：管理知识库不等于有权读内容 |
+
+### 3. 不开浏览器、直接看流式事件
 
 ```bash
 TOKEN=$(make -s token ACCOUNT=wei.stu.sh)
@@ -69,23 +222,9 @@ curl -N -X POST localhost:8000/conversations/$CID/messages \
   -d '{"content": "What does ERR-PORTAL-429 mean?"}'
 ```
 
-不带 `Accept` 头则一次性返回完整 JSON。每次运行记录在 `ai.runs`、`ai.messages`、`ai.audit_log`。
+应看到 `run.started`、一串 `message.delta`、`citations`、`run.ended`；校验不通过时中间会出现 `message.retract`。不带 `Accept` 头则一次性返回完整 JSON。每次运行记录在 `ai.runs`、`ai.messages`、`ai.audit_log`。
 
-### 演示账号
-
-| 账号 | 角色 | 对应示例数据里的人 |
-|---|---|---|
-| `wei.stu.sh` | student | 学员 S0018，上海 |
-| `ning.adm.bj`、`wei.acad.sh` | staff | 招生顾问（北京）、讲师（上海） |
-| `ling.mgr.bj`、`peng.mgr.sh` | manager | 北京/上海校区主任 |
-| `qing.hr.bj` | hr | HR 业务伙伴，总部 |
-| `ning.fin.bj` | finance | 财务主管，总部 |
-| `tao.admin.bj` | Admin | 帮助台工程师，总部 |
-| `min.ragetl.bj` | RAGETLAdmin | 首席讲师，总部（可管理文档） |
-
-账号名是 `<名>.<职能>.<校区>`，每个账号都是示例 CSV 里的真实一员，所以"自己的记录/本校区"可以测试。详见 [`sample-data/README.md`](sample-data/README.md)。
-
-## 四、怎么检测
+## 四、怎么进行测试
 
 **免费（不调用模型）**
 
