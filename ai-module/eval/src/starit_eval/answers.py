@@ -94,6 +94,32 @@ class UsageChat:
         )
 
 
+def estimate(
+    settings: Settings, questions: Sequence[Question], avg_chunk_tokens: int
+) -> tuple[dict[str, int], float | None]:
+    """Upper bound of the model calls of a run (no retries) and their cost at list price."""
+    readers = [q for q in questions if q.role not in ("Admin", "RAGETLADMIN", "RAGETLAdmin")]
+    judged = sum(1 for q in readers if q.should_answer and not q.facts)
+    calls = {
+        "understand": len(questions),
+        "rerank": len(readers),
+        "generate": len(readers),
+        "judge": judged,
+    }
+    rerank_in = 160 + settings.retrieval_rerank_in * (
+        min(avg_chunk_tokens, settings.rerank_passage_tokens) + 40
+    )
+    generate_in = 700 + settings.retrieval_final_k * avg_chunk_tokens
+    parts = [
+        cost_usd(settings.model_understand, calls["understand"] * 500, calls["understand"] * 80),
+        cost_usd(settings.model_rerank, calls["rerank"] * rerank_in, calls["rerank"] * 240),
+        cost_usd(settings.model_generate, calls["generate"] * generate_in, calls["generate"] * 200),
+        cost_usd(settings.model_judge, calls["judge"] * 450, calls["judge"] * 60),
+    ]
+    total = None if any(p is None for p in parts) else float(sum(p for p in parts if p is not None))
+    return calls, total
+
+
 def normalize(value: str) -> str:
     """Lower case, thousands separators removed (3,000 and 3000 are the same figure)."""
     return re.sub(r"(?<=\d),(?=\d)", "", value).lower()

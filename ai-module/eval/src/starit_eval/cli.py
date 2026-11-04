@@ -8,11 +8,14 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
+from starit_core.auth import Identity
 from starit_core.config import Settings, get_settings
 from starit_core.db import create_engine
 from starit_core.embeddings import EmbeddingClient, embedding_client
@@ -57,6 +60,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     data.add_argument("--only", action="append", help="a question id (SQL-07); repeatable")
     data.add_argument("--yes", action="store_true", help="do not ask before spending")
     data.add_argument("--out", type=Path, default=DEFAULT_OUT, help="report directory")
+    answers = sub.add_parser("answers", help="ask the document questions and grade the answers")
+    answers.add_argument("--only", action="append", help="a question id (DOC-07); repeatable")
+    answers.add_argument("--yes", action="store_true", help="do not ask before spending")
+    answers.add_argument("--no-db", action="store_true", help="do not write ai.eval_runs rows")
+    answers.add_argument("--out", type=Path, default=DEFAULT_OUT, help="report directory")
+    everything = sub.add_parser(
+        "all", help="retrieval, permissions, answers and data in one report"
+    )
+    everything.add_argument("--yes", action="store_true", help="do not ask before spending")
+    everything.add_argument("--no-db", action="store_true", help="do not write ai.eval_runs rows")
+    everything.add_argument("--out", type=Path, default=DEFAULT_OUT, help="report directory")
+    matrix = sub.add_parser("matrix", help="the experiment matrix (chunk size, weighting, derived)")
+    matrix.add_argument("--only", action="append", help="an experiment name; repeatable")
+    matrix.add_argument("--yes", action="store_true", help="do not ask before spending")
+    matrix.add_argument("--out", type=Path, default=DEFAULT_OUT, help="report directory")
     args = parser.parse_args(argv)
     if args.command == "retrieval" and not (args.mode or args.all_modes or args.leak_sweep):
         parser.error("choose --mode, --all-modes or --leak-sweep")
@@ -161,8 +179,45 @@ async def run_retrieval(args: argparse.Namespace) -> int:
             return 1
         embedder = embedding_client(settings)
         chat = chat_client(settings)
-    reranker = LLMReranker(chat, settings.model_rerank, settings.rerank_passage_tokens)
+    outcome = await retrieval_phase(
+        settings, engine, embedder, chat, questions, identities, manifest, corpus, modes,
+        sweep=args.leak_sweep, label=args.label or ("dry-run" if args.dry_run else "+".join(modes) or "leak-sweep"),
+        out=args.out, store_in_db=not args.no_db and not args.dry_run,
+    )  # fmt: skip
+    await engine.dispose()
+    print(f"report: {outcome.markdown}\ndata:   {outcome.data}")
+    if outcome.violations:
+        print(f"PERMISSION VIOLATIONS: {outcome.violations}", file=sys.stderr)
+        return 2
+    return 0
 
+
+@dataclass
+class RetrievalOutcome:
+    report: dict[str, Any]
+    markdown: Path
+    data: Path
+    violations: int
+
+
+async def retrieval_phase(
+    settings: Settings,
+    engine: AsyncEngine,
+    embedder: EmbeddingClient,
+    chat: ChatClient,
+    questions: Sequence[Question],
+    identities: dict[str, Identity],
+    manifest: dict[tuple[str, str], dict[str, str]],
+    corpus: dict[str, int],
+    modes: Sequence[str],
+    *,
+    sweep: bool,
+    label: str,
+    out: Path,
+    store_in_db: bool,
+) -> RetrievalOutcome:
+    """Retrieval quality for each mode, and the permission sweep (every question as every role)."""
+    reranker = LLMReranker(chat, settings.model_rerank, settings.rerank_passage_tokens)
     vectors, embedding_tokens = await embed_questions(
         embedder, questions, settings.embedding_batch_size
     )
@@ -175,33 +230,26 @@ async def run_retrieval(args: argparse.Namespace) -> int:
                 questions, identities, manifest, vectors, mode,
             )
         )  # fmt: skip
-    sweep = None
-    if args.leak_sweep:
+    swept = None
+    if sweep:
         print("running the permission sweep ...", flush=True)
-        sweep = await leak_sweep(
+        swept = await leak_sweep(
             engine, settings, embedder, questions, identities, manifest, vectors
         )
-
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M")
-    label = args.label or ("dry-run" if args.dry_run else "+".join(modes) or "leak-sweep")
     report = build_report(
-        label=label, settings=settings, corpus=corpus, mode_runs=mode_runs, sweep=sweep,
+        label=label, settings=settings, corpus=corpus, mode_runs=mode_runs, sweep=swept,
         embedding_tokens=embedding_tokens, rerank_model=settings.model_rerank,
         embedding_model=embedder.model,
     )  # fmt: skip
-    markdown, data = write_reports(args.out, report, f"retrieval-{label}-{stamp}".replace("+", "_"))
-    if not args.no_db and not args.dry_run:
+    markdown, data = write_reports(out, report, f"retrieval-{label}-{stamp}".replace("+", "_"))
+    if store_in_db:
         for mode_run in mode_runs:
             await store_run(engine, mode_run, report)
-    await engine.dispose()
-    print(f"report: {markdown}\ndata:   {data}")
     bad = sum(m["violations"] for m in report["modes"].values()) + (
-        len(sweep.violations) if sweep else 0
+        len(swept.violations) if swept else 0
     )
-    if bad:
-        print(f"PERMISSION VIOLATIONS: {bad}", file=sys.stderr)
-        return 2
-    return 0
+    return RetrievalOutcome(report, markdown, data, bad)
 
 
 async def run_agent(args: argparse.Namespace) -> int:
@@ -296,9 +344,174 @@ async def run_data(args: argparse.Namespace) -> int:
     return 0
 
 
+def _calls_line(calls: dict[str, int]) -> str:
+    return ", ".join(f"{n} {step}" for step, n in calls.items())
+
+
+async def run_answers_command(args: argparse.Namespace) -> int:
+    from starit_eval import answers
+
+    settings = get_settings()
+    questions = load_questions()
+    if args.only:
+        questions = [q for q in questions if q.id in set(args.only)]
+    engine = create_engine(settings)
+    corpus = await corpus_stats(engine)
+    calls, total = answers.estimate(settings, questions, corpus["avg_tokens"])
+    print(
+        f"\nThis run asks {len(questions)} document questions.\n"
+        f"  model calls (upper bound, no retries): {_calls_line(calls)}\n"
+        f"  estimated cost at list price: {'unknown' if total is None else f'about ${total:.3f}'}\n"
+    )
+    if not args.yes and not _proceed():
+        print("Cancelled.")
+        await engine.dispose()
+        return 1
+    chat = answers.UsageChat(chat_client(settings))
+    run = await answers.run_answers(
+        engine, settings, embedding_client(settings), chat, load_identities(), questions,
+        progress=lambda i, n: print(f"  {i}/{n}", end="\r", flush=True),
+    )  # fmt: skip
+    summary = answers.summarize(run)
+    path = answers.write(args.out, run, summary, total)
+    if not args.no_db:
+        from starit_eval.report import git_sha
+
+        await answers.store(engine, run, summary, git_sha(), "answers")
+    await engine.dispose()
+    print(f"{summary['passed']}/{summary['questions']} passed; report: {path}")
+    return 0
+
+
+async def run_all(args: argparse.Namespace) -> int:
+    from starit_eval import answers, data_check, suite
+    from starit_eval.report import git_sha
+
+    settings = get_settings()
+    engine = create_engine(settings)
+    questions, identities, manifest = load_questions(), load_identities(), load_manifest()
+    data_questions = data_check.load_data_questions()
+    corpus = await corpus_stats(engine)
+
+    retrieval_figures = estimate(settings, questions, list(MODES), True, corpus["avg_capped"])
+    answer_calls, answer_usd = answers.estimate(settings, questions, corpus["avg_tokens"])
+    data_calls, data_usd = data_check.estimate(settings, data_questions)
+    usd = [retrieval_figures["usd"], answer_usd, data_usd]
+    total = None if any(u is None for u in usd) else float(sum(u for u in usd if u is not None))
+    print(
+        f"\nThe full evaluation: {len(questions)} document questions and {len(data_questions)} data "
+        f"questions.\n"
+        f"  retrieval (4 modes): {retrieval_figures['embedding_tokens']} embedding tokens, "
+        f"{retrieval_figures['rerank_calls']} rerank calls (the {retrieval_figures['sweep_queries']} "
+        f"permission-sweep queries only read the database)\n"
+        f"  answers (upper bound): {_calls_line(answer_calls)}\n"
+        f"  data (upper bound): {_calls_line(data_calls)}\n"
+        f"  estimated cost at list price: {'unknown' if total is None else f'about ${total:.3f}'}\n"
+    )
+    if not args.yes and not _proceed():
+        print("Cancelled.")
+        await engine.dispose()
+        return 1
+
+    embedder = embedding_client(settings)
+    chat = answers.UsageChat(chat_client(settings))
+    print("== retrieval and permissions", flush=True)
+    retrieval = await retrieval_phase(
+        settings, engine, embedder, chat, questions, identities, manifest, corpus, list(MODES),
+        sweep=True, label="full", out=args.out, store_in_db=not args.no_db,
+    )  # fmt: skip
+    print("== answers", flush=True)
+    answer_chat = answers.UsageChat(chat_client(settings))
+    answer_run = await answers.run_answers(
+        engine, settings, embedder, answer_chat, identities, questions,
+        progress=lambda i, n: print(f"  {i}/{n}", end="\r", flush=True),
+    )  # fmt: skip
+    answer_summary = answers.summarize(answer_run)
+    answers_path = answers.write(args.out, answer_run, answer_summary, answer_usd)
+    print("== data questions", flush=True)
+    data_run = await data_check.run_data_check(
+        engine, settings, embedder, chat_client(settings), data_check.load_askers(), data_questions
+    )
+    data_summary = data_check.summarize(data_run)
+    data_path = data_check.write(args.out, data_run, None)
+    if not args.no_db:
+        await answers.store(engine, answer_run, answer_summary, git_sha(), "full")
+        await data_check.store(engine, data_run, git_sha(), "full")
+    sweep = retrieval.report.get("leak_sweep")
+    sweep_checked = sweep["checked"] if sweep else None
+    path = args.out / f"full-{datetime.now(UTC).strftime('%Y%m%d-%H%M')}.md"
+    path.write_text(
+        suite.render_all(
+            retrieval=retrieval.report, permission_violations=retrieval.violations,
+            sweep_checked=sweep_checked, answers=answer_summary, data=data_summary,
+            files={"检索": retrieval.markdown, "答案": answers_path, "数据题": data_path},
+            corpus=corpus, questions=len(questions),
+            models={
+                "understand": settings.model_understand, "rerank": settings.model_rerank,
+                "generate": settings.model_generate, "judge": settings.model_judge,
+                "plan": settings.model_plan, "sql": settings.model_sql,
+            },
+            git_sha=git_sha(),
+        ),
+        encoding="utf-8",
+    )  # fmt: skip
+    await engine.dispose()
+    print(f"report: {path}")
+    if retrieval.violations:
+        print(f"PERMISSION VIOLATIONS: {retrieval.violations}", file=sys.stderr)
+        return 2
+    return 0
+
+
+async def run_matrix_command(args: argparse.Namespace) -> int:
+    from starit_eval import matrix
+
+    settings = get_settings()
+    questions = load_questions()
+    experiments = [e for e in matrix.EXPERIMENTS if not args.only or e.name in set(args.only)]
+    engine = create_engine(settings)
+    corpus = await corpus_stats(engine)
+    await engine.dispose()
+    figures = matrix.estimate(settings, questions, corpus["chunks"], corpus["avg_tokens"])
+    embed_usd = cost_usd(settings.embedding_model, int(figures["embedding_tokens"]))
+    derive_usd = cost_usd(
+        settings.model_derive,
+        int(figures["derive_input_tokens"]),
+        int(figures["derive_output_tokens"]),
+    )
+    total = None if embed_usd is None or derive_usd is None else embed_usd + derive_usd
+    print(
+        f"\nThe experiment matrix: {len(experiments)} experiments, "
+        f"{figures['ingests']} ingestions of the sample documents into a scratch database.\n"
+        f"  embeddings: about {figures['embedding_tokens']} tokens\n"
+        f"  derived content: up to {figures['derive_calls']} calls to {settings.model_derive}\n"
+        f"  estimated cost at list price: {'unknown' if total is None else f'about ${total:.3f}'}\n"
+    )
+    if not args.yes and not _proceed():
+        print("Cancelled.")
+        return 1
+    results = await matrix.run_matrix(
+        settings, embedding_client(settings), chat_client(settings), questions, experiments,
+        progress=lambda message: print(f"  {message}", flush=True),
+    )  # fmt: skip
+    note = "" if total is None else f"运行前估算费用约 {total:.3f} 美元。"
+    path = matrix.write(
+        args.out, results,
+        {"embedding": settings.embedding_model, "derive": settings.model_derive}, note,
+    )  # fmt: skip
+    print(f"report: {path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
-    runner = {"agent": run_agent, "data": run_data}.get(args.command, run_retrieval)
+    runner = {
+        "agent": run_agent,
+        "data": run_data,
+        "answers": run_answers_command,
+        "all": run_all,
+        "matrix": run_matrix_command,
+    }.get(args.command, run_retrieval)
     sys.exit(asyncio.run(runner(args)))
 
 
