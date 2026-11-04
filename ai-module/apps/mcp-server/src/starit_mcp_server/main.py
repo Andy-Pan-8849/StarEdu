@@ -6,6 +6,7 @@ import uvicorn
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
+from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.auth import TokenVerifier, jwks_key_resolver
 from starit_core.config import Settings, get_settings
@@ -13,6 +14,7 @@ from starit_core.dataaccess.tools import DataTools
 from starit_core.db import create_engine
 from starit_core.embeddings import embedding_client
 from starit_core.logging import configure_logging
+from starit_core.telemetry import Providers, instrument_engine, setup_telemetry
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -21,7 +23,12 @@ from starit_mcp_server.auth import JwtTokenVerifier
 from starit_mcp_server.tools import register_tools
 
 
-def build_app(settings: Settings, engine: AsyncEngine, verifier: TokenVerifier) -> Starlette:
+def build_app(
+    settings: Settings,
+    engine: AsyncEngine,
+    verifier: TokenVerifier,
+    providers: Providers | None = None,
+) -> Starlette:
     jwt_verifier = JwtTokenVerifier(verifier)
     server = MCPServer(
         "starit-data",
@@ -39,11 +46,20 @@ def build_app(settings: Settings, engine: AsyncEngine, verifier: TokenVerifier) 
         return JSONResponse({"status": "ok"})
 
     hosts = [h.strip() for h in settings.mcp_allowed_hosts.split(",") if h.strip()]
-    return server.streamable_http_app(
+    app = server.streamable_http_app(
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True, allowed_hosts=hosts
         )
     )
+    if providers is not None:
+        # Continues the caller's trace (the W3C `traceparent` header) and records no headers.
+        app.add_middleware(
+            OpenTelemetryMiddleware,
+            tracer_provider=providers.tracer_provider,
+            meter_provider=providers.meter_provider,
+            excluded_urls="health",
+        )
+    return app
 
 
 def main() -> None:
@@ -54,7 +70,10 @@ def main() -> None:
         audience=settings.oidc_audience_mcp,
         key_resolver=jwks_key_resolver(settings.oidc_jwks_url),
     )
-    app = build_app(settings, create_engine(settings), verifier)
+    providers = setup_telemetry(settings, "starit-mcp-server")
+    engine = create_engine(settings)
+    instrument_engine(engine)
+    app = build_app(settings, engine, verifier, providers)
     logging.getLogger("starit_mcp_server").info("starting on port %s", settings.mcp_port)
     uvicorn.run(app, host="0.0.0.0", port=settings.mcp_port, log_level="warning")  # noqa: S104
 

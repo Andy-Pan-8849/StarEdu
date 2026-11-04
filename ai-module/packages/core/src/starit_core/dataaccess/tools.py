@@ -17,6 +17,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from starit_core import telemetry
 from starit_core.audit import write_audit
 from starit_core.auth import Identity
 from starit_core.config import Settings
@@ -143,6 +144,18 @@ class DataTools:
         arguments: dict[str, Any],
         *,
         token: str | None = None,  # the MCP backend needs it; in-process, identity is enough
+    ) -> dict[str, Any]:
+        with telemetry.span("tool.call", {"tool": name}) as active:
+            outcome = await self._call(identity, name, arguments)
+            result = "ok" if outcome.get("ok") else str(outcome["error"]["code"])
+            active.set_attribute("tool.result", result)
+            if result == "internal_error":
+                telemetry.fail(active, result)
+        telemetry.current().tool_calls.add(1, {"tool": name, "result": result})
+        return outcome
+
+    async def _call(
+        self, identity: Identity, name: str, arguments: dict[str, Any]
     ) -> dict[str, Any]:
         outcome: dict[str, Any]
         details: dict[str, Any] = {"tool": name, "arguments": arguments}

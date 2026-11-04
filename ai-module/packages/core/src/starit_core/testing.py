@@ -7,6 +7,7 @@ so that tests in different directories can share them.
 import asyncio
 import json
 from collections.abc import Callable, Mapping, Sequence
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -227,3 +228,75 @@ class Harness:
                 c=self.conversation_id,
             )
         )[0]
+
+
+class InMemoryTelemetry:
+    """Real OpenTelemetry providers that keep everything in memory, for asserting on what the
+    code records. `install()` makes it current; `restore()` puts back what was there."""
+
+    def __init__(self, *, capture_content: bool = False) -> None:
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+        from starit_core import telemetry
+
+        self.exporter = InMemorySpanExporter()
+        self.reader = InMemoryMetricReader()
+        self.tracer_provider = TracerProvider()
+        self.tracer_provider.add_span_processor(SimpleSpanProcessor(self.exporter))
+        self.meter_provider = MeterProvider(metric_readers=[self.reader])
+        self.telemetry = telemetry.Telemetry(
+            self.tracer_provider, self.meter_provider, capture_content=capture_content
+        )
+        self._previous = telemetry.current()
+
+    def install(self) -> "InMemoryTelemetry":
+        from starit_core import telemetry
+
+        telemetry.use(self.telemetry)
+        return self
+
+    def restore(self) -> None:
+        from starit_core import telemetry
+
+        telemetry.use(self._previous)
+
+    def spans(self, name: str | None = None) -> list[Any]:
+        found = list(self.exporter.get_finished_spans())
+        return [s for s in found if name is None or s.name == name]
+
+    def metric_points(self, name: str) -> list[Any]:
+        data = self.reader.get_metrics_data()
+        points: list[Any] = []
+        for resource in data.resource_metrics if data else []:
+            for scope in resource.scope_metrics:
+                for metric in scope.metrics:
+                    if metric.name == name:
+                        points += list(metric.data.data_points)
+        return points
+
+    def metric_total(self, name: str, **attributes: Any) -> float:
+        total = 0.0
+        for point in self.metric_points(name):
+            attrs = dict(point.attributes or {})
+            if all(attrs.get(k) == v for k, v in attributes.items()):
+                total += getattr(point, "value", 0)
+        return total
+
+    def everything_recorded(self) -> str:
+        """Every span name, attribute and event as one string, to search it for what must not be."""
+        parts: list[str] = []
+        for s in self.spans():
+            parts.append(s.name)
+            parts.append(str(dict(s.attributes or {})))
+            parts += [f"{e.name} {dict(e.attributes or {})}" for e in s.events]
+        for resource in (
+            self.reader.get_metrics_data() or SimpleNamespace(resource_metrics=[])
+        ).resource_metrics:
+            for scope in resource.scope_metrics:
+                for metric in scope.metrics:
+                    parts += [str(dict(p.attributes or {})) for p in metric.data.data_points]
+        return "\n".join(parts)

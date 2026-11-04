@@ -15,6 +15,7 @@ from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from starit_core import telemetry
 from starit_core.audit import write_audit
 from starit_core.config import Settings
 from starit_core.documents import add_chunk
@@ -54,6 +55,26 @@ async def process_job(
     chat: ChatClient | None = None,
 ) -> bool:
     """Run a claimed job to the end. Returns True on success. Never raises for a job failure."""
+    with telemetry.span("ingest.job", {"job_id": str(job.id), "attempt": job.attempt}) as active:
+        ok = await _process_job(
+            engine, job, storage=storage, embedder=embedder, settings=settings, chat=chat
+        )
+        active.set_attribute("ingest.succeeded", ok)
+        if not ok:
+            telemetry.fail(active, "ingestion failed")
+    telemetry.current().ingest_jobs.add(1, {"status": "succeeded" if ok else "failed"})
+    return ok
+
+
+async def _process_job(
+    engine: AsyncEngine,
+    job: queue.Job,
+    *,
+    storage: ObjectStorage,
+    embedder: EmbeddingClient,
+    settings: Settings,
+    chat: ChatClient | None,
+) -> bool:
     stage = "parse"
     try:
         stage = await _stage(engine, job, "parse")

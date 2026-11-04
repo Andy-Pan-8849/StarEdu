@@ -12,6 +12,7 @@ from starit_core.ingest.worker import run_worker
 from starit_core.llm import chat_client
 from starit_core.logging import configure_logging
 from starit_core.storage import S3Storage
+from starit_core.telemetry import instrument_engine, setup_telemetry
 
 logger = logging.getLogger("starit.worker")
 
@@ -24,7 +25,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 async def _run(once: bool) -> None:
     settings = get_settings()
+    setup_telemetry(settings, "starit-worker")
     engine = create_engine(settings)
+    instrument_engine(engine)
     storage = S3Storage(settings)
     await storage.ensure_bucket()
     embedder = embedding_client(settings)

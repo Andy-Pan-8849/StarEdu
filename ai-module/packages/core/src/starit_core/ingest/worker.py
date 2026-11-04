@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from starit_core import telemetry
 from starit_core.config import Settings
 from starit_core.embeddings import EmbeddingClient
 from starit_core.ingest import queue
@@ -40,6 +41,7 @@ async def run_worker(
         async with engine.begin() as conn:
             revived = await queue.requeue_stale(conn, settings.worker_stale_job_seconds)
             job = await queue.claim_next(conn, worker_id)
+            telemetry.current().set_queue_length(await queue.count_queued(conn))
         if revived:
             logger.warning("put %d stalled job(s) back in the queue", revived)
         if job is None:

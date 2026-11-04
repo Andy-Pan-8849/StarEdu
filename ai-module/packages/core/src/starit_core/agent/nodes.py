@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
@@ -10,6 +11,7 @@ from langchain_core.runnables import RunnableConfig
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from starit_core import telemetry
 from starit_core.agent import messages
 from starit_core.agent.prompts import PROMPT_VERSIONS, prompt_text
 from starit_core.agent.state import AgentState, RunContext
@@ -82,13 +84,35 @@ class BudgetedChat:
         self._totals.llm_calls += 1
         if model not in self._totals.models:
             self._totals.models.append(model)
-        result = await self._inner.complete(
-            messages,
-            model=model,
-            json_mode=json_mode,
-            max_tokens=max_tokens,
-            request_timeout=request_timeout or self._timeout,
-        )
+        tele = telemetry.current()
+        started = time.perf_counter()
+        outcome = "error"
+        with telemetry.span(
+            "llm.chat",
+            {"gen_ai.request.model": model, "langfuse.observation.type": "generation"},
+        ) as active:
+            if tele.capture_content:
+                active.set_attribute(
+                    "langfuse.observation.input", telemetry.clip(json.dumps(list(messages)))
+                )
+            try:
+                result = await self._inner.complete(
+                    messages,
+                    model=model,
+                    json_mode=json_mode,
+                    max_tokens=max_tokens,
+                    request_timeout=request_timeout or self._timeout,
+                )
+                outcome = "ok"
+            finally:
+                tele.llm_calls.add(1, {"model": model, "outcome": outcome})
+                tele.llm_duration.record(time.perf_counter() - started, {"model": model})
+            active.set_attribute("gen_ai.usage.input_tokens", result.input_tokens)
+            active.set_attribute("gen_ai.usage.output_tokens", result.output_tokens)
+            if tele.capture_content:
+                active.set_attribute("langfuse.observation.output", telemetry.clip(result.text))
+        tele.llm_tokens.add(result.input_tokens, {"model": model, "direction": "input"})
+        tele.llm_tokens.add(result.output_tokens, {"model": model, "direction": "output"})
         self._totals.input_tokens += result.input_tokens
         self._totals.output_tokens += result.output_tokens
         return result

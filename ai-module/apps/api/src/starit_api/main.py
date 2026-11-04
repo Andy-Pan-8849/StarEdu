@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import Identity, TokenVerifier, jwks_key_resolver
@@ -21,6 +22,7 @@ from starit_core.llm import chat_client
 from starit_core.logging import configure_logging, request_id_var
 from starit_core.ratelimit import RedisRateLimiter
 from starit_core.storage import S3Storage
+from starit_core.telemetry import Providers, instrument_engine, setup_telemetry
 
 from starit_api import conversations, documents
 from starit_api.deps import get_identity
@@ -42,6 +44,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     engine = create_engine(settings)
+    instrument_engine(engine)
     app.state.engine = engine
     app.state.storage = S3Storage(settings)
     app.state.verifier = TokenVerifier(
@@ -67,7 +70,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await engine.dispose()
 
 
-def create_app() -> FastAPI:
+def create_app(providers: Providers | None = None) -> FastAPI:
+    """`providers` lets a test pass in-memory OpenTelemetry providers; normally they come from the
+    settings (STARIT_OTEL_ENABLED) and are None when telemetry is off."""
+    providers = providers or setup_telemetry(get_settings(), "starit-api")
     app = FastAPI(title="StarEdu AI API", version="0.0.0", lifespan=lifespan)
     register_error_handlers(app)
     app.include_router(conversations.router)
@@ -116,6 +122,15 @@ def create_app() -> FastAPI:
             "student_id": identity.student_id,
         }
 
+    if providers is not None:
+        # Request spans and HTTP metrics. Headers (the bearer token) are not recorded; the
+        # health check is left out because Compose polls it every few seconds.
+        FastAPIInstrumentor.instrument_app(
+            app,
+            tracer_provider=providers.tracer_provider,
+            meter_provider=providers.meter_provider,
+            excluded_urls="healthz",
+        )
     return app
 
 

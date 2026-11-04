@@ -5,12 +5,14 @@ leads on to one of the six end steps, which is checked by a test that walks the 
 """
 
 import logging
+import time
 from collections.abc import Awaitable, Callable, Hashable
 from typing import Any, cast
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
+from starit_core import telemetry
 from starit_core.agent.nodes import AgentFailure, AgentNodes, _ctx
 from starit_core.agent.state import AgentState
 
@@ -56,15 +58,23 @@ def _guarded(fn: Step) -> Step:
     """A step that fails ends the run in the `error` state instead of breaking the graph."""
 
     async def run(state: AgentState, config: RunnableConfig) -> AgentState:
-        try:
-            return await fn(state, config)
-        except AgentFailure as failure:
-            _ctx(config).totals.failure_detail = failure.detail or failure.reason
-            return {"route": "end_error", "end_reason": failure.reason}
-        except Exception as exc:
-            logger.exception("step %s failed", fn.__name__)
-            _ctx(config).totals.failure_detail = f"{type(exc).__name__}: {exc}"
-            return {"route": "end_error", "end_reason": "internal"}
+        started = time.perf_counter()
+        node = fn.__name__
+        with telemetry.span(f"agent.{node}", {"agent.node": node}) as active:
+            try:
+                update = await fn(state, config)
+            except AgentFailure as failure:
+                _ctx(config).totals.failure_detail = failure.detail or failure.reason
+                telemetry.fail(active, failure.reason)
+                update = {"route": "end_error", "end_reason": failure.reason}
+            except Exception as exc:
+                logger.exception("step %s failed", node)
+                _ctx(config).totals.failure_detail = f"{type(exc).__name__}: {exc}"
+                telemetry.fail(active, "internal")
+                update = {"route": "end_error", "end_reason": "internal"}
+            active.set_attribute("agent.route", str(update.get("route", "")))
+        telemetry.current().node_duration.record(time.perf_counter() - started, {"node": node})
+        return update
 
     run.__name__ = fn.__name__
     return run

@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     )
     mcp_url: str = "http://localhost:8100/mcp"
     mcp_port: int = 8100
+    # OpenTelemetry: off by default; Compose turns it on with `make up-obs`.
+    otel_enabled: bool = False
+    otel_endpoint: str = "http://localhost:4318"  # OTLP/HTTP (the Collector)
+    otel_capture_content: bool = False  # put prompts and answers in spans (off: privacy)
     # Browser origins allowed to call the API (comma separated).
     cors_origins: str = "http://localhost:3000"
     # Host header values the MCP server accepts (DNS-rebinding protection stays on).

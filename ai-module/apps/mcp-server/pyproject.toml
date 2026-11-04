@@ -3,7 +3,11 @@ name = "starit-mcp-server"
 version = "0.0.0"
 description = "StarEdu AI module MCP server"
 requires-python = ">=3.12"
-dependencies = ["starit-core", "uvicorn>=0.30"]
+dependencies = [
+    "opentelemetry-instrumentation-asgi>=0.66b2",
+    "starit-core",
+    "uvicorn>=0.30",
+]
 
 [project.scripts]
 starit-mcp-server = "starit_mcp_server.main:main"
