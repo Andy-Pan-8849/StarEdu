@@ -949,6 +949,18 @@ make e2e                                          # Playwright（需先同意下
 
 10 条全部接受（浏览器内 OIDC；CORS；无前缀路径；8 个文档端点；引用加 `document_id`；前端栈；不做流式；Playwright 本地运行并**同意下载 Chromium**；Compose 加 `web`；真实检查先估算后确认）。
 
+### 暂停记录（2026-11-04）
+
+用户临时离开，**M7 暂停**，等用户下达"恢复"指令再继续。当时的状态：
+
+- **已完成并提交**（分支 `m7-docs-frontend`）：后端文档管理 API、读取接口、CORS、引用 `document_id`（699 个 Python 测试通过）；Next.js 前端（登录、聊天、引用抽屉、文档管理页，61 个 Vitest 测试，lint、类型、格式、构建通过）；web 的 Dockerfile、Compose `web` 服务、CI 前端作业、Makefile 目标、Playwright 测试、README 和设计 03 的修订。
+- **容器**：`api`、`web`、`worker`、`mcp-server` 等都在运行且健康；`web` 返回 200，API 的 CORS 对 `http://localhost:3000` 放行；`worker` 已恢复为正常（`openai`）嵌入配置。
+- **没有完成**：(1) Playwright 冒烟测试**一次都没有跑完**——Chromium 下载到约 50% 时被我按暂停指令中止；再跑一遍 `make e2e` 会重新下载（约 186 MB）。(2) 真实检查（上传 1 个小文档 + 1 个问题）还没做，需先给估算并等确认。(3) 本节"实际结果"还没填。(4) CI 还没在新分支上跑过前端作业。(5) 合并和 `ai-m7` 标签。
+- **本机环境的发现**（会写进实际结果）：Docker Desktop 的虚拟磁盘曾写满（`no space left on device`），Postgres 因此崩溃并进入恢复模式，`worker` 重启了一个多小时；清理了 6 GB 构建缓存后恢复。镜像构建里下载 Python 依赖的网络很慢，`uv` 默认的 30 秒超时导致失败，已在 `python.Dockerfile` 里设为 `UV_HTTP_TIMEOUT=120`；这次 API 镜像构建用了约 40 分钟。Docker 里还有约 8.6 GB 镜像和 10 GB 卷可回收，未动。
+- **未提交的改动**：`ai-module/deploy/docker/python.Dockerfile`（超时设置）和本记录。
+
+恢复后的顺序：确认容器健康 → `make e2e` → 处理失败（如有）→ 填实际结果 → 给真实检查的估算并等确认 → 推送、看 CI → 请用户确认合并并打 `ai-m7`。
+
 ### 实际结果
 
 （完成后填写）
