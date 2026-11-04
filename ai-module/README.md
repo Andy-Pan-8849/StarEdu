@@ -24,15 +24,49 @@ Prerequisites: [uv](https://docs.astral.sh/uv/), Docker with Compose, and `make`
 ```bash
 cd ai-module
 make sync      # install dependencies
-make up        # start Postgres (pgvector), Redis, object storage, Keycloak and the API
+make up        # start Postgres (pgvector), Redis, object storage, Keycloak, the LiteLLM
+               # gateway, the API, the worker, the MCP server and the web app
                # (a one-shot container applies the database migrations first)
-make seed-biz  # load the sample business tables into the biz schema
-make ingest-samples ARGS="--wait"   # register the 28 sample documents; the worker container
-                                     # parses, chunks, embeds and stores them
+make seed      # the sample business tables + the knowledge base from a prepared dump
+               # (no model key needed) + the original files of the sample documents
 make test      # unit tests, plus integration tests when the services are up
 make lint      # ruff and mypy
 curl http://localhost:8000/healthz
 ```
+
+Only a model key is needed to *ask questions* (`OPENAI_API_KEY` in `.env`, read by the LiteLLM
+gateway container). `make seed` itself needs none. To build the knowledge base with the real
+ingestion pipeline instead of the dump (this calls the embedding model), use
+`make seed ARGS=--ingest`, or `make ingest-samples ARGS="--wait"`. After a real ingestion,
+`make seed-dump` rewrites `seed/ai-seed.jsonl.gz`.
+
+### Models, gateway and keys
+
+In Compose, `api`, `worker` and `mcp-server` call models through the **LiteLLM gateway**
+(`STARIT_LLM_GATEWAY=litellm_proxy`); only the `litellm` container holds the provider keys, and
+`deploy/litellm/config.yaml` forwards any `openai/*` or `anthropic/*` model, so changing a model
+is a setting. Run on the host (`uv run`, the evaluation) the keys are used directly
+(`litellm_lib`, the default). The services authenticate to the gateway with `LITELLM_MASTER_KEY`
+(a local default in `.env.example`; change it before exposing the port).
+
+### Traces, metrics and Langfuse (optional)
+
+```bash
+make up-obs        # + OpenTelemetry Collector, Tempo, Prometheus, Grafana  -> http://localhost:3300
+make up-langfuse   # + Langfuse (heavy: web, worker, ClickHouse, ...)       -> http://localhost:3100
+```
+
+Grafana (`admin` / `admin`) has four dashboards in the StarEdu folder: run overview, how runs
+end, retrieval and model latency, document ingestion. Every assistant run is one trace: the HTTP
+request, each step of the graph, each model call, each database statement and, for a data
+question, the call into the MCP server. Find a run by its id in Grafana's Explore (Tempo,
+TraceQL: `{ span.run_id = "<run id>" }`). Logs are JSON with `request_id`, `run_id` and
+`trace_id`. Spans carry ids, model names, token counts and timings; **not** the bearer token and
+not the question or answer text (set `STARIT_OTEL_CAPTURE_CONTENT=true` to add them, which you
+should not do with real data). Langfuse (`admin@starit.example` / `starit-local`, local only)
+receives the same traces; the model calls appear as generations. With the core stack alone
+nothing is recorded or exported. Measured memory: core about 2.1 GiB, with observability about
+3.0 GiB, with Langfuse about 5.4 GiB (docs/design/06, section 11).
 
 ### Demo accounts (local only)
 
@@ -72,6 +106,9 @@ Retrieval lives in `starit_core.retrieval`: `retrieve(conn, identity, query, mod
 make eval ARGS="retrieval --all-modes --leak-sweep"        # four modes + every question as every role
 make eval ARGS="retrieval --mode hybrid --label try-1"     # one mode
 make eval ARGS="retrieval --all-modes --dry-run"           # fake models, no cost, the numbers mean nothing
+make eval ARGS="all"          # retrieval, permissions, answers and data questions in one report
+make eval ARGS="answers"      # the 114 document questions, graded (facts, a model judge, refusals)
+make eval ARGS="matrix"       # chunk size, identifier weighting, derived content (scratch database)
 ```
 
 Reports go to `docs/eval/` (see the baseline there) and each mode's run is recorded in `ai.eval_runs` / `ai.eval_results`. The rerank model is `STARIT_MODEL_RERANK` (default `openai/gpt-6-luna`).
