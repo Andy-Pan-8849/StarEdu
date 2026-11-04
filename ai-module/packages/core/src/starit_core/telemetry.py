@@ -51,6 +51,15 @@ class Telemetry:
             "starit.retrieval.restricted_hits",
             description="Matching chunks the asker may not read (a number, never their text)",
         )
+        self.llm_cost = meter.create_counter(
+            "starit.llm.cost_usd", unit="USD", description="Model spend at list price"
+        )
+        self.llm_fallbacks = meter.create_counter(
+            "starit.llm.fallbacks", description="Chat calls answered by a fallback model"
+        )
+        self.rate_limited = meter.create_counter(
+            "starit.rate_limited", description="Chat requests refused by a limit"
+        )
         self.tool_calls = meter.create_counter("starit.tool.calls", description="Data tool calls")
         self.ingest_jobs = meter.create_counter("starit.ingest.jobs", description="Ingestion jobs")
         self._queue_length = 0

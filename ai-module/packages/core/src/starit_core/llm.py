@@ -22,6 +22,9 @@ class ChatResult:
     text: str
     input_tokens: int = 0
     output_tokens: int = 0
+    model: str = (
+        ""  # the model that answered, which differs from the one asked for after a fallback
+    )
 
 
 class ChatClient(Protocol):
@@ -40,9 +43,15 @@ class LiteLLMChatClient:
     """Calls a hosted chat model through the litellm library, or through the LiteLLM gateway
     when `gateway_url` is given (the gateway holds the provider keys, not this process)."""
 
-    def __init__(self, gateway_url: str | None = None, gateway_key: str = "") -> None:
+    def __init__(
+        self,
+        gateway_url: str | None = None,
+        gateway_key: str = "",
+        fallbacks: Sequence[str] = (),
+    ) -> None:
         self._gateway_url = gateway_url
         self._gateway_key = gateway_key
+        self._fallbacks = list(fallbacks)
 
     async def complete(
         self,
@@ -75,6 +84,11 @@ class LiteLLMChatClient:
             model = f"openai/{model}"
             options["api_base"] = self._gateway_url
             options["api_key"] = self._gateway_key
+        if self._fallbacks:
+            # Tried in this order if the call errors. Through the gateway each name gets the same
+            # "openai/" prefix as the model above, so the gateway sees the configured names.
+            via_gateway = bool(self._gateway_url)
+            options["fallbacks"] = [f"openai/{m}" if via_gateway else m for m in self._fallbacks]
         try:
             response = await litellm.acompletion(
                 model=model, messages=[dict(m) for m in messages], **options
@@ -86,13 +100,19 @@ class LiteLLMChatClient:
             text=response.choices[0].message.content or "",
             input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
             output_tokens=getattr(usage, "completion_tokens", 0) or 0,
+            model=str(getattr(response, "model", "") or ""),
         )
 
 
+def parse_fallbacks(value: str) -> list[str]:
+    return [m.strip() for m in value.split(",") if m.strip()]
+
+
 def chat_client(settings: Settings) -> ChatClient:
+    fallbacks = parse_fallbacks(settings.llm_fallbacks)
     if settings.llm_gateway == "litellm_proxy":
-        return LiteLLMChatClient(settings.llm_gateway_url, settings.llm_gateway_key)
-    return LiteLLMChatClient()
+        return LiteLLMChatClient(settings.llm_gateway_url, settings.llm_gateway_key, fallbacks)
+    return LiteLLMChatClient(fallbacks=fallbacks)
 
 
 class FakeChatClient:

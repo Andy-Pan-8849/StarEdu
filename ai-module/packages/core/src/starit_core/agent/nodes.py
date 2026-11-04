@@ -17,6 +17,7 @@ from starit_core.agent.prompts import PROMPT_VERSIONS, prompt_text
 from starit_core.agent.state import AgentState, RunContext
 from starit_core.config import Settings
 from starit_core.conversations import recent_turns
+from starit_core.cost import DailyBudget, call_cost_usd
 from starit_core.dataaccess.schema import schema_prompt
 from starit_core.dataaccess.sqlguard import AccessDenied, SqlRejected, validate_sql
 from starit_core.embeddings import EmbeddingClient
@@ -59,16 +60,28 @@ class AgentFailure(Exception):
         self.detail = detail
 
 
+def _same_model(answered: str, requested: str) -> bool:
+    """`gpt-4o-mini-2024-07-18` answered a request for `openai/gpt-4o-mini`: the same model."""
+    name = requested.split("/")[-1]
+    return answered.startswith(name) or name.startswith(answered.split("/")[-1])
+
+
 class BudgetedChat:
     """Wraps the chat client for one run: counts calls and tokens, enforces the call limit."""
 
     def __init__(
-        self, inner: ChatClient, ctx_totals: Any, limit: int, request_timeout: float
+        self,
+        inner: ChatClient,
+        ctx_totals: Any,
+        limit: int,
+        request_timeout: float,
+        budget: DailyBudget | None = None,
     ) -> None:
         self._inner = inner
         self._totals = ctx_totals
         self._limit = limit
         self._timeout = request_timeout
+        self._budget = budget
 
     async def complete(
         self,
@@ -109,6 +122,18 @@ class BudgetedChat:
                 tele.llm_duration.record(time.perf_counter() - started, {"model": model})
             active.set_attribute("gen_ai.usage.input_tokens", result.input_tokens)
             active.set_attribute("gen_ai.usage.output_tokens", result.output_tokens)
+            answered_by = result.model or model
+            active.set_attribute("gen_ai.response.model", answered_by)
+            if result.model and not _same_model(result.model, model):
+                active.set_attribute("llm.fallback", True)
+                tele.llm_fallbacks.add(1, {"requested": model, "answered": result.model})
+                self._totals.fallbacks += 1
+                logger.warning("%s did not answer; %s did (fallback)", model, result.model)
+            cost = call_cost_usd(answered_by, result.input_tokens, result.output_tokens)
+            self._totals.cost_usd += cost
+            tele.llm_cost.add(cost, {"model": answered_by})
+            if self._budget is not None:
+                await self._budget.add(cost)
             if tele.capture_content:
                 active.set_attribute("langfuse.observation.output", telemetry.clip(result.text))
         tele.llm_tokens.add(result.input_tokens, {"model": model, "direction": "input"})

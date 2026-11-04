@@ -123,5 +123,7 @@ def _details(final: AgentState, totals: RunTotals) -> dict[str, Any]:
         "retrieval_attempts": final.get("retrieval_attempts", 0),
         "rerank_failed": totals.rerank_failed,
         "prompt_versions": PROMPT_VERSIONS,
+        "cost_usd": round(totals.cost_usd, 6),
+        "fallbacks": totals.fallbacks,
         "failure": totals.failure_detail,
     }

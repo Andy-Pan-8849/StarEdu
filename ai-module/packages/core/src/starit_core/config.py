@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     llm_gateway: str = "litellm_lib"
     llm_gateway_url: str = "http://localhost:4100"
     llm_gateway_key: str = Field(default="", repr=False)
+    # Models to try, in order, when a chat call fails (comma separated, after the model asked for):
+    # provider errors, timeouts, rate limits, an unknown model. Not for bad answers.
+    llm_fallbacks: str = ""
+
+    # Limits on the chat endpoint (docs/design/03, section 7), three dimensions: the user (above:
+    # rate_limit_chat_per_minute), the address, and the money the whole stack may spend per UTC day.
+    rate_limit_ip_per_minute: int = 60
+    trusted_proxies: str = ""  # comma separated networks whose X-Forwarded-For is believed
+    daily_budget_usd: float = 0.5  # 0 switches the budget off
 
     # Retrieval (docs/design/05-retrieval-etl-and-evaluation.md, section 2).
     retrieval_mode: str = "hybrid_rerank"  # keyword, vector, hybrid or hybrid_rerank

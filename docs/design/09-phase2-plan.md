@@ -11,8 +11,8 @@
 | 成本与延迟统计 | **不做自己的**：Langfuse 已经按模型和会话算出成本（full profile）。lite profile 没有 Langfuse，做 lite 时重新决定 |
 | Memory | 先不做，等企业后台有了再做 |
 | 写操作确认 | 先不做，等企业后台有了再做 |
-| 限流 3 维 | **做**，补上缺的两维（M9） |
-| LiteLLM 多模型 fallback | **做**（M9）：`openai/gpt-6-luna` → `openai/gpt-4o-mini` → `anthropic/claude-haiku-5-5` |
+| 限流 3 维 | **做**（M9）：IP / 用户 / token 三个维度；token 维度定为全栈每日不超过 0.5 美元 |
+| LiteLLM 多模型 fallback | **做**（M9）：`openai/gpt-6-luna` → `openai/gpt-4o-mini` → `anthropic/claude-haiku-5-5`；只验证 Haiku 可用，不用它跑完整评测 |
 | 图上有、需求清单里没有也没规划的几项 | **列入第二阶段**（本文第 3 节），**暂不排期** |
 
 ## 2. 已排期

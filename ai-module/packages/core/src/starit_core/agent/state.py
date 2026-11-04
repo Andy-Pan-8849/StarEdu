@@ -64,6 +64,8 @@ class RunTotals:
     restricted_keyword_hits: int = 0
     rerank_failed: bool = False
     failure_detail: str | None = None
+    cost_usd: float = 0.0
+    fallbacks: int = 0
 
 
 @dataclass

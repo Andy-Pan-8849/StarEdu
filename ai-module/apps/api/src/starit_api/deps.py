@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import AuthError, AuthUnavailableError, Identity, TokenVerifier
+from starit_core.cost import DailyBudget
 from starit_core.ratelimit import RateLimiter
 from starit_core.storage import ObjectStorage
 
@@ -29,6 +30,11 @@ def get_runtime(request: Request) -> AgentRuntime:
 def get_storage(request: Request) -> ObjectStorage:
     storage: ObjectStorage = request.app.state.storage
     return storage
+
+
+def get_budget(request: Request) -> DailyBudget | None:
+    budget: DailyBudget | None = request.app.state.budget
+    return budget
 
 
 def get_limiter(request: Request) -> RateLimiter:

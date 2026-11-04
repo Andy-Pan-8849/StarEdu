@@ -23,6 +23,7 @@ from starit_core.agent.nodes import AgentNodes, BudgetedChat, RetrieveFn
 from starit_core.agent.state import AgentState, RunContext, RunTotals
 from starit_core.auth import Identity
 from starit_core.config import Settings
+from starit_core.cost import DailyBudget
 from starit_core.embeddings import EmbeddingClient
 from starit_core.llm import ChatClient
 from starit_core.logging import run_id_var
@@ -52,8 +53,10 @@ class AgentRuntime:
         chat: ChatClient,
         retrieve_fn: RetrieveFn = retrieve,
         data_tools: Any = None,
+        budget: DailyBudget | None = None,
     ) -> None:
         self._data_tools = data_tools
+        self._budget = budget
         self._engine = engine
         self._settings = settings
         self._chat = chat
@@ -111,7 +114,11 @@ class AgentRuntime:
         clock = time.perf_counter()
         totals = RunTotals()
         chat = BudgetedChat(
-            self._chat, totals, settings.agent_max_llm_calls, settings.agent_llm_timeout_seconds
+            self._chat,
+            totals,
+            settings.agent_max_llm_calls,
+            settings.agent_llm_timeout_seconds,
+            self._budget,
         )
         ctx = RunContext(
             identity=identity,

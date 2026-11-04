@@ -1,20 +1,30 @@
 """Conversations and the chat endpoint (design 03, sections 3 and 4)."""
 
+import time
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core import conversations as store
 from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import Identity
 from starit_core.config import get_settings
+from starit_core.cost import DailyBudget
 from starit_core.ratelimit import RateLimiter
 
-from starit_api.deps import get_access_token, get_engine, get_identity, get_limiter, get_runtime
+from starit_api.deps import (
+    get_access_token,
+    get_budget,
+    get_engine,
+    get_identity,
+    get_limiter,
+    get_runtime,
+)
 from starit_api.errors import ApiError
+from starit_api.limits import check_chat_limits
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -151,6 +161,7 @@ async def list_messages(
 
 @router.post("/{conversation_id}/messages")
 async def post_message(
+    request: Request,
     conversation_id: UUID,
     body: MessageIn,
     identity: Identity = Depends(get_identity),
@@ -158,15 +169,12 @@ async def post_message(
     runtime: AgentRuntime = Depends(get_runtime),
     limiter: RateLimiter = Depends(get_limiter),
     access_token: str | None = Depends(get_access_token),
+    budget: DailyBudget | None = Depends(get_budget),
 ) -> dict[str, Any]:
     conversation = await _owned(engine, identity, conversation_id)
     if conversation["archived"]:
         raise ApiError(409, "conflict", "This conversation is archived")
-    limit = get_settings().rate_limit_chat_per_minute
-    if not await limiter.allow(f"chat:{identity.user_id}", limit, 60):
-        raise ApiError(
-            429, "rate_limited", "Too many messages; wait a minute", {"Retry-After": "60"}
-        )
+    await check_chat_limits(request, get_settings(), limiter, budget, identity.user_id, time.time())
     result = await runtime.run(
         identity, conversation_id, body.content.strip(), access_token=access_token
     )
