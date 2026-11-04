@@ -8,8 +8,8 @@ from pathlib import Path
 _DIRECTORY = Path(__file__).parent / "prompts"
 
 PROMPT_VERSIONS = {
-    "understand": "2",
-    "generate": "1",
+    "understand": "3",
+    "generate": "2",
     "rewrite": "1",
     "plan_data": "1",
     "sql": "1",

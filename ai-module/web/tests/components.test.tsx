@@ -7,6 +7,7 @@ const auth = vi.hoisted(() => ({
   me: null as unknown,
   json: vi.fn(),
   blob: vi.fn(),
+  stream: vi.fn(),
   signOut: vi.fn(),
   retry: vi.fn(),
 }));
@@ -14,7 +15,7 @@ const auth = vi.hoisted(() => ({
 vi.mock("@/components/auth-provider", () => ({
   useAuth: () => ({
     state: auth.me ? { status: "ready", me: auth.me } : { status: "loading" },
-    api: { json: auth.json, blob: auth.blob },
+    api: { json: auth.json, blob: auth.blob, stream: auth.stream },
     signOut: auth.signOut,
     retry: auth.retry,
   }),
@@ -321,6 +322,11 @@ describe("DocumentsAdmin", () => {
   });
 });
 
+function events(items: [string, object][]): Response {
+  const text = items.map(([n, d]) => `event: ${n}\ndata: ${JSON.stringify(d)}\n\n`).join("");
+  return new Response(text);
+}
+
 describe("Chat", () => {
   it("creates a conversation, sends the question and shows the answer with a source", async () => {
     auth.me = person("staff");
@@ -328,20 +334,23 @@ describe("Chat", () => {
       if (path.startsWith("/conversations?")) return { items: [], next_cursor: null };
       if (path === "/conversations" && options?.method === "POST")
         return { id: "cv1", title: null, archived: false };
-      if (path === "/conversations/cv1/messages") {
-        return {
-          run_id: "r1",
-          message: {
-            id: "m1",
-            content: "The limit is CNY 600 [1].",
-            citations: [{ n: 1, kind: "data", views: ["expense_claims"], row_count: 2 }],
-          },
-          end_state: "answered",
-          end_reason: null,
-        };
-      }
       return { items: [], next_cursor: null };
     });
+    auth.stream.mockResolvedValue(
+      events([
+        ["run.started", { run_id: "r1" }],
+        ["message.delta", { text: "The limit is " }],
+        ["message.delta", { text: "CNY 600 [1]." }],
+        [
+          "citations",
+          { citations: [{ n: 1, kind: "data", views: ["expense_claims"], row_count: 2 }] },
+        ],
+        [
+          "run.ended",
+          { message_id: "m1", end_state: "answered", content: "The limit is CNY 600 [1]." },
+        ],
+      ]),
+    );
     const user = userEvent.setup();
     render(<Chat />);
     await user.type(screen.getByLabelText("Your question"), "hotel limit?");
@@ -361,12 +370,39 @@ describe("Chat", () => {
       if (path.startsWith("/conversations?")) return { items: [], next_cursor: null };
       if (path === "/conversations" && options?.method === "POST")
         return { id: "cv1", title: null, archived: false };
-      throw new ApiError(429, "rate_limited", "Too many messages; wait a minute");
+      return { items: [], next_cursor: null };
     });
+    auth.stream.mockRejectedValue(
+      new ApiError(429, "rate_limited", "Too many messages; wait a minute"),
+    );
     const user = userEvent.setup();
     render(<Chat />);
     await user.type(screen.getByLabelText("Your question"), "again");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/wait a minute/);
+  });
+
+  it("withdraws a draft that failed its check and shows the corrected answer", async () => {
+    auth.me = person("staff");
+    auth.json.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (path === "/conversations" && options?.method === "POST")
+        return { id: "cv1", title: null, archived: false };
+      return { items: [], next_cursor: null };
+    });
+    auth.stream.mockResolvedValue(
+      events([
+        ["run.started", {}],
+        ["message.delta", { text: "Wrong draft [9]." }],
+        ["message.retract", { reason: "bad citation" }],
+        ["message.delta", { text: "Right answer [1]." }],
+        ["run.ended", { message_id: "m2", end_state: "answered", content: "Right answer [1]." }],
+      ]),
+    );
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.type(screen.getByLabelText("Your question"), "q");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/Right answer/)).toBeInTheDocument();
+    expect(screen.queryByText(/Wrong draft/)).not.toBeInTheDocument();
   });
 });

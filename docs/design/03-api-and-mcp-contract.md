@@ -92,14 +92,18 @@
 - 引用只包含**用户有权看到的**文档；`n` 与正文中的 `[n]` 对应。
 - 请求超时：服务端对一次运行设上限（**【建议】** 60 秒），超时以 `end_state: "error"`、`end_reason: "timeout"` 结束，不返回 5xx。
 
-第二阶段的流式版本：同一路径，请求头 `Accept: text/event-stream`，事件：
+流式版本（M9 已实现）：同一路径，请求头 `Accept: text/event-stream`。限流、归属检查与非流式相同，在流开始前返回普通 JSON 错误（401/404/409/429）。事件：
 
 | event | data |
 |---|---|
 | `run.started` | `{ "run_id" }` |
-| `message.delta` | `{ "text" }` |
-| `citations` | 同上 `citations` 数组 |
-| `run.ended` | `{ "end_state", "end_reason" }` |
+| `message.delta` | `{ "text" }`：追加到当前回答 |
+| `message.retract` | `{ "reason" }`：撤回此前已显示的全部回答文字（草稿未通过校验），随后可能再出现新的 `message.delta` |
+| `citations` | `{ "citations": [...] }`，同上 `citations` 数组 |
+| `run.ended` | `{ "run_id", "message_id", "end_state", "end_reason", "content" }`：`content` 是最终存档的回复，客户端应以它为准 |
+| `error` | `{ "code", "message" }`：仅在运行本身意外崩溃时出现，之后流结束 |
+
+约定：`generate` 先输出 `sufficient`，确认为 `true` 之后才开始流出 `answer`（"先流出，不通过时撤回"）；固定文案（澄清、拒答、未找到等）作为一个 `message.delta` 一次发出；每 15 秒无事件时发送注释行 `: keepalive`；客户端断开后运行在服务端继续并存档，回来后可从消息列表读到。
 
 ### 4.2 `GET /documents/{id}/chunks` 与 `GET /documents/{id}/file`
 
