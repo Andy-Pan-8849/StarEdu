@@ -17,7 +17,7 @@ from starit_core.dataaccess.client import McpDataTools
 from starit_core.dataaccess.tools import DataTools, DataToolsClient
 from starit_core.db import check_database, create_engine
 from starit_core.embeddings import embedding_client
-from starit_core.llm import LiteLLMChatClient
+from starit_core.llm import chat_client
 from starit_core.logging import configure_logging, request_id_var
 from starit_core.ratelimit import RedisRateLimiter
 from starit_core.storage import S3Storage
@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine=engine,
         settings=settings,
         embedder=embedder,
-        chat=LiteLLMChatClient(),
+        chat=chat_client(settings),
         data_tools=data_tools(settings, engine, embedder),
     )
     limiter = RedisRateLimiter(settings.redis_url)

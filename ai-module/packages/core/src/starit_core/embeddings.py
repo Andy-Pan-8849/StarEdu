@@ -23,20 +23,36 @@ class EmbeddingClient(Protocol):
 class LiteLLMEmbeddingClient:
     """Calls a hosted embedding model through the litellm library."""
 
-    def __init__(self, provider: str, model: str, dimensions: int) -> None:
+    def __init__(
+        self,
+        provider: str,
+        model: str,
+        dimensions: int,
+        gateway_url: str | None = None,
+        gateway_key: str = "",
+    ) -> None:
         self.provider = provider
         self.model = model
         self.dimensions = dimensions
+        self._gateway_url = gateway_url
+        self._gateway_key = gateway_key
 
     async def embed(self, texts: Sequence[str]) -> list[list[float]]:
         import litellm  # imported here: it is slow to import and not needed by every caller
 
+        model = f"{self.provider}/{self.model}"
+        gateway: dict[str, str] = {}
+        if self._gateway_url:
+            # Same convention as the chat client: the gateway sees "<provider>/<model>".
+            model = f"openai/{model}"
+            gateway = {"api_base": self._gateway_url, "api_key": self._gateway_key}
         try:
             response = await litellm.aembedding(
-                model=f"{self.provider}/{self.model}",
+                model=model,
                 input=list(texts),
                 dimensions=self.dimensions,
                 num_retries=2,
+                **gateway,
             )
         except Exception as exc:
             raise IngestError("embed", "embedding_failed", f"{type(exc).__name__}: {exc}") from exc
@@ -87,6 +103,11 @@ def vector_literal(vector: Sequence[float]) -> str:
 def embedding_client(settings: Settings) -> EmbeddingClient:
     if settings.embedding_provider == "fake":
         return FakeEmbeddingClient(settings.embedding_dimensions)
+    proxy = settings.llm_gateway == "litellm_proxy"
     return LiteLLMEmbeddingClient(
-        settings.embedding_provider, settings.embedding_model, settings.embedding_dimensions
+        settings.embedding_provider,
+        settings.embedding_model,
+        settings.embedding_dimensions,
+        settings.llm_gateway_url if proxy else None,
+        settings.llm_gateway_key if proxy else "",
     )

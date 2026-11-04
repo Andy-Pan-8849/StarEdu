@@ -10,6 +10,8 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from starit_core.config import Settings
+
 
 class ChatError(Exception):
     """The model call failed (network, rate limit, bad request)."""
@@ -35,7 +37,12 @@ class ChatClient(Protocol):
 
 
 class LiteLLMChatClient:
-    """Calls a hosted chat model through the litellm library."""
+    """Calls a hosted chat model through the litellm library, or through the LiteLLM gateway
+    when `gateway_url` is given (the gateway holds the provider keys, not this process)."""
+
+    def __init__(self, gateway_url: str | None = None, gateway_key: str = "") -> None:
+        self._gateway_url = gateway_url
+        self._gateway_key = gateway_key
 
     async def complete(
         self,
@@ -62,6 +69,12 @@ class LiteLLMChatClient:
             options["max_tokens"] = max_tokens
         if request_timeout is not None:
             options["timeout"] = request_timeout
+        if self._gateway_url:
+            # "openai/" tells the library to speak the OpenAI protocol to the gateway; it strips
+            # that prefix, so the gateway receives the model name exactly as configured.
+            model = f"openai/{model}"
+            options["api_base"] = self._gateway_url
+            options["api_key"] = self._gateway_key
         try:
             response = await litellm.acompletion(
                 model=model, messages=[dict(m) for m in messages], **options
@@ -74,6 +87,12 @@ class LiteLLMChatClient:
             input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
             output_tokens=getattr(usage, "completion_tokens", 0) or 0,
         )
+
+
+def chat_client(settings: Settings) -> ChatClient:
+    if settings.llm_gateway == "litellm_proxy":
+        return LiteLLMChatClient(settings.llm_gateway_url, settings.llm_gateway_key)
+    return LiteLLMChatClient()
 
 
 class FakeChatClient:

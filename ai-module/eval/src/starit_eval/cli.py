@@ -17,7 +17,7 @@ from starit_core.config import Settings, get_settings
 from starit_core.db import create_engine
 from starit_core.embeddings import EmbeddingClient, embedding_client
 from starit_core.ingest.tokens import count_tokens
-from starit_core.llm import ChatClient, LiteLLMChatClient
+from starit_core.llm import ChatClient, chat_client
 from starit_core.retrieval import MODES
 from starit_core.retrieval.rerank import LLMReranker
 
@@ -160,7 +160,7 @@ async def run_retrieval(args: argparse.Namespace) -> int:
             await engine.dispose()
             return 1
         embedder = embedding_client(settings)
-        chat = LiteLLMChatClient()
+        chat = chat_client(settings)
     reranker = LLMReranker(chat, settings.model_rerank, settings.rerank_passage_tokens)
 
     vectors, embedding_tokens = await embed_questions(
@@ -249,7 +249,7 @@ async def run_agent(args: argparse.Namespace) -> int:
                 engine,
                 variant_settings,
                 embedding_client(variant_settings),
-                LiteLLMChatClient(),
+                chat_client(variant_settings),
                 identities,
             )
         )
@@ -285,7 +285,7 @@ async def run_data(args: argparse.Namespace) -> int:
         engine,
         settings,
         embedding_client(settings),
-        LiteLLMChatClient(),
+        chat_client(settings),
         data_check.load_askers(),
         questions,
     )

@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     )
     embedding_batch_size: int = 64
 
+    # How models are reached. "litellm_lib" calls the provider from this process with the key in
+    # this process's environment; "litellm_proxy" sends every call to the LiteLLM gateway
+    # service, which alone holds the provider keys (docs/design/01, section 4.2).
+    llm_gateway: str = "litellm_lib"
+    llm_gateway_url: str = "http://localhost:4100"
+    llm_gateway_key: str = Field(default="", repr=False)
+
     # Retrieval (docs/design/05-retrieval-etl-and-evaluation.md, section 2).
     retrieval_mode: str = "hybrid_rerank"  # keyword, vector, hybrid or hybrid_rerank
     keyword_searcher: str = "ts_rank_cd"

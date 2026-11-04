@@ -113,14 +113,37 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STARIT_LLM_GATEWAY: litellm_proxy
+      STARIT_LLM_GATEWAY_URL: http://litellm:4000
+      STARIT_LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:-sk-starit-local-dev}
     depends_on:
+      litellm:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
       objectstore:
         condition: service_healthy
+
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.106.6
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    restart: unless-stopped
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-starit-local-dev}
+    volumes:
+      - ../litellm/config.yaml:/app/config.yaml:ro
+    ports:
+      - "${STARIT_LITELLM_PORT:-4100}:4000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:4000/health/liveliness', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   mcp-server:
     build:
@@ -141,10 +164,14 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STARIT_LLM_GATEWAY: litellm_proxy
+      STARIT_LLM_GATEWAY_URL: http://litellm:4000
+      STARIT_LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:-sk-starit-local-dev}
     ports:
       - "${STARIT_MCP_PORT:-8100}:8100"
     depends_on:
+      litellm:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       postgres:
@@ -179,7 +206,9 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STARIT_LLM_GATEWAY: litellm_proxy
+      STARIT_LLM_GATEWAY_URL: http://litellm:4000
+      STARIT_LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:-sk-starit-local-dev}
       STARIT_RATE_LIMIT_CHAT_PER_MINUTE: ${STARIT_RATE_LIMIT_CHAT_PER_MINUTE:-20}
       STARIT_DATA_TOOLS_BACKEND: mcp
       STARIT_CORS_ORIGINS: http://localhost:${STARIT_WEB_PORT:-3000}
@@ -187,6 +216,8 @@ services:
     ports:
       - "${STARIT_API_PORT:-8000}:8000"
     depends_on:
+      litellm:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       postgres:

@@ -1,0 +1,19 @@
+# The LiteLLM gateway: the only service that holds provider keys (design 01, section 4.2).
+# Callers send "<provider>/<model>" (for example "openai/gpt-6-luna"); a wildcard per provider
+# forwards any model of that provider, so changing a model is a setting, not an edit here.
+model_list:
+  - model_name: "openai/*"
+    litellm_params:
+      model: "openai/*"
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: "anthropic/*"
+    litellm_params:
+      model: "anthropic/*"
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+litellm_settings:
+  drop_params: true # a parameter a model does not support (for example reasoning_effort) is dropped
+  telemetry: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
