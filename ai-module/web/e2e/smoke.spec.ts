@@ -22,7 +22,7 @@ test("an ordinary user gets the assistant but not document management", async ({
   await expect(page.getByRole("link", { name: "Documents" })).toHaveCount(0);
 
   await page.goto("/admin/documents");
-  await expect(page.getByRole("alert")).toContainText("do not have permission");
+  await expect(page.getByText("You do not have permission to manage documents.")).toBeVisible();
 
   // The back end refuses on its own, whatever the page shows.
   const token = await tokenFor(request, "ning.adm.bj");
@@ -49,7 +49,7 @@ test("a question is answered with a source that can be opened", async ({ browser
       },
     });
   });
-  await page.getByLabel("Your question").fill("What is the hotel limit?");
+  await page.getByLabel("Your question", { exact: true }).fill("What is the hotel limit?");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("limited to CNY 600 per night")).toBeVisible();
   await page.getByRole("button", { name: "Show source 1" }).click();
@@ -67,15 +67,15 @@ test("an administrator uploads a document that then can be read from a citation"
   await admin.getByRole("link", { name: "Documents" }).click();
   await admin.getByRole("button", { name: "Upload a document" }).click();
 
-  await admin.getByLabel("File").setInputFiles({
+  await admin.getByLabel("File", { exact: true }).setInputFiles({
     name: "e2e-notes.md",
     mimeType: "text/markdown",
     buffer: Buffer.from(NOTE),
   });
-  await admin.getByLabel("Document code").fill(code);
-  await admin.getByLabel("Title").fill("E2E travel notes");
-  await admin.getByLabel("Domain").selectOption("finance");
-  await admin.getByLabel("Who may read it").selectOption("all-staff");
+  await admin.getByLabel("Document code", { exact: true }).fill(code);
+  await admin.getByLabel("Title", { exact: true }).fill("E2E travel notes");
+  await admin.getByLabel("Domain", { exact: true }).selectOption("finance");
+  await admin.getByLabel("Who may read it", { exact: true }).selectOption("all-staff");
   await admin.getByRole("button", { name: "Upload" }).click();
   await expect(admin.getByRole("status")).toContainText(code);
 
@@ -130,7 +130,7 @@ test("an administrator uploads a document that then can be read from a citation"
       },
     });
   });
-  await staff.getByLabel("Your question").fill("hotel limit");
+  await staff.getByLabel("Your question", { exact: true }).fill("hotel limit");
   await staff.getByRole("button", { name: "Send" }).click();
   await staff.getByRole("button", { name: "Show source 1" }).click();
   await expect(staff.getByRole("complementary", { name: "Source" })).toContainText(
