@@ -12,6 +12,7 @@ from starit_core.config import Settings
 from starit_core.embeddings import EmbeddingClient
 from starit_core.ingest import queue
 from starit_core.ingest.pipeline import process_job
+from starit_core.llm import ChatClient
 from starit_core.storage import ObjectStorage
 
 logger = logging.getLogger("starit.worker")
@@ -29,6 +30,7 @@ async def run_worker(
     *,
     once: bool = False,
     worker_id: str | None = None,
+    chat: ChatClient | None = None,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> int:
     """Process jobs until stopped, or, with `once`, until no job is ready. Returns jobs handled."""
@@ -46,5 +48,7 @@ async def run_worker(
             await sleep(settings.worker_poll_seconds)
             continue
         logger.info("job %s: document %s, attempt %d", job.id, job.document_id, job.attempt)
-        await process_job(engine, job, storage=storage, embedder=embedder, settings=settings)
+        await process_job(
+            engine, job, storage=storage, embedder=embedder, settings=settings, chat=chat
+        )
         handled += 1

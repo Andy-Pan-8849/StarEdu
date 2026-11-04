@@ -17,8 +17,10 @@ from starit_core.ingest import queue
 from starit_core.ingest.errors import IngestError
 from starit_core.ingest.register import register_from_manifest
 from starit_core.ingest.worker import run_worker
+from starit_core.llm import ChatError
 from starit_core.permissions import expand_access_level
 from starit_core.storage import InMemoryStorage
+from starit_core.testing import ScriptedChat
 
 pytestmark = pytest.mark.integration
 
@@ -388,3 +390,78 @@ async def test_forcing_a_new_run_re_embeds_with_the_new_model(
         await scalar(owner, "SELECT count(*) FROM ai.ingestion_jobs WHERE status = 'succeeded'")
         == 4
     )
+
+
+# --- derived content --------------------------------------------------------------------------
+
+
+class RecordingEmbedder(FakeEmbeddingClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.seen: list[str] = []
+
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        self.seen.extend(texts)
+        return await super().embed(texts)
+
+
+DERIVED = json.dumps({"summary": "Short summary.", "questions": ["First question?", "Second?"]})
+
+
+async def ingest_one(
+    app: AsyncEngine, tmp_path: Path, settings: Settings, embedder: FakeEmbeddingClient, chat: Any
+) -> InMemoryStorage:
+    storage = InMemoryStorage()
+    folder = copy_documents(tmp_path / "docs", only={"FIN-TAX-008"})
+    await register_from_manifest(app, storage, folder)
+    await run_worker(app, storage, embedder, settings, once=True, chat=chat)
+    return storage
+
+
+async def test_derived_content_is_stored_next_to_the_chunks_and_embedded_with_them(
+    engines: tuple[AsyncEngine, AsyncEngine], tmp_path: Path
+) -> None:
+    owner, app = engines
+    embedder = RecordingEmbedder()
+    settings = Settings(_env_file=None, embedding_provider="fake", ingest_derive="all")
+    await ingest_one(app, tmp_path, settings, embedder, ScriptedChat(derive=DERIVED))
+    chunks = await scalar(owner, "SELECT count(*) FROM ai.document_chunks")
+    assert chunks >= 1
+    kinds = await rows(owner, "SELECT kind, count(*) FROM ai.chunk_derived GROUP BY 1 ORDER BY 1")
+    assert kinds == [("question", 2 * chunks), ("summary", chunks)]
+    assert all("Short summary." in t and "First question?" in t for t in embedder.seen)
+    # The chunk text itself is untouched.
+    texts = await rows(owner, "SELECT text FROM ai.document_chunks")
+    assert not any("Short summary." in r[0] for r in texts)
+    assert await scalar(owner, "SELECT ingest_status FROM ai.documents") == "ready"
+
+
+async def test_a_model_failure_only_costs_the_derived_content(
+    engines: tuple[AsyncEngine, AsyncEngine], tmp_path: Path
+) -> None:
+    owner, app = engines
+    settings = Settings(_env_file=None, embedding_provider="fake", ingest_derive="all")
+    await ingest_one(
+        app, tmp_path, settings, FakeEmbeddingClient(), ScriptedChat(derive=ChatError("down"))
+    )
+    assert await scalar(owner, "SELECT ingest_status FROM ai.documents") == "ready"
+    assert await scalar(owner, "SELECT count(*) FROM ai.chunk_derived") == 0
+
+
+async def test_derived_content_is_off_by_default(
+    engines: tuple[AsyncEngine, AsyncEngine], tmp_path: Path
+) -> None:
+    owner, app = engines
+    chat = ScriptedChat(derive=DERIVED)
+    await ingest_one(app, tmp_path, SETTINGS, FakeEmbeddingClient(), chat)
+    assert chat.calls == [] and await scalar(owner, "SELECT count(*) FROM ai.chunk_derived") == 0
+
+
+async def test_asking_for_derived_content_without_a_model_fails_the_job_plainly(
+    engines: tuple[AsyncEngine, AsyncEngine], tmp_path: Path
+) -> None:
+    owner, app = engines
+    settings = Settings(_env_file=None, embedding_provider="fake", ingest_derive="summary")
+    await ingest_one(app, tmp_path, settings, FakeEmbeddingClient(), None)
+    assert await scalar(owner, "SELECT ingest_status FROM ai.documents") == "failed"
+    assert await scalar(owner, "SELECT error_code FROM ai.ingestion_jobs") == "no_model"

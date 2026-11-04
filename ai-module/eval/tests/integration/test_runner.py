@@ -47,27 +47,33 @@ async def engine(ingested: tuple[str, str]) -> AsyncIterator[AsyncEngine]:
 async def test_every_mode_runs_every_question_and_nothing_leaks(engine: AsyncEngine) -> None:
     questions, identities, manifest = load_questions(), load_identities(), load_manifest()
     vectors, tokens = await embed_questions(EMBEDDER, questions)
-    assert len(vectors) == 54 and tokens > 0
+    assert len(vectors) == len(load_questions()) and tokens > 0
     reranker = LLMReranker(FakeChatClient(lambda _m: '{"ranking": []}'), "m")
     for mode in MODES:
         run = await evaluate_mode(
             engine, SETTINGS, EMBEDDER, reranker if mode == "hybrid_rerank" else None,
             questions, identities, manifest, vectors, mode,
         )  # fmt: skip
-        assert len(run.runs) == 54, mode
+        assert len(run.runs) == len(load_questions()), mode
         assert all(not r.violations for r in run.runs), mode
-        assert all(r.doc_codes for r in run.runs), (
-            mode
-        )  # the corpus is small; something always matches
+        # Admin and RAGETLAdmin have no business role and read nothing; everyone else who asks
+        # an answerable question gets something back (the corpus is small).
+        for r in run.runs:
+            if r.question.role in ("Admin", "RAGETLAdmin"):
+                assert not r.doc_codes, (mode, r.question.id)
+            elif r.question.should_answer:
+                assert r.doc_codes, (mode, r.question.id)
         assert all(r.latency_ms > 0 for r in run.runs)
-    assert run.rerank_failures == 54  # the fake reranker answered with nothing usable each time
+    assert (
+        run.rerank_failures == len(load_questions()) - 2
+    )  # nothing usable each time; Admin and RAGETLAdmin have no candidates to rerank
 
 
 async def test_the_sweep_checks_every_role_question_and_mode(engine: AsyncEngine) -> None:
     questions, identities, manifest = load_questions(), load_identities(), load_manifest()
     vectors, _ = await embed_questions(EMBEDDER, questions)
     sweep = await leak_sweep(engine, SETTINGS, EMBEDDER, questions, identities, manifest, vectors)
-    assert sweep.checked == 7 * 54 * 3
+    assert sweep.checked == 7 * len(load_questions()) * 3
     assert sweep.violations == []
 
 
@@ -99,6 +105,6 @@ async def test_a_run_is_stored_in_the_database(engine: AsyncEngine) -> None:
                 text("SELECT config->>'mode' FROM ai.eval_runs WHERE id = :r"), {"r": run_id}
             )
         ).scalar()
-    assert count == 54
+    assert count == len(load_questions())
     assert summary == str(report["modes"]["keyword"]["overall"]["n"])
     assert config_mode == "keyword"

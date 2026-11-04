@@ -9,6 +9,7 @@ from starit_core.config import get_settings
 from starit_core.db import create_engine
 from starit_core.embeddings import embedding_client
 from starit_core.ingest.worker import run_worker
+from starit_core.llm import chat_client
 from starit_core.logging import configure_logging
 from starit_core.storage import S3Storage
 
@@ -32,7 +33,7 @@ async def _run(once: bool) -> None:
         settings.embedding_provider, embedder.model, embedder.dimensions,
     )  # fmt: skip
     try:
-        await run_worker(engine, storage, embedder, settings, once=once)
+        await run_worker(engine, storage, embedder, settings, once=once, chat=chat_client(settings))
     finally:
         await engine.dispose()
 

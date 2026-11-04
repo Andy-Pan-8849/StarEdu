@@ -40,6 +40,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "STARIT_EMBEDDING_DIMENSIONS"),
     )
     embedding_batch_size: int = 64
+    # Derived content (summary and questions per chunk): none, summary, questions or all. Off by
+    # default; the evaluation decides whether it earns its cost (design 05, section 1.5).
+    ingest_derive: str = "none"
+    model_derive: str = "openai/gpt-6-luna"
+    model_judge: str = "openai/gpt-6-luna"  # grades answers in the evaluation
 
     # How models are reached. "litellm_lib" calls the provider from this process with the key in
     # this process's environment; "litellm_proxy" sends every call to the LiteLLM gateway
@@ -51,6 +56,7 @@ class Settings(BaseSettings):
     # Retrieval (docs/design/05-retrieval-etl-and-evaluation.md, section 2).
     retrieval_mode: str = "hybrid_rerank"  # keyword, vector, hybrid or hybrid_rerank
     keyword_searcher: str = "ts_rank_cd"
+    retrieval_identifier_boost: bool = True  # exact identifiers (ERR-PORTAL-403) get a bonus
     retrieval_keyword_k: int = 30
     retrieval_vector_k: int = 30
     retrieval_rrf_k: int = 60

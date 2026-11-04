@@ -71,6 +71,10 @@ def step_of(messages: Sequence[Mapping[str, str]]) -> str:
         return "rewrite"
     if "rank passages" in system:
         return "rerank"
+    if "You grade answers" in system:
+        return "judge"
+    if "retrieval aids" in system:
+        return "derive"
     if "data access planner" in system:
         return "plan"
     if "Write one SQL" in system:

@@ -9,6 +9,7 @@ leaves the previous version of the document searchable and unchanged.
 import asyncio
 import logging
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 
 from sqlalchemy import text
@@ -21,9 +22,11 @@ from starit_core.embeddings import EmbeddingClient, vector_literal
 from starit_core.ingest import queue
 from starit_core.ingest.chunker import chunk_document
 from starit_core.ingest.clean import clean_document
+from starit_core.ingest.derive import Derived, derive_chunks
 from starit_core.ingest.errors import IngestError
 from starit_core.ingest.models import Chunk, ParsedDocument
 from starit_core.ingest.parsers import ParseError, parser_for
+from starit_core.llm import ChatClient
 from starit_core.storage import ObjectStorage
 
 logger = logging.getLogger("starit.ingest")
@@ -32,10 +35,13 @@ logger = logging.getLogger("starit.ingest")
 VECTOR_COLUMN_DIMENSIONS = 1536
 
 
-def embedding_input(title: str, chunk: Chunk) -> str:
-    """What is embedded: the document title and section path give the text its context."""
+def embedding_input(title: str, chunk: Chunk, derived: Sequence[Derived] = ()) -> str:
+    """What is embedded: the document title and section path give the text its context, and
+    derived content (when it was asked for) is added after the text, never in place of it."""
     context = "\n".join(part for part in (title, " > ".join(chunk.heading_path)) if part)
-    return f"{context}\n\n{chunk.text}" if context else chunk.text
+    body = f"{context}\n\n{chunk.text}" if context else chunk.text
+    extra = "\n".join(d.text for d in derived)
+    return f"{body}\n\n{extra}" if extra else body
 
 
 async def process_job(
@@ -45,6 +51,7 @@ async def process_job(
     storage: ObjectStorage,
     embedder: EmbeddingClient,
     settings: Settings,
+    chat: ChatClient | None = None,
 ) -> bool:
     """Run a claimed job to the end. Returns True on success. Never raises for a job failure."""
     stage = "parse"
@@ -65,16 +72,31 @@ async def process_job(
         if not chunks:
             raise IngestError("chunk", "no_content", "the document has no text", retryable=False)
 
-        # Summaries, questions and keywords are added later, only if evaluation shows they help.
         stage = await _stage(engine, job, "derive")
+        mode = str(job.config.get("derive", settings.ingest_derive))
+        if mode != "none" and chat is None:
+            raise IngestError(
+                "derive", "no_model", "derived content was asked for but no model is configured",
+                retryable=False,
+            )  # fmt: skip
+        derived = (
+            await derive_chunks(chat, settings.model_derive, document["title"], chunks, mode)
+            if chat is not None and mode != "none"
+            else [[] for _ in chunks]
+        )
 
         stage = await _stage(engine, job, "embed")
         vectors = await _embed(
-            embedder, [embedding_input(document["title"], c) for c in chunks], settings
+            embedder,
+            [
+                embedding_input(document["title"], c, d)
+                for c, d in zip(chunks, derived, strict=True)
+            ],
+            settings,
         )
 
         stage = await _stage(engine, job, "write")
-        await _write(engine, job, document["id"], chunks, vectors, embedder)
+        await _write(engine, job, document["id"], chunks, vectors, embedder, derived, mode)
     except IngestError as error:
         await _fail(engine, job, error)
         return False
@@ -154,12 +176,14 @@ async def _write(
     chunks: list[Chunk],
     vectors: list[list[float]],
     embedder: EmbeddingClient,
+    derived: list[list[Derived]],
+    derive_mode: str,
 ) -> None:
     async with engine.begin() as conn:
         await conn.execute(
             text("DELETE FROM ai.document_chunks WHERE document_id = :d"), {"d": document_id}
         )
-        for chunk, vector in zip(chunks, vectors, strict=True):
+        for chunk, vector, items in zip(chunks, vectors, derived, strict=True):
             chunk_id = await add_chunk(
                 conn,
                 job.document_id,
@@ -182,6 +206,11 @@ async def _write(
                     "e": vector_literal(vector),
                 },
             )
+            for item in items:
+                await conn.execute(
+                    text("INSERT INTO ai.chunk_derived (chunk_id, kind, text) VALUES (:c, :k, :t)"),
+                    {"c": chunk_id, "k": item.kind, "t": item.text},
+                )
         await queue.mark_succeeded(conn, job)
         await write_audit(
             conn,
@@ -192,6 +221,7 @@ async def _write(
                 "model": embedder.model,
                 "dimensions": embedder.dimensions,
                 "attempt": job.attempt,
+                "derive": derive_mode,
             },
         )
 

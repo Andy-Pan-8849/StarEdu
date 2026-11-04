@@ -22,6 +22,7 @@ class Question:
     expected_answer: str
     source_docs: tuple[str, ...]
     should_answer: bool
+    facts: tuple[str, ...] = ()  # figures, identifiers or words a correct answer must contain
 
 
 def load_questions(path: Path | None = None) -> list[Question]:
@@ -38,6 +39,7 @@ def load_questions(path: Path | None = None) -> list[Question]:
                 expected_answer=row["expected_answer"],
                 source_docs=tuple(row["source_docs"]),
                 should_answer=bool(row["should_answer"]),
+                facts=tuple(row.get("facts", ())),
             )
         )
     return questions

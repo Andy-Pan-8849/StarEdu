@@ -49,9 +49,11 @@ def test_summaries_by_type() -> None:
 
 def test_the_question_set_is_loaded_whole() -> None:
     questions = load_questions()
-    assert len(questions) == 54
-    assert sum(not q.should_answer for q in questions) == 6
-    assert {q.role for q in questions} <= {"student", "staff", "manager", "hr", "finance"}
+    assert len(questions) == 114
+    assert sum(not q.should_answer for q in questions) == 27
+    assert {q.role for q in questions} <= set(ALL_ROLES)
+    # Every answerable question says what a correct answer must contain, or can be judged.
+    assert all(q.source_docs for q in questions if q.should_answer)
     assert all(isinstance(q.source_docs, tuple) for q in questions)
     assert len(load_manifest()) == 28
 

@@ -56,7 +56,7 @@ async def retrieve(
     keyword_hits: list[Candidate] = []
     if mode != "vector":
         started = time.perf_counter()
-        searcher = keyword_searcher or TsRankKeywordSearcher()
+        searcher = keyword_searcher or TsRankKeywordSearcher(settings.retrieval_identifier_boost)
         keyword_hits = await searcher.search(conn, identity, query, settings.retrieval_keyword_k)
         timings["keyword"] = _ms(started)
     vector_hits: list[Candidate] = []
