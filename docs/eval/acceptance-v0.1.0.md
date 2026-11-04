@@ -5,7 +5,7 @@
 ## 1. `make up && make seed` 从零跑通
 
 - **做法**：`make clean`（删除本项目的全部本地数据卷：Postgres、Redis、Keycloak、对象存储、Tempo、Prometheus、Grafana、Langfuse 的全部数据；`.env` 保留），再 `make up-langfuse`（核心服务 + 可观测性 + Langfuse），再 `make seed`。
-- **结果**：清理 19 秒；`make up-langfuse` 约 2 分 30 秒（19 个容器都健康，迁移容器先跑完，Keycloak 导入演示 realm，Langfuse 按 `LANGFUSE_INIT_*` 创建项目）；`make seed` 4 秒：业务表（校区 8、员工 141、学员 60、作业 12、提交 198、报销 108、工单 70）、知识库从转储恢复（28 份文档、39 个块、39 个向量）、28 个原文件放进对象存储；28 份文档都是 `ready`。从清理开始到可以提问约 3 分钟。
+- **结果**：清理 19 秒；`make up-langfuse` 约 2 分 30 秒（19 个常驻容器都在运行、有健康检查的都是 healthy，迁移容器先跑完并退出，Keycloak 导入演示 realm，Langfuse 按 `LANGFUSE_INIT_*` 创建项目）；`make seed` 4 秒：业务表（校区 8、员工 141、学员 60、作业 12、提交 198、报销 108、工单 70）、知识库从转储恢复（28 份文档、39 个块、39 个向量）、28 个原文件放进对象存储；28 份文档都是 `ready`。从清理开始到可以提问约 3 分钟。
 - **之后**：用演示账号提问得到带引用的回答，引用的原文能打开（HTTP 200）；浏览器冒烟 3/3 通过。
 - **没验证到**：(a) **不是真正的新机器**——镜像和 uv 缓存都在本机，真正的新机器要先拉镜像并构建（这台机器上一次 API 镜像构建就花过约 40 分钟，主要是下载 Python 依赖时网络慢；Dockerfile 现在把依赖单独成层并用 uv 缓存挂载，之后改代码不会再重下）；(b) "只需要填写 LLM 密钥"：`make seed` 本身不需要密钥，提问需要 `OPENAI_API_KEY`，我没有在一份没有 `.env` 的目录里从头验证 `make env`；(c) 没有在 Linux 或 Windows 上试过。
 
