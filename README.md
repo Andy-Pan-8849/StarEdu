@@ -1,6 +1,6 @@
 # StarEdu
 
-An open-source blueprint for adding AI to a traditional business system. It pairs an enterprise back office with an AI knowledge assistant and agents, using one fictional company, **StarIT Education** (an IT training company with eight campuses in China), as the running example.
+An open-source blueprint for adding AI to a traditional business system. It pairs an enterprise back office with an AI knowledge assistant and agents, using one sample company, **StarIT Education** (an IT training company with eight campuses all around the country), as the running example.
 
 | Module | Folder | Status |
 |---|---|---|

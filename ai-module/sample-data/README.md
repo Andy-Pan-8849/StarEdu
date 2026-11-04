@@ -1,6 +1,6 @@
 # StarIT Education Sample Data (English)
 
-Everything here is **synthetic**. StarIT Education is a fictional company; names, numbers, policies, URLs (`*.starit.example`) and the tax ID are invented. The policies are inspired by common practice in the IT training industry and do not describe any real company.
+Everything here is **synthetic**. StarIT Education is a sample company; names, numbers, policies, URLs (`*.starit.example`) and the tax ID are invented. The policies are inspired by common practice in the IT training industry and do not describe any real company.
 
 This data supports three things: demonstrating RAG and hybrid search, evaluating retrieval quality, and giving the Agent structured data to query.
 
