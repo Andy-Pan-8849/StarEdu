@@ -975,3 +975,109 @@ make e2e                                          # Playwright（需先同意下
 - **已知限制**：令牌放在浏览器的 `sessionStorage`（XSS 能读到；缓解：Keycloak 令牌有效期短、不渲染 HTML）；`npm audit` 报告 16 条中高危，来自开发工具（Vitest 的依赖、`minimatch`）和 Next.js 自带的 PostCSS（只涉及不可信 CSS 输入，本项目的构建只处理自己的 CSS），**接受，没有强制升级**到会引入 Next 16 的版本；上传后的状态靠每 3 秒轮询，没有推送；删除是硬删除，没有回收站；Playwright 只在本地运行，CI 只跑前端的 lint、类型、格式、Vitest 和构建。
 - **真实检查**（用户确认后运行，真实嵌入和真实模型 `openai/gpt-6-luna`）：用 `RAGETLAdmin` 账号经 API 上传一个小文档 `VERIFY-001`（"核查城市的酒店标准是 CNY 777/晚"）→ 状态 `queued → running → ready`；再用员工账号提问"What is the hotel allowance per night for the verification city?"。**第一次助手没有直接回答，而是反问"Which verification city do you mean?"**（`need_clarification`）——是模型对我措辞的判断，不是链路问题；我在同一会话里补一句"The one in the Verification city allowance document."，第二次得到正确回答"CNY 777 per night … need approval from the finance controller [1]"，`end_state = answered`，引用带 `document_id` 和 `chunk_id`，用它请求 `GET /documents/{id}/chunks?around=…` 员工读到被引用的原文，`RAGETLAdmin` 账号读同一个文档得到 404；最后用 `RAGETLAdmin` 删除（204），数据库里文档和分块都是 0，测试文件已清理。**只问了这一个问题（两轮），不是一个题集**，不能当作质量结论；费用按估算不到 $0.002，没有逐项统计。**没有经真实浏览器登录点击这条真实回答的引用**——浏览器里点击引用由 Playwright（回答被固定）覆盖，真实回答的引用只用 API 验证了。
 - **未完成**：本分支最新一次推送的 CI 结果。
+
+## M8 完整评测、可观测性与收尾
+
+状态：**待确认**（分支 `m8-eval-observability`）。第一阶段的最后一个里程碑：把评测补全（更多的题、答案正确性、实验矩阵、一份汇总报告）、给所有服务接上 OpenTelemetry 和 Grafana（Langfuse 可选）、做"一条命令起来、不用 OpenAI 密钥也能有数据"的种子，最后对照设计 06 第 8 节的 7 条逐条验收并打 `v0.1.0`。评测和 LiteLLM 代理的真实检查会花钱，**先估算再等你确认**。
+
+### 开始前的现状（已核对）
+
+| 项 | 结果 |
+|---|---|
+| 评测 | 已有：检索评测（4 种模式、权限扫描 54 题 × 7 角色）、助手抽查（15 轮）、数据题（41 题，`starit-eval data`）。**没有**：答案正确性评分、拒绝正确性的汇总、运行指标汇总、实验矩阵的其余项、一份把它们合起来的报告。`ai.eval_runs`/`ai.eval_results` 表已有 |
+| 评测题 | `qa-set.jsonl` 54 题（`keyword` 3、`version` 2、`paraphrase` 1、`unanswerable` 3，`manager`/`hr` 各 1 题）——设计 05 已指出太少，说好 M8 补充 |
+| 派生内容（摘要、假设性问题） | `derive` 阶段在管线里是**空的**（注释写着"评测证明有用再加"），实验矩阵里"派生内容"这一项目前做不了 |
+| 可观测性 | **完全没有**：没有 OTel、没有指标、没有 Grafana。日志是 JSON，带 `request_id`，没有 `trace_id` 和 `run_id` |
+| 种子 | 没有 `make seed`；现在是 `make seed-biz` + `make ingest-samples`，后者**需要 OpenAI 密钥**。没有预置的向量库转储，也没有 `seed/` 目录 |
+| **一个我之前没有记录的偏差** | 设计 01 的 4.2（你已确认）写的是：full profile 经 **LiteLLM 代理服务**调用模型，lite 才用进程内的 litellm 库。**M5 做的是所有 profile 都用进程内的 litellm 库**，Compose 里没有 LiteLLM 服务，`STARIT_LLM_GATEWAY` 这个变量也不存在。这是我在 M5 漏记的偏差，现在补上，第 1 个确认点请你决定 |
+| 资源 | Docker Desktop 的内存上限约 11.7 GB，现在 8 个核心服务合计约 2.1 GB（Keycloak 826 MiB、api 331 MiB、worker 279 MiB、对象存储 306 MiB、mcp-server 139 MiB、web 131 MiB、Postgres 89 MiB、Redis 39 MiB）。虚拟磁盘 80 GB |
+
+### 需要先确认的问题
+
+1. **LiteLLM 代理**：补上设计 01 约定的做法——Compose 增加 `litellm` 服务（端口 4100，模型别名和密钥放在它的配置里），api、worker、mcp-server 通过 `STARIT_LLM_GATEWAY=litellm_proxy` 经它调用；在宿主机直接运行（`uv run`、评测）时默认仍用进程内库（`litellm_lib`）。好处：密钥只在一个服务里、调用和费用有统一的记录、与设计一致；代价：多一个服务（预计 0.3–0.5 GB）和一层配置，我**还没核对**当前 LiteLLM 代理镜像的版本和配置格式，开始时先核对。备选：不做，改设计 01，把"full 经代理"改成"所有 profile 进程内"。
+2. **评测运行器的完整版**：新增 `starit-eval answers`（对 `qa-set.jsonl` 问助手并打分）：编号、数字、日期等**确定性比对**；其余用 LLM 判官（判官模型单独配置，默认 `gpt-6-luna`），并**随机抽 20% 导出成一张表供人工核对**（判官的结论没有核对前不当作事实）；拒绝正确性（`should_answer=false` 的题：状态合法且回答不含受限事实）；每次运行的 `end_state`/`end_reason` 合法性；延迟 p50/p95、token、估算成本（来自 `ai.runs`——**注意应用账号读不到审计表，但能读 `ai.runs`**，我会先核对）。再加一个 `starit-eval all`，把检索、答案、数据、权限扫描合成**一份报告**，写入 `ai.eval_runs`（含提交号和全部配置）并生成 `docs/eval/` 下的 Markdown。
+3. **补充评测题（合成）**：我读样例文档，补写 `keyword`、`version`、`paraphrase`、`unanswerable` 各至少 8 题，`manager`/`hr`/`finance` 提问者至少再 6 题，每个受限文档至少一道"不被允许的角色问它"的题。每题写明来源文档和期望答案，并**用脚本核对期望答案里的事实确实出现在来源文档里**（防止我写错）。题集总数大约从 54 涨到 90 多。样本仍然很小——补完也**不对准确率下结论**，只是让各题型至少有 8 题。
+4. **实验矩阵里做哪些**（设计 05 的 4.4）：
+   - 检索模式（4 种）：在补充后的题集上重跑——**做**。
+   - 分块大小 300 / 500 / 800：重新入库（嵌入费用可以忽略，约 11k token）——**做**。
+   - 编号查询的 `identifiers` 加权开/关：加一个配置开关——**做**，不花钱。
+   - 派生内容（无 / 摘要 / 假设性问题 / 全部）：要**先实现** `derive` 阶段（入库时每个块多 1–2 次模型调用，28 份文档 39 个块约 80 次调用，约 $0.01），再比较——**建议做**，这是学习"改写问法"最直接的实验；若你想控制范围可以去掉。
+   - Rerank 实现（LLM 列表式 / 专用 API）：专用 API 没有接入——**不做**，记录为"只比较了 LLM 列表式"。
+   - 关键词排序 `ts_rank_cd` / BM25 扩展：扩展没有安装、没有验证过——**不做**，记录决定"第一阶段不引入 BM25"。
+5. **可观测性的范围**：api、worker、mcp-server 接入 OpenTelemetry：HTTP 请求、SQLAlchemy 查询、**每次模型调用**（模型名、token、耗时）、**图的每个节点**、每次工具调用都是 span；日志加 `trace_id`、`run_id`。指标：请求量与延迟、`end_state` 分布、检索延迟、模型调用数与 token、入库队列长度与失败数、被权限过滤的分块比例。Compose 增加 `observability.yaml`（OTel Collector、Prometheus、Grafana、Tempo），Grafana 预置 4 个仪表盘（运行概览、End 状态分布、检索与模型延迟、入库任务）；`make up-obs` 启动。**Loki（日志）这次不做**：日志仍是带 `trace_id` 的 JSON，用 `docker logs` 看，省约 0.5 GB 内存；你若想要，设计 06 里 Loki 本来标的是"视内存"。
+6. **Langfuse（可选 Compose 文件）**：`langfuse.yaml`（Langfuse 的 web、worker 和它依赖的 Postgres、ClickHouse、Redis、对象存储），通过 Collector 把**同一份 trace** 用 OTLP 发过去，并把评测分数写到 Langfuse。验收标准 6 要求"Langfuse 和 Grafana 能看到同一次运行"，所以需要它。**我还没核对 Langfuse 当前版本自托管需要哪些服务、OTLP 接入方式和镜像版本**，开始时先核对并实测内存，回填到设计 06（预计比其他可观测性组件重得多，粗估 2 GB 以上，**未核实**）。
+7. **种子与 `make seed`**：`make seed` = 导入业务表（`seed-biz`）+ 载入**预置的向量库转储** + 把样例原文件放进对象存储（这样点击引用能打开原文）。转储 `seed/ai-seed.sql.gz` 含文档、分块、向量（`text-embedding-3-small`）、派生内容，**不含**会话、审计、评测记录；由 `make seed-dump` 从验证过的库导出。这样**不需要 OpenAI 密钥就能有一个可用的知识库**（提问仍需要密钥）。`make seed ARGS=--ingest` 走真实的入库管线（需要密钥）。体积预计不到几 MB；超过 GitHub 限制则放发布附件。Keycloak 的 realm 本来就在 `make up` 时导入。
+8. **验收**：把设计 06 第 8 节的 7 条逐条跑一遍，写成 `docs/eval/acceptance-v0.1.0.md`（每条的命令、结果、没验证到的部分）。第 1 条"干净的 Mac 上 `make up && make seed`"：我在**这台机器**上执行 `make clean`（**会删除这个项目的本地数据卷**：Postgres、Redis、Keycloak、对象存储里的演示数据，不动别的项目的卷；`.env` 保留）后重新 `make up && make seed`，记录耗时。这不等于一台真正干净的机器，报告里会写明。
+9. **标签**：合并后同时打 `ai-m8` 和计划里写的 `v0.1.0`（AI 模块第一阶段）。
+10. **真实检查**（先估算再确认）：(a) `starit-eval all`：约 90 道文档题（每题理解 + 重排 + 生成 + 判官约 4 次调用）+ 数据题 41 道（约 4 次/题），估计 500–600 次模型调用，**估算费用我在命令里算出来给你看**，预计在 $0.2 以内；(b) 分块大小、`identifiers`、派生内容的矩阵重跑，主要是检索评测，费用主要是重排；(c) 经 LiteLLM 代理问 1 个真实问题；(d) Langfuse/Grafana 看同一次运行。
+
+### 计划的文件（`ai-module/` 下）
+
+| 文件 | 作用 |
+|---|---|
+| `eval/src/starit_eval/answers.py`（新）、`judge.py`（新）、`report.py`、`cli.py`、`runner.py`（改） | 答案正确性（确定性 + 判官 + 20% 人工抽查表）、拒绝正确性、运行指标、`starit-eval answers` 与 `all`、汇总报告 |
+| `eval/src/starit_eval/matrix.py`（新） | 实验矩阵：重新入库后跑检索评测，保存每个配置的结果 |
+| `sample-data/eval/qa-set.jsonl`、`sample-data/tools/`（改） | 补充的评测题与核对来源事实的脚本 |
+| `packages/core/src/starit_core/ingest/derive.py`（新）、`pipeline.py`、`config.py`、`retrieval/keyword.py`（改） | 派生内容、`identifiers` 加权开关 |
+| `packages/core/src/starit_core/telemetry.py`（新）、`agent/nodes.py`、`llm.py`、`dataaccess/tools.py`、三个服务的入口（改） | OTel 初始化、节点/模型/工具的 span、指标、日志里的 `trace_id`/`run_id` |
+| `deploy/compose/observability.yaml`、`langfuse.yaml`、`deploy/observability/`（新） | Collector、Prometheus、Tempo、Grafana（预置数据源与 4 个仪表盘）、Langfuse |
+| `deploy/compose/compose.yaml`、`deploy/litellm/config.yaml`（新/改） | LiteLLM 代理服务；`STARIT_LLM_GATEWAY` |
+| `packages/core/src/starit_core/llm.py`、`embeddings.py`、`config.py`（改） | 经代理调用（`api_base`），两种网关的切换 |
+| `scripts/seed.py`、`scripts/seed_dump.py`、`seed/`（新）、`Makefile`（改） | `make seed`、`make seed-dump`、`make up-obs` |
+| 相应的测试 | 见验证标准 |
+| `docs/design/01`、`04`、`05`、`06`、`ai-module/README.md`、`docs/eval/README.md`、`docs/eval/acceptance-v0.1.0.md`（改/新） | 偏差与实测的回填、使用文档、验收报告 |
+
+### 计划的命令
+
+```bash
+git switch -c m8-eval-observability                 # 已创建
+uv sync --all-packages
+make test && make lint && make web-check
+make up                                             # 现在含 litellm
+make up-obs                                         # Collector、Prometheus、Tempo、Grafana
+make seed-dump && make clean && make up && make seed   # 种子的往返验证（会删本项目的数据卷，先确认）
+make eval ARGS="all"                                # 先打印估算并等确认
+make eval ARGS="matrix"                             # 先估算并等确认
+```
+
+### 验证标准
+
+1. **答案评分**：确定性比对（数字、编号、日期、金额、带逗号的数）有单元测试；判官用假模型测试它的解析和失败处理；20% 抽查表可重现（同一随机种子）；拒绝正确性的判定有测试（含"回答里带受限事实就算失败"）。
+2. **新增评测题**：脚本核对每题的期望答案事实都在来源文档里；各题型数量达标；每个受限文档至少有一道被禁角色的题；**权限扫描（54 → 全部题 × 7 角色 × 3 种模式）越权为 0**。
+3. **派生内容与加权开关**：`derive` 的单元测试（假模型）；开关关闭时 `identifiers` 加权确实不起作用（有测试）；重新入库后原子替换。
+4. **OTel**：测试里用内存导出器，断言一次对话产生的 span 有预期的层次（HTTP → 图节点 → 模型调用/检索/工具 → 数据库）、同一个 `trace_id`；数据类问题经 MCP 时 trace 跨服务连起来；日志带 `trace_id` 和 `run_id`；**span 属性和日志里没有令牌、没有问题原文以外的个人数据**（有测试：令牌、`Authorization` 头不出现在任何 span 或日志里）。
+5. **指标**：测试用内存读取器断言 `end_state` 计数、模型调用数、token、入库队列长度等指标被记录。
+6. **Compose**：`make up-obs` 后 Collector、Prometheus、Tempo、Grafana 健康；Grafana 里 4 个仪表盘存在且查询有数据（跑几次真实或假模型的对话之后）；Prometheus 能查到 `end_state` 指标；Tempo 里能按 `run_id` 找到 trace。
+7. **Langfuse**：`langfuse.yaml` 启动后，同一次运行的 trace 在 Langfuse 和 Grafana（Tempo）里都能找到；实测内存回填设计 06。
+8. **LiteLLM 代理**：容器健康；经代理问一个真实问题得到带引用的回答；代理不可用时 API 的错误处理走 `error` 终态且不泄露密钥；密钥不出现在 api/worker/mcp-server 的环境变量里（只在 `litellm` 服务里）。
+9. **种子**：`seed-dump` → 清空 → `seed` 的往返：文档数、分块数、向量数、`content_hash` 一致；**不用 OpenAI 密钥**的 `make seed` 之后，无权限账号仍检索不到受限文档（权限回归）；点击引用能打开原文（对象存储里有文件）。
+10. **完整评测与矩阵**（确认费用后）：`starit-eval all` 出报告并写 `ai.eval_runs`；矩阵的每个配置都有结果；报告里写清楚样本量和局限，**不事先承诺任何指标数值**。
+11. **验收报告**：设计 06 第 8 节的 7 条逐条有命令、结果、没验证到的部分。
+12. 本地测试、lint、mypy、前端检查通过，CI 通过。
+
+### 开始前不确定的事
+
+- **OpenTelemetry、Prometheus、Grafana、Tempo、Langfuse、LiteLLM 代理这几个组件的当前版本、镜像名和配置格式我都还没核对**（它们更新很快，我的记忆可能过时）；实现前先逐个核对并固定版本，核对不了的写在记录里。
+- **Langfuse 的资源**：它依赖的服务多（含 ClickHouse），在 11.7 GB 的 Docker 内存里和其余服务一起跑不一定宽裕；实测后再决定是否默认启用，验收时可能需要先停掉别的可选组件。
+- **LiteLLM 代理本身的稳定性和对 `gpt-6-luna` 等模型名的支持**：如果代理对某个模型别名不认，要在它的配置里补，可能影响重排/理解步骤的 JSON 模式。
+- **判官（LLM 评分）会有误判**；20% 抽查只能估计误判率，不能消除；样本小，报告里不会写"准确率 X%"这样的结论，只写通过多少题和哪几题没过。
+- **派生内容**可能没有明显收益，也可能让检索变差（假设性问题会引入噪声）；这是实验，结果可能是"不建议开启"。
+- **`make clean` 后重新 `make up && make seed`** 的耗时主要取决于镜像是否已在本机；这台机器上镜像都已存在，比真正的新机器快得多，报告会写明。
+- **任务量很大**：评测、OTel、三个可选 Compose 文件、代理、种子、验收报告。如果中途发现范围太大，我会先停下来问你要不要把 Langfuse 或派生内容拆到 M8 之后，而不是悄悄缩水。
+
+### 需要你确认
+
+1. 补上 LiteLLM 代理（full 经代理，宿主机运行仍用进程内库）——并承认这是我在 M5 漏记的偏差。
+2. 评测运行器的完整版：答案评分（确定性 + 判官 + 20% 人工抽查表）、拒绝正确性、运行指标、`starit-eval all` 汇总报告。
+3. 合成补充评测题（各题型 ≥ 8，manager/hr/finance ≥ 6，每个受限文档 ≥ 1 道被禁角色的题），脚本核对来源事实。
+4. 实验矩阵：检索模式、分块大小 300/500/800、`identifiers` 加权开关、派生内容（先实现）；不做专用重排 API 和 BM25，并记录决定。
+5. 可观测性范围：OTel 贯穿 api、worker、mcp-server；指标；Collector、Prometheus、Tempo、Grafana（4 个仪表盘）；**不做 Loki**。
+6. Langfuse 作为可选 Compose 文件，接同一份 trace 和评测分数，先核对版本并实测内存。
+7. `make seed` 用预置的向量库转储（不需要 OpenAI 密钥）加原文件上传；`make seed ARGS=--ingest` 走真实管线。
+8. 验收：7 条逐条跑并写 `acceptance-v0.1.0.md`；第 1 条在这台机器上 `make clean` 后重来（**会删除本项目的本地数据卷**）。
+9. 合并后同时打 `ai-m8` 和 `v0.1.0`。
+10. 真实检查：`starit-eval all`、矩阵重跑、经代理问 1 个问题；每项先估算后确认。
+
+### 实际结果
+
+（完成后填写）
