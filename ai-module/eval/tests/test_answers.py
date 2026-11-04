@@ -48,6 +48,9 @@ def question(
         (["zero", "20"], "A score of zero; 20 percent otherwise", []),
         (["zero", "20"], "A score of zero", ["20"]),
         (["VPN"], "use the student vpn", []),
+        (["2.1"], "Version HR-REC-001 v2.1 is in force.", []),
+        (["2.1"], "Version 2.10 is in force.", ["2.1"]),
+        (["2.1"], "It is dev2.1 stuff.", ["2.1"]),
     ],
 )
 def test_facts_must_all_be_in_the_answer(facts: list[str], answer: str, absent: list[str]) -> None:

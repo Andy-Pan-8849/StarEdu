@@ -130,7 +130,8 @@ def missing_facts(facts: Sequence[str], answer: str) -> list[str]:
     absent = []
     for fact in facts:
         needle = normalize(fact)
-        pattern = rf"(?<![\w.]){re.escape(needle)}(?!\w|\.\d)"
+        # An optional leading v lets the fact 2.1 match "v2.1", as versions are usually written.
+        pattern = rf"(?<![\w.])v?{re.escape(needle)}(?!\w|\.\d)"
         if not re.search(pattern, haystack):
             absent.append(fact)
     return absent

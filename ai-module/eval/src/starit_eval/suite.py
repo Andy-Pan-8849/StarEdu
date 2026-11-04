@@ -72,7 +72,7 @@ def render_all(
         "",
         "## 文件",
         "",
-        *[f"- {name}：`{path}`" for name, path in files.items()],
+        *[f"- {name}：`{path.name}`" for name, path in files.items()],
         "",
         "## 怎么读这份报告",
         "",
