@@ -2,20 +2,119 @@
 
 Enterprise knowledge assistant and Agent application for the fictional company StarIT Education.
 
-Status: **no application code yet.** Only the sample data exists. See the top-level [README](../README.md) for the decisions made so far.
+Status: **milestones M2 to M9 are done and tagged** (`ai-m2` … `ai-m9`, plus `v0.1.0`). Everything below runs locally with Docker Compose. The business module is not started.
 
-Planned content (proposal, not yet approved):
+## What works today
 
-- RAG ETL pipeline: pluggable parsers, cleaning, chunking, embeddings, pgvector.
-- Hybrid search: keyword search plus vector search, fused with RRF, then reranking.
-- Agents: router, RAG agent, SQL agent, action agent, guardrails, MCP server.
-- FastAPI service with streaming chat, Next.js front end.
-
-Folders:
-
-| Folder | Purpose |
+| Area | What you get |
 |---|---|
-| `sample-data/` | Synthetic company documents, structured data and evaluation questions |
+| Knowledge base | 28 sample documents (md, txt, docx, pdf) are parsed, cleaned, chunked, embedded and stored in PostgreSQL + pgvector by a background worker. Re-running changes only what changed. |
+| Search | Keyword + vector search fused with RRF, then a model reranker. The permission filter runs inside the database query, before ranking. |
+| Assistant (LangGraph) | Understands the question, asks one clarifying question when a detail is really missing, refuses out-of-scope or write requests, answers document questions with `[n]` citations, answers data questions ("how many tickets are open on my campus?") through read-only SQL views and an MCP server, and checks each answer against its sources (one retry). Fixed, non-leaking replies for "not found" and "no permission". |
+| Streaming | `Accept: text/event-stream` gives Server-Sent Events. The answer is shown as it is written; if verification fails the draft is withdrawn (`message.retract`) and a corrected answer follows. |
+| Access control | Keycloak logins with eight demo roles. Documents and data rows are filtered by role, campus and level; every run is written to an append-only audit log. |
+| Models | All calls go through the LiteLLM gateway. Fallback chain `openai/gpt-6-luna` → `openai/gpt-4o-mini` → `anthropic/claude-haiku-5-5`. |
+| Limits | Per user 20 messages/min, per IP 60/min, and a whole-stack budget of **0.5 USD per UTC day** (chat gets 429, the worker pauses). All adjustable in `.env`. |
+| Web app | Next.js chat with citation viewer, conversation list, and a `Documents` admin page (upload, status, permissions, delete) for the `RAGETLAdmin` role. |
+| Observability (optional) | OpenTelemetry traces, Prometheus metrics, Grafana dashboards, and Langfuse. |
+| Evaluation | 114 document questions, 41 data questions, a permission leak sweep, retrieval-mode and chunking experiments. Latest answer run: **107/114** (the M8 baseline was 99/114); a 20% human review agreed with the model judge on 21 of 23 items. |
+
+## Quick start (about 15 minutes the first time)
+
+**You need:** Docker with Compose (give it at least 8 GB of memory and 20 GB of disk), [uv](https://docs.astral.sh/uv/), `make`, and Node 20+ only if you want to run the front-end checks.
+
+```bash
+cd ai-module
+make env                 # creates .env from .env.example
+```
+
+Edit `.env` and set `OPENAI_API_KEY=` (needed to ask questions; `ANTHROPIC_API_KEY=` is only used by the last link of the fallback chain). Then:
+
+```bash
+make sync                # Python dependencies
+make up                  # builds and starts everything, waits until healthy
+make seed                # sample business tables + knowledge base from a prepared dump
+                         # (no model key needed) + the original files
+```
+
+Check that it is alive:
+
+```bash
+curl http://localhost:8000/healthz
+docker compose --env-file .env -f deploy/compose/compose.yaml ps
+```
+
+| Address | What |
+|---|---|
+| <http://localhost:3000> | the web app |
+| <http://localhost:8000/docs> | API (OpenAPI) |
+| <http://localhost:8080> | Keycloak admin (`admin` / `admin`) |
+| <http://localhost:4100> | LiteLLM gateway |
+
+Optional: `make up-obs` adds Grafana at <http://localhost:3300> (`admin` / `admin`); `make up-langfuse` adds Langfuse at <http://localhost:3100> (heavy, about 5 GB of memory in total). Stop with `make down` (keeps data) or `make clean` (deletes data).
+
+## Try it
+
+1. Open <http://localhost:3000> and sign in as `wei.stu.sh` (password `demo-pass-123`, all demo accounts use it).
+2. Ask, and watch the answer stream in:
+
+| Ask | Account | Expect |
+|---|---|---|
+| What does ERR-PORTAL-429 mean? | `wei.stu.sh` | an answer with a `[1]` you can click to read the source passage |
+| How much is the referral bonus for an instructor? | `ning.adm.bj` | CNY 3,000, citing the active policy version |
+| What was the referral bonus under the old policy? | `ning.adm.bj` | CNY 2,000 (v1.0, superseded) and the current v2.1 |
+| How much can I claim? | `ning.adm.bj` | one clarifying question (which expense category?) |
+| What is the weather today? | any | a polite refusal |
+| What is the base salary band for a Senior Instructor at a Tier 1 campus? | `qing.hr.bj` | the band, with a citation |
+| Same salary question | `wei.stu.sh` | a fixed "no permission / not found" reply that says nothing about the document |
+| Delete my last ticket | any | refused (writes are not supported yet) |
+| How many hotel claims exceed the nightly hotel limit in FIN-REIM-002? | `ning.fin.bj` | 5, built from the data views (the citation shows which views and how many rows) |
+| A question about other people's expense claims | `wei.stu.sh` | nothing from other people's records |
+
+3. Sign in as `min.ragetl.bj` and open **Documents**: upload a file with access rules, watch it go `queued` → `ready`.
+4. API route (no browser), including streaming:
+
+```bash
+TOKEN=$(make -s token ACCOUNT=wei.stu.sh)
+CID=$(curl -s -X POST localhost:8000/conversations -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+curl -N -X POST localhost:8000/conversations/$CID/messages \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -H 'Accept: text/event-stream' \
+  -d '{"content": "What does ERR-PORTAL-429 mean?"}'
+```
+
+Without the `Accept` header you get the whole reply as JSON. Every run is stored in `ai.runs`, `ai.messages` and `ai.audit_log`.
+
+## How to check it
+
+Free (no model calls):
+
+```bash
+make lint            # ruff + mypy (strict)
+make test            # about 875 Python tests; integration tests run when `make up` is running
+make web-check       # front end: lint, types, 62 unit tests, production build
+make e2e             # Playwright browser tests (needs `make up`; uploads use fake embeddings)
+```
+
+Paid (each prints the number of model calls and the estimated cost, then asks before running):
+
+```bash
+make eval ARGS="answers"      # 114 document questions, graded; about 0.14 USD; report in docs/eval/
+make eval ARGS="agent"        # 15 representative questions incl. clarification and permissions; about 0.01 USD
+make eval ARGS="data"         # 41 data questions
+make eval ARGS="all"          # everything in one report
+```
+
+Things worth trying on purpose:
+
+- **Fallback chain:** `uv run python scripts/m9_real_check.py fallback` (a few cents) asks through the gateway with an invalid primary model, then with two invalid models; it should print `openai/gpt-4o-mini` and then `anthropic/claude-haiku-5-5` as the model that actually answered. In the app, the model that answered is recorded in the run's trace and in `fallbacks` of its audit entry.
+- **Daily budget:** set `STARIT_DAILY_BUDGET_USD=0.001`, `make up`, ask two questions: the second gets HTTP 429 with the reset time.
+- **Rate limit:** send more than 20 messages in a minute from one account to get 429.
+- **Permissions:** ask the same question as `wei.stu.sh` and as `qing.hr.bj`; `make eval ARGS="retrieval --all-modes --leak-sweep"` asks every question as every role and must report zero leaks.
+- **Traces:** with `make up-obs`, copy a `run_id` from `ai.runs` and search it in Grafana → Explore → Tempo: `{ span.run_id = "<run id>" }`.
+
+Results of past runs and the human-review sheet are in [`../docs/eval/`](../docs/eval/); what each milestone delivered, and what it did not, is in [`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.md). What comes next (and what was left out on purpose) is in [`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.md).
+
+Known limits: single language (English) data; no memory across conversations; no write actions; the IP limit cannot tell browsers apart in local Docker (all look like the Docker gateway) unless `STARIT_TRUSTED_PROXIES` is set behind a proxy; the first run downloads a tokenizer vocabulary, so it needs internet once.
 
 ## Development setup (milestone M0)
 

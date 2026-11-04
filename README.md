@@ -2,7 +2,7 @@
 
 A blueprint for small and mid-sized companies that want to add AI to a traditional business system. It pairs an enterprise back office with an AI knowledge assistant and agents, and uses one fictional company, **StarIT Education**, as the running example: an IT training company with eight campuses across China.
 
-> **Project status: early stage.** The sample data and the design are done. The application code (RAG pipeline, agents, web apps) has **not been written yet**. Sections marked *Planned* describe the intended design, not something you can run today.
+> **Project status.** The **AI module runs** (milestones M2 to M9: RAG pipeline, hybrid search, a permission-aware assistant with streaming answers, a data-question agent, LiteLLM gateway with model fallback, limits, observability, web app, evaluation). To start it, follow [`ai-module/README.md`](ai-module/README.md#quick-start-about-15-minutes-the-first-time). The business module is not started.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The project has two modules that describe the same company:
 
 | Module | Folder | What it is | Status |
 |---|---|---|---|
-| AI module | [`ai-module/`](ai-module/) | Enterprise knowledge assistant (RAG with hybrid search) and agents, exposed through a FastAPI service and a Next.js front end | Sample data done, code planned |
+| AI module | [`ai-module/`](ai-module/) | Enterprise knowledge assistant (RAG with hybrid search) and agents, exposed through a FastAPI service and a Next.js front end | Runs locally with Docker Compose (M2 to M9 done) |
 | Business module | [`business-module/`](business-module/) | A traditional enterprise back office in the style of open-source competitor, rebuilt in TypeScript | Not started |
 
 The goals are to show how the pieces fit together in a realistic business setting, and to give learners a codebase they can run, read and extend.
@@ -25,14 +25,20 @@ The goals are to show how the pieces fit together in a realistic business settin
   - 87 evaluation questions with expected answers
   - Deliberate retrieval challenges: superseded policy versions, role-based access, exact identifiers, paraphrases, multi-document reasoning, unanswerable questions
 
+**AI module (runs today, see [`ai-module/README.md`](ai-module/README.md))**
+
+- RAG pipeline with parsers for md, txt, docx and pdf; hybrid search (keyword + vector, RRF, reranking) with the permission filter inside the database query
+- A LangGraph assistant: clarification, refusal, cited answers with a verification step, data questions through read-only SQL views and an MCP server, streaming answers that are withdrawn if they fail verification
+- Role-based access through Keycloak, an append-only audit log, rate limits and a daily cost budget
+- LiteLLM gateway with a model fallback chain (OpenAI, then Anthropic)
+- OpenTelemetry, Prometheus, Grafana, Tempo and Langfuse (optional)
+- An evaluation suite: 114 document questions, 41 data questions, permission leak sweeps
+
 **Planned**
 
-- RAG pipeline with pluggable parsers (parse, clean, chunk, embed, store in pgvector)
-- Hybrid search: keyword search plus vector search, fused with reciprocal rank fusion, then reranking
-- Agents with tool use through an MCP server, guardrails, and read-only SQL access
-- Role-based access to documents
-- Two deployment profiles from one codebase: a **full** profile for local use and a **lite** profile for a small server
-- Observability: Prometheus, Grafana, Loki, Tempo and OpenTelemetry
+- Business module (NestJS back office)
+- Two deployment profiles from one codebase: a **full** profile for local use and a **lite** profile for a small server (k3s)
+- Second-phase AI features, see [`docs/design/09-phase2-plan.md`](docs/design/09-phase2-plan.md)
 
 ## Planned architecture
 
@@ -66,17 +72,16 @@ StarEdu/
 
 ## Getting started
 
-Right now the only runnable parts are the sample-data generators. They need Python 3 and nothing else.
-
 ```bash
 git clone https://github.com/Andy-Pan-8849/StarEdu.git
-cd StarEdu/ai-module/sample-data
-
-python3 tools/generate_structured.py   # regenerates the CSV tables and the SQL evaluation set
-python3 tools/build_documents.py       # rebuilds the documents from the Markdown sources
+cd StarEdu/ai-module
+make env                  # then put OPENAI_API_KEY in .env
+make sync && make up && make seed
 ```
 
-`build_documents.py` writes docx files with the macOS `textutil` command and PDFs with headless Google Chrome, so it only works on a Mac with Chrome installed. On other systems, change the `format:` of each source file in `_markdown-source/` to `md` or `txt`. The repository already contains the generated documents, so you do not need to run it to use the data.
+Open <http://localhost:3000> and sign in as `wei.stu.sh` / `demo-pass-123`. The full guide (what to ask, how to check, how to run the evaluation) is in [`ai-module/README.md`](ai-module/README.md).
+
+The sample-data generators (`ai-module/sample-data/tools/`) need only Python 3. `build_documents.py` writes docx files with the macOS `textutil` command and PDFs with headless Google Chrome, so it only works on a Mac with Chrome installed; the repository already contains the generated documents.
 
 ## Configuration (planned)
 
@@ -100,18 +105,11 @@ See the [sample-data README](ai-module/sample-data/README.md) for the file list,
 
 ## Testing and validation
 
-Today you can check the data, not the application:
-
-1. **The generator is reproducible.** Run `python3 tools/generate_structured.py` and then `git status`. A clean working tree means the committed tables match the generator.
-2. **The documents match the manifest.** `documents/manifest.csv` lists all 28 documents with their version, status and access level.
-3. **The evaluation sets are consistent.** Every `source_docs` entry in `eval/qa-set.jsonl` is a `doc_id` in the manifest, and the answers in `eval/sql-qa.jsonl` are computed by the generator from the CSV tables.
-
-When the application exists, the evaluation sets will be used to measure answer quality, compare keyword, vector and hybrid search, and check that role-based access works.
+From `ai-module/`: `make lint`, `make test`, `make web-check` and `make e2e` are free. `make eval ARGS="answers"` (and `agent`, `data`, `all`) call real models, print the estimated cost first and ask before running. The latest answer run is 107/114; reports are in [`docs/eval/`](docs/eval/).
 
 ## Roadmap
 
-1. AI module: RAG pipeline, hybrid search, agents, API and chat front end
-2. Observability for the AI module
+1. AI module: done through M9; second-phase features are being chosen
 3. Business module: enterprise back office in TypeScript
 4. Deployment profiles and a public demo
 5. Chinese version of the sample data
