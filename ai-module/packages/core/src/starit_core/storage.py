@@ -17,6 +17,8 @@ class ObjectStorage(Protocol):
 
     async def get(self, key: str) -> bytes: ...
 
+    async def delete(self, key: str) -> None: ...
+
 
 class S3Storage:
     def __init__(self, settings: Settings) -> None:
@@ -54,6 +56,9 @@ class S3Storage:
         body: bytes = await asyncio.to_thread(response["Body"].read)
         return body
 
+    async def delete(self, key: str) -> None:
+        await asyncio.to_thread(self._client.delete_object, Bucket=self._bucket, Key=key)
+
 
 class InMemoryStorage:
     """For tests."""
@@ -72,3 +77,6 @@ class InMemoryStorage:
             return self.objects[key]
         except KeyError:
             raise FileNotFoundError(key) from None
+
+    async def delete(self, key: str) -> None:
+        self.objects.pop(key, None)

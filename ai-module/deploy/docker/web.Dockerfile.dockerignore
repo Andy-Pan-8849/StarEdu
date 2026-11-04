@@ -1,0 +1,9 @@
+# Only web/ is needed; keep node_modules and build output out of the context.
+*
+!web
+web/node_modules
+web/.next
+web/e2e
+web/tests
+web/playwright-report
+web/test-results

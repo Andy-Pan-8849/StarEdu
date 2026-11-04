@@ -845,3 +845,133 @@ make eval ARGS="data --yes"                       # 数据题真实评测（先�
   - 未用 `doc_code` 前缀以外的方式给 `Candidate` 加 `domain`。
   - 对 MCP SDK 的 `custom_route` 装饰器加了一处 `type: ignore`（SDK 的类型标注不完整）。
 - **已知限制**：校区检查只能识别写在 SQL 里的校区编码或（读 `campuses` 时的）城市名，换一种写法（比如用子查询按别的列间接指向别校）可能漏过去——真正的保护仍是视图，漏过去的结果是"空数据"，不是别校的数据。空结果统一说"没找到匹配记录"，分不清"没有"和"没权限"，这是有意的。SQL 路径的质量取决于模型；41 题里只有这一次拦截缺口，样本小，不能当作基准。
+
+## M7 文档管理与前端
+
+状态：**进行中**（分支 `m7-docs-frontend`）。两件事：(1) 后端的文档管理 API 和"点击引用看原文"的接口；(2) `ai-module/web/` 的 Next.js 前端：登录、聊天页、会话列表、引用查看、文档管理页。本里程碑**不调用付费模型**，只在最后做一次小的真实检查（见下）。
+
+### 开始前的现状（已核对）
+
+| 项 | 结果 |
+|---|---|
+| 已有的 API | `/healthz`、`/me`、`/conversations` 及其消息接口。路径没有 `/api/v1` 前缀（M5 就是这样做的）。**没有** CORS 配置。**没有**任何 `/documents` 接口 |
+| 已有的文档服务（core） | `register_document`、`update_access`、`set_status`、`delete_document`、`set_content`、入库队列、`ObjectStorage`（只有 `put`/`get`，**没有 `delete`**）。上传的路径与 `register_from_manifest` 相同 |
+| 引用里缺什么 | 文档类引用有 `doc_code`、`chunk_id`，**没有 `document_id`**，前端点击引用时无法请求 `/documents/{id}/chunks` |
+| 前端 | 目录 `ai-module/web/` 还不存在。Node 20.19.6、npm 10.8.2 已装；`.nvmrc` 还没有 |
+| Keycloak | `starit-web` 客户端已配好：公开客户端、授权码 + PKCE（S256）、重定向 `http://localhost:3000/*`、Web 源 `http://localhost:3000`、令牌受众含 `starit-api` 和 `starit-mcp` |
+| 权限 | `RAGETLAdmin` 的账号只有这一个角色，按设计 01 的 4.3，**只能看文档元数据，看不了正文**；管理接口只允许 `RAGETLAdmin` |
+| CI | 目前只有 `ai-module` 一个作业（Python），没有前端作业 |
+
+### 需要先确认的问题
+
+1. **浏览器登录方式**：用 `oidc-client-ts` 在浏览器里做授权码 + PKCE，令牌放在内存（刷新页面时用 `sessionStorage` 恢复），请求 API 时直接带 `Authorization: Bearer`。不做服务端会话、不用 NextAuth。好处是和后端"只信 JWT"的模型完全一致，没有第二套会话；代价是令牌在浏览器里（用 PKCE 和短有效期缓解）。
+2. **浏览器怎么访问 API**：API 增加 CORS 中间件，允许的来源由 `STARIT_CORS_ORIGINS` 配置（默认 `http://localhost:3000`），只允许 `Authorization`、`Content-Type` 头，不带 cookie。备选是 Next.js 反向代理，会多一跳，也让 SSE（以后）更麻烦。
+3. **路径前缀**：保持已经实现的无前缀路径（`/conversations`、`/documents`……），把设计 03 里的 `/api/v1` 前缀改成"以后需要时再加"。前缀改动会牵动 M5 的全部测试和脚本，价值不大。
+4. **文档管理 API 的范围**：设计 03 第 5 节的 7 个端点（`POST/GET /documents`、`GET/PATCH/DELETE /documents/{id}`、`POST …/reindex`、`GET …/jobs`）加阅读用的 `GET /documents/{id}/chunks` 与 `GET /documents/{id}/file`。上传限制：单文件 ≤ 20 MB，只收 docx/pdf/md/txt（按扩展名和文件头双重判断）；相同 `content_hash` 且相同 `(doc_code, version)` 返回 409。`DELETE` 是硬删除（设计已定），所以给 `ObjectStorage` 加 `delete`。所有写动作写审计。
+5. **引用加 `document_id`**：文档类引用新增 `document_id`（设计 03 同步修改），前端点击 `[n]` 时请求该文档的分块并高亮被引用的块；数据类引用（`kind: "data"`）只显示视图名和行数，不能点开。
+6. **前端技术栈**：Next.js 15（App Router）、TypeScript 严格模式、Tailwind、shadcn/ui、ESLint、Prettier；单元测试用 Vitest + Testing Library；包管理用 npm（`package-lock.json` 入库）；`.nvmrc` 固定 Node 20。
+7. **第一阶段不做流式**：聊天页发送后显示"思考中"，等 `POST …/messages` 返回完整回答（实测约 3–8 秒）。设计里的 SSE 属于第二阶段。
+8. **端到端冒烟测试（Playwright）**：需要下载 Chromium（约 150–300 MB）——**下载前要你同意**。覆盖：登录、提问、查看引用、上传文档。为了不花钱也不依赖模型，提问这一步**拦截 `POST …/messages` 返回固定回答**；上传这一步走真实的 API → 入库队列 → worker，但容器里的嵌入用 `EMBEDDING_PROVIDER=fake`（M3 已有）。在本地用 `make e2e` 运行（需要 `make up`），**CI 里不跑**（CI 没有完整的 Compose 栈），CI 只跑前端的 lint、类型检查、Vitest 和构建。
+9. **容器**：Compose 增加 `web` 服务（Next.js standalone 构建，端口 3000，依赖 api 与 keycloak），`.env.example` 增加 `NEXT_PUBLIC_*` 配置（API 地址、Keycloak 地址与客户端 ID）。
+10. **真实检查**：做完后用 `RAGETLAdmin` 账号上传 1 个小文档，用**真实嵌入**入库（估算不到 $0.001），再用一个有权限的账号问一个关于它的问题（约 4 次模型调用，约 $0.001）。先给估算，你确认后再跑。
+
+### 计划的文件（`ai-module/` 下）
+
+| 文件 | 作用 |
+|---|---|
+| `apps/api/src/starit_api/documents.py`（新） | 文档管理与阅读的 8 个端点；`require_roles("RAGETLAdmin")`；分页（`limit`/`cursor`）、过滤；上传校验 |
+| `apps/api/src/starit_api/main.py`、`config`（改） | 挂载路由；CORS（`cors_origins`） |
+| `packages/core/src/starit_core/storage.py`（改） | `ObjectStorage.delete`（S3 与内存实现） |
+| `packages/core/src/starit_core/documents.py`（改） | 列表查询、读取分块、元数据更新的服务函数（保持"同一事务更新文档和分块"） |
+| `packages/core/src/starit_core/agent/nodes.py`（改） | 文档引用带 `document_id` |
+| `apps/api/tests/integration/test_documents.py`（新）等 | 见验证标准 |
+| `web/`（新） | `app/`（登录回调、聊天页、文档管理页）、`components/`（对话、引用抽屉、会话列表、文档表格与上传表单，shadcn/ui）、`lib/`（OIDC、API 客户端）、`tests/`（Vitest）、`e2e/`（Playwright）、`Dockerfile`、`package.json`、`.nvmrc` |
+| `deploy/compose/compose.yaml`、`.env.example`、`Makefile`（改） | `web` 服务；`make web-dev`、`make e2e` |
+| `.github/workflows/ci.yml`（改） | 前端作业：`npm ci`、lint、类型检查、Vitest、构建 |
+| `docs/design/01`、`03`、`ai-module/README.md`（改） | 路径前缀说明、引用的 `document_id`、前端的启动方式 |
+
+### 页面（第一阶段）
+
+- `/`：已登录进入聊天页；未登录跳转 Keycloak。左侧会话列表（新建、重命名、归档），中间对话，回答里的 `[n]` 是可点击的标记，点击打开右侧抽屉：文档名、编号、版本、状态、章节路径、被引用的块（高亮）和前后块；数据类引用显示"来自数据：students，12 行"。回答的结束状态为 `no_permission`/`not_found`/`refused`/`error` 时显示对应的普通提示（后端已给出统一文案）。
+- `/admin/documents`：只有 `RAGETLAdmin` 在菜单里看得到；表格（编号、标题、版本、状态、入库状态、更新时间），过滤；上传表单（设计 03 第 5 节的字段）；行内操作：编辑元数据与权限、重新入库、删除（二次确认）、查看入库任务（阶段、次数、错误码与错误信息）。其他角色直接访问该地址显示"没有权限"，后端同样返回 403。
+- 菜单、按钮是否显示只依据 `/me`；后端每个接口都再次校验。
+
+### 计划的命令
+
+```bash
+git switch -c m7-docs-frontend                    # 已创建
+uv sync --all-packages
+(cd web && npm ci)
+make test && make lint                            # 后端
+(cd web && npm run lint && npm run typecheck && npm test && npm run build)
+make up                                           # 现在包含 web
+make e2e                                          # Playwright（需先同意下载浏览器）
+```
+
+### 验证标准
+
+1. **文档管理 API 的权限矩阵**：9 个演示账号 × 每个端点：只有 `RAGETLAdmin` 成功，其余 403，未登录 401。
+2. **上传**：合法的四种格式 202 并入队；超过 20 MB、扩展名与文件头不符、缺必填字段、非法 `access_level` → 422；重复 → 409 并给出已有文档 ID；写审计。
+3. **完整流程**（假嵌入）：上传 → worker 入库 → `ingest_status = ready` → 有权限的账号能检索到、无权限的账号检索不到。
+4. **元数据与权限修改**：`PATCH` 后文档和所有分块在同一事务里一致（沿用 M2 的测试方式）；状态改为 `superseded`/`archived` 后检索行为符合设计 02。
+5. **删除与重新入库**：删除后文档、分块、向量、原文件都没有了，会话历史里的引用文本保留；重新入库成功后原子替换旧分块，失败时旧分块不动。
+6. **阅读接口**：`chunks`/`file` 与检索使用同一个权限函数；无权限返回 404；`RAGETLAdmin`（无业务角色）读正文得到 404、读元数据得到 200。
+7. **引用**：文档类引用带 `document_id`，用它请求分块能得到被引用的块。
+8. **CORS**：允许的来源能通过预检；其他来源不返回 `Access-Control-Allow-Origin`。
+9. **前端**：Vitest 覆盖 OIDC 回调与令牌处理、`/me` 驱动的菜单（7 个角色各一个断言）、引用抽屉、上传表单校验、错误状态；lint、类型检查、构建通过。
+10. **Playwright 冒烟**（本地）：登录、提问（拦截的回答）、点击引用看到原文、`RAGETLAdmin` 上传到 `ready`；普通账号看不到管理菜单，直接访问管理地址得到无权限页面。
+11. **容器冒烟**：`web` 容器健康，浏览器经 `http://localhost:3000` 完成登录和一次提问。
+12. 真实检查（确认后）：上传 1 个小文档用真实嵌入入库，再问一个问题得到带引用的回答。
+13. 本地测试、lint、mypy 通过，CI（含新的前端作业）通过。
+
+### 开始前不确定的事
+
+- **令牌放在浏览器里**是安全上的取舍（XSS 能读到 `sessionStorage`）。缓解：Keycloak 令牌有效期短（沿用现在的设置）、前端不渲染未经转义的 HTML、回答按纯文本/受控的 Markdown 渲染。若你更想用服务端会话（NextAuth + 后端换令牌），代价是多一套会话，要在第 1 条里改。
+- **shadcn/ui、Tailwind、Next.js 15 的最新次版本**我会在开始时核对并固定版本；Next.js 的大版本更新快，可能和我记忆里的 API 有差别，以实际安装的为准。
+- **Playwright 在 Mac 上的浏览器下载**需要网络和约 300 MB 磁盘（Docker 磁盘刚刚满过一次，这是本机的实际约束，与浏览器无关，但提醒一下）。
+- **上传大文件和入库时长**：docx/pdf 的解析在 worker 里，上传接口只入队；页面靠轮询 `GET /documents`（每 3 秒）更新状态，没有推送。
+- **删除是硬删除**，不可恢复；前端用二次确认，后端写审计，但没有"回收站"。
+
+### 需要你确认
+
+1. 浏览器内 OIDC（授权码 + PKCE），令牌在内存/`sessionStorage`。
+2. API 加 CORS，来源可配置。
+3. 保持无前缀路径，修改设计 03。
+4. 文档管理 8 个端点，上传 ≤ 20 MB、四种格式，`ObjectStorage` 加 `delete`。
+5. 文档类引用加 `document_id`。
+6. 前端栈：Next.js 15、TypeScript 严格、Tailwind、shadcn/ui、Vitest、npm、Node 20。
+7. 第一阶段不做流式。
+8. Playwright 本地运行、拦截聊天回答、假嵌入上传；**同意下载 Chromium**；CI 只跑 lint/类型/Vitest/构建。
+9. Compose 增加 `web` 服务。
+10. 真实检查：上传 1 个小文档（真实嵌入，不到 $0.001）+ 1 个问题（约 $0.001），先估算后确认。
+
+### 用户的确认（2026-11-03）
+
+10 条全部接受（浏览器内 OIDC；CORS；无前缀路径；8 个文档端点；引用加 `document_id`；前端栈；不做流式；Playwright 本地运行并**同意下载 Chromium**；Compose 加 `web`；真实检查先估算后确认）。
+
+### 暂停记录（2026-11-04）
+
+用户临时离开，**M7 暂停**，等用户下达"恢复"指令再继续。当时的状态：
+
+- **已完成并提交**（分支 `m7-docs-frontend`）：后端文档管理 API、读取接口、CORS、引用 `document_id`（699 个 Python 测试通过）；Next.js 前端（登录、聊天、引用抽屉、文档管理页，61 个 Vitest 测试，lint、类型、格式、构建通过）；web 的 Dockerfile、Compose `web` 服务、CI 前端作业、Makefile 目标、Playwright 测试、README 和设计 03 的修订。
+- **容器**：`api`、`web`、`worker`、`mcp-server` 等都在运行且健康；`web` 返回 200，API 的 CORS 对 `http://localhost:3000` 放行；`worker` 已恢复为正常（`openai`）嵌入配置。
+- **没有完成**：(1) Playwright 冒烟测试**一次都没有跑完**——Chromium 下载到约 50% 时被我按暂停指令中止；再跑一遍 `make e2e` 会重新下载（约 186 MB）。(2) 真实检查（上传 1 个小文档 + 1 个问题）还没做，需先给估算并等确认。(3) 本节"实际结果"还没填。(4) CI 还没在新分支上跑过前端作业。(5) 合并和 `ai-m7` 标签。
+- **本机环境的发现**（会写进实际结果）：Docker Desktop 的虚拟磁盘曾写满（`no space left on device`），Postgres 因此崩溃并进入恢复模式，`worker` 重启了一个多小时；清理了 6 GB 构建缓存后恢复。镜像构建里下载 Python 依赖的网络很慢，`uv` 默认的 30 秒超时导致失败，已在 `python.Dockerfile` 里设为 `UV_HTTP_TIMEOUT=120`；这次 API 镜像构建用了约 40 分钟。Docker 里还有约 8.6 GB 镜像和 10 GB 卷可回收，未动。
+- **未提交的改动**：`ai-module/deploy/docker/python.Dockerfile`（超时设置）和本记录。
+
+恢复后的顺序：确认容器健康 → `make e2e` → 处理失败（如有）→ 填实际结果 → 给真实检查的估算并等确认 → 推送、看 CI → 请用户确认合并并打 `ai-m7`。
+
+### 实际结果
+
+**状态：代码完成，端到端冒烟和真实检查通过，待你确认合并。**
+
+- **后端测试**：699 个通过（M6 结束时 615 个）。新增 82 个文档 API 测试：7 个角色 × 7 个管理端点（只有 `RAGETLAdmin` 成功，其余 403，未登录 401）；上传校验（扩展名与文件头不符、空文件、非 UTF-8 文本、含二进制的文本、超过 20 MB、缺字段、非法 `access_level`/`doc_code`/`version`/`domain`/`status`/`min_level`、路径穿越的文件名）；重复上传 409 且消息带已有文档 ID；**完整流程**（真实 worker、假嵌入）：上传 → `ready` → 员工检索得到、学员和 `RAGETLAdmin` 检索不到；`chunks`/`file` 对员工 200、对学员和 `RAGETLAdmin` 404；`around` 取前后块；`PATCH` 后文档和所有分块的权限在同一事务里一致，改成 `draft` 后读不到；等级要求可设置、可清除；删除后文档、分块、原文件都没有、审计保留、再删 404；重新入库后分块被整体替换、任务历史两条；列表过滤（域、状态、入库状态、标题或编号、`%` 当字面量）与分页；CORS（允许前端来源，不允许其他来源，普通请求也不带 `Access-Control-Allow-Origin`）。
+- **前端**：Vitest 61 个通过；lint、类型检查（严格模式，含 `noUncheckedIndexedAccess`）、格式检查、生产构建都干净。覆盖：`[n]` 解析（未知编号保持文本、内容不当作 HTML）、返回路径只接受站内路径、7 个角色的菜单（只有 `RAGETLAdmin` 看到"文档"链接；直接进入管理页也显示无权限且不发请求）、引用抽屉（数据类显示视图与行数；文档类请求 `around`、高亮被引用的块、读取失败或没有 `document_id` 时的提示）、上传表单（校验、不发请求、字段与重复项的编码、服务器错误如重复）、文档页（列表、删除要二次确认、过滤、入库任务与错误原因）、聊天（建会话、发送、显示回答与来源、限流提示）、API 客户端（带令牌、401 触发重新登录、无令牌不发请求）。
+- **Playwright 冒烟**（`make e2e`，Chromium，对真实的 Compose 栈）：3 个通过。(1) 员工登录：看得到助手、看不到"文档"、直接进管理页显示无权限、**直接用令牌请求 `/documents` 得到 403**；(2) 提问（模型被拦截为固定回答，页面和 API 是真的）、点击 `[1]` 看到来源；(3) `RAGETLAdmin` 上传文档 → 等到 `ready`（worker 临时用假嵌入）→ 管理员账号读不到正文（404）、员工读得到 → 在聊天页点击引用看到原文 → 管理员在页面里删除（有确认）→ 行消失。`make e2e` 结束后 worker 自动恢复成真实嵌入，数据库里没有残留的测试文档。
+- **e2e 的两处是我的测试写错了，不是应用的问题**：Next.js 自带的路由播报元素也是 `role="alert"`，我的定位器匹配到两个；`Title` 同时匹配了标题输入框和"Search title or code"，改成按文字和精确标签定位。
+- **容器**：`web`（standalone 构建）、`api`、`mcp-server`、`worker` 等都健康；`web` 返回 200；API 对 `http://localhost:3000` 的 CORS 预检通过。
+- **与确认点的差异**：(a) shadcn/ui 的组件（按钮、输入、徽章、对话框等）是我**手写**的，沿用它的工具库（`class-variance-authority`、`clsx`、`tailwind-merge`）和风格，没有用它的 CLI，避免交互式安装和多出来的 Radix 依赖；对话框用 `role="dialog"` 自己实现。(b) 前端用 Next.js 15.5.29 + React 19 + Tailwind 4（npm 上最新是 Next 16，按设计固定在 15）。(c) `min_level` 是 1–7 的等级序号。(d) 列表的 `cursor` 是偏移量，不是游标键。(e) 回答按纯文本渲染（`[n]` 变按钮），不渲染 Markdown。(f) 第 8 条里"上传这一步走假嵌入"是通过 `make e2e` 临时切换 worker 实现的。
+- **本机环境的发现**：Docker Desktop 虚拟磁盘曾写满（`no space left on device`），Postgres 崩溃进入恢复模式，`worker` 重启了一个多小时；清理 6 GB 构建缓存后恢复，之后用户把磁盘上限调到 80 GB，又清理了停止的容器、悬空镜像和构建缓存（约 6 GB）。镜像构建里下载 Python 依赖的网络很慢，`uv` 默认的 30 秒超时导致一次构建失败，已在 `python.Dockerfile` 设 `UV_HTTP_TIMEOUT=120`；API 镜像构建用了约 40 分钟。
+- **已知限制**：令牌放在浏览器的 `sessionStorage`（XSS 能读到；缓解：Keycloak 令牌有效期短、不渲染 HTML）；`npm audit` 报告 16 条中高危，来自开发工具（Vitest 的依赖、`minimatch`）和 Next.js 自带的 PostCSS（只涉及不可信 CSS 输入，本项目的构建只处理自己的 CSS），**接受，没有强制升级**到会引入 Next 16 的版本；上传后的状态靠每 3 秒轮询，没有推送；删除是硬删除，没有回收站；Playwright 只在本地运行，CI 只跑前端的 lint、类型、格式、Vitest 和构建。
+- **真实检查**（用户确认后运行，真实嵌入和真实模型 `openai/gpt-6-luna`）：用 `RAGETLAdmin` 账号经 API 上传一个小文档 `VERIFY-001`（"核查城市的酒店标准是 CNY 777/晚"）→ 状态 `queued → running → ready`；再用员工账号提问"What is the hotel allowance per night for the verification city?"。**第一次助手没有直接回答，而是反问"Which verification city do you mean?"**（`need_clarification`）——是模型对我措辞的判断，不是链路问题；我在同一会话里补一句"The one in the Verification city allowance document."，第二次得到正确回答"CNY 777 per night … need approval from the finance controller [1]"，`end_state = answered`，引用带 `document_id` 和 `chunk_id`，用它请求 `GET /documents/{id}/chunks?around=…` 员工读到被引用的原文，`RAGETLAdmin` 账号读同一个文档得到 404；最后用 `RAGETLAdmin` 删除（204），数据库里文档和分块都是 0，测试文件已清理。**只问了这一个问题（两轮），不是一个题集**，不能当作质量结论；费用按估算不到 $0.002，没有逐项统计。**没有经真实浏览器登录点击这条真实回答的引用**——浏览器里点击引用由 Playwright（回答被固定）覆盖，真实回答的引用只用 API 验证了。
+- **未完成**：本分支最新一次推送的 CI 结果。

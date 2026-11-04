@@ -1,12 +1,15 @@
 # Developer commands for the AI module. Run from the ai-module/ directory.
 COMPOSE = docker compose --env-file .env -f deploy/compose/compose.yaml
 
-.PHONY: help env sync lint fmt test up down logs migrate seed-biz ingest-samples eval ps token clean
+.PHONY: help env sync lint fmt test up down logs migrate seed-biz ingest-samples eval ps token clean web-install web-dev web-check e2e
 
 help:
 	@echo "make env      create .env from .env.example if missing"
 	@echo "make sync     install Python dependencies (uv)"
 	@echo "make lint     ruff + mypy"
+	@echo "make web-dev  run the front end on port 3000 (needs make up for the API)"
+	@echo "make web-check  front end: lint, types, tests, build"
+	@echo "make e2e      browser smoke tests (needs make up)"
 	@echo "make fmt      format code with ruff"
 	@echo "make test     run tests (integration tests need make up + make migrate)"
 	@echo "make up       start Postgres, Redis, object storage and the API"
@@ -35,6 +38,21 @@ fmt:
 
 test:
 	uv run pytest
+
+web-install:
+	cd web && npm ci
+
+web-dev:
+	cd web && npm run dev
+
+web-check:
+	cd web && npm run lint && npm run typecheck && npm run format:check && npm test && npm run build
+
+# The worker is switched to fake embeddings for the run (an upload costs nothing), then back.
+e2e: env
+	EMBEDDING_PROVIDER=fake $(COMPOSE) up -d --force-recreate worker
+	cd web && npx playwright install chromium && npm run e2e; status=$$?; \
+	  cd .. && $(COMPOSE) up -d --force-recreate worker; exit $$status
 
 up: env
 	$(COMPOSE) up -d --build --wait

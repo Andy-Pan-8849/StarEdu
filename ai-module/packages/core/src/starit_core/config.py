@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     )
     mcp_url: str = "http://localhost:8100/mcp"
     mcp_port: int = 8100
+    # Browser origins allowed to call the API (comma separated).
+    cors_origins: str = "http://localhost:3000"
     # Host header values the MCP server accepts (DNS-rebinding protection stays on).
     mcp_allowed_hosts: str = "localhost:8100,127.0.0.1:8100,mcp-server:8100"
     # The first of two gates before answering: the best passage must score at least this much
