@@ -105,3 +105,29 @@ async def test_a_failing_run_marks_the_root_span(harness: Harness, tele: InMemor
     (root,) = tele.spans("agent.run")
     assert root.status.status_code.name == "ERROR"
     assert tele.metric_total("starit.runs", end_state="error") == 1
+
+
+async def test_database_statements_become_spans_without_their_values(
+    engines: tuple[AsyncEngine, AsyncEngine], tele: InMemoryTelemetry
+) -> None:
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from starit_core.telemetry import instrument_engine
+
+    url = engines[1].url
+    engine = create_async_engine(url)
+    try:
+        instrument_engine(engine)
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT :needle AS x"), {"needle": "a-value-that-is-private"})
+    finally:
+        SQLAlchemyInstrumentor().uninstrument()
+        await engine.dispose()
+    statements = [
+        dict(s.attributes).get("db.statement", "")
+        for s in tele.spans()
+        if dict(s.attributes).get("db.system") == "postgresql"
+    ]
+    assert any("SELECT" in statement for statement in statements), tele.everything_recorded()
+    assert "a-value-that-is-private" not in tele.everything_recorded()

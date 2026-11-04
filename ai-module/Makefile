@@ -1,12 +1,18 @@
 # Developer commands for the AI module. Run from the ai-module/ directory.
 COMPOSE = docker compose --env-file .env -f deploy/compose/compose.yaml
+OBS = $(COMPOSE) -f deploy/compose/observability.yaml
+LANGFUSE = $(OBS) -f deploy/compose/langfuse.yaml
+# Every file, so `down` and `clean` also take away the optional parts.
+EVERYTHING = $(LANGFUSE)
 
-.PHONY: help env sync lint fmt test up down logs migrate seed-biz ingest-samples eval ps token clean web-install web-dev web-check e2e
+.PHONY: seed seed-dump up-obs up-langfuse help env sync lint fmt test up down logs migrate seed-biz ingest-samples eval ps token clean web-install web-dev web-check e2e
 
 help:
 	@echo "make env      create .env from .env.example if missing"
 	@echo "make sync     install Python dependencies (uv)"
 	@echo "make lint     ruff + mypy"
+	@echo "make up-obs    also start traces and metrics (Collector, Tempo, Prometheus, Grafana)"
+	@echo "make up-langfuse  up-obs plus Langfuse (heavy)"
 	@echo "make web-dev  run the front end on port 3000 (needs make up for the API)"
 	@echo "make web-check  front end: lint, types, tests, build"
 	@echo "make e2e      browser smoke tests (needs make up)"
@@ -14,6 +20,8 @@ help:
 	@echo "make test     run tests (integration tests need make up + make migrate)"
 	@echo "make up       start Postgres, Redis, object storage and the API"
 	@echo "make migrate  apply database migrations (as the database owner)"
+	@echo "make seed      business tables + knowledge base from the dump (no model key) + original files"
+	@echo "make seed-dump  write the knowledge base to seed/ai-seed.jsonl.gz (after a real ingestion)"
 	@echo "make seed-biz load the sample business tables (sample-data/structured) into the biz schema"
 	@echo "make token ACCOUNT=staff.sh   print an access token for a demo account"
 	@echo "make ingest-samples [ARGS=--wait]   register and queue the 28 sample documents (the worker container processes them)"
@@ -63,14 +71,26 @@ migrate: env
 seed-biz: env
 	set -a; . ./.env; set +a; uv run python scripts/seed_biz.py
 
+seed: env
+	set -a; . ./.env; set +a; uv run python scripts/seed.py $(ARGS)
+
+seed-dump: env
+	set -a; . ./.env; set +a; uv run python scripts/seed_dump.py
+
 ingest-samples: env
 	set -a; . ./.env; set +a; uv run python scripts/ingest_samples.py $(ARGS)
 
 eval: env
 	set -a; . ./.env; set +a; uv run starit-eval $(ARGS)
 
+up-obs: env
+	$(OBS) up -d --build --wait
+
+up-langfuse: env
+	$(LANGFUSE) up -d --build --wait
+
 down: env
-	$(COMPOSE) down
+	$(EVERYTHING) down
 
 ps: env
 	$(COMPOSE) ps
@@ -82,4 +102,4 @@ token: env
 	@set -a; . ./.env; set +a; scripts/token.sh $(ACCOUNT)
 
 clean: env
-	$(COMPOSE) down -v
+	$(EVERYTHING) down -v

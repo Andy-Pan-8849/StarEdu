@@ -143,6 +143,11 @@ def instrument_engine(engine: Any) -> None:
         return
     from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
+    # The instrumentor's declared range stops before the SQLAlchemy 2.1 this project uses, though
+    # the engine events it listens to are the same; skip_dep_check lets it attach, and a test
+    # proves that statements are really recorded.
     SQLAlchemyInstrumentor().instrument(
-        engine=engine.sync_engine, tracer_provider=current().tracer_provider
+        engine=engine.sync_engine,
+        tracer_provider=current().tracer_provider,
+        skip_dep_check=True,
     )
