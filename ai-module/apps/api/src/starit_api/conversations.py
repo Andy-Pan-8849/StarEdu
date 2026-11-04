@@ -1,11 +1,15 @@
 """Conversations and the chat endpoint (design 03, sections 3 and 4)."""
 
+import asyncio
+import json
 import time
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core import conversations as store
@@ -159,7 +163,59 @@ async def list_messages(
     }
 
 
-@router.post("/{conversation_id}/messages")
+KEEPALIVE_SECONDS = 15.0
+
+
+def _wants_stream(request: Request) -> bool:
+    return "text/event-stream" in request.headers.get("accept", "")
+
+
+def _sse(name: str, data: dict[str, Any]) -> str:
+    return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+async def _event_stream(
+    runtime: AgentRuntime,
+    identity: Identity,
+    conversation_id: UUID,
+    content: str,
+    access_token: str | None,
+) -> AsyncIterator[str]:
+    """Server-sent events of one run. The run is a task of its own: if the client goes away the
+    run still finishes and its reply is stored, so the answer is there when they come back."""
+    queue: asyncio.Queue[tuple[str, dict[str, Any]] | None] = asyncio.Queue()
+
+    async def sink(name: str, data: dict[str, Any]) -> None:
+        await queue.put((name, data))
+
+    async def work() -> None:
+        try:
+            await runtime.run(
+                identity, conversation_id, content, access_token=access_token, on_event=sink
+            )
+        except Exception as exc:  # the stream must end with an event, not a broken connection
+            await queue.put(("error", {"code": "internal", "message": type(exc).__name__}))
+        finally:
+            await queue.put(None)
+
+    task = asyncio.create_task(work())
+    _running.add(task)
+    task.add_done_callback(_running.discard)
+    while True:
+        try:
+            item = await asyncio.wait_for(queue.get(), KEEPALIVE_SECONDS)
+        except TimeoutError:
+            yield ": keepalive\n\n"
+            continue
+        if item is None:
+            return
+        yield _sse(*item)
+
+
+_running: set[asyncio.Task[None]] = set()  # keeps runs alive when nobody is listening
+
+
+@router.post("/{conversation_id}/messages", response_model=None)
 async def post_message(
     request: Request,
     conversation_id: UUID,
@@ -170,11 +226,17 @@ async def post_message(
     limiter: RateLimiter = Depends(get_limiter),
     access_token: str | None = Depends(get_access_token),
     budget: DailyBudget | None = Depends(get_budget),
-) -> dict[str, Any]:
+) -> Any:
     conversation = await _owned(engine, identity, conversation_id)
     if conversation["archived"]:
         raise ApiError(409, "conflict", "This conversation is archived")
     await check_chat_limits(request, get_settings(), limiter, budget, identity.user_id, time.time())
+    if _wants_stream(request):
+        return StreamingResponse(
+            _event_stream(runtime, identity, conversation_id, body.content.strip(), access_token),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
     result = await runtime.run(
         identity, conversation_id, body.content.strip(), access_token=access_token
     )

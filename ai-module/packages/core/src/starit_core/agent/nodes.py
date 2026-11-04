@@ -25,6 +25,7 @@ from starit_core.llm import ChatClient, ChatError, ChatResult, parse_json_object
 from starit_core.retrieval import RetrievalResult, retrieve
 from starit_core.retrieval.models import Candidate
 from starit_core.sqlaccess import run_as_identity
+from starit_core.streaming import AnswerStream
 
 logger = logging.getLogger("starit.agent")
 
@@ -92,6 +93,75 @@ class BudgetedChat:
         max_tokens: int | None = None,
         request_timeout: float | None = None,
     ) -> ChatResult:
+        return await self._invoke(
+            messages,
+            model,
+            lambda: self._inner.complete(
+                messages,
+                model=model,
+                json_mode=json_mode,
+                max_tokens=max_tokens,
+                request_timeout=request_timeout or self._timeout,
+            ),
+        )
+
+    async def stream(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        *,
+        model: str,
+        json_mode: bool = False,
+        max_tokens: int | None = None,
+        request_timeout: float | None = None,
+        on_chunk: Callable[[str], Awaitable[None]],
+    ) -> ChatResult:
+        """Like `complete`, with `on_chunk` called for each piece of text as it arrives. A client
+        that cannot stream answers in one piece, so callers need not care which they have."""
+        inner_stream = getattr(self._inner, "stream", None)
+        first = [True]
+        started = time.perf_counter()
+
+        async def seen(chunk: str) -> None:
+            if first[0]:
+                first[0] = False
+                telemetry.current().llm_first_token.record(
+                    time.perf_counter() - started, {"model": model}
+                )
+            await on_chunk(chunk)
+
+        if inner_stream is None:
+
+            async def whole() -> ChatResult:
+                result: ChatResult = await self._inner.complete(
+                    messages,
+                    model=model,
+                    json_mode=json_mode,
+                    max_tokens=max_tokens,
+                    request_timeout=request_timeout or self._timeout,
+                )
+                await seen(result.text)
+                return result
+
+            return await self._invoke(messages, model, whole)
+        return await self._invoke(
+            messages,
+            model,
+            lambda: inner_stream(
+                messages,
+                model=model,
+                json_mode=json_mode,
+                max_tokens=max_tokens,
+                request_timeout=request_timeout or self._timeout,
+                on_chunk=seen,
+            ),
+        )
+
+    async def _invoke(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        model: str,
+        call: Callable[[], Awaitable[ChatResult]],
+    ) -> ChatResult:
         if self._totals.llm_calls >= self._limit:
             raise AgentFailure("step_limit", f"more than {self._limit} model calls in one run")
         self._totals.llm_calls += 1
@@ -109,13 +179,7 @@ class BudgetedChat:
                     "langfuse.observation.input", telemetry.clip(json.dumps(list(messages)))
                 )
             try:
-                result = await self._inner.complete(
-                    messages,
-                    model=model,
-                    json_mode=json_mode,
-                    max_tokens=max_tokens,
-                    request_timeout=request_timeout or self._timeout,
-                )
+                result = await call()
                 outcome = "ok"
             finally:
                 tele.llm_calls.add(1, {"model": model, "outcome": outcome})
@@ -374,15 +438,13 @@ class AgentNodes:
         user = f"Question: {question}\n\nExcerpts:\n\n{excerpt_block(chunks)}"
         if state.get("verify_feedback"):
             user += f"\n\nYour previous reply was rejected: {state['verify_feedback']} Reply again."
+        messages = [
+            {"role": "system", "content": prompt_text("generate")},
+            {"role": "user", "content": user},
+        ]
+        parser = AnswerStream(require_sufficient=True)
         try:
-            result = await ctx.chat.complete(
-                [
-                    {"role": "system", "content": prompt_text("generate")},
-                    {"role": "user", "content": user},
-                ],
-                model=self._settings.model_generate,
-                json_mode=True,
-            )
+            result = await self._ask(ctx, messages, self._settings.model_generate, parser)
         except ChatError as exc:
             raise AgentFailure("llm_error", str(exc)) from exc
         try:
@@ -400,6 +462,29 @@ class AgentNodes:
             "route": "verify_answer",
         }
 
+    async def _ask(
+        self,
+        ctx: RunContext,
+        messages: list[dict[str, str]],
+        model: str,
+        parser: AnswerStream,
+    ) -> ChatResult:
+        """One JSON-mode model call. When a client is listening, the answer text is passed on as
+        it is written (see streaming.py); otherwise the reply is simply waited for."""
+        emitter = ctx.emitter
+        if emitter is None:
+            plain: ChatResult = await ctx.chat.complete(messages, model=model, json_mode=True)
+            return plain
+
+        async def on_chunk(chunk: str) -> None:
+            for piece in parser.feed(chunk):
+                await emitter.delta(piece)
+
+        streamed: ChatResult = await ctx.chat.stream(
+            messages, model=model, json_mode=True, on_chunk=on_chunk
+        )
+        return streamed
+
     async def verify_answer(self, state: AgentState, config: RunnableConfig) -> AgentState:
         attempts = state.get("verify_attempts", 0) + 1
         problem = self._problem(state)
@@ -416,6 +501,9 @@ class AgentNodes:
             )
             citations = [citation_info(int(n), chunks[int(n) - 1]) for n in numbers]
             return {"citations": citations, "route": "end_answered", "verify_attempts": attempts}
+        if _ctx(config).emitter is not None:
+            # The client may already be showing this draft: take it back before the next one.
+            await _ctx(config).emitter.retract(problem)
         if attempts <= self._settings.agent_verify_retries:
             return {"verify_feedback": problem, "route": "generate", "verify_attempts": attempts}
         return {"route": "end_error", "end_reason": "llm_error", "verify_attempts": attempts}
@@ -587,17 +675,19 @@ class AgentNodes:
         payload = json.dumps(
             {"rows_total": state["data_row_count"], "rows": rows}, default=str, ensure_ascii=False
         )
+        messages = [
+            {"role": "system", "content": prompt_text("answer_data")},
+            {
+                "role": "user",
+                "content": f"Question: {state['standalone_query']}\n\nData:\n{payload}",
+            },
+        ]
         try:
-            result = await ctx.chat.complete(
-                [
-                    {"role": "system", "content": prompt_text("answer_data")},
-                    {
-                        "role": "user",
-                        "content": f"Question: {state['standalone_query']}\n\nData:\n{payload}",
-                    },
-                ],
-                model=self._settings.model_generate,
-                json_mode=True,
+            result = await self._ask(
+                ctx,
+                messages,
+                self._settings.model_generate,
+                AnswerStream(require_sufficient=False),
             )
         except ChatError as exc:
             raise AgentFailure("llm_error", str(exc)) from exc

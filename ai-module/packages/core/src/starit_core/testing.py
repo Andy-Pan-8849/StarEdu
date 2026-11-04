@@ -6,7 +6,7 @@ so that tests in different directories can share them.
 
 import asyncio
 import json
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -14,12 +14,13 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from starit_core.agent.events import Sink
 from starit_core.agent.runtime import AgentRuntime, RunResult
 from starit_core.auth import Identity
 from starit_core.config import Settings
 from starit_core.conversations import create_conversation
 from starit_core.embeddings import FakeEmbeddingClient
-from starit_core.llm import ChatResult
+from starit_core.llm import ChatError, ChatResult
 from starit_core.retrieval.models import Candidate, RetrievalDiagnostics, RetrievalResult
 
 Answer = str | Exception | Callable[[Sequence[Mapping[str, str]], int], str]
@@ -93,6 +94,8 @@ class ScriptedChat:
         self._script = script
         self.calls: list[tuple[str, list[dict[str, str]]]] = []
         self._counts: dict[str, int] = {}
+        self.chunk_size = 5  # characters per streamed piece
+        self.fail_stream_after: dict[str, int] = {}  # step -> characters delivered before it fails
 
     def steps(self) -> list[str]:
         return [step for step, _ in self.calls]
@@ -109,6 +112,30 @@ class ScriptedChat:
         max_tokens: int | None = None,
         request_timeout: float | None = None,
     ) -> ChatResult:
+        return ChatResult(text=self._next(messages), input_tokens=100, output_tokens=20)
+
+    async def stream(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        *,
+        model: str,
+        json_mode: bool = False,
+        max_tokens: int | None = None,
+        request_timeout: float | None = None,
+        on_chunk: Callable[[str], Awaitable[None]],
+    ) -> ChatResult:
+        """The scripted reply, delivered `chunk_size` characters at a time. Give a step the value
+        `fail_stream_after[step] = n` to fail once n characters were delivered."""
+        step = step_of(messages)
+        text = self._next(messages)
+        fail_after = self.fail_stream_after.get(step)
+        for start in range(0, len(text), self.chunk_size):
+            if fail_after is not None and start >= fail_after:
+                raise ChatError("the connection dropped mid-answer")
+            await on_chunk(text[start : start + self.chunk_size])
+        return ChatResult(text=text, input_tokens=100, output_tokens=20)
+
+    def _next(self, messages: Sequence[Mapping[str, str]]) -> str:
         step = step_of(messages)
         number = self._counts.get(step, 0)
         self._counts[step] = number + 1
@@ -120,8 +147,7 @@ class ScriptedChat:
             raise AssertionError(f"the test gave no answer for the {step!r} step")
         if isinstance(answer, Exception):
             raise answer
-        text = answer(messages, number) if callable(answer) else answer
-        return ChatResult(text=str(text), input_tokens=100, output_tokens=20)
+        return str(answer(messages, number) if callable(answer) else answer)
 
 
 def candidate(
@@ -213,8 +239,12 @@ class Harness:
         assert self.conversation_id is not None
         return self.conversation_id
 
-    async def ask(self, runtime: AgentRuntime, text_in: str) -> RunResult:
-        return await runtime.run(self.identity, await self.conversation(), text_in)
+    async def ask(
+        self, runtime: AgentRuntime, text_in: str, *, on_event: Sink | None = None
+    ) -> RunResult:
+        return await runtime.run(
+            self.identity, await self.conversation(), text_in, on_event=on_event
+        )
 
     async def rows(self, sql: str, **params: Any) -> list[tuple[Any, ...]]:
         async with self.owner.connect() as conn:

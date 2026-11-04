@@ -6,11 +6,12 @@ only needs one short answer per call.
 
 import json
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 from starit_core.config import Settings
+from starit_core.ingest.tokens import count_tokens
 
 
 class ChatError(Exception):
@@ -53,17 +54,14 @@ class LiteLLMChatClient:
         self._gateway_key = gateway_key
         self._fallbacks = list(fallbacks)
 
-    async def complete(
+    def _request(
         self,
         messages: Sequence[Mapping[str, str]],
-        *,
         model: str,
-        json_mode: bool = False,
-        max_tokens: int | None = None,
-        request_timeout: float | None = None,
-    ) -> ChatResult:
-        import litellm  # imported here: it is slow to import
-
+        json_mode: bool,
+        max_tokens: int | None,
+        request_timeout: float | None,
+    ) -> dict[str, Any]:
         options: dict[str, Any] = {
             "temperature": 0,
             # Models that reason by default spend tokens (and money) thinking; this task does
@@ -71,6 +69,7 @@ class LiteLLMChatClient:
             "reasoning_effort": "none",
             "drop_params": True,
             "num_retries": 2,
+            "messages": [dict(m) for m in messages],
         }
         if json_mode:
             options["response_format"] = {"type": "json_object"}
@@ -89,10 +88,23 @@ class LiteLLMChatClient:
             # "openai/" prefix as the model above, so the gateway sees the configured names.
             via_gateway = bool(self._gateway_url)
             options["fallbacks"] = [f"openai/{m}" if via_gateway else m for m in self._fallbacks]
+        options["model"] = model
+        return options
+
+    async def complete(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        *,
+        model: str,
+        json_mode: bool = False,
+        max_tokens: int | None = None,
+        request_timeout: float | None = None,
+    ) -> ChatResult:
+        import litellm  # imported here: it is slow to import
+
+        request = self._request(messages, model, json_mode, max_tokens, request_timeout)
         try:
-            response = await litellm.acompletion(
-                model=model, messages=[dict(m) for m in messages], **options
-            )
+            response = await litellm.acompletion(**request)
         except Exception as exc:
             raise ChatError(f"{type(exc).__name__}: {exc}") from exc
         usage = response.usage
@@ -102,6 +114,50 @@ class LiteLLMChatClient:
             output_tokens=getattr(usage, "completion_tokens", 0) or 0,
             model=str(getattr(response, "model", "") or ""),
         )
+
+    async def stream(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        *,
+        model: str,
+        json_mode: bool = False,
+        max_tokens: int | None = None,
+        request_timeout: float | None = None,
+        on_chunk: Callable[[str], Awaitable[None]],
+    ) -> ChatResult:
+        """Like `complete`, but `on_chunk` gets each piece of text as it arrives. An error after
+        some text was delivered is still a ChatError; the caller decides about that text."""
+        import litellm
+
+        request = self._request(messages, model, json_mode, max_tokens, request_timeout)
+        parts: list[str] = []
+        usage: Any = None
+        answered = ""
+        try:
+            response = await litellm.acompletion(
+                stream=True, stream_options={"include_usage": True}, **request
+            )
+            async for chunk in response:
+                answered = str(getattr(chunk, "model", "") or answered)
+                if getattr(chunk, "usage", None):
+                    usage = chunk.usage
+                for choice in chunk.choices or []:
+                    piece = getattr(choice.delta, "content", None)
+                    if piece:
+                        parts.append(piece)
+                        await on_chunk(piece)
+        except ChatError:
+            raise
+        except Exception as exc:
+            raise ChatError(f"{type(exc).__name__}: {exc}") from exc
+        text = "".join(parts)
+        if usage is not None:
+            tokens_in = getattr(usage, "prompt_tokens", 0) or 0
+            tokens_out = getattr(usage, "completion_tokens", 0) or 0
+        else:  # the provider sent no usage: estimate, rather than count the call as free
+            tokens_in = sum(count_tokens(m["content"]) for m in messages)
+            tokens_out = count_tokens(text)
+        return ChatResult(text, tokens_in, tokens_out, answered)
 
 
 def parse_fallbacks(value: str) -> list[str]:

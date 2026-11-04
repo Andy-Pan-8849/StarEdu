@@ -44,6 +44,14 @@ class Telemetry:
         self.llm_calls = meter.create_counter("starit.llm.calls", description="Model calls")
         self.llm_tokens = meter.create_counter("starit.llm.tokens", description="Model tokens")
         self.llm_duration = meter.create_histogram("starit.llm.duration", unit="s")
+        self.llm_first_token = meter.create_histogram(
+            "starit.llm.time_to_first_token", unit="s", description="Streamed model calls"
+        )
+        self.run_first_token = meter.create_histogram(
+            "starit.run.time_to_first_token",
+            unit="s",
+            description="From the request to the first answer text the user can see",
+        )
         self.node_duration = meter.create_histogram("starit.agent.node.duration", unit="s")
         self.retrievals = meter.create_counter("starit.retrieval.queries")
         self.retrieval_duration = meter.create_histogram("starit.retrieval.duration", unit="s")

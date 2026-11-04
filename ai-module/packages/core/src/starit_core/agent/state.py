@@ -79,4 +79,5 @@ class RunContext:
     chat: Any  # a budget-counting ChatClient
     reranker: Any
     data_tools: Any = None  # a DataToolsClient
+    emitter: Any = None  # a RunEmitter when a client is listening, else None
     access_token: str | None = None  # the caller's raw JWT: in memory only, never logged
