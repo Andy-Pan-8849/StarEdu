@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0}</style>
+<title>架构图对照验收表</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* 布局：8 层的纵向堆叠，和架构图同一个顺序；每一行是"图上画的 | 我们做的 | 状态"三栏并排。 */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #16212b;
+  --muted: #566573;
+  --line: #d8dfe6;
+  --accent: #0a6c74;
+  --accent-tint: #dff1f2;
+  --ok: #17703f;       --ok-tint: #e1f3e8;
+  --alt: #2a5db0;      --alt-tint: #e4ecfa;
+  --part: #8f5a00;     --part-tint: #fbefd2;
+  --none: #4b5663;     --none-tint: #e9edf1;
+  --flag: #a4331f;     --flag-tint: #fbe6e1;
+  --font-body: "Noto Sans SC", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11171d; --surface: #19212a; --ink: #e6ecf1; --muted: #97a5b2; --line: #2c3945;
+    --accent: #55c2cb; --accent-tint: #173a3e;
+    --ok: #6fd69a;  --ok-tint: #17352a;
+    --alt: #8fb4f2; --alt-tint: #1c2c47;
+    --part: #f0bd62; --part-tint: #3b2d0f;
+    --none: #aab6c2; --none-tint: #26303a;
+    --flag: #f19a8b; --flag-tint: #44201b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11171d; --surface: #19212a; --ink: #e6ecf1; --muted: #97a5b2; --line: #2c3945;
+  --accent: #55c2cb; --accent-tint: #173a3e;
+  --ok: #6fd69a;  --ok-tint: #17352a;
+  --alt: #8fb4f2; --alt-tint: #1c2c47;
+  --part: #f0bd62; --part-tint: #3b2d0f;
+  --none: #aab6c2; --none-tint: #26303a;
+  --flag: #f19a8b; --flag-tint: #44201b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1 { font-size: 28px; line-height: 1.25; margin: 0; text-wrap: balance; }
+h2 { font-size: 18px; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.sub { color: var(--muted); max-width: 68ch; }
+.mono { font-family: var(--font-mono); }
+
+/* 结论 */
+.verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.verdict > div { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+.verdict b { display: block; margin-bottom: 4px; }
+.verdict .flag-note { background: var(--flag-tint); border-color: transparent; }
+
+/* 总览条 */
+.overview { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: var(--none-tint); }
+.bar i { display: block; height: 100%; }
+.bar .s-done { background: var(--ok); } .bar .s-alt { background: var(--alt); }
+.bar .s-partial { background: var(--part); } .bar .s-none { background: var(--none); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+.legend span b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.dot.s-done { background: var(--ok); } .dot.s-alt { background: var(--alt); }
+.dot.s-partial { background: var(--part); } .dot.s-none { background: var(--none); }
+
+/* 标签页与筛选 */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.tab, .chip {
+  font: inherit; font-size: 14px; color: var(--ink); background: transparent; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px;
+}
+.tab[aria-selected="true"], .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .tab[aria-selected="true"], :root[data-theme="dark"] .chip[aria-pressed="true"] { color: #08262a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tab[aria-selected="true"], :root:not([data-theme="light"]) .chip[aria-pressed="true"] { color: #08262a; }
+}
+.tab:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filters .label { color: var(--muted); font-size: 13px; margin-right: 2px; }
+
+/* 层 */
+.layer { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.layer-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--accent-tint); }
+.layer-head .no { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+.layer-head .count { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cols, .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr) minmax(0, 190px); gap: 6px 18px; padding: 11px 16px; }
+.cols { font-size: 12px; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--line); padding-block: 8px; }
+.row { border-bottom: 1px solid var(--line); align-items: start; }
+.row:last-child { border-bottom: 0; }
+.seen { font-weight: 500; }
+.did { color: var(--ink); }
+.did small { display: block; color: var(--muted); margin-top: 2px; font-size: 13px; }
+.state { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.pill { display: inline-block; font-size: 13px; font-weight: 500; padding: 1px 10px; border-radius: 3px; }
+.pill.s-done { background: var(--ok-tint); color: var(--ok); }
+.pill.s-alt { background: var(--alt-tint); color: var(--alt); }
+.pill.s-partial { background: var(--part-tint); color: var(--part); }
+.pill.s-none { background: var(--none-tint); color: var(--none); }
+.why { font-size: 12.5px; color: var(--muted); }
+.why.flag { color: var(--flag); font-weight: 500; }
+.why.flag::before { content: "需要你定 · "; }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+
+/* 卡片列表（需求 A–H、P1、待办） */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.card h3 { font-size: 15px; margin: 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.card .meta b { color: var(--ink); font-weight: 500; }
+.rec { font-size: 13px; font-weight: 500; padding: 1px 9px; border-radius: 3px; background: var(--accent-tint); color: var(--accent); }
+.rec.later { background: var(--none-tint); color: var(--none); }
+.rec.ask { background: var(--flag-tint); color: var(--flag); }
+.section-note { color: var(--muted); font-size: 14px; max-width: 78ch; }
+.group-title { margin-top: 6px; }
+
+@media (max-width: 760px) {
+  h1 { font-size: 23px; }
+  .cols { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 4px; padding-block: 14px; }
+  .state { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+  .seen::before { content: "图上画的　"; color: var(--muted); font-weight: 400; font-size: 12px; }
+  .did::before { content: "我们做的　"; color: var(--muted); font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <h1>架构图对照验收表</h1>
+    <p class="sub">把基准架构图（<span class="mono">interview_arch_traditional_plus_ai_v2.png</span>）里和 AI 部分有关的每个格子，对照 <span class="mono">v0.1.0</span> 实际做出来的东西，逐格标出状态和原因。2026-11-04。</p>
+  </header>
+
+  <section class="verdict" aria-label="结论">
+    <div><b>第一阶段清单 A–H</b>没有真正的缺项；有 5 处打了折扣：上下文只截断不摘要、显式拒绝在认证层、Loki、lite、20% 人工抽查。</div>
+    <div><b>做法和图不同、但是有意决定的</b>用 Postgres 队列代替 Kafka、Postgres 全文代替 Elasticsearch、视图代替 RLS、LLM 重排代替 Cohere、会话状态存表代替 checkpointer。</div>
+    <div class="flag-note"><b>图上有、需求里没有、也没规划的</b>输出端护栏与 PII 脱敏、Jailbreak 检测、MCP Resources、Analytics 与 Web Search、fallback、Redis 缓存。红字标"需要你定"的就是这些。</div>
+  </section>
+
+  <section class="overview" aria-label="总览">
+    <h2>按架构图统计（<span id="total"></span> 个格子）</h2>
+    <div class="bar" id="bar" role="img" aria-label="各状态占比"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="视图">
+    <button class="tab" role="tab" id="t-layers" data-view="layers">按架构图的层（8 层）</button>
+    <button class="tab" role="tab" id="t-req" data-view="req">需求清单 A–H</button>
+    <button class="tab" role="tab" id="t-p1" data-view="p1">第二阶段 P1 与后续项</button>
+    <button class="tab" role="tab" id="t-todo" data-view="todo">这次发现的待办</button>
+  </nav>
+
+  <div id="view-layers" hidden>
+    <div class="filters" id="filters" style="margin-bottom:14px"></div>
+    <div id="layers" style="display:flex;flex-direction:column;gap:16px"></div>
+  </div>
+  <div id="view-req" hidden></div>
+  <div id="view-p1" hidden></div>
+  <div id="view-todo" hidden></div>
+</div>
+
+<script>
+/* 状态：done 做了　alt 做法不同（有意决定）　partial 做了一部分　none 没做
+   why：d 设计时决定　p1 排给第二阶段　out 不在 AI 范围　none 没规划　unv 我没验证　gap 没对齐
+   flag：true 表示需要你来决定 */
+var STATUS = {
+  done: { label: "做了" }, alt: { label: "做法不同" }, partial: { label: "做了一部分" }, none: { label: "没做" }
+};
+var WHY = {
+  d: ["设计时决定的", false], p1: ["排给第二阶段（P1）", false], out: ["不在 AI 范围", false],
+  none: ["图上有，需求清单里没有，没规划", true], unv: ["配了，我没验证过", true], gap: ["和图没对齐", true], later: ["单独排期", false]
+};
+var LAYERS = [
+  { no: "①", name: "用户浏览器", items: [
+    ["React SPA（TanStack Query、SSE Client）", "Next.js 15 App Router，页面是客户端组件，直接调 API；没有 TanStack Query，没有 SSE 客户端", "partial", "p1"],
+    ["Mobile App（RN / Native）", "—", "none", "out"]
+  ]},
+  { no: "②", name: "边缘与反向代理", items: [
+    ["Keycloak（SSO、JWT / OIDC）", "演示 realm 随 make up 导入；浏览器内授权码 + PKCE；api 和 MCP 各自用 JWKS 校验", "done"],
+    ["Nginx / Cloudflare 反向代理，/ → Next.js、/api/ai/ → FastAPI", "浏览器分别访问 3000 和 8000 端口，api 靠 CORS 放行前端来源。等企业后台出现、需要统一入口时才有意义", "none", "d"],
+    ["CDN + WAF", "—", "none", "later"]
+  ]},
+  { no: "③", name: "服务进程（FastAPI 8000）", items: [
+    ["LangGraph 编排", "agent 包；图结构有测试，每个节点都能到达某个结束状态", "done"],
+    ["Checkpointer", "会话状态（session_mode、pending_question、clarify_count）存在 ai.conversations，不用 LangGraph 的 checkpointer", "alt", "d"],
+    ["/chat 的 SSE 流式对话", "现在是一次性 JSON；响应结构已为 SSE 预留", "none", "p1"],
+    ["限流（3 维）", "1 维：每用户每分钟 20 次（Redis）", "partial", "gap"],
+    ["PII 脱敏", "—", "none", "none"],
+    ["复用同一把 JWT", "api 和 MCP 校验同一个 Keycloak JWT；调 MCP 时转发用户自己的令牌", "done"],
+    ["Langfuse LLM 观测", "OTel → Collector → Langfuse；同一个 trace 在 Tempo 和 Langfuse 里实测都看到了", "done"]
+  ]},
+  { no: "④", name: "Agent 层", items: [
+    ["Router：意图识别、分类分流", "understand 节点，5 种意图：文档问答、数据查询、写操作、闲聊、范围外", "done"],
+    ["Router：失败 fallback", "每个节点失败都落到 error 结束状态并带原因码；模型调用有次数上限和重试", "done"],
+    ["RAG Agent（混合检索 + Rerank）", "关键词 + 向量 + RRF + LLM 列表式重排；完整评测里重排后 hit@1 达到 1.0", "done"],
+    ["SQL Agent（Text-to-SQL、Postgres 只读）", "sqlglot 白名单校验 + 只读角色 + 视图；数据题 41/41 通过", "done"],
+    ["SQL Agent 的 RLS 行级权限", "行级范围由 ai_sql 视图的 WHERE 保证，不用 Postgres RLS", "alt", "d"],
+    ["Chit-chat（纯 LLM）", "固定回复，不调用模型", "alt", "d"],
+    ["Guardrail 前置：Prompt Injection 检测", "几条正则；代码注释写明只是最简单的几种。真正的防线是模型拿不到用户无权读的内容", "partial", "d"],
+    ["Guardrail 前置：Jailbreak 检测", "没有分类器", "none", "none"],
+    ["Guardrail 后置：PII 脱敏、敏感词", "输出没有再过一道过滤", "none", "none"],
+    ["Guardrail 后置：越权拦截", "不在输出端拦，而在数据层保证：权限过滤、视图、数据工具。权限回归 2,394 次检索越权为 0", "alt", "d"],
+    ["Analytics Agent（数据分析、图表、报表）", "—", "none", "none"],
+    ["Web Search Agent", "—", "none", "none"],
+    ["Action Agent（改业务数据 → NestJS REST）", "识别出写操作后直接以 refused / write_not_enabled 结束", "none", "p1"]
+  ]},
+  { no: "⑤", name: "MCP Server", items: [
+    ["Tools", "6 个工具；真实 HTTP 服务；令牌过期、被改、受众不对都得 401；转发用户令牌；每次调用有审计", "done"],
+    ["Resources（URI 定位的只读数据源）", "—", "none", "none"],
+    ["Prompt Templates（版本化、A/B）", "提示词是仓库里的文件，有版本号并写进每次运行的审计；没有通过 MCP 提供，没有 A/B", "partial", "d"]
+  ]},
+  { no: "⑥", name: "LLM 网关", items: [
+    ["LiteLLM：统一入口、路由、重试", "M8 才补上（这是 M5 漏记的偏差）；供应商密钥只在 litellm 容器里；实测 3 次对话 + 1 次向量化都是 200", "done"],
+    ["LiteLLM：多模型 fallback", "没有配置备用模型", "none", "none"],
+    ["LiteLLM：计费", "没有开成本统计", "none", "p1"],
+    ["OpenAI 主力模型", "gpt-6-luna 对话，text-embedding-3-small 向量", "done"],
+    ["Claude Opus / Sonnet", "网关配置有 anthropic/*，.env 里有密钥，但没有用 Anthropic 模型跑过任何调用", "partial", "unv"],
+    ["Local vLLM（敏感数据兜底）", "—", "none", "none"],
+    ["Embedding", "提供方、模型、维度都是配置变量；分块记录模型与维度", "done"],
+    ["Rerank（Cohere Rerank v3）", "用 LLM 列表式重排；检索接口预留了专用重排 API，没接", "alt", "d"]
+  ]},
+  { no: "⑦", name: "数据层", items: [
+    ["PostgreSQL：聊天历史、审计、RBAC + ABAC", "会话、消息、运行记录、审计（应用角色只能 INSERT）；角色或指定用户任一满足（OR），校区与职级都要满足（AND）", "done"],
+    ["PostgreSQL：主从、PITR 备份", "—", "none", "later"],
+    ["Redis：限流", "每用户每分钟 20 次，Redis 计数（STARIT_RATE_LIMIT_CHAT_PER_MINUTE）", "done"],
+    ["Redis：Session、JWT 黑名单、响应缓存、分布式锁、Pub/Sub", "只用于限流，没有对应的需求", "none", "none"],
+    ["Vector DB（pgvector、metadata 过滤）", "数据库内先按权限与版本过滤再排序；样例规模用精确扫描，没建 HNSW", "done"],
+    ["Kafka", "入库任务用 Postgres 队列（FOR UPDATE SKIP LOCKED）", "alt", "d"],
+    ["对象存储（S3 / MinIO、预签名 URL）", "pgsty/silo（MinIO 兼容）；原文由 api 转发并用同一个权限函数判断，没有预签名 URL", "alt", "d"],
+    ["Elasticsearch（BM25）", "Postgres 全文 ts_rank_cd + 编号加权；BM25 扩展没安装，评测说暂不需要", "alt", "d"]
+  ]},
+  { no: "⑧", name: "可观测性与部署", items: [
+    ["Prometheus + Grafana", "4 个仪表盘，每个查询都验证过能执行；渲染效果没人看过", "done"],
+    ["Tempo + OpenTelemetry", "api、worker、mcp-server；跨服务 trace；span 里没有令牌和问题文本（有测试）", "done"],
+    ["Langfuse（LLM 专用）", "可选 Compose 文件；模型调用显示为 generation", "done"],
+    ["Loki 日志", "日志是带 request_id、run_id、trace_id 的 JSON，没做集中日志", "none", "d"],
+    ["K8s + Helm + ArgoCD", "—", "none", "later"],
+    ["Vault 密钥、Sentry 错误", "—", "none", "none"]
+  ]}
+];
+
+var REQ = [
+  ["A 知识库与 ETL", "done", "上传、可插拔解析器、可配置分块、来源与标题路径、元数据、embedding 配置、入库状态与失败原因与重试都有。派生内容做了，但默认关闭（评测没有显示明显收益）。"],
+  ["B 检索", "done", "全文 + 向量 + RRF、库内先过滤、重排、检索器可插拔。编号类问题 13 题全部通过。"],
+  ["C 员工助手", "partial", "带引用的问答、用户创建会话、没权限或查不到时明说都有。上下文过长是截断（最近 6 轮），没有做摘要；没答案时偶尔仍标“已回答”（无泄露）。"],
+  ["D Agent", "done", "固定流程 + 局部 Agent，三类工具，显式结束状态与原因码，会话状态。结束状态合法 114/114。"],
+  ["E 身份与权限", "partial", "Keycloak JWT + JWKS、授权 OR / 强制 AND、审计都有，权限回归越权 0。显式拒绝在认证层处理（账号停用即拒绝），没有单独的拒绝名单。"],
+  ["G 评测与可观测性", "partial", "评测集 114 + 41（比原定 54 + 16 多），Langfuse、OTel、Prometheus、Grafana 都有。20% 人工抽查没做，Loki 没做。"],
+  ["H 前端与部署", "partial", "聊天页、会话列表、引用展示、文档管理页、Compose full、一键导入样例数据都有。lite（k3s）没做。"]
+];
+var P1 = [
+  { g: "需求文档确认的 4 项", items: [
+    ["流式输出", "响应结构已预留", "后端 generate 流式 + SSE，前端 SSE 客户端。动手前要先定怎么处理 verify_answer：校验通过后再流出，还是先流出、不通过时撤回。", "中", "补上", "do"],
+    ["成本与延迟统计（按模型、按会话）", "ai.runs 只存合计 token；Prometheus 已有按模型的 token 与延迟", "逐次调用的用量表 + 价格表 + 按会话汇总的接口和页面。", "小到中", "补上", "do"],
+    ["Memory（只存稳定偏好和事实）", "没有", "表、load_memory / save_memory 节点、用户能查看和删除的页面、隐私规则（不存受限内容）。", "中偏大", "放一放", "later"],
+    ["写操作需用户确认", "写操作直接拒绝", "confirm_action（LangGraph interrupt）+ 一个可写的目标。现在没有可写的业务系统。", "大", "放一放，等企业后台有了再做", "later"]
+  ]},
+  { g: "设计里提到、但不在这 4 项里的后续项", items: [
+    ["lite profile（Oracle k3s、Helm、身份方案）", "单独排期", "依赖你核实 Oracle 额度。", "大", "放一放", "later"],
+    ["企业后台（NestJS 业务模块）", "子项目 2", "下一个大工程。", "大", "放一放", "later"],
+    ["Auditor 角色与审计查询接口", "03 里写了“第二阶段可加”", "—", "小", "放一放", "later"],
+    ["加盟店数据、中文版数据", "07 里列为不在第一阶段", "—", "中", "放一放", "later"],
+    ["BM25 扩展", "评测说暂不需要", "—", "小", "放一放", "later"],
+    ["Loki 集中日志", "图上有，M8 里主动没做", "省约 0.5 GB 内存。", "小", "放一放", "later"]
+  ]}
+];
+var TODO = [
+  ["20% 人工抽查", "docs/eval/answers-20261104-0454.csv。判官的结论在人看过之前不能当作事实。", "先做", "do"],
+  ["understand 过度反问澄清", "87 道可直接回答的题里有 4 道被反问（DOC-04、31、42、69），例如“哪一年”。改提示词并重新评测。", "补上", "do"],
+  ["没答案时仍标“已回答”", "DOC-108：回答里说“没写”，结束状态却是 answered（没有泄露）。和上一项一起改。", "补上", "do"],
+  ["Anthropic 路径与 LLM fallback", "配了没验证。成本极小，几个调用。", "补上", "do"],
+  ["输出端护栏（PII、敏感词）、Jailbreak 分类器", "图上有，我们只有正则。企业场景值得做，但需求清单没列。", "要你定", "ask"],
+  ["限流从 1 维到 3 维", "图上是 3 维，需求只要求限流。", "放一放", "later"],
+  ["把没点过的地方点一遍", "文档页的编辑、重新入库、失败原因没在真浏览器里点过；Playwright 不在 CI；Grafana 仪表盘没人看过渲染效果。", "放一放，或你自己点一遍", "later"]
+];
+
+var state = { view: "layers", filter: "all" };
+function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+function stats() {
+  var c = { done: 0, alt: 0, partial: 0, none: 0, flag: 0 }, total = 0;
+  LAYERS.forEach(function (L) { L.items.forEach(function (it) { c[it[2]]++; total++; if (it[3] && WHY[it[3]][1]) c.flag++; }); });
+  c.total = total; return c;
+}
+function renderOverview() {
+  var c = stats();
+  document.getElementById("total").textContent = c.total;
+  var bar = document.getElementById("bar"), legend = document.getElementById("legend");
+  ["done", "alt", "partial", "none"].forEach(function (k) {
+    var seg = el("i", "s-" + k); seg.style.width = (c[k] / c.total * 100) + "%"; seg.title = STATUS[k].label + " " + c[k]; bar.appendChild(seg);
+    legend.appendChild(el("span", null, '<i class="dot s-' + k + '"></i>' + STATUS[k].label + " <b>" + c[k] + "</b>"));
+  });
+  legend.appendChild(el("span", null, "其中需要你决定 <b style='color:var(--flag)'>" + c.flag + "</b>"));
+}
+function renderFilters() {
+  var f = document.getElementById("filters");
+  f.appendChild(el("span", "label", "筛选"));
+  [["all", "全部"], ["done", "做了"], ["alt", "做法不同"], ["partial", "做了一部分"], ["none", "没做"], ["flag", "需要你决定"]].forEach(function (p) {
+    var b = el("button", "chip", p[1]); b.type = "button"; b.dataset.f = p[0];
+    b.addEventListener("click", function () { state.filter = p[0]; renderLayers(); syncChips(); });
+    f.appendChild(b);
+  });
+  syncChips();
+}
+function syncChips() {
+  document.querySelectorAll("#filters .chip").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.f === state.filter ? "true" : "false"); });
+}
+function match(it) {
+  if (state.filter === "all") return true;
+  if (state.filter === "flag") return !!(it[3] && WHY[it[3]][1]);
+  return it[2] === state.filter;
+}
+function renderLayers() {
+  var box = document.getElementById("layers"); box.innerHTML = "";
+  var shown = 0;
+  LAYERS.forEach(function (L) {
+    var rows = L.items.filter(match); if (!rows.length) return; shown += rows.length;
+    var sec = el("section", "layer");
+    var head = el("div", "layer-head", '<span class="no">' + L.no + '</span><h2>' + L.name + '</h2><span class="count">' + rows.length + " / " + L.items.length + " 项</span>");
+    sec.appendChild(head);
+    sec.appendChild(el("div", "cols", "<span>图上画的</span><span>我们做的</span><span>状态与原因</span>"));
+    rows.forEach(function (it) {
+      var why = it[3] ? '<span class="why' + (WHY[it[3]][1] ? " flag" : "") + '">' + WHY[it[3]][0] + "</span>" : "";
+      var r = el("div", "row",
+        '<div class="seen">' + it[0] + '</div><div class="did">' + it[1] + '</div><div class="state"><span class="pill s-' + it[2] + '">' + STATUS[it[2]].label + "</span>" + why + "</div>");
+      sec.appendChild(r);
+    });
+    box.appendChild(sec);
+  });
+  if (!shown) box.appendChild(el("div", "empty", "这个筛选下没有条目。"));
+}
+function renderReq() {
+  var v = document.getElementById("view-req");
+  v.appendChild(el("p", "section-note", "需求文档第七轮确认的第一阶段清单（没有 F，原文如此）。每项一句话说清做到了什么、打了什么折扣。"));
+  var grid = el("div", "cards"); grid.style.marginTop = "14px";
+  REQ.forEach(function (r) { grid.appendChild(el("div", "card", "<h3>" + r[0] + ' <span class="pill s-' + r[1] + '">' + STATUS[r[1]].label + "</span></h3><p>" + r[2] + "</p>")); });
+  v.appendChild(grid);
+}
+function renderP1() {
+  var v = document.getElementById("view-p1");
+  P1.forEach(function (grp, gi) {
+    v.appendChild(el("h2", "group-title", grp.g));
+    var grid = el("div", "cards"); grid.style.marginTop = "12px"; grid.style.marginBottom = "20px";
+    grp.items.forEach(function (it) {
+      grid.appendChild(el("div", "card",
+        '<h3>' + it[0] + '</h3><p>' + it[2] + '</p><div class="meta"><span>现状 <b>' + it[1] + '</b></span><span>规模 <b>' + it[3] + '</b></span></div><div><span class="rec ' + (it[5] === "do" ? "" : "later") + '">建议：' + it[4] + "</span></div>"));
+    });
+    v.appendChild(grid);
+  });
+}
+function renderTodo() {
+  var v = document.getElementById("view-todo");
+  v.appendChild(el("p", "section-note", "这次核对和 M8 评测里发现的，不在原来的清单里。"));
+  var grid = el("div", "cards"); grid.style.marginTop = "14px";
+  TODO.forEach(function (t) {
+    grid.appendChild(el("div", "card", "<h3>" + t[0] + "</h3><p>" + t[1] + '</p><div><span class="rec ' + (t[3] === "do" ? "" : t[3]) + '">建议：' + t[2] + "</span></div>"));
+  });
+  v.appendChild(grid);
+}
+function show(view) {
+  state.view = view;
+  ["layers", "req", "p1", "todo"].forEach(function (k) {
+    document.getElementById("view-" + k).hidden = k !== view;
+    var t = document.getElementById("t-" + k); t.setAttribute("aria-selected", k === view ? "true" : "false");
+  });
+  try { if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view); } catch (e) {}
+}
+document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { show(t.dataset.view); }); });
+window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (["layers", "req", "p1", "todo"].indexOf(h) >= 0) show(h); });
+renderOverview(); renderFilters(); renderLayers(); renderReq(); renderP1(); renderTodo();
+(function () { var h = location.hash.slice(1); show(["layers", "req", "p1", "todo"].indexOf(h) >= 0 ? h : "layers"); })();
+</script>
+
+</body>
+</html>
