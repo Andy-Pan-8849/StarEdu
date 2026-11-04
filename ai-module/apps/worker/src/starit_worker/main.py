@@ -9,8 +9,10 @@ from starit_core.config import get_settings
 from starit_core.db import create_engine
 from starit_core.embeddings import embedding_client
 from starit_core.ingest.worker import run_worker
+from starit_core.llm import chat_client
 from starit_core.logging import configure_logging
 from starit_core.storage import S3Storage
+from starit_core.telemetry import instrument_engine, setup_telemetry
 
 logger = logging.getLogger("starit.worker")
 
@@ -23,7 +25,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 async def _run(once: bool) -> None:
     settings = get_settings()
+    setup_telemetry(settings, "starit-worker")
     engine = create_engine(settings)
+    instrument_engine(engine)
     storage = S3Storage(settings)
     await storage.ensure_bucket()
     embedder = embedding_client(settings)
@@ -32,7 +36,7 @@ async def _run(once: bool) -> None:
         settings.embedding_provider, embedder.model, embedder.dimensions,
     )  # fmt: skip
     try:
-        await run_worker(engine, storage, embedder, settings, once=once)
+        await run_worker(engine, storage, embedder, settings, once=once, chat=chat_client(settings))
     finally:
         await engine.dispose()
 

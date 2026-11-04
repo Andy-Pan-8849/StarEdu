@@ -2,10 +2,12 @@
 without saying who is asking."""
 
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from functools import wraps
 
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from starit_core import telemetry
 from starit_core.auth import Identity
 from starit_core.config import Settings
 from starit_core.embeddings import EmbeddingClient
@@ -20,6 +22,34 @@ from starit_core.retrieval.vector import vector_search
 MODES = ("keyword", "vector", "hybrid", "hybrid_rerank")
 
 
+def _traced[**P](
+    fn: Callable[P, Awaitable[RetrievalResult]],
+) -> Callable[P, Awaitable[RetrievalResult]]:
+    """A span and metrics around a retrieval; only numbers and the mode go into them."""
+
+    @wraps(fn)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> RetrievalResult:
+        mode = str(kwargs.get("mode", ""))
+        tele = telemetry.current()
+        started = time.perf_counter()
+        with telemetry.span("retrieval.search", {"retrieval.mode": mode}) as active:
+            result = await fn(*args, **kwargs)
+            d = result.diagnostics
+            active.set_attribute("retrieval.keyword_candidates", d.keyword_candidates)
+            active.set_attribute("retrieval.vector_candidates", d.vector_candidates)
+            active.set_attribute("retrieval.returned", len(result.chunks))
+            active.set_attribute("retrieval.restricted_hits", d.restricted_keyword_hits)
+            active.set_attribute("retrieval.rerank_failed", d.rerank_failed)
+        tele.retrievals.add(1, {"mode": mode})
+        tele.retrieval_duration.record(time.perf_counter() - started, {"mode": mode})
+        if d.restricted_keyword_hits:
+            tele.retrieval_restricted.add(d.restricted_keyword_hits, {"mode": mode})
+        return result
+
+    return wrapper
+
+
+@_traced
 async def retrieve(
     conn: AsyncConnection,
     identity: Identity,
@@ -56,7 +86,7 @@ async def retrieve(
     keyword_hits: list[Candidate] = []
     if mode != "vector":
         started = time.perf_counter()
-        searcher = keyword_searcher or TsRankKeywordSearcher()
+        searcher = keyword_searcher or TsRankKeywordSearcher(settings.retrieval_identifier_boost)
         keyword_hits = await searcher.search(conn, identity, query, settings.retrieval_keyword_k)
         timings["keyword"] = _ms(started)
     vector_hits: list[Candidate] = []

@@ -40,10 +40,23 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("EMBEDDING_DIMENSIONS", "STARIT_EMBEDDING_DIMENSIONS"),
     )
     embedding_batch_size: int = 64
+    # Derived content (summary and questions per chunk): none, summary, questions or all. Off by
+    # default; the evaluation decides whether it earns its cost (design 05, section 1.5).
+    ingest_derive: str = "none"
+    model_derive: str = "openai/gpt-6-luna"
+    model_judge: str = "openai/gpt-6-luna"  # grades answers in the evaluation
+
+    # How models are reached. "litellm_lib" calls the provider from this process with the key in
+    # this process's environment; "litellm_proxy" sends every call to the LiteLLM gateway
+    # service, which alone holds the provider keys (docs/design/01, section 4.2).
+    llm_gateway: str = "litellm_lib"
+    llm_gateway_url: str = "http://localhost:4100"
+    llm_gateway_key: str = Field(default="", repr=False)
 
     # Retrieval (docs/design/05-retrieval-etl-and-evaluation.md, section 2).
     retrieval_mode: str = "hybrid_rerank"  # keyword, vector, hybrid or hybrid_rerank
     keyword_searcher: str = "ts_rank_cd"
+    retrieval_identifier_boost: bool = True  # exact identifiers (ERR-PORTAL-403) get a bonus
     retrieval_keyword_k: int = 30
     retrieval_vector_k: int = 30
     retrieval_rrf_k: int = 60
@@ -81,6 +94,10 @@ class Settings(BaseSettings):
     )
     mcp_url: str = "http://localhost:8100/mcp"
     mcp_port: int = 8100
+    # OpenTelemetry: off by default; Compose turns it on with `make up-obs`.
+    otel_enabled: bool = False
+    otel_endpoint: str = "http://localhost:4318"  # OTLP/HTTP (the Collector)
+    otel_capture_content: bool = False  # put prompts and answers in spans (off: privacy)
     # Browser origins allowed to call the API (comma separated).
     cors_origins: str = "http://localhost:3000"
     # Host header values the MCP server accepts (DNS-rebinding protection stays on).

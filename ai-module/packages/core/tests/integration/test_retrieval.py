@@ -311,7 +311,7 @@ async def test_no_question_ever_returns_a_chunk_the_asker_may_not_read(
                         chunk.doc_code,
                     )
                 checked += 1
-    assert checked == 7 * 54 * 3
+    assert checked == 7 * len(QUESTIONS) * 3
 
 
 # --- versions -------------------------------------------------------------------------------
@@ -370,3 +370,23 @@ async def test_a_draft_is_never_returned(
                 )
             )
         await owner.dispose()
+
+
+async def test_retrieval_records_its_mode_and_counts_not_text(
+    conn: AsyncConnection, make_identity: Callable[..., Identity]
+) -> None:
+    from starit_core.testing import InMemoryTelemetry
+
+    tele = InMemoryTelemetry().install()
+    try:
+        student = identity_for_role("student", make_identity)
+        await search(
+            conn, student, "What is the pass threshold for instructor candidates?", "keyword"
+        )
+        (recorded,) = tele.spans("retrieval.search")
+        attrs = dict(recorded.attributes)
+        assert attrs["retrieval.mode"] == "keyword" and "retrieval.returned" in attrs
+        assert "pass threshold" not in tele.everything_recorded()
+        assert tele.metric_total("starit.retrieval.queries", mode="keyword") == 1
+    finally:
+        tele.restore()

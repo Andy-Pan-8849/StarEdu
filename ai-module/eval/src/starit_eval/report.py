@@ -198,7 +198,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         )
     else:
         lines.append(
-            f"54 个问题 × 7 个角色 × 3 种模式，共 {sweep['checked']} 次检索；"
+            f"{sweep['checked'] // 21} 个问题 × 7 个角色 × 3 种模式，共 {sweep['checked']} 次检索；"
             f"**越权的块：{len(sweep['violations'])}**。"
         )
         for violation in sweep["violations"][:20]:

@@ -56,11 +56,13 @@ def _columns() -> list[Any]:
     ]
 
 
-def keyword_statement(query: str, limit: int, access: Any | None) -> Any:
+def keyword_statement(
+    query: str, limit: int, access: Any | None, identifier_boost: bool = True
+) -> Any:
     """The keyword query. `access` is the permission condition; None builds the unfiltered
     probe version (see probe.py), which never leaves this package."""
     tsquery = or_tsquery(query)
-    identifiers = extract_identifiers(query)
+    identifiers = extract_identifiers(query) if identifier_boost else []
     id_array = literal(identifiers, ARRAY(Text))
     has_identifier = chunks.c.identifiers.overlap(id_array) if identifiers else literal(False)
     is_named_document = chunks.c.doc_code == any_(id_array) if identifiers else literal(False)
@@ -85,10 +87,15 @@ def keyword_statement(query: str, limit: int, access: Any | None) -> Any:
 
 
 class TsRankKeywordSearcher:
+    def __init__(self, identifier_boost: bool = True) -> None:
+        self._identifier_boost = identifier_boost
+
     async def search(
         self, conn: AsyncConnection, identity: Identity, query: str, limit: int
     ) -> list[Candidate]:
-        statement = keyword_statement(query, limit, chunk_access_clause(identity))
+        statement = keyword_statement(
+            query, limit, chunk_access_clause(identity), self._identifier_boost
+        )
         found: list[Candidate] = []
         for rank, row in enumerate((await conn.execute(statement)).mappings(), start=1):
             candidate = Candidate.from_row(row)

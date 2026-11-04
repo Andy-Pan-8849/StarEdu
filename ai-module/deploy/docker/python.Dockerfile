@@ -9,13 +9,24 @@ ENV UV_COMPILE_BYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
+
+# Dependencies first, from the manifests alone: this layer (and uv's download cache) is reused
+# when only source code changes, so a rebuild does not download every package again.
 COPY pyproject.toml uv.lock ./
+COPY packages/core/pyproject.toml ./packages/core/pyproject.toml
+COPY apps/api/pyproject.toml ./apps/api/pyproject.toml
+COPY apps/worker/pyproject.toml ./apps/worker/pyproject.toml
+COPY apps/mcp-server/pyproject.toml ./apps/mcp-server/pyproject.toml
+COPY eval/pyproject.toml ./eval/pyproject.toml
+ARG APP
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-workspace --package "starit-${APP}"
+
 COPY packages ./packages
 COPY apps ./apps
 COPY alembic.ini ./
 COPY migrations ./migrations
-
-ARG APP
-RUN uv sync --frozen --no-dev --package "starit-${APP}"
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --package "starit-${APP}"
 
 ENV PATH="/app/.venv/bin:$PATH"

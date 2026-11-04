@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime
@@ -264,3 +265,60 @@ def summarize_for_console(run: DataRun) -> str:
         f"{run.input_tokens} in / {run.output_tokens} out tokens"
         + (f"; failed: {', '.join(wrong)}" if wrong else "")
     )
+
+
+def summarize(run: DataRun) -> dict[str, Any]:
+    answerable = [r for r in run.results if r.question.should_answer]
+    refused = [r for r in run.results if not r.question.should_answer]
+    by_type: dict[str, list[DataResult]] = {}
+    for r in run.results:
+        by_type.setdefault(r.question.type, []).append(r)
+    return {
+        "questions": len(run.results),
+        "passed": run.passed,
+        "answerable": {"n": len(answerable), "passed": sum(r.ok for r in answerable)},
+        "must_refuse": {"n": len(refused), "passed": sum(r.ok for r in refused)},
+        "by_type": {t: [sum(r.ok for r in rs), len(rs)] for t, rs in sorted(by_type.items())},
+        "llm_calls": run.llm_calls,
+        "tokens": {"input": run.input_tokens, "output": run.output_tokens},
+        "failed": [r.question.id for r in run.results if not r.ok],
+    }
+
+
+async def store(engine: AsyncEngine, run: DataRun, sha: str | None, label: str) -> str:
+    """Record the run in ai.eval_runs and one row per question in ai.eval_results."""
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        run_id = (
+            await conn.execute(
+                text(
+                    "INSERT INTO ai.eval_runs (git_sha, config, summary) "
+                    "VALUES (:sha, CAST(:config AS jsonb), CAST(:summary AS jsonb)) RETURNING id"
+                ),
+                {
+                    "sha": sha,
+                    "config": json.dumps({"kind": "data", "label": label, "models": run.models}),
+                    "summary": json.dumps(summarize(run)),
+                },
+            )
+        ).scalar_one()
+        for r in run.results:
+            await conn.execute(
+                text(
+                    "INSERT INTO ai.eval_results (run_id, question_id, role, answer, passed, "
+                    "latency_ms, notes) VALUES (:run, :q, :role, :answer, :passed, :ms, :notes)"
+                ),
+                {
+                    "run": run_id,
+                    "q": r.question.id,
+                    "role": r.question.role,
+                    "answer": r.answer,
+                    "passed": r.ok,
+                    "ms": int(r.seconds * 1000),
+                    "notes": json.dumps(
+                        {"end": f"{r.end_state}/{r.end_reason}", "problems": r.problems}
+                    ),
+                },
+            )
+    return str(run_id)

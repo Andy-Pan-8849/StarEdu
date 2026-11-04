@@ -185,3 +185,70 @@ def test_the_compose_service_name_is_an_accepted_host(server: str) -> None:
 
 def test_an_unknown_host_is_refused_even_with_a_valid_token(server: str) -> None:
     assert _initialize(server, "evil.example").status_code in (400, 421)
+
+
+# --- the trace continues across the HTTP call ---------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def traced_server(scratch_urls: tuple[str, str]) -> Iterator[tuple[str, Any]]:
+    from starit_core.db import create_engine as app_engine
+    from starit_core.telemetry import Providers
+    from starit_core.testing import InMemoryTelemetry
+
+    tele = InMemoryTelemetry().install()
+    port = free_port()
+    url = f"http://127.0.0.1:{port}/mcp"
+    settings = Settings(
+        _env_file=None, database_url=scratch_urls[1], embedding_provider="fake", mcp_url=url,
+        oidc_issuer=ISSUER, mcp_allowed_hosts=f"127.0.0.1:{port}",
+    )  # fmt: skip
+    verifier = TokenVerifier(
+        issuer=ISSUER, audience="starit-mcp", key_resolver=lambda _t: KEY.public_key()
+    )
+    app = build_app(
+        settings,
+        app_engine(settings),
+        verifier,
+        Providers(tele.tracer_provider, tele.meter_provider),
+    )
+    instance = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
+    thread = threading.Thread(target=instance.run, daemon=True)
+    thread.start()
+    for _ in range(100):
+        if instance.started:
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("the server did not start")
+    yield url, tele
+    instance.should_exit = True
+    thread.join(timeout=5)
+    tele.restore()
+
+
+async def test_a_tool_call_is_one_trace_from_the_client_through_the_server(
+    traced_server: tuple[str, Any],
+) -> None:
+    from starit_core import telemetry
+
+    url, tele = traced_server
+    bearer = token()
+    with telemetry.span("caller"):
+        out = await McpDataTools(url, lambda _i: bearer).call(
+            whoever(), "list_assignments", {"program": "java"}
+        )
+    assert out["ok"] is True
+    spans = {
+        s.name: s for s in tele.spans() if s.name in ("caller", "mcp.client.call", "tool.call")
+    }
+    assert set(spans) == {"caller", "mcp.client.call", "tool.call"}
+    assert len({s.context.trace_id for s in spans.values()}) == 1
+    client_span = spans["mcp.client.call"]
+    server_spans = [
+        s
+        for s in tele.spans()
+        if s.parent is not None and s.parent.span_id == client_span.context.span_id
+    ]
+    assert server_spans, "the server's request span is a child of the client call"
+    assert bearer not in tele.everything_recorded()

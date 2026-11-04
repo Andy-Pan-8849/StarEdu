@@ -15,6 +15,7 @@ from starit_core.db import create_engine
 from starit_core.embeddings import embedding_client
 from starit_core.ingest.register import register_from_manifest
 from starit_core.ingest.worker import run_worker
+from starit_core.llm import chat_client
 from starit_core.storage import S3Storage
 
 DOCUMENTS = Path(__file__).resolve().parent.parent / "sample-data" / "documents"
@@ -30,7 +31,14 @@ async def main(wait: bool, process: bool, force: bool) -> None:
         print(f"{action}: {sum(r.action == action for r in results)}")
 
     if process:
-        await run_worker(engine, storage, embedding_client(settings), settings, once=True)
+        await run_worker(
+            engine,
+            storage,
+            embedding_client(settings),
+            settings,
+            once=True,
+            chat=chat_client(settings),
+        )
     if wait or process:
         deadline = time.monotonic() + 600
         while time.monotonic() < deadline:

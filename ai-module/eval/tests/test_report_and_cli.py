@@ -106,3 +106,19 @@ def test_prices() -> None:
     assert cost_usd("text-embedding-3-small", 1_000_000) == pytest.approx(0.02)
     assert cost_usd("openai/gpt-6-luna", 1_000_000, 1_000_000) == pytest.approx(0.60)
     assert cost_usd("openai/unlisted", 10) is None
+
+
+def test_the_new_commands_parse() -> None:
+    assert parse_args(["answers", "--only", "DOC-01", "--yes"]).only == ["DOC-01"]
+    assert parse_args(["all", "--yes", "--no-db"]).no_db is True
+    assert parse_args(["matrix", "--only", "baseline"]).only == ["baseline"]
+
+
+def test_the_report_counts_the_sweep_questions_from_its_own_numbers() -> None:
+    report = build_report(
+        label="t", settings=SETTINGS, corpus={"documents": 1, "chunks": 1, "avg_tokens": 1},
+        mode_runs=[ModeRun("hybrid", [run(question("1"), ["A"])], 0)],
+        sweep=SweepResult(checked=7 * 114 * 3, violations=[]), embedding_tokens=1,
+        rerank_model="m", embedding_model="e",
+    )  # fmt: skip
+    assert "114 个问题 × 7 个角色" in render_markdown(report)

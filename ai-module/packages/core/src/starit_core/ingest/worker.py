@@ -8,10 +8,12 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from starit_core import telemetry
 from starit_core.config import Settings
 from starit_core.embeddings import EmbeddingClient
 from starit_core.ingest import queue
 from starit_core.ingest.pipeline import process_job
+from starit_core.llm import ChatClient
 from starit_core.storage import ObjectStorage
 
 logger = logging.getLogger("starit.worker")
@@ -29,6 +31,7 @@ async def run_worker(
     *,
     once: bool = False,
     worker_id: str | None = None,
+    chat: ChatClient | None = None,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> int:
     """Process jobs until stopped, or, with `once`, until no job is ready. Returns jobs handled."""
@@ -38,6 +41,7 @@ async def run_worker(
         async with engine.begin() as conn:
             revived = await queue.requeue_stale(conn, settings.worker_stale_job_seconds)
             job = await queue.claim_next(conn, worker_id)
+            telemetry.current().set_queue_length(await queue.count_queued(conn))
         if revived:
             logger.warning("put %d stalled job(s) back in the queue", revived)
         if job is None:
@@ -46,5 +50,7 @@ async def run_worker(
             await sleep(settings.worker_poll_seconds)
             continue
         logger.info("job %s: document %s, attempt %d", job.id, job.document_id, job.attempt)
-        await process_job(engine, job, storage=storage, embedder=embedder, settings=settings)
+        await process_job(
+            engine, job, storage=storage, embedder=embedder, settings=settings, chat=chat
+        )
         handled += 1

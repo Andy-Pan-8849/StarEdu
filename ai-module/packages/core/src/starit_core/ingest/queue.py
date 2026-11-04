@@ -57,6 +57,16 @@ async def enqueue(
     return UUID(str(job_id))
 
 
+async def count_queued(conn: AsyncConnection) -> int:
+    return int(
+        (
+            await conn.execute(
+                text("SELECT count(*) FROM ai.ingestion_jobs WHERE status = 'queued'")
+            )
+        ).scalar_one()
+    )
+
+
 async def claim_next(conn: AsyncConnection, worker_id: str) -> Job | None:
     row = (
         (

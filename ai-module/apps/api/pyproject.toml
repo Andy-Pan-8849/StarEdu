@@ -8,6 +8,7 @@ dependencies = [
     "starit-core",
     "uvicorn>=0.30",
     "python-multipart>=0.0.20",
+    "opentelemetry-instrumentation-fastapi>=0.66b2",
 ]
 
 [build-system]

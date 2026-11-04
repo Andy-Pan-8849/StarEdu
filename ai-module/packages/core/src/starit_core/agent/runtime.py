@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 from langgraph.errors import GraphRecursionError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from starit_core import telemetry
 from starit_core.agent import messages
 from starit_core.agent.finish import finish_run
 from starit_core.agent.graph import build_graph
@@ -24,6 +25,7 @@ from starit_core.auth import Identity
 from starit_core.config import Settings
 from starit_core.embeddings import EmbeddingClient
 from starit_core.llm import ChatClient
+from starit_core.logging import run_id_var
 from starit_core.retrieval import retrieve
 from starit_core.retrieval.rerank import LLMReranker
 
@@ -71,8 +73,40 @@ class AgentRuntime:
         *,
         access_token: str | None = None,
     ) -> RunResult:
-        settings = self._settings
         run_id = uuid4()
+        token = run_id_var.set(str(run_id))
+        try:
+            with telemetry.span(
+                "agent.run",
+                {
+                    "run_id": str(run_id),
+                    "conversation_id": str(conversation_id),
+                    "user.roles": sorted(identity.roles),
+                    "langfuse.session.id": str(conversation_id),
+                    "langfuse.trace.name": "assistant run",
+                },
+            ) as active:
+                result = await self._run(identity, conversation_id, user_text, run_id, access_token)
+                active.set_attribute("agent.end_state", result.end_state)
+                active.set_attribute("agent.end_reason", result.end_reason or "")
+                if result.end_state == "error":
+                    telemetry.fail(active, result.end_reason or "error")
+            telemetry.current().runs.add(
+                1, {"end_state": result.end_state, "end_reason": result.end_reason or ""}
+            )
+            return result
+        finally:
+            run_id_var.reset(token)
+
+    async def _run(
+        self,
+        identity: Identity,
+        conversation_id: UUID,
+        user_text: str,
+        run_id: UUID,
+        access_token: str | None,
+    ) -> RunResult:
+        settings = self._settings
         started_at = datetime.now(UTC)
         clock = time.perf_counter()
         totals = RunTotals()

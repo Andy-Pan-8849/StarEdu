@@ -10,7 +10,9 @@ from typing import Any
 import httpx2
 from mcp.client import Client
 from mcp.client.streamable_http import streamable_http_client
+from opentelemetry import propagate
 
+from starit_core import telemetry
 from starit_core.auth import Identity
 
 CALL_TIMEOUT_S = 30.0
@@ -34,18 +36,22 @@ class McpDataTools:
         token = token or (self._token_for(identity) if self._token_for else None)
         if not token:
             return _error("forbidden", "No token to present to the data service.")
-        http = httpx2.AsyncClient(
-            headers={"Authorization": f"Bearer {token}"}, timeout=CALL_TIMEOUT_S
-        )
-        try:
-            async with http:
-                transport = streamable_http_client(self._url, http_client=http)
-                async with Client(transport, read_timeout_seconds=CALL_TIMEOUT_S) as client:
-                    result = await client.call_tool(name, arguments)
-        except Exception as exc:
-            return _error(
-                "internal_error", f"The data service is unavailable ({type(exc).__name__})."
-            )
+        with telemetry.span("mcp.client.call", {"tool": name}) as active:
+            # The trace continues in the MCP server: the W3C `traceparent` header carries it.
+            # The token is a header of the HTTP client only; it is not in any attribute.
+            headers = {"Authorization": f"Bearer {token}"}
+            propagate.inject(headers)
+            http = httpx2.AsyncClient(headers=headers, timeout=CALL_TIMEOUT_S)
+            try:
+                async with http:
+                    transport = streamable_http_client(self._url, http_client=http)
+                    async with Client(transport, read_timeout_seconds=CALL_TIMEOUT_S) as client:
+                        result = await client.call_tool(name, arguments)
+            except Exception as exc:
+                telemetry.fail(active, type(exc).__name__)
+                return _error(
+                    "internal_error", f"The data service is unavailable ({type(exc).__name__})."
+                )
         for block in result.content:
             text = getattr(block, "text", None)
             if text:
