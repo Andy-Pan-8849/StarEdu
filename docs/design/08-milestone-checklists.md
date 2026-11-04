@@ -963,7 +963,7 @@ make e2e                                          # Playwright（需先同意下
 
 ### 实际结果
 
-**状态：代码完成，端到端冒烟通过；真实检查待确认，CI 待检查，待你确认合并。**
+**状态：代码完成，端到端冒烟和真实检查通过，待你确认合并。**
 
 - **后端测试**：699 个通过（M6 结束时 615 个）。新增 82 个文档 API 测试：7 个角色 × 7 个管理端点（只有 `RAGETLAdmin` 成功，其余 403，未登录 401）；上传校验（扩展名与文件头不符、空文件、非 UTF-8 文本、含二进制的文本、超过 20 MB、缺字段、非法 `access_level`/`doc_code`/`version`/`domain`/`status`/`min_level`、路径穿越的文件名）；重复上传 409 且消息带已有文档 ID；**完整流程**（真实 worker、假嵌入）：上传 → `ready` → 员工检索得到、学员和 `RAGETLAdmin` 检索不到；`chunks`/`file` 对员工 200、对学员和 `RAGETLAdmin` 404；`around` 取前后块；`PATCH` 后文档和所有分块的权限在同一事务里一致，改成 `draft` 后读不到；等级要求可设置、可清除；删除后文档、分块、原文件都没有、审计保留、再删 404；重新入库后分块被整体替换、任务历史两条；列表过滤（域、状态、入库状态、标题或编号、`%` 当字面量）与分页；CORS（允许前端来源，不允许其他来源，普通请求也不带 `Access-Control-Allow-Origin`）。
 - **前端**：Vitest 61 个通过；lint、类型检查（严格模式，含 `noUncheckedIndexedAccess`）、格式检查、生产构建都干净。覆盖：`[n]` 解析（未知编号保持文本、内容不当作 HTML）、返回路径只接受站内路径、7 个角色的菜单（只有 `RAGETLAdmin` 看到"文档"链接；直接进入管理页也显示无权限且不发请求）、引用抽屉（数据类显示视图与行数；文档类请求 `around`、高亮被引用的块、读取失败或没有 `document_id` 时的提示）、上传表单（校验、不发请求、字段与重复项的编码、服务器错误如重复）、文档页（列表、删除要二次确认、过滤、入库任务与错误原因）、聊天（建会话、发送、显示回答与来源、限流提示）、API 客户端（带令牌、401 触发重新登录、无令牌不发请求）。
@@ -973,4 +973,5 @@ make e2e                                          # Playwright（需先同意下
 - **与确认点的差异**：(a) shadcn/ui 的组件（按钮、输入、徽章、对话框等）是我**手写**的，沿用它的工具库（`class-variance-authority`、`clsx`、`tailwind-merge`）和风格，没有用它的 CLI，避免交互式安装和多出来的 Radix 依赖；对话框用 `role="dialog"` 自己实现。(b) 前端用 Next.js 15.5.29 + React 19 + Tailwind 4（npm 上最新是 Next 16，按设计固定在 15）。(c) `min_level` 是 1–7 的等级序号。(d) 列表的 `cursor` 是偏移量，不是游标键。(e) 回答按纯文本渲染（`[n]` 变按钮），不渲染 Markdown。(f) 第 8 条里"上传这一步走假嵌入"是通过 `make e2e` 临时切换 worker 实现的。
 - **本机环境的发现**：Docker Desktop 虚拟磁盘曾写满（`no space left on device`），Postgres 崩溃进入恢复模式，`worker` 重启了一个多小时；清理 6 GB 构建缓存后恢复，之后用户把磁盘上限调到 80 GB，又清理了停止的容器、悬空镜像和构建缓存（约 6 GB）。镜像构建里下载 Python 依赖的网络很慢，`uv` 默认的 30 秒超时导致一次构建失败，已在 `python.Dockerfile` 设 `UV_HTTP_TIMEOUT=120`；API 镜像构建用了约 40 分钟。
 - **已知限制**：令牌放在浏览器的 `sessionStorage`（XSS 能读到；缓解：Keycloak 令牌有效期短、不渲染 HTML）；`npm audit` 报告 16 条中高危，来自开发工具（Vitest 的依赖、`minimatch`）和 Next.js 自带的 PostCSS（只涉及不可信 CSS 输入，本项目的构建只处理自己的 CSS），**接受，没有强制升级**到会引入 Next 16 的版本；上传后的状态靠每 3 秒轮询，没有推送；删除是硬删除，没有回收站；Playwright 只在本地运行，CI 只跑前端的 lint、类型、格式、Vitest 和构建。
-- **未完成**：真实检查（上传 1 个小文档用真实嵌入 + 1 个真实问题）等待确认；本分支上新的前端 CI 作业还没看过结果。
+- **真实检查**（用户确认后运行，真实嵌入和真实模型 `openai/gpt-6-luna`）：用 `RAGETLAdmin` 账号经 API 上传一个小文档 `VERIFY-001`（"核查城市的酒店标准是 CNY 777/晚"）→ 状态 `queued → running → ready`；再用员工账号提问"What is the hotel allowance per night for the verification city?"。**第一次助手没有直接回答，而是反问"Which verification city do you mean?"**（`need_clarification`）——是模型对我措辞的判断，不是链路问题；我在同一会话里补一句"The one in the Verification city allowance document."，第二次得到正确回答"CNY 777 per night … need approval from the finance controller [1]"，`end_state = answered`，引用带 `document_id` 和 `chunk_id`，用它请求 `GET /documents/{id}/chunks?around=…` 员工读到被引用的原文，`RAGETLAdmin` 账号读同一个文档得到 404；最后用 `RAGETLAdmin` 删除（204），数据库里文档和分块都是 0，测试文件已清理。**只问了这一个问题（两轮），不是一个题集**，不能当作质量结论；费用按估算不到 $0.002，没有逐项统计。**没有经真实浏览器登录点击这条真实回答的引用**——浏览器里点击引用由 Playwright（回答被固定）覆盖，真实回答的引用只用 API 验证了。
+- **未完成**：本分支最新一次推送的 CI 结果。
