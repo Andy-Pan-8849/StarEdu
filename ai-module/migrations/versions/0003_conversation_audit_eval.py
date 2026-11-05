@@ -1,4 +1,12 @@
-"""Conversations, runs, the append-only audit log, evaluation tables and the drift view.
+"""会话、运行记录、只增不改的审计日志、评测表，以及权限漂移检查视图。
+
+文件：migrations/versions/0003_conversation_audit_eval.py
+作用与思想：
+  - conversations / runs / messages：会话、每次助手运行（结局、模型、token、耗时）、消息和引用。
+  - audit_log：审计日志。应用账号只被授予 INSERT，没有 UPDATE/DELETE/SELECT，
+    所以应用代码无法修改或删除审计记录（这是不可抵赖性的数据库层保证）。
+  - eval_runs / eval_results：评测运行与逐题结果。
+  - v_chunk_permission_drift：检查视图，列出权限字段与所属文档不一致的文本块（应当永远为空）。
 
 Revision ID: 0003
 Revises: 0002
@@ -14,6 +22,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    """建会话/运行/消息/审计/评测表和漂移视图，并授权（审计表只给 INSERT）。"""
     op.execute(
         """
         CREATE TABLE ai.conversations (
@@ -129,12 +138,14 @@ def upgrade() -> None:
     )
 
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ai TO ai_app")
+    # 审计表单独收紧：先撤销全部权限，再只给 INSERT
     # The audit log is append-only for the application: it may insert and nothing else.
     op.execute("REVOKE ALL ON ai.audit_log FROM ai_app")
     op.execute("GRANT INSERT ON ai.audit_log TO ai_app")
 
 
 def downgrade() -> None:
+    """按依赖的反向顺序删除本迁移建的对象。"""
     op.execute("DROP VIEW IF EXISTS ai.v_chunk_permission_drift")
     op.execute("DROP TABLE IF EXISTS ai.eval_results")
     op.execute("DROP TABLE IF EXISTS ai.eval_runs")

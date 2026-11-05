@@ -1,11 +1,13 @@
-"""Everything a fresh stack needs to be usable (make seed).
+"""为新环境准备好一切可用的数据（make seed）。
 
-1. the sample business tables (biz schema, read through the ai_sql views);
-2. the knowledge base: restored from seed/ai-seed.jsonl.gz, which needs no model key, or, with
-   --ingest, built by the real ingestion pipeline (that one needs the embedding key);
-3. the original files of the sample documents in object storage, so a citation can be opened.
-
-The Keycloak realm with its demo accounts is imported when the stack starts.
+文件：scripts/seed.py
+作用：让一个刚启动的空环境变得可用，分三步：
+  1. 载入示例业务表（biz 模式，通过 ai_sql 视图读取）；
+  2. 知识库：默认从预制转储 seed/ai-seed.jsonl.gz 恢复（不需要任何模型密钥）；
+     加 --ingest 则用真实入库流水线重新建（需要嵌入模型的密钥）；
+  3. 把示例文档的原文件放进对象存储，让引用能点开看原文。
+Keycloak 的域和演示账号在服务启动时自动导入，不在这里。
+说明：命令行 --help 里显示的描述取本文档字符串的第一行。
 """
 
 import argparse
@@ -25,14 +27,21 @@ from starit_core.seed_ai import load_ai, read_dump, upload_originals
 from starit_core.seed_biz import load_biz
 from starit_core.storage import S3Storage
 
+# 仓库里的预制转储、示例文档位置
 ROOT = Path(__file__).resolve().parent.parent
 DUMP = ROOT / "seed" / "ai-seed.jsonl.gz"
 DOCUMENTS = ROOT / "sample-data" / "documents"
 
 
 async def main(ingest: bool) -> None:
+    """执行播种。
+
+    参数：ingest——为真时用真实流水线入库，否则从转储恢复。
+    转储里的向量模型与当前配置不一致时只警告：检索只比较同一模型的向量，不一致会搜不到。
+    """
     settings = get_settings()
 
+    # 业务表需要库所有者账号来写（应用账号读不了 biz 表）
     owner = create_sync_engine(settings.migration_database_url)
     with owner.begin() as conn:
         counts = load_biz(conn, ROOT / "sample-data" / "structured")

@@ -1,4 +1,13 @@
-"""Database roles and the knowledge-base tables (docs/design/02-data-model.md, section 2).
+"""数据库角色和知识库的表（设计见 docs/design/02-data-model.md 第 2 节）。
+
+文件：migrations/versions/0002_knowledge_tables.py
+作用与思想：
+  - 创建两个角色：ai_app（应用日常连接用的普通账号，可登录）和 ai_sql_ro（不能登录，
+    应用在事务内用 SET LOCAL ROLE 切换到它来执行模型写的 SQL，使这类查询只能看白名单视图）。
+  - 建知识库的表：documents（文档）、document_chunks（文本块，冗余存放文档的权限字段以便
+    单表过滤，并带全文检索向量 tsv 和各种 GIN 索引）、chunk_embeddings（向量）、
+    chunk_derived（衍生内容）、ingestion_jobs（入库任务队列）。
+  - 角色是整个数据库集群共享的，所以 downgrade 不删除角色，只撤销本库的权限。
 
 Revision ID: 0002
 Revises: 0001
@@ -16,6 +25,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    """创建角色、授权和知识库的全部表与索引。"""
     conn = op.get_bind()
 
     # ai_app: the ordinary account the application connects with. Only migrations use the owner.
@@ -177,6 +187,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """删除本迁移建的表和函数、撤销权限；角色保留（别的库可能在用）。"""
     op.execute("DROP TABLE IF EXISTS ai.ingestion_jobs")
     op.execute("DROP TABLE IF EXISTS ai.chunk_derived")
     op.execute("DROP TABLE IF EXISTS ai.chunk_embeddings")

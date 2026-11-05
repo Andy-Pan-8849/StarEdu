@@ -1,7 +1,8 @@
-"""Register the sample documents and queue them for ingestion (make ingest-samples).
-
---wait     wait until the queued jobs finish and print the result
---process  also run the worker here, once, instead of relying on the worker container
+"""文件：scripts/ingest_samples.py
+作用：登记示例文档并排入库任务（make ingest-samples）。
+选项：--wait 等任务做完并打印结果；--process 在本进程里直接跑一遍 worker，不依赖 worker 容器；
+  --force 即使没变化也全部重新入库（比如换了嵌入模型）。
+会调用嵌入模型（花钱），先确认再运行。
 """
 
 import argparse
@@ -22,6 +23,7 @@ DOCUMENTS = Path(__file__).resolve().parent.parent / "sample-data" / "documents"
 
 
 async def main(wait: bool, process: bool, force: bool) -> None:
+    """登记文档（打印新登记/更新/未变化各几份）；按选项运行 worker；等待并列出失败的文档。"""
     settings = get_settings()
     engine = create_engine(settings)
     storage = S3Storage(settings)
@@ -40,6 +42,7 @@ async def main(wait: bool, process: bool, force: bool) -> None:
             chat=chat_client(settings),
         )
     if wait or process:
+        # 最多等 10 分钟：每 3 秒看一次状态分布，没有排队/运行中的就结束
         deadline = time.monotonic() + 600
         while time.monotonic() < deadline:
             async with engine.connect() as conn:

@@ -1,4 +1,12 @@
-"""M9 real checks (a few cents): streaming through the gateway, the fallback chain, Haiku."""
+"""文件：scripts/m9_real_check.py
+作用：M9 的真实调用检查（总共几美分）：经网关的流式、备用链、Haiku 直连。
+用法：uv run python scripts/m9_real_check.py gateway|fallback|haiku
+  - gateway：经 LiteLLM 网关流式调用 gpt-6-luna 和 gpt-4o-mini；
+  - fallback：主模型无效时应由 gpt-4o-mini 作答；前两级都无效时应由 claude-haiku 作答；
+  - haiku：直连 Haiku，流式和非流式各一次。
+每行输出：实际作答的模型、收到几块、token 数、返回的是不是合法 JSON。
+会产生真实费用，运行前要确认。
+"""
 
 import asyncio
 import json
@@ -19,6 +27,7 @@ MSG = [
 
 
 async def show(title: str, client: LiteLLMChatClient, model: str, stream: bool = True) -> None:
+    """调用一次并打印结果摘要；失败打印错误类型和前 300 字，不抛异常。"""
     chunks: list[str] = []
 
     async def on_chunk(c: str) -> None:
@@ -41,6 +50,7 @@ async def show(title: str, client: LiteLLMChatClient, model: str, stream: bool =
 
 
 async def main() -> None:
+    """按命令行参数选择要做的检查。"""
     which = sys.argv[1]
     base = Settings(_env_file=None)
     gw = dict(gateway_url="http://localhost:4100", gateway_key="sk-starit-local-dev")
