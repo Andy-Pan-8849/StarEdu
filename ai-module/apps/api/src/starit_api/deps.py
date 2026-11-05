@@ -1,4 +1,9 @@
-"""FastAPI dependencies: who is calling, and are they allowed."""
+"""文件：deps.py
+作用：FastAPI 依赖——取共享对象（引擎、运行时、存储、预算、限流器、令牌校验器）和“谁在调用”。
+主要思想：共享对象在应用启动时(main.py 的 lifespan)放进 app.state，路由通过依赖函数取用，
+所以测试里可以替换成假的。get_identity 是鉴权入口：没有令牌 401，令牌无效 401，
+公钥取不到 503；require_roles 在此基础上要求至少有指定角色之一，否则 403。
+"""
 
 from collections.abc import Callable
 
@@ -13,36 +18,44 @@ from starit_core.storage import ObjectStorage
 
 from starit_api.errors import ApiError
 
+# 从 Authorization: Bearer 头取令牌；auto_error=False 让我们自己返回统一格式的 401
 _bearer = HTTPBearer(auto_error=False)
+# 401 响应要带的 WWW-Authenticate 头
 _CHALLENGE = {"WWW-Authenticate": "Bearer"}
 
 
 def get_engine(request: Request) -> AsyncEngine:
+    """数据库引擎（应用账号）。"""
     engine: AsyncEngine = request.app.state.engine
     return engine
 
 
 def get_runtime(request: Request) -> AgentRuntime:
+    """助手运行时。"""
     runtime: AgentRuntime = request.app.state.runtime
     return runtime
 
 
 def get_storage(request: Request) -> ObjectStorage:
+    """对象存储。"""
     storage: ObjectStorage = request.app.state.storage
     return storage
 
 
 def get_budget(request: Request) -> DailyBudget | None:
+    """每日预算；关闭时为 None。"""
     budget: DailyBudget | None = request.app.state.budget
     return budget
 
 
 def get_limiter(request: Request) -> RateLimiter:
+    """限流器。"""
     limiter: RateLimiter = request.app.state.limiter
     return limiter
 
 
 def get_verifier(request: Request) -> TokenVerifier:
+    """令牌校验器。"""
     verifier: TokenVerifier = request.app.state.verifier
     return verifier
 
@@ -51,6 +64,9 @@ def get_identity(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     verifier: TokenVerifier = Depends(get_verifier),
 ) -> Identity:
+    """从请求里取出并校验令牌，返回调用者身份。
+    失败：没带令牌或令牌无效 -> 401；身份服务取不到公钥 -> 503。
+    """
     if credentials is None:
         raise ApiError(401, "unauthenticated", "Missing bearer token", _CHALLENGE)
     try:
@@ -64,12 +80,12 @@ def get_identity(
 def get_access_token(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> str | None:
-    """The caller's raw token, to be forwarded to the data service. Kept in memory only."""
+    """调用者的原始令牌，用来转发给数据服务；只放在内存里，不记录。"""
     return credentials.credentials if credentials else None
 
 
 def require_roles(*roles: str) -> Callable[[Identity], Identity]:
-    """Allow the call only when the caller has at least one of the given roles."""
+    """生成一个依赖：调用者至少拥有 roles 里的一个角色才放行，否则 403。"""
     wanted = frozenset(roles)
 
     def check(identity: Identity = Depends(get_identity)) -> Identity:

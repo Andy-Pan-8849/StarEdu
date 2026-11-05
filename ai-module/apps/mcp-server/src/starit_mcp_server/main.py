@@ -1,4 +1,12 @@
-"""The MCP server: the data tools over streamable HTTP, behind bearer-token authentication."""
+"""文件：main.py
+作用：MCP 服务器的装配与启动。
+主要思想：
+  - build_app 创建 MCPServer，接上令牌校验、注册六个数据工具、加 /health 健康检查，
+    开启 DNS 重绑定保护（只接受允许的 Host 头），按配置接入 OpenTelemetry。
+  - OpenTelemetry 中间件会从请求头的 traceparent 接上调用方（API）的链路，
+    所以一次聊天从 API 到 MCP 到数据库在 Grafana 里是同一条链路。
+  - main 是进程入口：读配置、建校验器和引擎、用 uvicorn 在 mcp_port 端口提供服务。
+"""
 
 import logging
 
@@ -30,6 +38,11 @@ def build_app(
     verifier: TokenVerifier,
     providers: Providers | None = None,
 ) -> Starlette:
+    """构造 MCP 服务的 ASGI 应用。
+
+    参数：settings 配置；engine 数据库引擎；verifier 令牌校验器（受众是 MCP）；
+      providers 可选的 OpenTelemetry 提供者。
+    """
     jwt_verifier = JwtTokenVerifier(verifier)
     server = MCPServer(
         "starit-data",
@@ -37,6 +50,7 @@ def build_app(
         auth=AuthSettings(
             issuer_url=settings.oidc_issuer,
             resource_server_url=settings.mcp_url,
+            # 不在这里校验资源，受众由 TokenVerifier 检查
             validate_token_resource=False,  # the audience is checked by TokenVerifier
         ),
     )
@@ -50,12 +64,14 @@ def build_app(
     async def health(request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
+    # 允许的 Host 头（防 DNS 重绑定攻击）
     hosts = [h.strip() for h in settings.mcp_allowed_hosts.split(",") if h.strip()]
     app = server.streamable_http_app(
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True, allowed_hosts=hosts
         )
     )
+    # 接入链路：继续调用方的 trace（W3C traceparent），不记录请求头；/health 不记录
     if providers is not None:
         # Continues the caller's trace (the W3C `traceparent` header) and records no headers.
         app.add_middleware(
@@ -68,6 +84,7 @@ def build_app(
 
 
 def main() -> None:
+    """进程入口：读配置 -> 建校验器/链路/引擎 -> 启动 uvicorn。"""
     settings = get_settings()
     configure_logging(settings.log_level)
     verifier = TokenVerifier(

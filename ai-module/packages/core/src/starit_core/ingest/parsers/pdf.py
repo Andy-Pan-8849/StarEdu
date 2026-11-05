@@ -33,11 +33,14 @@ _LIST_MARKER = re.compile(r"^(?:[•·●▪\-–]|\d+[.)])\s+")
 _TITLE_RATIO = 1.6  # at least this much larger than body text: the document title
 _SECTION_RATIO = 1.2  # section heading
 _SUBSECTION_RATIO = 1.05  # sub-heading, only when bold
+# 标题的最大字数，更长的当作正文
 _MAX_HEADING_CHARS = 100
 
 
 @dataclass
 class _Line:
+    """PDF 里的一行文字：页码、上下边的位置、文字、最大字号、是否加粗（多数字符是粗体字体）。"""
+
     page: int
     top: float
     bottom: float
@@ -47,7 +50,10 @@ class _Line:
 
 
 class PdfParser:
+    """PDF 解析器。"""
+
     def parse(self, path: Path) -> ParsedDocument:
+        """读取 PDF，返回结构化文档；打不开抛 ParseError，没有可提取文字也抛 ParseError。"""
         try:
             with pdfplumber.open(str(path)) as pdf:
                 items = self._collect(pdf)
@@ -59,12 +65,13 @@ class PdfParser:
 
     @staticmethod
     def _collect(pdf: Any) -> list[tuple[int, float, str, Any]]:
-        """Lines and tables of every page as (page, top, kind, payload), in reading order."""
+        """收集每页的文字行和表格，返回 (页码, 纵向位置, 类型, 内容) 的列表，已按阅读顺序排好。"""
         items: list[tuple[int, float, str, Any]] = []
         for number, page in enumerate(pdf.pages, start=1):
             tables = page.find_tables()
             boxes = [t.bbox for t in tables]
 
+            # 过滤函数：只保留中心点不在任何表格区域内的字符，避免表格文字被当成正文重复提取
             def outside_tables(obj: dict[str, Any], boxes: list[Any] = boxes) -> bool:
                 if obj.get("object_type") != "char":
                     return True
@@ -90,6 +97,7 @@ class PdfParser:
 
     @staticmethod
     def _assemble(items: list[tuple[int, float, str, Any]]) -> ParsedDocument:
+        """把收集到的行和表格按字号分类，组装成文档（算法见文件头）。"""
         sizes: Counter[float] = Counter()
         for _page, _top, kind, payload in items:
             if kind == "line":
@@ -129,6 +137,7 @@ class PdfParser:
     @staticmethod
     def _add_heading(blocks: list[Block], line: _Line, level: int, page: int) -> None:
         # A long heading can wrap onto a second line of the same size.
+        """加标题。超长标题会折成同字号的两行，此时并入上一个同级同页的标题。"""
         if (
             blocks
             and blocks[-1].type == "heading"
@@ -141,6 +150,7 @@ class PdfParser:
 
     @staticmethod
     def _add_body(blocks: list[Block], line: _Line, previous: _Line | None, page: int) -> None:
+        """加正文行：列表项单独成块；与上一行紧挨着的接成同一段，否则另起一段。"""
         marker = _LIST_MARKER.match(line.text)
         if marker:
             blocks.append(Block("list_item", line.text[marker.end() :], page=page))
@@ -157,6 +167,8 @@ class PdfParser:
             last = blocks[-1]
             # A hyphenated identifier such as FIN-TAX-008 can wrap right after its hyphen. Join
             # without a space so it stays one identifier.
+            # 连字符编号（如 FIN-TAX-008）可能刚好在连字符后换行：这种情况不加空格，
+            #   保持它是一个编号
             joiner = "" if re.search(r"[A-Za-z0-9]-$", last.text) else " "
             blocks[-1] = Block(last.type, f"{last.text}{joiner}{line.text}", page=last.page)
         else:
