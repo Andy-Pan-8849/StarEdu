@@ -1,3 +1,6 @@
+# 文件：apps/api/pyproject.toml
+# 作用：API 服务的包定义与依赖（FastAPI 等）；依赖 starit-core。
+
 [project]
 name = "starit-api"
 version = "0.0.0"

@@ -1,3 +1,8 @@
+/*
+ * 文件：app/globals.css
+ * 作用：全局样式。引入 Tailwind CSS，并让页面撑满整个窗口高度（聊天界面需要）。
+ */
+
 @import "tailwindcss";
 
 html,

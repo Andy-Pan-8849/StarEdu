@@ -46,11 +46,50 @@ Design documents are in [`docs/design/`](docs/design/); what each milestone deli
 
 ```
 StarEdu/
-├── ai-module/         the AI module (code, deployment files, sample data)
-│   └── sample-data/   synthetic documents, tables and evaluation sets
-├── business-module/   placeholder
-└── docs/              design documents and evaluation reports
+├── README.md              this file
+├── LICENSE                MIT
+├── ai-module/             the AI module: everything you run
+│   ├── README.md          detailed guide, in Chinese: start, try, test, directory layout
+│   ├── Makefile           the commands you use every day (make up, make seed, make eval ...)
+│   ├── pyproject.toml     uv workspace root; shared ruff, mypy and pytest settings
+│   ├── alembic.ini        database migration tool settings
+│   ├── conftest.py        pytest fixtures shared by every test directory
+│   ├── .env.example       environment variable template (copied to .env by `make env`)
+│   ├── packages/core/     shared Python library, starit_core (see below)
+│   ├── apps/              the three services, each a thin entry point over the core library
+│   │   ├── api/           HTTP API (FastAPI): conversations, chat with SSE streaming, documents
+│   │   ├── worker/        ingestion worker: takes documents from the queue and indexes them
+│   │   └── mcp-server/    MCP server that exposes the data tools, with its own token check
+│   ├── web/               front end (Next.js): chat, citation drawer, document management
+│   ├── eval/              evaluation tool `starit-eval`: retrieval, answers, data questions, leaks
+│   ├── migrations/        Alembic database migrations (roles, tables, row-level SQL views)
+│   ├── scripts/           helper scripts: seeding, sample ingestion, Keycloak realm builder, tokens
+│   ├── seed/              ready-made knowledge base dump, so `make seed` needs no model key
+│   ├── deploy/            Docker Compose files, Dockerfiles, LiteLLM, Grafana/Tempo/Prometheus config
+│   └── sample-data/       synthetic company: documents, tables, demo accounts, evaluation questions
+├── business-module/       placeholder for the traditional back office (not started)
+└── docs/                  design documents and evaluation reports
+    ├── design/            numbered design documents 01-09 and the milestone checklists
+    └── eval/              evaluation reports, human review sheets and acceptance notes
 ```
+
+### Inside the core library (`ai-module/packages/core/src/starit_core/`)
+
+| Folder / file | What it does |
+|---|---|
+| `agent/` | The assistant as a LangGraph flow: `nodes.py` (every step), `graph.py` (wiring), `runtime.py` (one run, recorded), `state.py`, `events.py` (streaming events), `messages.py` (fixed replies), `prompts/` (prompt files, versioned in `prompts.py`) |
+| `retrieval/` | Hybrid search: `keyword.py`, `vector.py`, `fusion.py` (rank fusion), `rerank.py`, `assemble.py`, `probe.py` (counts what the asker may not read), `search.py` (entry point) |
+| `ingest/` | Document ingestion: `parsers/` (docx, pdf, md, txt), `clean.py`, `chunker.py`, `derive.py`, `pipeline.py`, `queue.py` (Postgres job queue), `worker.py`, `register.py` |
+| `dataaccess/` | Business-data access: `tools.py` (six fixed tools), `sqlguard.py` (validates model-written SQL), `schema.py` (views and who may read them), `client.py` (MCP client) |
+| `permissions.py`, `auth.py` | Who may read which chunks, enforced in the database query; JWT verification and the caller's identity |
+| `llm.py`, `embeddings.py`, `streaming.py` | Model clients (gateway, fallback chain), embeddings, and the incremental extraction of the answer text from streamed JSON |
+| `cost.py`, `ratelimit.py` | Cost of a call and the shared daily budget; fixed-window rate limiter |
+| `documents.py`, `conversations.py`, `audit.py` | Reading and writing documents, conversations and the append-only audit log |
+| `config.py`, `db.py`, `storage.py`, `sqlaccess.py` | Settings, database engine, object storage, running a read-only query as a given person |
+| `telemetry.py`, `logging.py` | OpenTelemetry traces and metrics, JSON logs |
+| `seed_ai.py`, `seed_biz.py`, `testing.py` | Knowledge-base dump and restore, sample business tables, test doubles shared by the tests |
+
+Every source file starts with a header comment that says what the file is for and the idea behind it. Tests sit next to the code they test (`tests/` folders inside each package and app).
 
 ## Sample data
 

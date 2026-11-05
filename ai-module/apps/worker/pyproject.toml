@@ -1,3 +1,6 @@
+# 文件：apps/worker/pyproject.toml
+# 作用：入库 worker 的包定义与依赖；依赖 starit-core。提供命令 starit-worker。
+
 [project]
 name = "starit-worker"
 version = "0.0.0"

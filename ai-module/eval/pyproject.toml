@@ -1,3 +1,6 @@
+# 文件：eval/pyproject.toml
+# 作用：评测工具的包定义与依赖；提供命令 starit-eval。
+
 [project]
 name = "starit-eval"
 version = "0.0.0"
