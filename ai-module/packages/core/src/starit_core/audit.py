@@ -1,7 +1,7 @@
-"""Append-only audit trail (ai.audit_log).
-
-The application role may only INSERT into this table, so there is no RETURNING and no way to
-change or remove a record from application code.
+"""文件：audit.py
+作用：只增不改的审计日志（表 ai.audit_log）。
+主要思想：应用账号对这张表只有 INSERT 权限，所以代码里既不能改也不能删记录，
+INSERT 之后也不带 RETURNING（读也需要 SELECT 权限）。审计里只记元数据，不记模型回答原文。
 """
 
 import json
@@ -26,6 +26,12 @@ async def write_audit(
     ip: str | None = None,
     details: dict[str, Any] | None = None,
 ) -> None:
+    """写一条审计记录。
+
+    参数：conn 数据库连接（通常和业务写入在同一事务）；action 动作名（如 chat.query）；
+      actor 谁做的；run_id 关联的运行；query_text 用户问题；doc_ids 读到的文档；
+      filtered_count 被权限过滤掉的命中数；ip 来源 IP；details 其他详情(JSON)。
+    """
     await conn.execute(
         text(
             """

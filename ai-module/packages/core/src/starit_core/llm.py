@@ -1,7 +1,10 @@
-"""A minimal chat-model client: send messages, get text back.
-
-Milestone M5 extends this with streaming and tool calls. For now it serves the reranker, which
-only needs one short answer per call.
+"""文件：llm.py
+作用：聊天模型客户端——发消息、收文字（可选流式）。
+主要思想：
+  - 上层只依赖 `ChatClient` 接口，不关心背后是 litellm 库直连还是 LiteLLM 网关。
+  - 走网关时，网关地址和密钥由配置给出，厂商密钥只在网关容器里。
+  - 备用链(fallbacks)：主模型出错（网络、限流、模型不存在等，不是“答得不好”）时按顺序换下一个模型。
+  - 统一返回 ChatResult，带实际作答的模型名，便于发现备用链触发并正确计费。
 """
 
 import json
@@ -15,11 +18,15 @@ from starit_core.ingest.tokens import count_tokens
 
 
 class ChatError(Exception):
-    """The model call failed (network, rate limit, bad request)."""
+    """模型调用失败（网络、限流、请求错误），或模型的回答无法按要求解析。"""
 
 
 @dataclass(frozen=True)
 class ChatResult:
+    """一次模型调用的结果：文字、输入/输出 token，
+    以及实际作答的模型（备用链触发后与请求的模型不同）。
+    """
+
     text: str
     input_tokens: int = 0
     output_tokens: int = 0
@@ -29,6 +36,8 @@ class ChatResult:
 
 
 class ChatClient(Protocol):
+    """聊天客户端接口：complete 一次拿完整结果。真实实现与测试替身都满足它。"""
+
     async def complete(
         self,
         messages: Sequence[Mapping[str, str]],
@@ -41,8 +50,9 @@ class ChatClient(Protocol):
 
 
 class LiteLLMChatClient:
-    """Calls a hosted chat model through the litellm library, or through the LiteLLM gateway
-    when `gateway_url` is given (the gateway holds the provider keys, not this process)."""
+    """通过 litellm 调用聊天模型；给了 gateway_url 就改走 LiteLLM 网关（密钥在网关，不在本进程）。
+    fallbacks 是出错时依次尝试的备用模型。
+    """
 
     def __init__(
         self,
@@ -62,7 +72,14 @@ class LiteLLMChatClient:
         max_tokens: int | None,
         request_timeout: float | None,
     ) -> dict[str, Any]:
+        """组装 litellm 的请求参数。
+
+        参数：messages 消息；model 模型名；json_mode 是否要求返回 JSON；
+          max_tokens 输出上限；request_timeout 单次请求超时（秒）。
+        返回：可直接传给 litellm.acompletion 的字典。
+        """
         options: dict[str, Any] = {
+            # 温度 0：要尽量可复现的输出（评测、校验都依赖这一点）
             "temperature": 0,
             # Models that reason by default spend tokens (and money) thinking; this task does
             # not need it. Models without the setting simply ignore it (drop_params).
@@ -80,6 +97,7 @@ class LiteLLMChatClient:
         if self._gateway_url:
             # "openai/" tells the library to speak the OpenAI protocol to the gateway; it strips
             # that prefix, so the gateway receives the model name exactly as configured.
+            # 走网关：加 openai/ 前缀让库用 OpenAI 协议与网关通信，网关收到的是配置里的原模型名
             model = f"openai/{model}"
             options["api_base"] = self._gateway_url
             options["api_key"] = self._gateway_key
@@ -100,6 +118,7 @@ class LiteLLMChatClient:
         max_tokens: int | None = None,
         request_timeout: float | None = None,
     ) -> ChatResult:
+        """发起一次非流式调用，返回 ChatResult；任何失败统一包装成 ChatError。"""
         import litellm  # imported here: it is slow to import
 
         request = self._request(messages, model, json_mode, max_tokens, request_timeout)
@@ -125,8 +144,10 @@ class LiteLLMChatClient:
         request_timeout: float | None = None,
         on_chunk: Callable[[str], Awaitable[None]],
     ) -> ChatResult:
-        """Like `complete`, but `on_chunk` gets each piece of text as it arrives. An error after
-        some text was delivered is still a ChatError; the caller decides about that text."""
+        """流式调用：每收到一段文字就调用 on_chunk。
+        已经交付过部分文字后再出错，仍抛 ChatError，如何处理这部分文字由调用方决定。
+        供应商没返回用量时按文字估算 token，避免把这次调用记成免费。
+        """
         import litellm
 
         request = self._request(messages, model, json_mode, max_tokens, request_timeout)
@@ -161,10 +182,12 @@ class LiteLLMChatClient:
 
 
 def parse_fallbacks(value: str) -> list[str]:
+    """把逗号分隔的备用模型配置拆成列表，忽略空项。"""
     return [m.strip() for m in value.split(",") if m.strip()]
 
 
 def chat_client(settings: Settings) -> ChatClient:
+    """按配置创建聊天客户端：litellm_proxy 走网关，否则直连。"""
     fallbacks = parse_fallbacks(settings.llm_fallbacks)
     if settings.llm_gateway == "litellm_proxy":
         return LiteLLMChatClient(settings.llm_gateway_url, settings.llm_gateway_key, fallbacks)
@@ -172,7 +195,7 @@ def chat_client(settings: Settings) -> ChatClient:
 
 
 class FakeChatClient:
-    """For tests: answers from a function or a list, and remembers what it was asked."""
+    """测试替身：按函数或列表回答，并记录收到的请求。"""
 
     def __init__(
         self, answer: Callable[[Sequence[Mapping[str, str]]], str] | Sequence[str]
@@ -205,7 +228,7 @@ _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
 
 def parse_json_object(text: str) -> dict[str, Any]:
-    """Read a model's answer as one JSON object (code fences tolerated)."""
+    """把模型的回答解析成一个 JSON 对象（容忍 ```json 围栏）；不是对象则抛 ChatError。"""
     try:
         data = json.loads(_FENCE.sub("", text.strip()))
     except json.JSONDecodeError as exc:

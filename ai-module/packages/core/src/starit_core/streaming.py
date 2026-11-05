@@ -1,21 +1,18 @@
-"""Pull the answer text out of the model's JSON reply while it is still arriving.
-
-The answering steps ask the model for one JSON object, `{"sufficient": true, "answer": "...",
-"citations": [1]}`. Streamed, the characters that arrive are that JSON, not the answer. This is a
-small state machine over the characters: it follows the top-level object, skips every value it
-does not need, and decodes the `answer` string as it grows (escapes, `\\uXXXX`, surrogate pairs,
-a chunk that ends in the middle of any of them).
-
-The rule that keeps it safe: text is released only once `sufficient` is known to be `true`.
-`sufficient: false` releases nothing. If the model writes `answer` before `sufficient`, nothing is
-released at all and the caller sends the whole answer at the end, as before streaming existed.
-What was released is always a prefix of the final answer; the caller compares it with the parsed
-reply and corrects the difference.
+"""文件：streaming.py
+作用：模型还在输出 JSON 回复时，实时把其中 `answer` 字段的文字抠出来，供前端边写边显示。
+背景：回答步骤要求模型返回一个 JSON 对象 {"sufficient": true, "answer": "...", "citations": [1]}。
+流式时到达的字符是 JSON 本身，不是回答文字，所以不能直接转发。
+主要思想：一个逐字符的小状态机：跟踪最外层对象，跳过不需要的值，边接收边解码 answer 字符串
+（转义、Unicode 转义序列、代理对，以及任何一种在块中间被截断的情况）。
+安全规则：只有已确认 `sufficient` 为 true 才放出文字。sufficient 为 false 什么都不放；
+模型把 answer 写在 sufficient 前面时，也什么都不放，调用方在结束时一次性发整段（等同没有流式）。
+已放出的文字永远是最终回答的前缀，调用方拿它与解析后的完整回复比较并补齐差异。
 """
 
 import re
 
 _WHITESPACE = " \t\r\n"
+# JSON 的单字符转义对照表
 _SIMPLE_ESCAPES = {
     '"': '"',
     "\\": "\\",
@@ -27,18 +24,22 @@ _SIMPLE_ESCAPES = {
     "t": "\t",
 }
 _HEX = re.compile(r"^[0-9a-fA-F]{4}$")
+# 遇到坏的转义或孤立的代理项时用的替换字符
 REPLACEMENT = "�"
 
 
 class _String:
-    """Decodes one JSON string a character at a time."""
+    """逐字符解码一个 JSON 字符串，处理转义、Unicode 十六进制转义和 UTF-16 代理对。"""
 
     def __init__(self) -> None:
         self._escape: str | None = None  # None, "\\" or "\\u" plus the hex digits so far
         self._high: int | None = None  # a high surrogate waiting for its low half
 
     def push(self, char: str) -> tuple[str, bool]:
-        """(decoded text, whether the closing quote was reached)."""
+        """喂入一个字符。
+
+        返回：(解码出的文字, 是否遇到了结束引号)。转义序列没收齐时返回空文字，等下个字符。
+        """
         if self._escape is None:
             if char == "\\":
                 self._escape = "\\"
@@ -75,6 +76,7 @@ class _String:
         return self._flush_high() + chr(code), False
 
     def _flush_high(self) -> str:
+        """有等待低位的高位代理项却没等到：补一个替换字符，避免丢字也避免乱码。"""
         if self._high is None:
             return ""
         self._high = None
@@ -82,7 +84,17 @@ class _String:
 
 
 class AnswerStream:
-    """Feed it the chunks of the reply; it returns the answer text that may be shown now."""
+    """喂入回复的各个片段，返回此刻可以展示的回答文字。
+
+    参数：
+      require_sufficient：是否要等 sufficient=true 才放出文字
+        （数据类回答没有这个字段，传 False）；
+      key：要抠出的字段名，默认 answer。
+    属性：
+      sufficient：模型的判断；
+      deferred：answer 先于 sufficient 出现（此后不放文字）；
+      emitted：已放出的文字。
+    """
 
     def __init__(self, *, require_sufficient: bool = True, key: str = "answer") -> None:
         self._require_sufficient = require_sufficient
@@ -99,7 +111,7 @@ class AnswerStream:
         self.emitted = ""
 
     def feed(self, chunk: str) -> list[str]:
-        """The pieces of answer text to show now (usually none or one)."""
+        """喂入一个片段，返回此刻可展示的文字片段列表（通常 0 或 1 个）。"""
         released: list[str] = []
         for char in chunk:
             text = self._step(char)
@@ -109,6 +121,8 @@ class AnswerStream:
 
     # --- the state machine ----------------------------------------------------------------
 
+    # 状态机：state 依次是 start -> key_or_end/key_next -> key -> after_key -> before_value ->
+    # (answer | skip_string | skip_nested | skip_literal) -> after_value -> ... -> done
     def _step(self, char: str) -> str:  # noqa: PLR0911, PLR0912
         state = self._state
         if state == "done":
@@ -169,6 +183,7 @@ class AnswerStream:
         return ""
 
     def _begin_value(self, char: str) -> str:
+        """遇到一个值的开头：是目标字段的字符串就开始解码，否则按类型进入对应的“跳过”状态。"""
         if char in _WHITESPACE:
             return ""
         if self._key == self._target and char == '"':
@@ -190,6 +205,7 @@ class AnswerStream:
         return ""
 
     def _skip_nested(self, char: str) -> str:
+        """跳过嵌套的对象/数组：数括号深度，同时识别字符串（里面的括号不算）。"""
         if self._in_string:
             if self._escaped:
                 self._escaped = False
@@ -208,6 +224,7 @@ class AnswerStream:
         return ""
 
     def _finish_literal(self) -> None:
+        """一个裸值（true/false/数字）读完；若是 sufficient 就记下真假。"""
         if self._key == "sufficient":
             if self._literal == "true":
                 self.sufficient = True
@@ -217,6 +234,7 @@ class AnswerStream:
         self._state = "after_value"
 
     def _release(self, text: str) -> str:
+        """决定这段新解码的文字能不能放出：被推迟、sufficient 为假或未确认时都不放。"""
         if not text or self.deferred or self.sufficient is False:
             return ""
         if self._require_sufficient and self.sufficient is not True:

@@ -1,7 +1,8 @@
-"""Turning text into vectors.
-
-The rest of the code depends on `EmbeddingClient` only. The provider, model and dimensions are
-settings, so another model is a configuration change followed by re-ingesting the documents.
+"""文件：embeddings.py
+作用：把文本变成向量（嵌入）。
+主要思想：其余代码只依赖 `EmbeddingClient` 接口；提供方、模型、维度都是配置项，
+换模型只需改配置再重新入库。向量维度要和数据库列（1536）一致，不一致立即报错而不是写入脏数据。
+测试用 FakeEmbeddingClient：用文本哈希生成确定的向量，免费但没有语义。
 """
 
 import hashlib
@@ -16,6 +17,8 @@ from starit_core.ingest.errors import IngestError
 
 
 class EmbeddingClient(Protocol):
+    """嵌入客户端接口：model、dimensions 属性，和 embed(文本列表) -> 向量列表。"""
+
     model: str
     dimensions: int
 
@@ -23,7 +26,7 @@ class EmbeddingClient(Protocol):
 
 
 class LiteLLMEmbeddingClient:
-    """Calls a hosted embedding model through the litellm library."""
+    """通过 litellm 调用嵌入模型（可经网关），并把费用记入指标和每日预算。"""
 
     def __init__(
         self,
@@ -42,6 +45,13 @@ class LiteLLMEmbeddingClient:
         self._gateway_key = gateway_key
 
     async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        """为一批文本生成向量。
+
+        参数：texts——要嵌入的文本列表。
+        返回：与输入等长的向量列表。
+        异常：调用失败或数量不符抛 IngestError(embedding_failed)；
+        维度与配置不符抛 IngestError(dimension_mismatch)，且不可重试。
+        """
         import litellm  # imported here: it is slow to import and not needed by every caller
 
         model = f"{self.provider}/{self.model}"
@@ -77,6 +87,7 @@ class LiteLLMEmbeddingClient:
         return vectors
 
     async def _record(self, response: Any, model: str) -> None:
+        """记录这次嵌入的费用：写指标，并累加到每日预算。"""
         usage = getattr(response, "usage", None)
         tokens = int(getattr(usage, "total_tokens", 0) or getattr(usage, "prompt_tokens", 0) or 0)
         if not tokens:
@@ -88,8 +99,7 @@ class LiteLLMEmbeddingClient:
 
 
 class FakeEmbeddingClient:
-    """Deterministic vectors derived from a hash of the text. For tests: it costs nothing and has
-    no meaning, so similar texts are not close."""
+    """测试用：向量由文本的 SHA-256 哈希确定生成并归一化，不花钱、无语义（相似文本也不接近）。"""
 
     def __init__(self, dimensions: int = 1536, model: str = "fake-embedding") -> None:
         self.model = model
@@ -111,11 +121,12 @@ class FakeEmbeddingClient:
 
 
 def vector_literal(vector: Sequence[float]) -> str:
-    """A vector in pgvector's text form, for use in a CAST(... AS vector)."""
+    """把向量转成 pgvector 的文本形式 [x,y,...]，用于 CAST(... AS vector)。"""
     return "[" + ",".join(repr(float(x)) for x in vector) + "]"
 
 
 def embedding_client(settings: Settings, budget: DailyBudget | None = None) -> EmbeddingClient:
+    """按配置创建嵌入客户端：provider 为 fake 用假实现，否则用 litellm（可经网关）。"""
     if settings.embedding_provider == "fake":
         return FakeEmbeddingClient(settings.embedding_dimensions)
     proxy = settings.llm_gateway == "litellm_proxy"
