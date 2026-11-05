@@ -1,9 +1,10 @@
-"""Ask the assistant a set of representative questions for real and report what happens.
-
-This is a spot check, not a benchmark: a handful of questions that exercise the hard cases (a
-calculation, an old policy version, look-alike error codes, a restricted document, a question
-with no answer, a clarification, and the things the assistant must refuse). Each is judged by the
-end state it must reach and by facts the answer must contain.
+"""文件：agent_check.py
+作用：对助手做一次“抽查”——用十几道有代表性的问题真实运行，看它在难点上的表现。
+这是抽查，不是基准测试：挑的是难例——计算、旧版本政策、相似的错误码、受限文档、无答案的问题、
+需要反问的问题，以及必须拒绝的请求。
+每个案例（Case）有一到几轮对话（Turn），每轮声明：必须到达的结局、原因、
+  回答里必须包含和不能包含的内容、
+不能引用的受限文档。
 """
 
 import re
@@ -27,6 +28,10 @@ from starit_eval.pricing import cost_usd
 
 @dataclass(frozen=True)
 class Turn:
+    """一轮对话的期望：states 里任意一个结局都算通过；contains/excludes
+    是回答里必须有/不能有的词（不分大小写）；forbidden_docs 是不能被引用的受限文档。
+    """
+
     text: str
     states: tuple[str, ...]  # any of these end states is a pass
     reasons: tuple[str | None, ...] | None = None
@@ -37,12 +42,15 @@ class Turn:
 
 @dataclass(frozen=True)
 class Case:
+    """一个案例：名称、提问角色、若干轮对话，以及说明（为什么选它）。"""
+
     name: str
     role: str
     turns: tuple[Turn, ...]
     note: str = ""
 
 
+# 案例清单：每个案例对应一种已知的难点（比如小模型曾经把迟交扣分算错）
 CASES: tuple[Case, ...] = (
     Case(
         "Late-penalty calculation (DOC-40)",
@@ -169,6 +177,8 @@ CASES: tuple[Case, ...] = (
 
 @dataclass
 class TurnResult:
+    """一轮对话的实际结果和发现的问题。"""
+
     case: str
     role: str
     text: str
@@ -184,6 +194,8 @@ class TurnResult:
 
 @dataclass
 class VariantResult:
+    """同一批案例用某一种配置(变体，比如不同模型)跑完的结果。"""
+
     label: str
     models: dict[str, str]
     turns: list[TurnResult] = field(default_factory=list)
@@ -197,8 +209,7 @@ class VariantResult:
 
 
 class CountingChat:
-    """Counts the model calls and tokens of a variant (the application role cannot read the
-    audit log, by design, so the run records are not used for this)."""
+    """包住聊天客户端，统计调用次数和 token，用来核对费用。"""
 
     def __init__(self, inner: ChatClient) -> None:
         self._inner = inner
@@ -215,6 +226,9 @@ class CountingChat:
 
 
 def judge(turn: Turn, result: RunResult) -> list[str]:
+    """给一轮对话找问题：结局和原因是否符合期望、必须包含/不能包含的词、是否引用了受限文档。
+    返回问题列表（空表示通过）。
+    """
     problems = []
     if result.end_state not in turn.states:
         problems.append(
@@ -233,7 +247,7 @@ def judge(turn: Turn, result: RunResult) -> list[str]:
 
 
 def estimate_calls(cases: Sequence[Case]) -> dict[str, int]:
-    """Model calls a pass over the cases makes, by step (an upper bound: no retries)."""
+    """一遍案例要调用模型的次数，按步骤分（上限，不含重试）。"""
     understand = sum(len(c.turns) for c in cases)
     searching = sum(
         1 for c in cases for t in c.turns if "answered" in t.states and t.text != "Hi!"
@@ -244,6 +258,7 @@ def estimate_calls(cases: Sequence[Case]) -> dict[str, int]:
 def estimate_cost(
     settings: Settings, calls: dict[str, int], avg_chunk_tokens: int, generate_model: str
 ) -> float | None:
+    """按标价估算费用；有模型没标价则返回 None。"""
     rerank_in = 160 + settings.retrieval_rerank_in * (
         min(avg_chunk_tokens, settings.rerank_passage_tokens) + 40
     )
@@ -265,6 +280,7 @@ async def run_variant(
     identities: dict[str, Identity],
     cases: Sequence[Case] = CASES,
 ) -> VariantResult:
+    """用一种配置把所有案例跑一遍（每个案例新开会话），返回 VariantResult。"""
     counting = CountingChat(chat)
     runtime = AgentRuntime(engine=engine, settings=settings, embedder=embedder, chat=counting)
     variant = VariantResult(
@@ -299,6 +315,7 @@ async def run_variant(
 
 
 def render(variants: Sequence[VariantResult], estimate_usd: float | None) -> str:
+    """生成中文 Markdown 报告：每个案例每一轮的结局、回答和发现的问题。"""
     date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
         f"# 助手真实检查（{date}）",
@@ -362,6 +379,7 @@ def render(variants: Sequence[VariantResult], estimate_usd: float | None) -> str
 
 
 def write(out_dir: Path, variants: Sequence[VariantResult], estimate_usd: float | None) -> Path:
+    """写报告文件，返回路径。"""
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"agent-check-{datetime.now(UTC).strftime('%Y%m%d-%H%M')}.md"
     path.write_text(render(variants, estimate_usd), encoding="utf-8")
@@ -369,6 +387,7 @@ def write(out_dir: Path, variants: Sequence[VariantResult], estimate_usd: float 
 
 
 def summarize_for_console(variants: Sequence[VariantResult]) -> str:
+    """控制台上的摘要。"""
     rows: list[Any] = []
     for v in variants:
         rows.append(

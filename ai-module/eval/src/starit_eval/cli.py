@@ -1,7 +1,10 @@
-"""Command line: `starit-eval retrieval --all-modes --leak-sweep`.
-
-A real run calls hosted models (question embeddings, and reranking in hybrid_rerank mode), so
-it first prints how many calls and tokens that will be and what they should cost, and asks.
+"""文件：cli.py
+作用：评测的命令行入口 `starit-eval`（通过 `make eval ARGS="..."` 使用）。
+子命令：retrieval（检索，可 --all-modes、--leak-sweep）/ answers（114 道文档题）/
+agent（代表性问题抽查）/ data（数据题）/ all（全部合成一份报告）/ matrix（对比实验）。
+重要原则：真实运行会调用付费模型，所以每个子命令先打印“会调用多少次、多少 token、
+按标价约多少钱”，然后问是否继续（Proceed? [y/N]）；加 --yes 才跳过询问。
+估算是上限（不含重试），实际费用通常更低。
 """
 
 import argparse
@@ -29,12 +32,15 @@ from starit_eval.pricing import cost_usd
 from starit_eval.report import build_report, store_run, write_reports
 from starit_eval.runner import embed_questions, evaluate_mode, leak_sweep
 
+# 报告默认写到仓库的 docs/eval/
 DEFAULT_OUT = AI_MODULE.parent / "docs" / "eval"
+# 估算用的常数：重排提示里的指令和问题；每段落的编号头
 RERANK_OVERHEAD_TOKENS = 160  # the instructions and the question
 PASSAGE_HEADER_TOKENS = 40  # "[3] HR-REC-001 v2.1 (active) - title - section"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """定义并解析命令行参数（子命令和选项）。"""
     parser = argparse.ArgumentParser(prog="starit-eval", description="StarEdu AI module evaluation")
     sub = parser.add_subparsers(dest="command", required=True)
     retrieval = sub.add_parser("retrieval", help="measure retrieval quality and permissions")
@@ -82,6 +88,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 async def corpus_stats(engine: AsyncEngine) -> dict[str, int]:
+    """知识库的规模：文档数、块数、平均块大小，写进报告。"""
     async with engine.connect() as conn:
         row = (
             await conn.execute(
@@ -111,7 +118,7 @@ def estimate(
     sweep: bool,
     avg_capped: int,
 ) -> dict[str, float | int | None]:
-    """Upper-bound token counts for the calls a run will make."""
+    """估算一次检索评测会调用多少次嵌入和重排、多少 token（上限）。"""
     embedding_tokens = sum(count_tokens(q.question) for q in questions)
     rerank_calls = len(questions) if "hybrid_rerank" in modes else 0
     per_call = RERANK_OVERHEAD_TOKENS + settings.retrieval_rerank_in * (
@@ -137,10 +144,12 @@ def estimate(
 
 
 def _proceed() -> bool:
+    """在终端问用户是否继续；非交互环境下读不到输入会报错，此时应加 --yes。"""
     return input("Proceed? [y/N] ").strip().lower() in ("y", "yes")
 
 
 def _confirm(args: argparse.Namespace, figures: dict[str, float | int | None]) -> bool:
+    """打印将要进行的调用与估算费用，再询问是否继续（--yes 则直接继续）。返回是否继续。"""
     usd = "unknown" if figures["usd"] is None else f"about ${figures['usd']}"
     print(
         f"\nThis run will call hosted models:\n"
@@ -156,6 +165,9 @@ def _confirm(args: argparse.Namespace, figures: dict[str, float | int | None]) -
 
 
 async def run_retrieval(args: argparse.Namespace) -> int:
+    """检索评测子命令：估算 -> 确认 -> 各模式运行 -> 可选越权扫描 -> 写报告和数据库记录。
+    返回退出码（有越权则非 0）。
+    """
     settings = get_settings()
     engine = create_engine(settings)
     questions, identities, manifest = load_questions(), load_identities(), load_manifest()
@@ -194,6 +206,8 @@ async def run_retrieval(args: argparse.Namespace) -> int:
 
 @dataclass
 class RetrievalOutcome:
+    """检索阶段的产出：各模式的运行、越权扫描和越权数，供 all 子命令继续使用。"""
+
     report: dict[str, Any]
     markdown: Path
     data: Path
@@ -253,6 +267,7 @@ async def retrieval_phase(
 
 
 async def run_agent(args: argparse.Namespace) -> int:
+    """代表性问题抽查子命令。"""
     from starit_eval import agent_check
 
     settings = get_settings()
@@ -309,6 +324,7 @@ async def run_agent(args: argparse.Namespace) -> int:
 
 
 async def run_data(args: argparse.Namespace) -> int:
+    """数据题评测子命令。"""
     from starit_eval import data_check
 
     settings = get_settings()
@@ -345,10 +361,12 @@ async def run_data(args: argparse.Namespace) -> int:
 
 
 def _calls_line(calls: dict[str, int]) -> str:
+    """把 {步骤: 次数} 格式化成一行文字。"""
     return ", ".join(f"{n} {step}" for step, n in calls.items())
 
 
 async def run_answers_command(args: argparse.Namespace) -> int:
+    """答案评测子命令：估算、确认、跑 114 道文档题、写报告、抽查表和数据库记录。"""
     from starit_eval import answers
 
     settings = get_settings()
@@ -384,6 +402,7 @@ async def run_answers_command(args: argparse.Namespace) -> int:
 
 
 async def run_all(args: argparse.Namespace) -> int:
+    """全部评测：检索 + 越权扫描 + 答案 + 数据题，合成一份总报告；有越权则整体失败。"""
     from starit_eval import answers, data_check, suite
     from starit_eval.report import git_sha
 
@@ -464,6 +483,7 @@ async def run_all(args: argparse.Namespace) -> int:
 
 
 async def run_matrix_command(args: argparse.Namespace) -> int:
+    """对比实验子命令：估算、确认、在临时数据库里跑所有实验。"""
     from starit_eval import matrix
 
     settings = get_settings()
@@ -504,6 +524,7 @@ async def run_matrix_command(args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """命令行入口：解析参数并运行对应子命令，退出码交给 sys.exit。"""
     args = parse_args(argv)
     runner = {
         "agent": run_agent,

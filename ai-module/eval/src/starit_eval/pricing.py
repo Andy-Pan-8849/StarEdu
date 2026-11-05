@@ -1,7 +1,7 @@
-"""List prices, USD per million tokens, for the cost estimate.
-
-Found on 2026-11-03 in third-party price lists; OpenAI's own pricing page was not read, so treat
-the figures as estimates. A model that is not listed has an unknown cost.
+"""文件：pricing.py
+作用：评测前估算费用用的价目表（每百万 token 的美元价）。
+说明：价格来自第三方价目表(2026-11-03)，没有读 OpenAI 官网，只能当估算；
+表里没有的模型费用未知（返回 None）。真正的计费以 LiteLLM 价目表为准（见 starit_core/cost.py）。
 """
 
 PRICES_PER_MILLION: dict[str, tuple[float, float]] = {  # (input, output)
@@ -13,6 +13,9 @@ PRICES_PER_MILLION: dict[str, tuple[float, float]] = {  # (input, output)
 
 
 def cost_usd(model: str, input_tokens: int, output_tokens: int = 0) -> float | None:
+    """估算一次调用的美元费用；模型不在价目表里返回 None。参数：model 模型名；
+    input_tokens/output_tokens。
+    """
     name = model.split("/", 1)[-1]
     if name not in PRICES_PER_MILLION:
         return None

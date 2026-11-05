@@ -1,4 +1,9 @@
-"""Turn a run into JSON, a Markdown report, and rows in ai.eval_runs / ai.eval_results."""
+"""文件：report.py
+作用：把一次检索评测的结果整理成 JSON、Markdown 报告，以及数据库里的评测记录
+（表 ai.eval_runs 与 ai.eval_results）。
+流程：build_report 把各模式的运行汇总成字典 -> render_markdown 转成中文 Markdown ->
+write_reports 写文件 -> store_run 写数据库，方便以后对比不同时间的结果。
+"""
 
 import json
 import subprocess
@@ -18,6 +23,7 @@ from starit_eval.runner import ModeRun, QuestionRun, SweepResult
 
 
 def git_sha() -> str | None:
+    """当前提交的短哈希，取不到（没装 git 等）返回 None；写进报告以便追溯。"""
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
@@ -28,10 +34,12 @@ def git_sha() -> str | None:
 
 
 def answerable(run: QuestionRun) -> bool:
+    """这道题的检索是否属于“可回答”：应回答并且有来源文档。"""
     return run.question.should_answer and bool(run.question.source_docs)
 
 
 def scored(runs: Sequence[QuestionRun]) -> list[Scored]:
+    """挑出可回答的题，转成指标计算需要的 Scored 列表。"""
     return [
         Scored(r.question.type, tuple(r.doc_codes), r.question.source_docs)
         for r in runs
@@ -40,9 +48,12 @@ def scored(runs: Sequence[QuestionRun]) -> list[Scored]:
 
 
 def passed(run: QuestionRun) -> bool | None:
-    """Did retrieval do its job? Answerable: a source is in the first six documents.
-    Not answerable or not allowed: nothing the asker may not read came back, and for a question
-    about a restricted document, that document did not."""
+    """检索这一步算不算通过。
+    - 有越权返回 -> 不通过；
+    - 可回答题：前 6 个文档里有来源文档才通过；
+    - 有来源但不该回答/无权读：来源文档不能出现在结果里；
+    - 没有来源文档可参照（无答案的题）：返回 None，不判。
+    """
     if run.violations:
         return False
     if answerable(run):
@@ -53,6 +64,7 @@ def passed(run: QuestionRun) -> bool | None:
 
 
 def _summary_dict(summary: Summary) -> dict[str, float]:
+    """把 Summary 转成保留 4 位小数的字典。"""
     return {
         "n": summary.n,
         "hit@1": round(summary.hit1, 4),
@@ -74,6 +86,12 @@ def build_report(
     rerank_model: str,
     embedding_model: str,
 ) -> dict[str, Any]:
+    """把各检索模式的运行结果汇总成报告字典。
+
+    内容：每种模式的总体指标、按题型指标、没命中的题、延迟 p50/p95、
+    “可回答 vs 无答案”的最高分中位数（这是 grade_retrieval 阈值的依据）、越权块数、重排 token；
+    再加权限扫描结果和估算费用。
+    """
     modes: dict[str, Any] = {}
     for mode_run in mode_runs:
         runs = mode_run.runs
@@ -139,11 +157,15 @@ def build_report(
 
 
 def _median(values: Sequence[float | None]) -> float | None:
+    """中位数（忽略 None），没有数据返回 None。"""
     clean = sorted(v for v in values if v is not None)
     return None if not clean else round(clean[len(clean) // 2], 4)
 
 
 def render_markdown(report: dict[str, Any]) -> str:
+    """把报告字典渲染成中文 Markdown：总体结果表、按题型表、未命中的题、分数分布、权限回归、
+    费用和局限。
+    """
     c, cfg = report["corpus"], report["config"]
     lines = [
         f"# 检索评测报告：{report['label']}",
@@ -223,6 +245,7 @@ def render_markdown(report: dict[str, Any]) -> str:
 
 
 def write_reports(out_dir: Path, report: dict[str, Any], name: str) -> tuple[Path, Path]:
+    """把报告写成同名的 .md 和 .json 两个文件，返回它们的路径。"""
     out_dir.mkdir(parents=True, exist_ok=True)
     markdown, data = out_dir / f"{name}.md", out_dir / f"{name}.json"
     markdown.write_text(render_markdown(report), encoding="utf-8")
@@ -231,7 +254,7 @@ def write_reports(out_dir: Path, report: dict[str, Any], name: str) -> tuple[Pat
 
 
 async def store_run(engine: AsyncEngine, mode_run: ModeRun, report: dict[str, Any]) -> str:
-    """Record one mode's run in ai.eval_runs and its per-question rows in ai.eval_results."""
+    """把一种模式的运行写入 ai.eval_runs（汇总）和 ai.eval_results（每题一行），返回运行 ID。"""
     summary = report["modes"][mode_run.mode]
     config = {**report["config"], "mode": mode_run.mode, "label": report["label"]}
     async with engine.begin() as conn:
