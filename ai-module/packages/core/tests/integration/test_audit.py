@@ -1,3 +1,7 @@
+"""文件：测试——审计日志只增不改（集成）
+测什么：应用账号只能追加审计记录，不能修改、删除，也不能读取（数据库层面的权限保证）。
+"""
+
 from collections.abc import Callable
 
 import pytest

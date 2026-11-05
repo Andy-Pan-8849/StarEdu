@@ -1,4 +1,8 @@
-"""The assistant's data path: tools and generated SQL, with scripted models and real data."""
+"""文件：测试——助手的数据路径（集成）
+测什么：固定工具与模型生成 SQL 两条路；工具参数错误退回 SQL；SQL
+  被校验器拒绝/数据库拒绝后带反馈重写；
+无权限与查不到的结局；引用里记录用到的视图和行数。
+"""
 
 import csv
 from collections.abc import AsyncIterator

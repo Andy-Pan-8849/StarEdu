@@ -1,4 +1,7 @@
-"""The three limits on the chat endpoint: address, user, and the day's spend."""
+"""文件：测试——聊天接口的三道限制（集成）
+测什么：IP、用户、当日花费三道限制各自触发 429 和 Retry-After；被拒绝的请求不调用模型；
+X-Forwarded-For 只在来自受信任代理时才被采信，别人伪造的会被忽略。
+"""
 
 import time
 from collections.abc import Callable, Iterator

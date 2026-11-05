@@ -1,7 +1,6 @@
-"""The assistant with the real retrieval over the ingested sample documents.
-
-The models are scripted and the embeddings are fake, so what is checked is what does not depend
-on how well a model reads: who may see what, and what the assistant does about it.
+"""文件：测试——助手的权限（集成）
+测什么：用真实检索在已入库的示例文档上，不同角色问同一个问题得到不同结局；
+受限内容绝不出现在提示词、回答和引用里。
 """
 
 import asyncio

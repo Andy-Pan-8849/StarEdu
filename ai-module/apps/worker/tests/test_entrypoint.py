@@ -1,3 +1,7 @@
+"""文件：测试——worker 命令行入口
+测什么：默认一直运行；--once 表示处理完现有任务就退出。
+"""
+
 from starit_worker.main import parse_args
 
 

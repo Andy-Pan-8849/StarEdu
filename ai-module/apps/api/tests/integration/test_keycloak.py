@@ -1,4 +1,7 @@
-"""Needs the Compose stack with Keycloak (make up). Skipped when Keycloak is unreachable."""
+"""文件：测试——真实 Keycloak（集成）
+测什么：对每个演示账号取真实令牌并调用 /me，身份与示例数据一致；被篡改的真实令牌会被拒绝。
+前提：需要 Compose 栈里的 Keycloak（make up）；连不上时自动跳过。
+"""
 
 import csv
 from collections.abc import Iterator

@@ -1,4 +1,9 @@
-"""The conversation endpoints on a scratch database, with a scripted assistant."""
+"""文件：测试——会话接口（集成）
+测什么：在临时数据库上，用脚本化的助手测试：每个接口都要登录；新建/取/改名/列表；
+别人的会话等同于不存在（404）；格式错误的 ID 或游标是校验错误；列表按最新在前分页；
+归档后隐藏且不能再发消息；发消息得到约定格式的回答并保留历史；空消息和超长消息被拒绝；
+每用户每分钟限流；一条消息可以用 SSE 流式返回，并且流式请求同样受限流和所有权约束。
+"""
 
 import time
 from collections.abc import Iterator

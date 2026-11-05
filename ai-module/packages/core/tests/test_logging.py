@@ -1,3 +1,7 @@
+"""文件：测试——JSON 日志
+测什么：日志是一行 JSON，有请求 ID 时带上，没有时不带这个字段。
+"""
+
 import json
 import logging
 

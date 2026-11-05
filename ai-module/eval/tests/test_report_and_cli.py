@@ -1,3 +1,8 @@
+"""文件：测试——检索报告与命令行
+测什么：passed 对可回答/被拒绝的题判断不同；报告包含所有章节且数字自洽；越权会被计数并显示；
+命令行没给任务时报错；估算只计真正会发生的调用；价目表；新子命令能解析。
+"""
+
 import pytest
 from starit_core.config import Settings
 from starit_eval.cli import estimate, parse_args

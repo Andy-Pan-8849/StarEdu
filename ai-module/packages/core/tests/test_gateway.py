@@ -1,4 +1,8 @@
-"""Models are reached directly or through the LiteLLM gateway, chosen by settings."""
+"""文件：测试——模型调用方式（直连或经网关）
+测什么：直连时按原模型名；走网关时发往网关并带网关密钥；由配置选择客户端；
+网关密钥不出现在配置的 repr 里；网关不可达时是 ChatError 且错误信息不含密钥；
+嵌入同样可经网关，并跟随同一个配置。
+"""
 
 from types import SimpleNamespace
 from typing import Any

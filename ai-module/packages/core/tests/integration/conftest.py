@@ -1,8 +1,5 @@
-"""Fixtures for tests that need the migrated Postgres (make up, or the CI service).
-
-Each test runs as the database owner inside one transaction that is rolled back at the end,
-so nothing is left behind. Inside it, `SET LOCAL ROLE ai_app` (or ai_sql_ro) gives exactly that
-role's privileges, so grants can be tested without separate logins.
+"""文件：packages/core/tests/integration/conftest.py
+作用：需要已迁移 Postgres 的集成测试夹具（make up，或 CI 里的数据库服务）。
 """
 
 from collections.abc import AsyncIterator, Callable

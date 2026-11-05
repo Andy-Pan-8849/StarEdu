@@ -1,3 +1,10 @@
+"""文件：测试——遥测
+测什么：一次模型调用是一个 span 并计 token；失败的调用标记 span 并计错误；提示词和回答默认不进
+  span，开关打开才进；
+日志带 trace/run ID；span 里的异常标成错误；没启用时什么都不装；启用后建出可导出的提供者；
+  队列长度是仪表。
+"""
+
 import json
 import logging
 from collections.abc import Iterator

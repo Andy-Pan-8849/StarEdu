@@ -1,4 +1,10 @@
-"""A real MCP server (uvicorn in a thread) with real signature checks, against seeded data."""
+"""文件：测试——MCP 服务器端到端
+测什么：用 uvicorn 在线程里起一个真实的 MCP 服务器，带真实的签名校验，针对种子数据：
+有效令牌得到调用者自己的数据范围；由服务器根据令牌决定“谁在问”，参数里不能指定别人的身份；
+坏令牌在门口就被拒绝；被拒绝的调用在客户端表现为错误而不是数据；没有令牌就不发起调用；
+/health 不需要令牌；Compose 里的服务名是被接受的 Host，未知 Host 即使令牌有效也被拒绝；
+一次工具调用是从客户端到服务器的一条链路。
+"""
 
 import socket
 import threading

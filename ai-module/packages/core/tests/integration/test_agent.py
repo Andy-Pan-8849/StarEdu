@@ -1,4 +1,12 @@
-"""Every way a run can end, on a real database, with a scripted model and a retrieval stub."""
+"""文件：测试——助手的各种结局（集成）
+测什么：在真实数据库上，用脚本化模型和检索桩，覆盖一次运行的各种走向：
+证据充足就带引用回答；问候得到固定回复且不检索；理解结果不可读时退回用原话检索；
+回答被校验打回时带着原因重试一次；搜不到就重试一次再 not_found；证据弱时重试，第二次更好就回答，
+  仍弱则 not_found；
+作答步骤认为摘录不足也是 not_found；被隐藏的内容结局是 no_permission 且话术与 not_found 相同；
+低于阈值的弱匹配只算 not_found；含糊问题反问一次，下一条消息补全；两次澄清后第三次放弃；
+不处理的请求被拒绝；被拦截的输入到不了模型；各种失败以 error 结局结束并带原因。
+"""
 
 from collections.abc import Callable
 from typing import Any

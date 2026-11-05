@@ -1,4 +1,6 @@
-"""HTTP spans of the API: one per request, no health checks, and never the bearer token."""
+"""文件：测试——API 的链路
+测什么：每个请求一个 HTTP span；健康检查不产生 span；任何 span 里都不出现 Bearer 令牌。
+"""
 
 import time
 from collections.abc import Iterator

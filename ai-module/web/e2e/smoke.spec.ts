@@ -1,3 +1,10 @@
+/**
+ * 文件：e2e/smoke.spec.ts
+ * 作用：浏览器端到端冒烟测试（Playwright），运行在真实的 Compose 栈上（需要 make up）。
+ * 三个场景：普通用户有助手但没有文档管理入口；提问得到带来源的回答并能打开来源；
+ * 管理员上传一份文档，之后能从引用里读到它。上传使用假向量，不花钱。
+ */
+
 import { expect, test } from "@playwright/test";
 import { API, bearer, signedIn, tokenFor } from "./helpers";
 

@@ -1,4 +1,7 @@
-"""The experiment matrix on a scratch database, with fake embeddings and a scripted derive model."""
+"""文件：测试——对比实验矩阵（集成）
+测什么：实验清单覆盖了检查清单里承诺的各项；估算统计入库次数和衍生内容的调用数；
+实验在临时数据库上运行，并且结束后不留下任何东西。
+"""
 
 import json
 

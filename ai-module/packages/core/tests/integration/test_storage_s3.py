@@ -1,4 +1,6 @@
-"""The object-storage client against the real S3-compatible service (make up)."""
+"""文件：测试——对象存储客户端
+测什么：对真实的 S3 兼容服务（make up 里的 MinIO）存取删对象、不存在时抛 FileNotFoundError。
+"""
 
 import uuid
 

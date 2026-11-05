@@ -1,3 +1,12 @@
+/**
+ * 文件：tests/lib.test.ts
+ * 作用：前端工具函数的单元测试。
+ * 覆盖：splitCitations（已知标记变成引用、不匹配的保持原样、不把文字当 HTML、无标记时原样返回）
+ *   ；
+ * safeReturnPath（只接受站内路径）；canManageDocuments；validateUpload 与 splitList；
+ * createApi（带令牌、JSON 收发、401 重新登录、无令牌不发请求、204 与错误码）；userMessage。
+ */
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, createApi, userMessage } from "@/lib/api";
 import { canManageDocuments, safeReturnPath } from "@/lib/auth";

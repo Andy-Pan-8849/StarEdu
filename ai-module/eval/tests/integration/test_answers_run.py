@@ -1,4 +1,7 @@
-"""run_answers end to end on the ingested sample documents, with scripted models."""
+"""文件：测试——答案评测的完整流程（集成）
+测什么：在已入库的示例文档上，用脚本化的模型：题目被提问、判分、汇总并存入数据库；
+  答错的题会被判为失败。
+"""
 
 import asyncio
 from collections.abc import AsyncIterator

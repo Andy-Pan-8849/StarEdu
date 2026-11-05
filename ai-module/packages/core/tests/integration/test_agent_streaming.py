@@ -1,4 +1,7 @@
-"""What a listening client is shown while a run works, and that it matches what is stored."""
+"""文件：测试——助手的流式事件（集成）
+测什么：有客户端在监听时：回答边写边流出，结束时等于落库的回复；摘录不足时不展示任何文字；
+流出的草稿校验失败会被撤回；固定话术一次性给出；模型连接中途断开以 error 结局结束。
+"""
 
 from collections.abc import Callable
 from typing import Any

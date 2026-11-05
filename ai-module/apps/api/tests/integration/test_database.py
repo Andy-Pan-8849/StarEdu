@@ -1,4 +1,7 @@
-"""Needs a migrated Postgres (make up && make migrate, or the CI service)."""
+"""文件：测试——数据库迁移与应用账号（集成）
+测什么：迁移已应用；应用是以普通低权限账号 ai_app 连接的，不是库所有者。
+前提：需要已迁移的 Postgres（make up && make migrate，或 CI 的服务）。
+"""
 
 from collections.abc import AsyncIterator
 

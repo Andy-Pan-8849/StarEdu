@@ -1,9 +1,6 @@
-"""Differential test: the SQL filter must agree with an independent Python rule everywhere.
-
-A grid of documents (access level x campus scope x status x grade requirement x named user)
-is stored, then a grid of callers (role sets x campus x job level x user id) queries it. For
-every caller the set of visible chunks from the database must equal what the plain Python
-rule below says.
+"""文件：测试——权限的差分测试
+测什么：数据库里的 SQL 权限过滤，必须与一份独立的 Python 规则在所有（角色 × 文档）组合上一致；
+两份独立实现不一致就是 bug。
 """
 
 import itertools

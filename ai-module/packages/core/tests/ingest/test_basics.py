@@ -1,3 +1,9 @@
+"""文件：测试——入库的基础件
+测什么：token 计数；编号抽取；文字清理（只整理不改写；多页重复的页眉页脚才删除）；
+被嵌入的文字加上标题和章节路径；向量字面量格式；假嵌入确定且为单位向量；
+litellm 嵌入客户端检查维度、数量并把失败包装成统一错误、传入正确的模型和维度。
+"""
+
 import pytest
 from starit_core.embeddings import FakeEmbeddingClient, LiteLLMEmbeddingClient, vector_literal
 from starit_core.ingest.clean import clean_document, clean_text
