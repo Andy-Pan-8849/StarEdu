@@ -1,7 +1,18 @@
-"""PDF files, using font sizes to find headings and pdfplumber's table detection.
-
-Headings are lines set larger than the body text. Tables are detected on the page, removed from
-the text flow and kept whole. Lines are joined into paragraphs and list items by their layout.
+"""文件：ingest/parsers/pdf.py
+作用：解析 PDF 文件。PDF 没有“标题/段落”这种结构，只有一行行带字号的文字，所以要靠版式推断。
+算法思想：
+  1. 逐页收集：用 pdfplumber 找出表格区域，把落在表格里的字符排除，剩下的按行提取文字
+     （记下每行的页码、位置、字号、是否加粗）；表格整块提取；行和表格按（页, 纵向位置）排序，
+       还原阅读顺序。
+  2. 判断“正文字号”：全文里出现字数最多的字号就是正文字号 body。
+  3. 逐行分类，看字号相对正文的倍数：
+     - 至少 1.6 倍，且还没有标题 -> 文档标题；
+     - 至少 1.2 倍且不太长 -> 章节标题（一级）；
+     - 至少 1.05 倍、加粗、不太长 -> 小节标题（二级）；
+     - 否则是正文。
+  4. 正文行合并成段落：以项目符号/编号开头的行是列表项；
+     与上一行同页、行距很小（小于行高的 0.45 倍）就接在上一段后面，否则另起一段。
+文档顶部的元数据表丢掉；整份文件提不出文字（如扫描件）则抛 ParseError。
 """
 
 import re
@@ -16,7 +27,9 @@ from starit_core.ingest.models import Block, ParsedDocument
 from starit_core.ingest.parsers.base import ParseError
 from starit_core.ingest.parsers.common import is_metadata_table, table_block
 
+# 列表项的开头：项目符号或 "1."、"2)" 这样的编号
 _LIST_MARKER = re.compile(r"^(?:[•·●▪\-–]|\d+[.)])\s+")
+# 字号相对正文的倍数阈值：标题 / 章节标题 / 小节标题（仅加粗时）
 _TITLE_RATIO = 1.6  # at least this much larger than body text: the document title
 _SECTION_RATIO = 1.2  # section heading
 _SUBSECTION_RATIO = 1.05  # sub-heading, only when bold

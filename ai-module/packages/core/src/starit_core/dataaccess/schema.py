@@ -1,19 +1,20 @@
-"""What the assistant may know about the business data: the views, who can use them, and the
-text that describes them to the model.
-
-The views in the `ai_sql` schema do the real filtering (docs/design/02-data-model.md, section 5).
-The role table here is only used to refuse early and to tell the model what exists; a test keeps
-it in step with the views.
+"""文件：dataaccess/schema.py
+作用：助手能了解的业务数据：有哪些视图、每列是什么、谁能用，以及给 SQL 模型看的结构说明文字。
+主要思想：真正的行级过滤由数据库里 `ai_sql` 模式的视图完成（设计见 docs/design/02 第 5 节）；
+这里的“角色 -> 视图”表只用于提前拒绝和告诉模型有哪些视图，并有测试保证它与视图的实际情况同步。
+说明文字里会写上提问者的身份(角色、校区、员工/学员编号)，让“我的”能对应到具体编号。
 """
 
 from dataclasses import dataclass
 
 from starit_core.auth import Identity
 
+# 角色分组：全部 / 员工侧 / 有业务数据可读的角色（管理角色 Admin、RAGETLAdmin 不在其中）
 ALL_ROLES = frozenset({"student", "staff", "manager", "hr", "finance", "Admin", "RAGETLAdmin"})
 STAFF_SIDE = frozenset({"staff", "manager", "hr", "finance"})
 EVERYONE_WITH_DATA = frozenset({"student", "staff", "manager", "hr", "finance"})
 
+# 八个校区的编码与名称
 CAMPUSES = {
     "BJ": "Beijing (headquarters)",
     "SH": "Shanghai",
@@ -28,12 +29,15 @@ CAMPUSES = {
 
 @dataclass(frozen=True)
 class View:
+    """一个视图的说明：名称、用途、每列(名称, 类型, 备注)，以及哪些角色可以访问它。"""
+
     name: str
     description: str
     columns: tuple[tuple[str, str, str], ...]  # (name, SQL type, note)
     roles: frozenset[str]  # roles that can see any row of it at all
 
 
+# 全部视图的定义。注意视图只返回调用者有权看的行（学员只看自己，员工看本校区……）
 VIEWS: dict[str, View] = {
     v.name: v
     for v in (
@@ -158,15 +162,19 @@ VIEWS: dict[str, View] = {
     )
 }
 
+# 视图名 -> 可访问的角色，供 sqlguard 做早拒绝
 VIEW_ROLES: dict[str, frozenset[str]] = {name: view.roles for name, view in VIEWS.items()}
 
 
 def can_use_view(roles: frozenset[str], view: str) -> bool:
+    """这些角色里是否有人能使用该视图。"""
     return bool(VIEW_ROLES[view] & roles)
 
 
 def schema_prompt(identity: Identity) -> str:
-    """The description of the data, for the SQL-writing model."""
+    """生成给写 SQL 的模型看的数据说明：每个视图和列、校区编码表、提问者身份。
+    参数：identity 提问者。返回：多行文字。
+    """
     lines = ["Views (always write them as ai_sql.<name>):", ""]
     for view in VIEWS.values():
         lines.append(f"ai_sql.{view.name} - {view.description}")

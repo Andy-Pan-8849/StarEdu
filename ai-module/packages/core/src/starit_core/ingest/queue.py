@@ -1,8 +1,10 @@
-"""The ingestion job queue, kept in Postgres (ai.ingestion_jobs).
-
-A worker claims a job with FOR UPDATE SKIP LOCKED, so several workers can run at once and
-each job is taken by exactly one of them. A failed job is queued again with a growing delay
-until it has used its attempts; then it is marked failed and the document is marked failed.
+"""文件：ingest/queue.py
+作用：入库任务队列，直接用 Postgres 表 ai.ingestion_jobs 实现（不额外引入消息队列）。
+主要思想：
+  - 领取任务用 `FOR UPDATE SKIP LOCKED`：多个 worker 同时跑也不会领到同一个任务，
+    也不会互相阻塞。
+  - 失败后按退避时间(30 秒、2 分钟、10 分钟…)重新排队；用完次数则任务标记失败，文档也标记失败。
+  - worker 异常退出时，卡在 running 的任务超时后被放回队列（requeue_stale）。
 """
 
 import json
@@ -15,11 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from starit_core.ingest.errors import IngestError
 
+# 第 1、2、3… 次失败后各等多少秒再重试
 BACKOFF_SECONDS = (30, 120, 600)  # delay after the 1st, 2nd, 3rd... failed attempt
 
 
 @dataclass(frozen=True)
 class Job:
+    """一个被领取的入库任务：任务 ID、文档 ID、第几次尝试、最多几次、配置。"""
+
     id: UUID
     document_id: UUID
     attempt: int
@@ -30,7 +35,9 @@ class Job:
 async def enqueue(
     conn: AsyncConnection, document_id: UUID, config: dict[str, Any] | None = None
 ) -> UUID:
-    """Queue a document for ingestion, unless a job for it is already waiting or running."""
+    """给文档排一个入库任务；若已有排队中或运行中的任务就不重复排，直接返回它的 ID。
+    参数：document_id 文档；config 任务配置（如是否生成衍生内容）。
+    """
     existing = (
         await conn.execute(
             text(
@@ -58,6 +65,7 @@ async def enqueue(
 
 
 async def count_queued(conn: AsyncConnection) -> int:
+    """排队中的任务数（用于队列长度指标）。"""
     return int(
         (
             await conn.execute(
@@ -68,6 +76,11 @@ async def count_queued(conn: AsyncConnection) -> int:
 
 
 async def claim_next(conn: AsyncConnection, worker_id: str) -> Job | None:
+    """领取下一个到期的任务，没有则返回 None。
+
+    在一条 UPDATE 里完成“选中 + 标记为运行中 + 尝试次数加一”，选中时加 SKIP LOCKED，
+    所以并发领取是安全的。同时把文档状态改为 running。
+    """
     row = (
         (
             await conn.execute(
@@ -108,12 +121,14 @@ async def claim_next(conn: AsyncConnection, worker_id: str) -> Job | None:
 
 
 async def mark_stage(conn: AsyncConnection, job_id: UUID, stage: str) -> None:
+    """记录任务当前所处阶段（解析/切块/嵌入…），方便在管理页看进度和失败位置。"""
     await conn.execute(
         text("UPDATE ai.ingestion_jobs SET stage = :s WHERE id = :j"), {"s": stage, "j": job_id}
     )
 
 
 async def mark_succeeded(conn: AsyncConnection, job: Job) -> None:
+    """任务成功：任务置 succeeded，文档置 ready。"""
     await conn.execute(
         text(
             "UPDATE ai.ingestion_jobs SET status = 'succeeded', finished_at = now(), "
@@ -128,7 +143,10 @@ async def mark_succeeded(conn: AsyncConnection, job: Job) -> None:
 
 
 async def mark_failed(conn: AsyncConnection, job: Job, error: IngestError) -> bool:
-    """Record a failure. Returns True when the job was queued again, False when it gave up."""
+    """记录一次失败。
+
+    可重试且还有次数：按退避时间重新排队，返回 True；否则任务和文档都标记为 failed，返回 False。
+    """
     retry = error.retryable and job.attempt < job.max_attempts
     params = {
         "j": job.id,
@@ -167,7 +185,7 @@ async def mark_failed(conn: AsyncConnection, job: Job, error: IngestError) -> bo
 
 
 async def requeue_stale(conn: AsyncConnection, older_than_seconds: int) -> int:
-    """Put back jobs whose worker stopped without finishing (it died or was killed)."""
+    """把超过 older_than_seconds 秒仍在运行的任务放回队列（worker 可能已崩溃）。返回放回了几个。"""
     result = await conn.execute(
         text(
             "UPDATE ai.ingestion_jobs SET status = 'queued', locked_by = NULL "
