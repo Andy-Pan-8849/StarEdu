@@ -1,7 +1,9 @@
-"""Run the assistant for one message and record what happened.
-
-However the graph ends (normally, by a failing step, by timeout or by a bug), exactly one run is
-recorded with an end state and a reply.
+"""文件：agent/runtime.py
+作用：为一条用户消息运行一次助手，并把结果记录下来——助手对外的唯一入口。
+主要思想：无论图怎么结束（正常结束、某步失败、超时、程序错误），都恰好记录一次运行，
+带结局和回复，调用方永远拿到一个结果，不会没有回应。
+流式：传入 on_event 时，运行过程中会发事件（见 events.py），并在结束时把已展示的文字
+与最终记录的回复对齐（_finish_stream）。
 """
 
 import asyncio
@@ -36,6 +38,8 @@ logger = logging.getLogger("starit.agent")
 
 @dataclass
 class RunResult:
+    """一次运行的结果：运行 ID、助手消息 ID、回复文字、引用、结局和结局原因。"""
+
     run_id: UUID
     message_id: UUID
     content: str
@@ -45,6 +49,10 @@ class RunResult:
 
 
 class AgentRuntime:
+    """助手运行时。构造时把依赖（数据库、配置、嵌入/聊天客户端、检索函数、数据工具、预算）
+    注入进来，并编译好流程图；之后每条消息调用一次 run。
+    """
+
     def __init__(
         self,
         *,
@@ -78,14 +86,22 @@ class AgentRuntime:
         access_token: str | None = None,
         on_event: Sink | None = None,
     ) -> RunResult:
-        """Run the assistant for one message. With `on_event` a client is listening: the run says
-        what it is doing as it goes (see agent/events.py) and ends with `run.ended`."""
+        """为一条消息运行助手。
+
+        参数：
+          identity：提问者身份（所有权限判断的依据）；conversation_id：所在会话；user_text：用户原文。
+          access_token：调用方的原始令牌，只在内存里传给数据工具，不记录、不落库。
+          on_event：有客户端在监听时传入。运行会边做边发事件，并以 run.ended 结束。
+        返回：RunResult。
+        """
+        # 每次运行有自己的 ID，贯穿日志、链路、审计和事件
         run_id = uuid4()
         emitter = RunEmitter(on_event) if on_event is not None else None
         token = run_id_var.set(str(run_id))
         try:
             if emitter is not None:
                 await emitter.event("run.started", {"run_id": str(run_id)})
+            # 整个运行放在一个链路 span 里，结束时写入结局
             with telemetry.span(
                 "agent.run",
                 {
@@ -96,10 +112,12 @@ class AgentRuntime:
                     "langfuse.trace.name": "assistant run",
                 },
             ) as active:
+                # 真正执行：跑图 -> 落库 -> 得到结果
                 result = await self._run(
                     identity, conversation_id, user_text, run_id, access_token, emitter
                 )
                 if emitter is not None:
+                    # 流式收尾：对齐已展示的文字，补发引用和结束事件
                     await self._finish_stream(emitter, result)
                 active.set_attribute("agent.end_state", result.end_state)
                 active.set_attribute("agent.end_reason", result.end_reason or "")
@@ -121,10 +139,17 @@ class AgentRuntime:
         access_token: str | None,
         emitter: RunEmitter | None = None,
     ) -> RunResult:
+        """执行流程图并落库，返回结果。
+
+        超时、递归过深（步骤太多）、任何异常都会转成 error 结局，而不是向外抛，
+        这样“恰好记录一次运行”的保证永远成立。
+        """
         settings = self._settings
         started_at = datetime.now(UTC)
         clock = time.perf_counter()
+        # 本次运行的统计容器，各步骤往里累加
         totals = RunTotals()
+        # 包装模型客户端：计数、限次、计费
         chat = BudgetedChat(
             self._chat,
             totals,
@@ -132,6 +157,7 @@ class AgentRuntime:
             settings.agent_llm_timeout_seconds,
             self._budget,
         )
+        # 步骤需要的上下文：身份、客户端、重排器、事件发送器
         ctx = RunContext(
             identity=identity,
             conversation_id=conversation_id,
@@ -149,6 +175,7 @@ class AgentRuntime:
         }
         final: AgentState
         try:
+            # 带总超时地运行整张图
             final = await asyncio.wait_for(
                 self._graph.ainvoke({"user_text": user_text}, config),
                 timeout=settings.agent_run_timeout_seconds,
@@ -164,9 +191,11 @@ class AgentRuntime:
             logger.exception("the assistant failed")
             totals.failure_detail = f"{type(exc).__name__}: {exc}"
             final = self._failed("internal", run_id)
+        # 图没走到任何结局节点（不应发生）：按内部错误处理
         if "end_state" not in final:  # the graph stopped without reaching an end step
             final = self._failed("internal", run_id)
 
+        # 落库：运行、消息、审计一个事务写完
         message_id = await finish_run(
             self._engine,
             identity=identity,
@@ -189,11 +218,12 @@ class AgentRuntime:
 
     @staticmethod
     async def _finish_stream(emitter: RunEmitter, result: RunResult) -> None:
-        """Make what the client was shown equal to the recorded reply, then end the run.
+        """让客户端看到的文字与记录的回复一致，然后结束这次运行。
 
-        A reply that was never streamed (a clarification, a refusal, an error text) goes out as one
-        piece. Streamed text that the reply continues is topped up; text that the run did not
-        keep is retracted first. Trailing whitespace the run trimmed is not worth a retraction."""
+        没流式输出过的回复（反问、拒绝、错误文案）一次性发出；流出的文字若是回复的前缀就补发其余；
+        流出的文字最终没被采用就先撤回再发新的；只差首尾空白的不值得撤回。
+        最后发 citations 和 run.ended 事件。
+        """
         shown, reply = emitter.open_text, result.content
         if not shown:
             await emitter.delta(reply)
@@ -219,6 +249,7 @@ class AgentRuntime:
 
     @staticmethod
     def _failed(reason: str, run_id: UUID, detail: str = "") -> AgentState:
+        """构造一个 error 结局的最终状态（回复里带运行 ID）。"""
         return {
             "end_state": "error",
             "end_reason": reason,

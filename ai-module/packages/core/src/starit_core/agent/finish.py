@@ -1,5 +1,8 @@
-"""Record a run: one transaction writes the run, both messages, the audit entry and the
-conversation's new state, so a failure never leaves half of it."""
+"""文件：agent/finish.py
+作用：记录一次运行的结果。
+主要思想：用同一个数据库事务写入运行记录、用户消息、助手消息、审计条目和会话的新状态，
+任何一步失败都整体回滚，不会留下写了一半的记录。
+"""
 
 import json
 import re
@@ -30,12 +33,20 @@ async def finish_run(
     totals: RunTotals,
     latency_ms: int,
 ) -> UUID:
-    """Returns the id of the assistant message."""
+    """把一次运行落库。
+
+    参数：
+      engine：应用账号的数据库引擎；identity：提问者；conversation_id/run_id：会话与运行 ID。
+      user_text：用户原文；started_at：运行开始时间；final：流程图的最终状态；
+      totals：本次运行的统计；latency_ms：总耗时（毫秒）。
+    返回：助手消息的 ID。
+    """
     end_state = final["end_state"]
     message_id = uuid4()
     async with engine.begin() as conn:
         await conn.execute(
             text(
+                # 1. 运行记录（结局、模型、token、耗时）
                 "INSERT INTO ai.runs (id, conversation_id, user_id, started_at, ended_at, "
                 "end_state, end_reason, model, tokens_in, tokens_out, latency_ms) "
                 "VALUES (:id, :c, :u, :started, now(), :state, :reason, :model, :tin, :tout, :ms)"
@@ -55,6 +66,7 @@ async def finish_run(
         )
         await conn.execute(
             text(
+                # 2. 用户这条消息
                 "INSERT INTO ai.messages (conversation_id, run_id, role, content, created_at) "
                 "VALUES (:c, :r, 'user', :content, :at)"
             ),
@@ -62,6 +74,7 @@ async def finish_run(
         )
         await conn.execute(
             text(
+                # 3. 助手回复，含引用
                 "INSERT INTO ai.messages (id, conversation_id, run_id, role, content, citations) "
                 "VALUES (:id, :c, :r, 'assistant', :content, CAST(:citations AS jsonb))"
             ),
@@ -73,7 +86,9 @@ async def finish_run(
                 "citations": json.dumps(final.get("citations", [])),
             },
         )
+        # 4. 更新会话状态（标题、是否在等用户澄清）
         await _update_conversation(conn, conversation_id, user_text, final)
+        # 5. 只增不改的审计日志：谁、问了什么、读了哪些文档、被过滤了多少
         await write_audit(
             conn,
             action="chat.query",
@@ -90,6 +105,9 @@ async def finish_run(
 async def _update_conversation(
     conn: Any, conversation_id: UUID, user_text: str, final: AgentState
 ) -> None:
+    """更新会话：标题取首条消息前 60 字；若本轮是反问，则记下待澄清的问题并计数，
+    下一轮据此合并回答；正常结束则清除待澄清状态；出错则保持原状，免得丢掉正在等待的澄清。
+    """
     title = re.sub(r"\s+", " ", user_text).strip()[:TITLE_CHARS]
     params: dict[str, Any] = {"c": conversation_id, "title": title}
     session = ""
@@ -112,6 +130,7 @@ async def _update_conversation(
 
 
 def _details(final: AgentState, totals: RunTotals) -> dict[str, Any]:
+    """审计记录的详情：结局、意图、模型、token、费用、提示词版本、是否回退等。"""
     return {
         "end_state": final["end_state"],
         "end_reason": final.get("end_reason"),
