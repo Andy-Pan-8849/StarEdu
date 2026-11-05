@@ -1,3 +1,7 @@
+# 文件：dashboards.yaml
+# 作用：Grafana 自动加载看板的配置——启动时从指定目录读取 JSON 看板（由 build_dashboards.py
+#   生成）。
+
 apiVersion: 1
 providers:
   - name: StarEdu

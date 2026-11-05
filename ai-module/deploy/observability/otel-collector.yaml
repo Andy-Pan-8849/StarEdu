@@ -1,3 +1,8 @@
+# 文件：deploy/observability/otel-collector.yaml
+# 作用：OTel Collector 配置：接收三个服务的 OTLP/HTTP，链路转给 Tempo，指标开放给 Prometheus
+#   抓取。
+# memory_limiter 防止 Collector 占用过多内存，batch 批量发送。
+
 # Receives OTLP/HTTP from api, worker and mcp-server; traces go to Tempo, metrics are exposed for
 # Prometheus to scrape. No logs pipeline: logs stay JSON on stdout (with trace_id and run_id).
 receivers:

@@ -1,3 +1,9 @@
+# 文件：deploy/docker/python.Dockerfile
+# 作用：构建工作区里任意一个 Python 服务的镜像，用 --build-arg APP=api|worker|mcp-server
+#   选择。
+# 主要思想：先只拷各个 pyproject.toml 和 uv.lock 装依赖，再拷源码——只改代码时依赖那层走缓存，
+# 不用重新下载所有包。用 uv 的 --frozen 严格按锁文件安装，保证每次构建的版本一致。
+
 # Builds one Python service of the workspace: docker build --build-arg APP=api ...
 FROM python:3.12-slim
 

@@ -1,3 +1,6 @@
+# 文件：deploy/observability/prometheus.yml
+# 作用：Prometheus 配置：每 10 秒从 OTel Collector 的 8889 端口抓取指标。
+
 global:
   scrape_interval: 10s
 

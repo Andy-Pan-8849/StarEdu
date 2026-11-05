@@ -1,3 +1,7 @@
+# 文件：deploy/observability/otel-collector-langfuse.yaml
+# 作用：在原 Collector 配置之上，再把链路转发给 Langfuse（OTLP/HTTP，Langfuse 不支持 gRPC）。
+# 认证头由 basicauth 扩展根据公钥/私钥现场编码，仓库里不存编码后的凭据。
+
 # The same Collector, with a second trace destination: Langfuse (OTLP over HTTP; gRPC is not
 # supported there). Used by deploy/compose/langfuse.yaml in place of otel-collector.yaml.
 extensions:

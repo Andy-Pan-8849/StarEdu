@@ -1,6 +1,22 @@
+# 文件：deploy/compose/compose.yaml
+# 作用：Docker Compose 主配置——一条命令（make up）启动整个 AI 模块。
+# 服务一览（按依赖从底层到上层）：
+#   postgres 数据库(含 pgvector) / redis 限流与每日预算计数 / objectstore 对象存储(存原文件) /
+#   keycloak 登录与角色 / migrate 一次性执行数据库迁移 / worker 文档入库后台 /
+#   litellm 模型网关(唯一持有厂商密钥) / mcp-server 数据工具服务 / api 后端 HTTP 接口 / web
+#     前端页面。
+# 主要思想：
+#   - 用 depends_on + healthcheck 保证启动顺序：数据库健康 -> 迁移完成 -> 服务启动 ->
+#     前端最后。
+#   - 所有 ${变量:-默认值} 都可在 .env 里覆盖；默认值是本地演示用的，对外开放前必须改。
+#   - 应用用低权限账号 ai_app 连库；只有 migrate 用库所有者账号。
+#   - api / worker / mcp-server 都经 litellm 网关调用模型，自己不持有厂商密钥。
+#   - 可选的监控(observability.yaml)和 Langfuse(langfuse.yaml)是叠加的另外两个文件。
+
 name: starit-ai
 
 services:
+  # 数据库：带向量扩展的 PostgreSQL；数据放在命名卷 pgdata，容器删了数据还在
   postgres:
     image: pgvector/pgvector:0.8.7-pg17
     environment:
@@ -17,6 +33,7 @@ services:
       timeout: 5s
       retries: 20
 
+  # Redis：只用来存限流计数和每日预算计数，丢了也不影响业务数据
   redis:
     image: redis:7-alpine
     ports:
@@ -122,6 +139,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      # 模型网关：LiteLLM。所有模型调用都经过它，厂商密钥只配在这里；配置见
+      #   deploy/litellm/config.yaml
       litellm:
         condition: service_healthy
       migrate:
@@ -150,6 +169,7 @@ services:
       retries: 12
       start_period: 20s
 
+  # MCP 服务器：以 MCP 协议提供六个数据工具；调用者的令牌由它自己校验
   mcp-server:
     build:
       context: ../..
@@ -194,6 +214,8 @@ services:
       timeout: 5s
       retries: 10
 
+  # API 服务：对前端提供会话/聊天/文档接口；通过 MCP
+  #   服务器调用数据工具（STARIT_DATA_TOOLS_BACKEND=mcp）
   api:
     build:
       context: ../..
@@ -250,6 +272,7 @@ services:
       timeout: 5s
       retries: 10
 
+  # 前端：Next.js。NEXT_PUBLIC_* 地址在构建时写进页面，要改地址得重新构建镜像
   web:
     build:
       context: ../..

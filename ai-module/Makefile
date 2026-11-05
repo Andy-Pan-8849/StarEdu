@@ -1,3 +1,10 @@
+# 文件：Makefile
+# 作用：开发者常用命令的入口（在 ai-module/ 目录里运行）。`make help` 列出全部命令。
+# 分组：环境(env, sync) / 检查(lint, fmt, test, web-check, e2e) / 运行(up, down, logs, clean,
+#   up-obs, up-langfuse) /
+# 数据(migrate, seed, seed-dump, seed-biz, ingest-samples) / 评测(eval) / 其他(token)。
+# COMPOSE 变量把几个 compose 文件叠加起来：核心 + 监控 + Langfuse。
+
 # Developer commands for the AI module. Run from the ai-module/ directory.
 COMPOSE = docker compose --env-file .env -f deploy/compose/compose.yaml
 OBS = $(COMPOSE) -f deploy/compose/observability.yaml
