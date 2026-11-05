@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * 文件：app/callback/page.tsx
+ * 作用：登录回调页（路径 /callback）。Keycloak 登录成功后浏览器被带回这里，
+ * 这里完成 OIDC 授权码换令牌，然后跳回登录前所在的页面（路径经 safeReturnPath 检查，只允许站内）
+ *   。
+ * useRef 保证在 React 严格模式下只处理一次回调（授权码只能用一次）。
+ */
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";

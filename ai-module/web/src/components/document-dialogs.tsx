@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * 文件：components/document-dialogs.tsx
+ * 作用：文档管理页用到的三个对话框：
+ *   - EditDialog 编辑：标题、状态、权限级别、校区范围、指名用户、最低职等（PATCH）；
+ *   - JobsDialog 入库任务：查看这份文档每次入库的状态、阶段、重试次数、错误（GET jobs）；
+ *   - DeleteDialog 删除：明确告知“文档、检索索引和原文件都会删除，不可撤销”，确认后才删除。
+ * 权限修改在服务端是“文档和它的所有文本块一起变”，所以保存后立刻对检索生效。
+ */
+
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Badge, Button, Field, Input, Modal, Select } from "@/components/ui";
@@ -8,6 +17,9 @@ import { ACCESS_LEVELS, type DocumentMeta, type Job } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 import { splitList } from "@/lib/validation";
 
+/**
+ * 编辑文档的元数据与权限。参数：document 要编辑的文档；onClose 关闭；onSaved 保存成功后的回调。
+ */
 export function EditDialog({
   document,
   onClose,
@@ -27,6 +39,10 @@ export function EditDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /**
+   * 保存：先在前端检查职等（1-7 整数）、标题非空、至少一个校区；通过后 PATCH，最低职等传 null
+   *   表示去掉要求。
+   */
   async function save(event: FormEvent) {
     event.preventDefault();
     const grade = level.trim() === "" ? null : Number(level);
@@ -133,6 +149,9 @@ export function EditDialog({
   );
 }
 
+/**
+ * 显示一份文档的入库任务历史。
+ */
 export function JobsDialog({ document, onClose }: { document: DocumentMeta; onClose: () => void }) {
   const { api } = useAuth();
   const [jobs, setJobs] = useState<Job[] | null>(null);
@@ -194,6 +213,9 @@ export function JobsDialog({ document, onClose }: { document: DocumentMeta; onCl
   );
 }
 
+/**
+ * 删除前的确认对话框。参数：onDeleted 删除成功后的回调。
+ */
 export function DeleteDialog({
   document,
   onClose,
@@ -207,6 +229,9 @@ export function DeleteDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /**
+   * 执行删除；失败显示错误并允许重试。
+   */
   async function remove() {
     setBusy(true);
     try {

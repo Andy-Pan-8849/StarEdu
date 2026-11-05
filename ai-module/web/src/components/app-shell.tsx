@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * 文件：components/app-shell.tsx
+ * 作用：登录后的页面外壳：顶部栏（标题、主菜单、当前用户、退出按钮）+ 下面放页面内容。
+ * 主要思想：先等登录完成（loading 显示“Signing in…”，error 显示重试）；
+ * 菜单项由 /me 返回的角色决定（有管理角色才出现 Documents）。隐藏链接只是方便，
+ * API 对每个请求都会再校验，所以不依赖这里。
+ */
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -8,8 +16,10 @@ import { Button } from "@/components/ui";
 import { canManageDocuments } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-/** Waits for sign-in, then shows the menu. What the menu shows comes from /me only; the API
- * checks every request again, so hiding a link is never the protection. */
+/**
+ * 等登录完成后显示菜单与内容。菜单内容只取决于 /me；API 会再次检查每个请求，
+ *   所以隐藏链接从来不是保护手段。
+ */
 export function AppShell({ children }: { children: ReactNode }) {
   const { state, signOut, retry } = useAuth();
   const path = usePathname();

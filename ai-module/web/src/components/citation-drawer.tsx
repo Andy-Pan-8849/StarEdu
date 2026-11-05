@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * 文件：components/citation-drawer.tsx
+ * 作用：点击回答里的 [n] 后右侧弹出的“来源”抽屉。
+ * 两种来源：
+ *   - 数据类（kind=data）：说明答案来自哪些视图、用了几行；
+ *   - 文档类（kind=document）：显示文档标题、编号、版本、状态（现行/已被取代）、页码、章节路径，
+ *     并取回被引用的那段原文（前后各带一块上下文，被引用的那块高亮），还能打开原文件。
+ * 原文通过 /documents/{id}/chunks 取；无权读的文档服务端返回 404，这里显示错误提示。
+ */
+
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Badge, Button } from "@/components/ui";
@@ -7,6 +17,9 @@ import { userMessage } from "@/lib/api";
 import type { ChunksResponse, Citation } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/**
+ * 来源抽屉的外框：标题栏 + 关闭按钮 + 按引用类型显示内容。
+ */
 export function CitationDrawer({ citation, onClose }: { citation: Citation; onClose: () => void }) {
   return (
     <aside
@@ -31,6 +44,9 @@ export function CitationDrawer({ citation, onClose }: { citation: Citation; onCl
   );
 }
 
+/**
+ * 数据类来源：用了哪些视图和多少行；并说明只会包含账号有权看的数据。
+ */
 function DataSource({ views, rows }: { views: string[]; rows: number }) {
   return (
     <div className="space-y-2">
@@ -46,12 +62,16 @@ function DataSource({ views, rows }: { views: string[]; rows: number }) {
   );
 }
 
+/**
+ * 文档类来源：取被引用的块（around + window=1 即前后各一块）并显示，可打开原文件。
+ */
 function DocumentSource({ citation }: { citation: Extract<Citation, { kind: "document" }> }) {
   const { api } = useAuth();
   const [data, setData] = useState<ChunksResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // cancelled：切换引用或关闭时，丢弃迟到的旧请求结果
     let cancelled = false;
     setData(null);
     setError(null);
@@ -74,6 +94,9 @@ function DocumentSource({ citation }: { citation: Extract<Citation, { kind: "doc
     };
   }, [api, citation.document_id, citation.chunk_id]);
 
+  /**
+   * 取原文件（带令牌的请求），在新标签页打开；noopener 防止新页面操作本页。
+   */
   async function openOriginal() {
     if (!citation.document_id) return;
     try {
