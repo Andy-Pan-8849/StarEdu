@@ -1,9 +1,9 @@
-"""Derived content: a short summary and a few questions each chunk can answer, per chunk.
-
-They are extra fields next to the chunk (`ai.chunk_derived`), never a replacement for its text, and
-they enrich what is embedded, so a question worded unlike the document can still land near it.
-Whether that helps is an experiment (docs/design/05, section 1.5), so it is off by default.
-A model failure only means a chunk has no derived content; the document is still ingested.
+"""文件：ingest/derive.py
+作用：为每个文本块让模型生成“衍生内容”——一句摘要，和几个这段能回答的问题。
+主要思想：它们是块旁边的附加字段(ai.chunk_derived)，不替换原文；用来丰富被嵌入的内容，
+这样措辞和文档不一样的提问也能落到这段附近。
+这有没有用是一个实验(docs/design/05 第 1.5 节)，所以默认关闭。
+模型失败只意味着这个块没有衍生内容，文档照常入库。
 """
 
 import json
@@ -16,10 +16,13 @@ from starit_core.llm import ChatClient, ChatError, parse_json_object
 
 logger = logging.getLogger("starit.ingest")
 
+# 模式：不生成 / 只摘要 / 只问题 / 都生成
 DERIVE_MODES = ("none", "summary", "questions", "all")
+# 提示词版本；改了提示词要升版本
 DERIVE_PROMPT_VERSION = "1"
 QUESTIONS_PER_CHUNK = 3
 
+# 给模型的指令：只能依据段落内容，返回 JSON {summary, questions}
 _SYSTEM = (
     "Write retrieval aids for one passage of a company policy document. Use only what the "
     "passage says; never add facts. Reply with one JSON object and nothing else: "
@@ -31,6 +34,8 @@ _SYSTEM = (
 
 @dataclass(frozen=True)
 class Derived:
+    """一条衍生内容：kind 是 summary 或 question，text 是内容。"""
+
     kind: str  # "summary" or "question"
     text: str
 
@@ -38,7 +43,11 @@ class Derived:
 async def derive_chunks(
     chat: ChatClient, model: str, title: str, chunks: Sequence[Chunk], mode: str
 ) -> list[list[Derived]]:
-    """One list of derived items per chunk, in order. `mode` is one of DERIVE_MODES."""
+    """为一批块生成衍生内容。
+
+    参数：chat 聊天客户端；model 模型；title 文档标题；chunks 块；mode 取值见 DERIVE_MODES。
+    返回：与 chunks 等长的列表，每项是该块的 Derived 列表。mode 不合法抛 ValueError。
+    """
     if mode not in DERIVE_MODES:
         raise ValueError(f"unknown derive mode {mode!r}; use one of {', '.join(DERIVE_MODES)}")
     if mode == "none":
@@ -73,4 +82,5 @@ async def derive_chunks(
 
 
 def derived_json(items: Sequence[Derived]) -> str:
+    """把衍生内容列表转成 JSON 字符串，用于写库。"""
     return json.dumps([{"kind": d.kind, "text": d.text} for d in items])

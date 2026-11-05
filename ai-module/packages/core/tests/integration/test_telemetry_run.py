@@ -1,4 +1,7 @@
-"""What one assistant run records: spans in a tree, metrics, and nothing that must stay private."""
+"""文件：测试——一次助手运行记录了什么
+测什么：一次运行是一条以运行为根的链路；运行及其模型用量被计数；令牌和问题文字不会被记录；
+失败的运行会标记根 span；数据库语句成为 span 但不带参数值。
+"""
 
 from collections.abc import Callable, Iterator
 from typing import Any

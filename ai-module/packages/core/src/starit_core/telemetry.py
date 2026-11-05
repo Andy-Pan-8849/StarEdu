@@ -1,13 +1,10 @@
-"""OpenTelemetry for the api, the worker and the MCP server.
-
-The code is instrumented unconditionally and costs next to nothing when no SDK is set up: with
-`STARIT_OTEL_ENABLED=false` (the default) every span and metric below goes to a no-op provider.
-`setup_telemetry` builds the real providers, which export over OTLP/HTTP to the Collector.
-
-What goes into a span is a decision, not a default: identifiers (run, conversation), model names,
-token counts, timings, states. Never the bearer token, never the user's question or the model's
-answer, unless `STARIT_OTEL_CAPTURE_CONTENT=true` is set on purpose (then the first 2,000
-characters of each model call's input and output are added, which Langfuse can display).
+"""文件：telemetry.py
+作用：api、worker、mcp-server 共用的 OpenTelemetry（链路 + 指标）。
+主要思想：代码里无条件埋点，没配置 SDK 时开销几乎为零——默认(STARIT_OTEL_ENABLED=false)所有 span
+和指标都进“空实现”。`setup_telemetry` 才创建真正的提供者，经 OTLP/HTTP 导出到 Collector。
+记录什么是经过取舍的：只记标识(运行/会话 ID)、模型名、token 数、耗时、状态；
+绝不记令牌、用户的问题或模型的回答；只有明确设 STARIT_OTEL_CAPTURE_CONTENT=true 才附带
+每次模型调用输入输出的前 2000 字（供 Langfuse 显示）。
 """
 
 from collections.abc import Iterator, Mapping
@@ -21,12 +18,14 @@ from opentelemetry.trace import NoOpTracerProvider, Span, Status, StatusCode, Tr
 
 from starit_core.config import Settings
 
+# 开启内容记录时每段最多保留的字符数
 CONTENT_LIMIT = 2000
+# 三个服务在链路里的名字
 SERVICE_NAMES = ("starit-api", "starit-worker", "starit-mcp-server")
 
 
 class Telemetry:
-    """The tracer and the instruments the code records to."""
+    """持有 tracer 和全部指标仪器；代码通过 current() 取到它并记录。"""
 
     def __init__(
         self,
@@ -40,6 +39,8 @@ class Telemetry:
         self.capture_content = capture_content
         self.tracer: Tracer = self.tracer_provider.get_tracer("starit")
         meter: Meter = self.meter_provider.get_meter("starit")
+        # —— 各项指标：助手运行、模型调用(次数/token/耗时/首字/费用/备用链)、
+        # 检索、限流、工具调用、入库任务
         self.runs = meter.create_counter("starit.runs", description="Assistant runs by end state")
         self.llm_calls = meter.create_counter("starit.llm.calls", description="Model calls")
         self.llm_tokens = meter.create_counter("starit.llm.tokens", description="Model tokens")
@@ -70,6 +71,7 @@ class Telemetry:
         )
         self.tool_calls = meter.create_counter("starit.tool.calls", description="Data tool calls")
         self.ingest_jobs = meter.create_counter("starit.ingest.jobs", description="Ingestion jobs")
+        # 入库队列长度用“观测型仪表”：每次采集时读当前值
         self._queue_length = 0
         meter.create_observable_gauge(
             "starit.ingest.queue_length",
@@ -81,10 +83,12 @@ class Telemetry:
         self._queue_length = value
 
 
+# 进程里当前使用的 Telemetry；默认是空实现，setup_telemetry 或测试会替换
 _current = Telemetry()
 
 
 def current() -> Telemetry:
+    """取当前使用的 Telemetry。"""
     return _current
 
 
@@ -96,7 +100,7 @@ def use(telemetry: Telemetry) -> None:
 
 @contextmanager
 def span(name: str, attributes: Mapping[str, Any] | None = None) -> Iterator[Span]:
-    """A span that is current inside the block; an exception marks it as an error."""
+    """开一个链路 span 并在代码块内设为当前；块内抛异常会把它标成错误。"""
     with current().tracer.start_as_current_span(
         name, attributes=dict(attributes or {}), record_exception=True, set_status_on_exception=True
     ) as active:
@@ -104,26 +108,35 @@ def span(name: str, attributes: Mapping[str, Any] | None = None) -> Iterator[Spa
 
 
 def fail(active: Span, message: str) -> None:
+    """把 span 标记为失败并附上简短原因。"""
     active.set_status(Status(StatusCode.ERROR, message))
 
 
 def trace_id_hex() -> str | None:
+    """当前链路的 trace ID（32 位十六进制），没有有效链路时返回 None。"""
     context = trace.get_current_span().get_span_context()
     return f"{context.trace_id:032x}" if context.is_valid else None
 
 
 def clip(text: str) -> str:
+    """把文本截到 CONTENT_LIMIT 个字符以内。"""
     return text[:CONTENT_LIMIT]
 
 
 @dataclass
 class Providers:
+    """setup_telemetry 的返回值：真实的 tracer/meter 提供者，用于进程退出时 flush。"""
+
     tracer_provider: Any
     meter_provider: Any
 
 
 def setup_telemetry(settings: Settings, service: str) -> Providers | None:
-    """Build the OTLP exporters and make them current. Does nothing unless enabled."""
+    """创建 OTLP 导出器并设为当前；未启用时什么都不做、返回 None。
+
+    参数：settings 配置；service 本进程的服务名（如 starit-api）。
+    返回：Providers 或 None。
+    """
     if not settings.otel_enabled:
         return None
     from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
@@ -155,7 +168,7 @@ def setup_telemetry(settings: Settings, service: str) -> Providers | None:
 
 
 def instrument_engine(engine: Any) -> None:
-    """Database spans for an async SQLAlchemy engine (statement text, no parameter values)."""
+    """给异步 SQLAlchemy 引擎加数据库 span（记录 SQL 文本，不记参数值）。未启用链路时不做事。"""
     if isinstance(current().tracer_provider, NoOpTracerProvider):
         return
     from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor

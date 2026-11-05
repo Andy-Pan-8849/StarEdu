@@ -1,9 +1,17 @@
-"""Business sample tables, whitelisted SQL views with data-scope filters, set_config guard.
+"""示例业务表、带数据范围过滤的白名单 SQL 视图，以及 set_config 限制。
 
-Who may see which rows is defined in docs/design/02-data-model.md, section 5. The views read
-the caller's identity from session settings (app.user_id, app.roles, app.campus_id,
-app.employee_id, app.student_id), which the application sets inside a transaction before it
-switches to the ai_sql_ro role. Without those settings every view returns no rows.
+文件：migrations/versions/0004_biz_and_sql_views.py
+作用与思想（数据权限的数据库层实现）：
+  - biz 模式放业务示例表（校区、员工、学员、作业、提交、报销、工单）。
+  - ai_sql 模式放对外的白名单视图，每个视图的 WHERE 里按调用者身份过滤行：
+    学员只看自己的记录；员工和主管看本校区（员工的报销、员工表只看自己）；hr/finance 看全部；
+    管理角色什么业务数据都看不到。
+  - 视图从会话设置 app.user_id / app.roles / app.campus_id / app.employee_id / app.student_id
+    读取调用者身份，这些由应用在事务内设置，再切换到只读角色 ai_sql_ro；
+      没有设置时视图一行也不返回。
+  - 视图用 security_barrier，防止查询里的函数在过滤之前就看到被过滤的行。
+  - 限制 set_config 只有所有者和应用账号能执行，防止模型写的 SQL 改写自己的身份设置。
+权限矩阵见 docs/design/02-data-model.md 第 5 节。
 
 Revision ID: 0004
 Revises: 0003
@@ -17,6 +25,7 @@ down_revision = "0003"
 branch_labels = None
 depends_on = None
 
+# 业务示例表的建表语句（父表在前，满足外键顺序）
 BIZ_TABLES = [
     """
     CREATE TABLE biz.campuses (
@@ -102,6 +111,8 @@ BIZ_TABLES = [
     """,
 ]
 
+# 身份辅助函数（ai_auth 模式）：从会话设置里读出调用者的用户、校区、员工/学员编号、角色；
+# 没有设置时返回 NULL，视图因此一行都不返回
 AUTH_FUNCTIONS = """
 CREATE FUNCTION ai_auth.setting(name text) RETURNS text
 LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting(name, true), '') $$;
@@ -198,6 +209,7 @@ VIEW_NAMES = [
 
 
 def upgrade() -> None:
+    """建业务表、身份辅助函数、白名单视图，授权给 ai_sql_ro，并收紧 set_config。"""
     op.execute("CREATE SCHEMA IF NOT EXISTS ai_auth")
     op.execute("CREATE SCHEMA IF NOT EXISTS ai_sql")
     for ddl in BIZ_TABLES:
@@ -224,6 +236,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """撤销本迁移的对象与授权（恢复 set_config 对所有人可执行）。"""
     op.execute("GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO PUBLIC")
     for name in VIEW_NAMES:
         op.execute(f"DROP VIEW IF EXISTS ai_sql.{name}")

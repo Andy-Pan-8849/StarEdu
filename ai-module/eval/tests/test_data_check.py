@@ -1,3 +1,8 @@
+"""文件：测试——数据题评测
+测什么：题库包含各种类型；判分规则（该回答/该拒绝/其他结局）；估算按每题四个步骤计；
+报告会列出失败的题；命令行参数解析。
+"""
+
 import pytest
 from starit_core.config import Settings
 from starit_eval.cli import parse_args

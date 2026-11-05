@@ -1,3 +1,7 @@
+# 文件：deploy/compose/observability.yaml
+# 作用：可选的链路与指标栈（make up-obs 叠加启动）：OTel Collector 收数据 -> Tempo 存链路、
+# Prometheus 存指标 -> Grafana 看板。同时给 api、worker、mcp-server 打开 OpenTelemetry。
+
 # Optional: traces and metrics. Start with `make up-obs`; the core stack works without it.
 # It adds the OTel Collector, Tempo (traces), Prometheus (metrics) and Grafana, and turns
 # OpenTelemetry on in api, worker and mcp-server.

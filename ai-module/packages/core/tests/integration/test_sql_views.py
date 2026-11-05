@@ -1,4 +1,8 @@
-"""The ai_sql views return only the rows a caller may see, and the guard rails hold."""
+"""文件：测试——ai_sql 视图的行级权限
+测什么：每个视图恰好返回可见的行；校验器里的角色表与视图一致，给模型看的结构说明与视图一致；
+没有身份时每个视图都是空的；查询角色只能读视图；查询不能改写自己的身份设置；只执行单条 SELECT；
+查询后角色会恢复；行数上限生效；评测答案能由视图算出，被拒绝的评测题看不到数据。
+"""
 
 import csv
 import json

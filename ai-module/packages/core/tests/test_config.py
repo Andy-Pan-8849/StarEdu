@@ -1,3 +1,7 @@
+"""文件：测试——配置
+测什么：默认值与 compose.yaml 一致；环境变量能覆盖默认值；密钥不会出现在对象的 repr 里。
+"""
+
 import pytest
 from starit_core.config import Settings
 

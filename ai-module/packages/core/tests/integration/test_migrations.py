@@ -1,4 +1,6 @@
-"""The migrations apply on an empty database, go back, and apply again."""
+"""文件：测试——迁移
+测什么：迁移能在空库上应用、能退回、能再次应用（可逆且可重复）。
+"""
 
 import os
 import subprocess

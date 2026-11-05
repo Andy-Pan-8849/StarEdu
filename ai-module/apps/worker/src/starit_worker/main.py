@@ -1,4 +1,8 @@
-"""Entry point of the ingestion worker (starit-worker, or `--once` to drain the queue and exit)."""
+"""文件：main.py
+作用：入库 worker 的命令行入口：`starit-worker` 常驻运行；加 `--once` 处理完现有任务就退出。
+主要思想：启动时确保对象存储的桶存在，装配好嵌入客户端、聊天客户端(衍生内容用)、每日预算，
+然后调用 starit_core.ingest.worker.run_worker 开始循环。
+"""
 
 import argparse
 import asyncio
@@ -19,12 +23,14 @@ logger = logging.getLogger("starit.worker")
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """解析命令行：--once 表示只处理就绪的任务然后退出。"""
     parser = argparse.ArgumentParser(prog="starit-worker", description="Document ingestion worker")
     parser.add_argument("--once", action="store_true", help="process the ready jobs, then exit")
     return parser.parse_args(argv)
 
 
 async def _run(once: bool) -> None:
+    """装配依赖并运行 worker 循环；退出时释放数据库引擎。"""
     settings = get_settings()
     setup_telemetry(settings, "starit-worker")
     engine = create_engine(settings)
@@ -44,6 +50,7 @@ async def _run(once: bool) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """进程入口：解析参数、配置日志、运行事件循环。"""
     args = parse_args(argv)
     configure_logging(get_settings().log_level)
     asyncio.run(_run(args.once))

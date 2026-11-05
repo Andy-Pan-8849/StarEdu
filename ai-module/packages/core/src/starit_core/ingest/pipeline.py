@@ -1,9 +1,11 @@
-"""Run one ingestion job: parse, clean, chunk, (derive), embed, write.
-
-The stages follow docs/design/05-retrieval-etl-and-evaluation.md. Each stage is recorded on the
-job, so a failure shows where it happened. Nothing is written to the chunk tables until the
-last stage, which replaces the document's old chunks in one transaction: a failure earlier
-leaves the previous version of the document searchable and unchanged.
+"""文件：ingest/pipeline.py
+作用：执行一个入库任务：解析 -> 清洗/切块 -> (衍生内容) -> 嵌入 -> 写库。
+各阶段见 docs/design/05。
+主要思想：
+  - 每进入一个阶段就记在任务上，失败时能看出卡在哪一步。
+  - 直到最后一个阶段才动 chunk 相关的表，并且在一个事务里“删旧块、写新块”：
+    前面任何一步失败，文档原来的版本仍然可检索、完全没变。
+  - process_job 永不向外抛异常，所有失败都记到任务上并决定是否重试。
 """
 
 import asyncio
@@ -33,12 +35,14 @@ from starit_core.storage import ObjectStorage
 logger = logging.getLogger("starit.ingest")
 
 # The width of ai.chunk_embeddings.embedding. A different width needs a new migration.
+# 数据库向量列的宽度；换宽度需要新的迁移
 VECTOR_COLUMN_DIMENSIONS = 1536
 
 
 def embedding_input(title: str, chunk: Chunk, derived: Sequence[Derived] = ()) -> str:
-    """What is embedded: the document title and section path give the text its context, and
-    derived content (when it was asked for) is added after the text, never in place of it."""
+    """决定“被嵌入的文字”是什么：文档标题和章节路径提供上下文，再加正文；
+    若要了衍生内容，附在正文之后（绝不取代正文）。
+    """
     context = "\n".join(part for part in (title, " > ".join(chunk.heading_path)) if part)
     body = f"{context}\n\n{chunk.text}" if context else chunk.text
     extra = "\n".join(d.text for d in derived)
@@ -54,7 +58,9 @@ async def process_job(
     settings: Settings,
     chat: ChatClient | None = None,
 ) -> bool:
-    """Run a claimed job to the end. Returns True on success. Never raises for a job failure."""
+    """把一个已领取的任务跑到结束，成功返回 True。任务失败不会抛异常（记入任务）；
+    同时记录链路和指标。
+    """
     with telemetry.span("ingest.job", {"job_id": str(job.id), "attempt": job.attempt}) as active:
         ok = await _process_job(
             engine, job, storage=storage, embedder=embedder, settings=settings, chat=chat
@@ -75,6 +81,11 @@ async def _process_job(
     settings: Settings,
     chat: ChatClient | None,
 ) -> bool:
+    """入库的主流程，按阶段推进：
+      parse 读原文件并解析 -> chunk 清洗并切块 -> derive 衍生内容 -> embed 批量嵌入 -> write
+        写库。
+    IngestError 按其 retryable 决定是否重试；其他异常归到当前阶段，标为 internal。
+    """
     stage = "parse"
     try:
         stage = await _stage(engine, job, "parse")
@@ -130,12 +141,14 @@ async def _process_job(
 
 
 async def _stage(engine: AsyncEngine, job: queue.Job, stage: str) -> str:
+    """把任务当前阶段记入数据库（独立事务，立即可见），并返回阶段名。"""
     async with engine.begin() as conn:
         await queue.mark_stage(conn, job.id, stage)
     return stage
 
 
 async def _load_document(engine: AsyncEngine, job: queue.Job) -> dict[str, str]:
+    """读取文档记录；文档已被删除或没有原文件时抛不可重试的 IngestError。"""
     async with engine.connect() as conn:
         row = (
             (
@@ -158,6 +171,7 @@ async def _load_document(engine: AsyncEngine, job: queue.Job) -> dict[str, str]:
 
 
 async def _parse(document: dict[str, str], storage: ObjectStorage) -> ParsedDocument:
+    """从对象存储取原文件，写入临时目录，用对应格式的解析器解析（在线程里跑，避免阻塞）。"""
     try:
         data = await storage.get(document["object_key"])
     except FileNotFoundError as exc:
@@ -175,6 +189,9 @@ async def _parse(document: dict[str, str], storage: ObjectStorage) -> ParsedDocu
 async def _embed(
     embedder: EmbeddingClient, texts: list[str], settings: Settings
 ) -> list[list[float]]:
+    """分批嵌入所有文字（每批 embedding_batch_size 条）。
+    嵌入模型的维度与数据库列不一致时直接失败且不重试。
+    """
     if embedder.dimensions != VECTOR_COLUMN_DIMENSIONS:
         raise IngestError(
             "embed",
@@ -200,9 +217,14 @@ async def _write(
     derived: list[list[Derived]],
     derive_mode: str,
 ) -> None:
+    """最后一个阶段，在一个事务里完成：删除文档原有的块 -> 逐块写入文本块、向量、衍生内容 ->
+    标记任务成功 -> 写审计。任何一步失败整体回滚，旧块保持不变。
+    """
     async with engine.begin() as conn:
         await conn.execute(
-            text("DELETE FROM ai.document_chunks WHERE document_id = :d"), {"d": document_id}
+            # 先删旧块（向量、衍生内容随外键级联删除），再写新块
+            text("DELETE FROM ai.document_chunks WHERE document_id = :d"),
+            {"d": document_id},
         )
         for chunk, vector, items in zip(chunks, vectors, derived, strict=True):
             chunk_id = await add_chunk(
@@ -248,6 +270,7 @@ async def _write(
 
 
 async def _fail(engine: AsyncEngine, job: queue.Job, error: IngestError) -> None:
+    """记录失败：交给队列决定重试还是放弃，并写日志。"""
     async with engine.begin() as conn:
         retry = await queue.mark_failed(conn, job, error)
     logger.warning(

@@ -1,9 +1,7 @@
-"""Writes the four Grafana dashboards (grafana/dashboards/*.json) from the queries below.
-
-The dashboards are generated so a metric name is written once. Run: python3 build_dashboards.py
-The names are the ones Prometheus really holds: the Collector turns `starit.runs` into
-`starit_runs_total`, and a histogram `starit.llm.duration` (seconds) into
-`starit_llm_duration_seconds_*`.
+"""文件：deploy/observability/build_dashboards.py
+作用：生成 Grafana 看板的 JSON 文件（运行它会覆盖看板文件）。
+主要思想：看板 JSON 又长又难读，手改容易出错，所以用 Python 函数描述“有哪些面板、各查什么指标”，
+再统一生成 JSON；以后调整看板只改这个脚本。
 """
 
 import json

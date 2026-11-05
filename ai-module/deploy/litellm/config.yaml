@@ -1,3 +1,6 @@
+# 文件：deploy/litellm/config.yaml
+# 作用：LiteLLM 网关的配置。读下面的注释（设计见 docs/design/01 第 4.2 节）。
+
 # The LiteLLM gateway: the only service that holds provider keys (design 01, section 4.2).
 # Callers send "<provider>/<model>" (for example "openai/gpt-6-luna"); a wildcard per provider
 # forwards any model of that provider, so changing a model is a setting, not an edit here.

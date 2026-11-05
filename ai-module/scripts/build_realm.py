@@ -1,8 +1,11 @@
-"""Generate deploy/compose/keycloak/starit-realm.json from sample-data/demo-accounts.csv.
-
-Run: uv run python scripts/build_realm.py
-The accounts are real people in the sample data, so "own records" and "own campus" can be
-tested. All accounts share one demo password and exist for local demos only.
+"""文件：scripts/build_realm.py
+作用：根据 sample-data/demo-accounts.csv 生成 Keycloak 的域配置文件
+deploy/compose/keycloak/starit-realm.json（运行：uv run python scripts/build_realm.py）。
+主要思想：演示账号都是示例数据里的真实一员（学员/员工），所以“自己的记录”“本校区”可以测试；
+所有账号共用一个演示密码，只用于本地演示。
+生成内容：七个角色；web 客户端（PKCE、密码授权仅供脚本和测试取令牌，真实部署要关掉）、
+API 和 MCP 两个只接受令牌的客户端；把校区、职级、员工/学员编号作为自定义声明放进令牌；
+audience 映射让同一个令牌能被 API 和 MCP 两边接受。
 """
 
 import csv
@@ -14,6 +17,7 @@ ACCOUNTS = ROOT / "sample-data" / "demo-accounts.csv"
 OUT = ROOT / "deploy" / "compose" / "keycloak" / "starit-realm.json"
 DEMO_PASSWORD = "demo-pass-123"
 
+# 七个角色：五个业务角色加两个管理角色（后两者默认不能读受限内容）
 ROLES = {
     "student": "Student of a StarIT campus",
     "staff": "Employee (instructor or staff)",
@@ -23,10 +27,12 @@ ROLES = {
     "Admin": "Manages users, roles and configuration; no default access to restricted content",
     "RAGETLAdmin": "Manages knowledge-base documents (upload, delete, re-index)",
 }
+# 放进令牌的自定义属性：权限判断要用
 CUSTOM_ATTRIBUTES = ["campus_id", "level", "employee_id", "student_id"]
 
 
 def attr_mapper(name: str) -> dict:
+    """把用户属性映射成令牌里的同名声明。"""
     return {
         "name": name,
         "protocol": "openid-connect",
@@ -43,6 +49,7 @@ def attr_mapper(name: str) -> dict:
 
 
 def aud_mapper(client_id: str) -> dict:
+    """给令牌加上受众(audience)，让对应服务接受它。"""
     return {
         "name": f"audience-{client_id}",
         "protocol": "openid-connect",
@@ -56,6 +63,7 @@ def aud_mapper(client_id: str) -> dict:
 
 
 def profile_attribute(name: str, display: str, validations: dict | None = None) -> dict:
+    """声明 Keycloak 用户资料里的一个属性及其校验与权限。"""
     return {
         "name": name,
         "displayName": display,
@@ -65,6 +73,7 @@ def profile_attribute(name: str, display: str, validations: dict | None = None) 
 
 
 def main() -> None:
+    """读取演示账号、拼出完整的域配置并写入文件。"""
     user_profile = {
         "attributes": [
             profile_attribute("username", "${username}", {"length": {"min": 3, "max": 255}}),
@@ -82,6 +91,7 @@ def main() -> None:
         ]
     }
 
+    # 每个演示账号一个用户：姓名拆成名/姓，属性带校区、职级、编号，角色一个
     users = []
     with open(ACCOUNTS, newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):

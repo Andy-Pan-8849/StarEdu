@@ -259,14 +259,74 @@ make eval ARGS="retrieval --all-modes --leak-sweep"   # 四种检索模式 + 每
 - 第一次运行要联网下载一次分词表。
 - 生成延迟 p50 约 7 秒（评测口径）；流式主要改善"第一个字出现"的时间，不缩短总时长。
 
-## 六、更多资料
+## 六、项目目录结构
+
+先看整体，再看各目录的分工。读代码的建议顺序：`apps/api` → `starit_core/agent` → `starit_core/retrieval` → `starit_core/ingest`。每个源码文件开头都有一段注释，说明这个文件是干什么的、主要思想是什么。
+
+```
+StarEdu/
+├── README.md              英文总说明（给外人看）
+├── ai-module/             AI 模块：要运行的东西都在这里
+│   ├── README.md          本文件：启动、试用、测试、目录结构
+│   ├── Makefile           日常命令入口（make up / seed / eval …）
+│   ├── pyproject.toml     uv 工作区根配置；ruff、mypy、pytest 的统一设置
+│   ├── alembic.ini        数据库迁移工具配置
+│   ├── conftest.py        pytest 共享夹具（主要是“临时数据库”）
+│   ├── .env.example       环境变量模板，make env 会复制成 .env
+│   ├── packages/core/     共享核心库 starit_core（业务逻辑几乎都在这）
+│   ├── apps/              三个服务，都是核心库之上的薄入口
+│   ├── web/               前端（Next.js）
+│   ├── eval/              评测工具 starit-eval
+│   ├── migrations/        数据库迁移（角色、表、行级权限视图）
+│   ├── scripts/           辅助脚本
+│   ├── seed/              预制的知识库转储
+│   ├── deploy/            Docker Compose、Dockerfile、网关与监控配置
+│   └── sample-data/       虚构公司的示例数据与评测题
+├── business-module/       传统业务后台（占位，未开始）
+└── docs/                  设计文档与评测报告
+```
+
+**各目录的作用**
+
+1. `packages/core/src/starit_core/`：共享核心库，下面分十来块，见下一张表。
+2. `apps/api/`：HTTP 接口服务（FastAPI）。`main.py` 装配应用，`deps.py` 鉴权，`conversations.py` 会话与聊天（含 SSE 流式），`documents.py` 文档管理与阅读，`limits.py` 限流与预算，`errors.py` 统一错误格式。
+3. `apps/worker/`：入库后台。从任务队列领文档，解析、切块、嵌入、写库。
+4. `apps/mcp-server/`：MCP 服务器。把六个数据工具对外提供，自己校验令牌。
+5. `web/`：前端。`src/app` 是页面（首页聊天、登录回调、文档管理），`src/components` 是组件，`src/lib` 是 API 调用、登录、SSE 解析、校验等工具；`tests` 是单元测试，`e2e` 是浏览器端到端测试。
+6. `eval/`：评测工具。`cli.py` 是命令行入口，`answers.py` 答案评测，`data_check.py` 数据题，`agent_check.py` 代表性问题抽查，`matrix.py` 检索对比实验，`runner.py` + `leak.py` 检索与越权扫描，`report.py`、`suite.py` 生成报告。
+7. `migrations/`：数据库迁移。`0001` 基线，`0002` 角色与知识库表，`0003` 会话/审计/评测表，`0004` 业务表与带权限过滤的视图，`0005` 会话澄清状态。
+8. `scripts/`：`seed.py` 播种（make seed）、`seed_dump.py` 导出知识库、`seed_biz.py` 载入业务表、`ingest_samples.py` 登记并入库示例文档、`build_realm.py` 生成 Keycloak 配置、`token.sh` 取演示令牌、`m9_real_check.py` M9 的真实调用检查。
+9. `seed/ai-seed.jsonl.gz`：一次真实入库的结果，别人 `make seed` 时直接恢复，不需要 OpenAI 密钥。
+10. `deploy/`：`compose/` 是 Docker Compose（核心、监控、Langfuse 三个文件叠加；`keycloak/` 是登录域配置），`docker/` 是两个 Dockerfile，`litellm/` 是模型网关配置，`observability/` 是 Collector、Tempo、Prometheus、Grafana 配置。
+11. `sample-data/`：虚构的 StarIT 公司。`documents/` 是 28 份文档和清单，`structured/` 是 7 张业务表 CSV，`demo-accounts.csv` 是演示账号，`eval/` 是评测题，`tools/` 是生成它们的脚本。
+12. `docs/`：`design/` 是编号的设计文档和里程碑检查清单，`eval/` 是评测报告和人工抽查表。
+
+**核心库 `starit_core` 里有什么**
+
+| 目录 / 文件 | 作用 |
+|---|---|
+| `agent/` | 助手的 LangGraph 流程：`nodes.py` 每个步骤、`graph.py` 连线、`runtime.py` 一次运行及记录、`state.py` 状态、`events.py` 流式事件、`messages.py` 固定话术、`prompts/` 提示词文件（版本在 `prompts.py`） |
+| `retrieval/` | 混合检索：`keyword.py` 关键词、`vector.py` 向量、`fusion.py` 排名融合、`rerank.py` 重排、`assemble.py` 挑选放进提示词的块、`probe.py` 统计被权限挡住的命中、`search.py` 入口 |
+| `ingest/` | 文档入库：`parsers/` 四种格式解析器、`clean.py` 清理、`chunker.py` 切块、`derive.py` 衍生内容、`pipeline.py` 流水线、`queue.py` 任务队列、`worker.py` 后台循环、`register.py` 按清单登记 |
+| `dataaccess/` | 业务数据访问：`tools.py` 六个固定工具、`sqlguard.py` 校验模型写的 SQL、`schema.py` 视图与谁能用、`client.py` MCP 客户端 |
+| `permissions.py`、`auth.py` | 文本块的权限（在数据库查询里完成）；令牌校验与调用者身份 |
+| `llm.py`、`embeddings.py`、`streaming.py` | 聊天与嵌入模型客户端（网关、备用链）；从流式 JSON 里实时抠出回答文字 |
+| `cost.py`、`ratelimit.py` | 费用计算与全栈每日预算；固定窗口限流 |
+| `documents.py`、`conversations.py`、`audit.py` | 文档、会话的读写；只增不改的审计日志 |
+| `config.py`、`db.py`、`storage.py`、`sqlaccess.py` | 配置、数据库引擎、对象存储、以某人身份执行只读查询 |
+| `telemetry.py`、`logging.py` | 链路与指标、JSON 日志 |
+| `seed_ai.py`、`seed_biz.py`、`testing.py` | 知识库转储/恢复、业务表载入、测试替身 |
+
+测试放在被测代码旁边（各包和各应用下的 `tests/`）。代码注释主要用中文写成（少数原有的英文注释保留），文件头写明“文件名、作用、主要思想”，复杂算法（如切块、PDF 版式推断、流式 JSON 解析、RRF 融合）在函数前说明思路。
+
+## 七、更多资料
 
 - 各里程碑做了什么、没做什么、实际结果：[`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.md)
 - 第二阶段计划与候选项：[`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.md)
 - 评测报告与人工抽查表：[`../docs/eval/`](../docs/eval/)
 - 设计文档：[`../docs/design/`](../docs/design/)
 
-## 七、参考
+## 八、参考
 
 **常用命令**
 

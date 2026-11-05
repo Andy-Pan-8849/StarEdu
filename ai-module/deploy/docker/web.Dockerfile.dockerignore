@@ -1,3 +1,6 @@
+# 文件：web.Dockerfile.dockerignore
+# 作用：构建前端镜像时不要拷进去的东西（node_modules、.next 等），加快构建、避免带入本机产物。
+
 # Only web/ is needed; keep node_modules and build output out of the context.
 *
 !web

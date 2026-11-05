@@ -1,5 +1,8 @@
-"""The knowledge base survives a dump and a restore, and the restored one is as safe as the
-ingested one."""
+"""文件：测试——知识库的导出与恢复
+测什么：转储恢复后得到同样的知识库；相同内容总得到相同字节；在已有知识库上恢复会替换它；
+不带 replace 时若已有文档则什么都不改；损坏的转储被拒绝且已有数据保留；
+恢复后的知识库仍然保持受限文档受限；原文件按文档约定的键存放。
+"""
 
 import asyncio
 import gzip

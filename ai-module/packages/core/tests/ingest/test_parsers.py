@@ -1,3 +1,11 @@
+"""文件：测试——四种文件解析器
+测什么：解析结果的结构与 Markdown 源一致；文字全部保留且元数据块被去掉；块类型合理；
+PDF 表格变成 Markdown 表；txt 能区分列表项与章节标题；被取代的政策保留自己的标题；Markdown
+  保留代码围栏；
+docx 没有标题样式时退回“加粗编号行”；损坏文件、空 PDF、非 UTF-8 文本、未知格式都抛 ParseError；
+源文档里的每个编号解析后都还在，PDF 里折行的连字符编号保持完整。
+"""
+
 import csv
 import re
 from pathlib import Path

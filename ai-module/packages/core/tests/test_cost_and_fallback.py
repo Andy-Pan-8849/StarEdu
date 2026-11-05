@@ -1,4 +1,11 @@
-"""Prices, the daily budget, the fallback chain, and which model gets the credit."""
+"""文件：测试——价格、每日预算、备用链
+测什么：已知模型按 LiteLLM 价目表计价；未知模型按高价计，保证预算不会被突破；
+预算按天累加并在 UTC 零点重置，距重置的秒数正确，可以关闭；Redis 预算用一个共享的键；
+Redis 连不上时不阻断助手；备用模型列表从配置读取，直连原样传、走网关则每个都加前缀，
+  没有备用时不传该参数；
+配置能建出带备用链的客户端；带日期的模型名仍是同一个模型；备用模型按实际作答的模型计价和计数；
+请求的模型自己作答不算回退；不报告模型的客户端按请求的模型计价。
+"""
 
 import socket
 from types import SimpleNamespace

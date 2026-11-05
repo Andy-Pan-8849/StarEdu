@@ -1,3 +1,10 @@
+"""文件：测试——SQL 校验器
+测什么：只读 SELECT 通过；写入、DDL、多语句、表函数、非白名单的视图和函数全部拒绝；
+注释不能藏第二条语句；执行的是解析器重新生成的语句；CTE 不能借名字逃逸；
+角色与视图的访问矩阵；校区范围——非总部角色不能点名别的校区（编码、城市名、IN 列表都能识别），
+但出差城市不会被误当成校区。
+"""
+
 import pytest
 from starit_core.auth import Identity
 from starit_core.dataaccess.sqlguard import AccessDenied, SqlRejected, validate_sql

@@ -1,3 +1,9 @@
+"""文件：测试——文档登记与权限变更（集成）
+测什么：登记时权限级别展开成角色，文本块复制文档的权限字段；改权限/状态同步到所有块；
+中途失败整体不变；未知权限级别或状态被拒绝；文档不存在时报告；删除会级联并写审计；
+漂移视图能发现直接改库造成的不一致；编号可作为精确词被检索。
+"""
+
 from collections.abc import Callable
 from datetime import date
 from uuid import UUID

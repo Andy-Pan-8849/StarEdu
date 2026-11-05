@@ -1,10 +1,12 @@
-"""The experiment matrix: how retrieval changes when one thing about ingestion or search changes.
-
-Each experiment re-ingests the sample documents into a scratch database (the development database
-is never touched), asks every answerable question in the three modes that need no reranking
-model, and records hit@k and MRR. Reranking is left out on purpose: it is measured by the full
-run, and it is the expensive part. Experiments that only change search (identifier weighting)
-reuse the ingestion of the baseline.
+"""文件：matrix.py
+作用：检索与切块的对比实验矩阵——一次改一个因素，看检索效果怎么变。
+实验清单（EXPERIMENTS）：基线 / 块大小 300、500、800 token / 关闭编号加权 / 三种衍生内容（摘要、
+  问题、两者）。
+主要思想：
+  - 每个实验可能要重新入库（块大小、衍生内容变了就得重切重嵌入），所以会在一个“临时数据库”里做，
+    做完删除，不影响开发数据库；入库设置相同的实验共用一次入库（ingest_key）；
+  - 每个实验在 keyword / vector / hybrid 三种模式下回答同一批题，比较 hit@k 和 MRR；
+  - 样本量小，结果只看方向，不能说明真实规模上的优劣。
 """
 
 import asyncio
@@ -35,11 +37,16 @@ from starit_eval.dataset import AI_MODULE, SAMPLE_DATA, Question, load_identitie
 from starit_eval.report import scored
 from starit_eval.runner import embed_questions, evaluate_mode
 
+# 实验中比较的检索模式（不含重排，省钱）
 MODES = ("keyword", "vector", "hybrid")
 
 
 @dataclass(frozen=True)
 class Experiment:
+    """一个实验：名称、所属组(用来分块展示)、要覆盖的配置项。ingest_key
+    相同的实验可以共用同一次入库。
+    """
+
     name: str
     group: str
     overrides: dict[str, Any] = field(default_factory=dict)
@@ -54,9 +61,11 @@ class Experiment:
 
 
 def _chunks(target: int) -> dict[str, Any]:
+    """生成“目标块大小为 target token”的配置，最大值取目标的 1.25 倍。"""
     return {"chunk_target_tokens": target, "chunk_max_tokens": int(target * 1.25)}
 
 
+# 实验清单：基线，加上每一组只改一个因素
 EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment("baseline", "baseline"),
     Experiment("chunk-300", "chunk size", _chunks(300)),
@@ -71,6 +80,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
 
 @dataclass
 class ExperimentResult:
+    """一个实验的结果：块数、平均块大小、各模式总体指标、按题型的 hybrid MRR、衍生内容条数。"""
+
     experiment: Experiment
     chunks: int
     avg_tokens: int
@@ -82,7 +93,7 @@ class ExperimentResult:
 def estimate(
     settings: Settings, questions: Sequence[Question], chunks: int, avg_tokens: int
 ) -> dict[str, Any]:
-    """Upper bounds: embedding tokens (questions and every ingestion) and derive-model calls."""
+    """运行前估算上限：实验数、入库次数、嵌入 token、衍生内容的模型调用次数和 token。"""
     ingests = len({e.ingest_key for e in EXPERIMENTS})
     derive_runs = len({e.ingest_key for e in EXPERIMENTS if e.ingest_key[2] != "none"})
     embedding_tokens = (
@@ -101,8 +112,7 @@ def estimate(
 
 @asynccontextmanager
 async def scratch_database(settings: Settings) -> AsyncIterator[str]:
-    """A fresh, migrated database next to the development one; dropped afterwards.
-    Yields the URL of the application role on it."""
+    """创建一个新的、已迁移好的临时数据库（和开发库并列），用完删除；产出临时库里应用账号的连接串。"""
     owner = make_url(settings.migration_database_url)
     admin_dsn = owner.set(drivername="postgresql", database="postgres").render_as_string(False)
     name = f"matrix_{uuid.uuid4().hex[:8]}"
@@ -134,6 +144,7 @@ async def _ingest(
     chat: ChatClient,
     storage: InMemoryStorage,
 ) -> None:
+    """在临时库里用当前配置把示例文档完整入库一遍。"""
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM ai.documents"))  # chunks and jobs follow (cascade)
     await register_from_manifest(engine, storage, SAMPLE_DATA / "documents")
@@ -156,6 +167,11 @@ async def run_matrix(
     experiments: Sequence[Experiment] = EXPERIMENTS,
     progress: Any = None,
 ) -> list[ExperimentResult]:
+    """依次运行所有实验并返回结果列表。
+
+    参数：base 基础配置；embedder 嵌入客户端；chat 聊天客户端（衍生内容用）；
+      questions 题目；experiments 要跑的实验；progress 进度回调。
+    """
     identities, manifest = load_identities(), load_manifest()
     results: list[ExperimentResult] = []
     vectors, _ = await embed_questions(embedder, questions, base.embedding_batch_size)
@@ -216,6 +232,7 @@ async def run_matrix(
 
 
 def render(results: Sequence[ExperimentResult], models: dict[str, str], estimate_note: str) -> str:
+    """生成中文 Markdown 报告：每组实验的指标对比表和局限说明。"""
     date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
         f"# 实验矩阵（{date}）",
@@ -269,6 +286,7 @@ def render(results: Sequence[ExperimentResult], models: dict[str, str], estimate
 def write(
     out_dir: Path, results: Sequence[ExperimentResult], models: dict[str, str], note: str
 ) -> Path:
+    """写报告文件并返回路径。"""
     import json
 
     out_dir.mkdir(parents=True, exist_ok=True)

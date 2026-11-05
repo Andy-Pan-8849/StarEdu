@@ -1,3 +1,9 @@
+"""文件：测试——检索指标与评测数据
+测什么：hit/recall 按文档计数而不是按块；倒数排名取第一个来源文档；最近名次法百分位；
+  按题型汇总；
+题库完整载入；每个角色一个身份且编号正确；独立的访问规则与文档里的表一致；未知文档永远不可读。
+"""
+
 import pytest
 from starit_eval import metrics
 from starit_eval.dataset import ALL_ROLES, load_identities, load_manifest, load_questions

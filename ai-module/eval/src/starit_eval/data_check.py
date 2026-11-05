@@ -1,9 +1,10 @@
-"""Ask the assistant the structured-data questions (sample-data/eval/sql-qa.jsonl) for real.
-
-Each question is asked by the named demo account. An answerable question passes when the answer
-contains the reference value (every number and id in it); a question that must be refused passes
-when the run ends as no_permission or not_found and the answer carries no data. The report also
-shows how often a statement had to be retried and which questions the assistant got wrong.
+"""文件：data_check.py
+作用：真实调用助手回答“业务数据题”(sample-data/eval/sql-qa.jsonl，共 41 道)，并判分。
+每道题由题里指定的演示账号来问，因为答案取决于“谁在问”（学员只看自己，主管看本校区……）。
+判分：
+  - 该回答的题：回答里必须出现参考答案中的每个数字和编号；
+  - 该拒绝的题：运行必须以 no_permission 或 not_found 结束，且回答里不带数据。
+报告还会统计：SQL 被打回重写的频率，以及哪些题答错了。
 """
 
 import json
@@ -28,12 +29,16 @@ from starit_eval.agent_check import CountingChat
 from starit_eval.dataset import SAMPLE_DATA
 from starit_eval.pricing import cost_usd
 
+# 算“拒绝”的结局（数据题没有 refused）
 REFUSAL_STATES = ("no_permission", "not_found")
+# 从参考答案里抽出需要核对的数字和编号（如 C0035、81.5、14604）
 _TOKEN = re.compile(r"[A-Za-z]+\d+|\d+(?:\.\d+)?")
 
 
 @dataclass(frozen=True)
 class DataQuestion:
+    """一道数据题：题目、参考答案、提问账号和角色、该回答还是该拒绝。"""
+
     id: str
     type: str
     question: str
@@ -45,6 +50,8 @@ class DataQuestion:
 
 @dataclass
 class DataResult:
+    """一道数据题的结果：结局、是否通过、问题、耗时、回答、模型调用次数。"""
+
     question: DataQuestion
     end_state: str
     end_reason: str | None
@@ -57,6 +64,8 @@ class DataResult:
 
 @dataclass
 class DataRun:
+    """一次数据评测的全部结果和用量；passed 是通过的题数。"""
+
     results: list[DataResult] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
@@ -69,6 +78,7 @@ class DataRun:
 
 
 def load_data_questions(path: Path | None = None) -> list[DataQuestion]:
+    """读取数据题（默认 sample-data/eval/sql-qa.jsonl）。"""
     path = path or SAMPLE_DATA / "eval" / "sql-qa.jsonl"
     questions = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -88,6 +98,7 @@ def load_data_questions(path: Path | None = None) -> list[DataQuestion]:
 
 
 def load_askers(path: Path | None = None) -> dict[str, Identity]:
+    """读取演示账号，返回 账号名 -> Identity（每个账号都是示例数据里的真实一员）。"""
     import csv
 
     path = path or SAMPLE_DATA / "demo-accounts.csv"
@@ -109,6 +120,12 @@ def load_askers(path: Path | None = None) -> dict[str, Identity]:
 
 
 def judge(question: DataQuestion, end_state: str, answer: str) -> list[str]:
+    """给一道数据题的回答找问题，返回问题列表（空表示通过）。
+
+    该拒绝：结局必须是拒绝类，且不能 answered。
+    该回答：结局必须是 answered，并且参考答案里的每个数字/编号都出现在回答里
+    （去掉千分位逗号；没有数字的参考答案做不分大小写的包含检查）。
+    """
     if not question.should_answer:
         problems = []
         if end_state not in REFUSAL_STATES:
@@ -145,6 +162,7 @@ def _mentions(answer: str, token: str) -> bool:
 def estimate(
     settings: Settings, questions: Sequence[DataQuestion]
 ) -> tuple[dict[str, int], float | None]:
+    """运行前估算：四个步骤(理解/规划/写SQL/作答)的调用次数上限和按标价的费用。"""
     n = len(questions)
     calls = {"understand": n, "plan": n, "sql": n, "answer": n}
     parts = [
@@ -165,6 +183,7 @@ async def run_data_check(
     askers: dict[str, Identity],
     questions: Sequence[DataQuestion],
 ) -> DataRun:
+    """依次用提问账号问每道数据题（接入数据工具），记录结局、回答、耗时和调用次数。返回 DataRun。"""
     counting = CountingChat(chat)
     runtime = AgentRuntime(
         engine=engine,
@@ -208,6 +227,7 @@ async def run_data_check(
 
 
 def render(run: DataRun, estimate_usd: float | None) -> str:
+    """生成中文 Markdown 报告：总体通过数、没通过的题（参考答案和实际回答）、用量。"""
     answerable = [r for r in run.results if r.question.should_answer]
     refused = [r for r in run.results if not r.question.should_answer]
     by_type: dict[str, list[DataResult]] = {}
@@ -252,6 +272,7 @@ def render(run: DataRun, estimate_usd: float | None) -> str:
 
 
 def write(out_dir: Path, run: DataRun, estimate_usd: float | None) -> Path:
+    """写报告文件，返回路径。"""
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"data-check-{datetime.now(UTC).strftime('%Y%m%d-%H%M')}.md"
     path.write_text(render(run, estimate_usd), encoding="utf-8")
@@ -259,6 +280,7 @@ def write(out_dir: Path, run: DataRun, estimate_usd: float | None) -> Path:
 
 
 def summarize_for_console(run: DataRun) -> str:
+    """控制台上的一两行摘要。"""
     wrong = [r.question.id for r in run.results if not r.ok]
     return (
         f"{run.passed}/{len(run.results)} passed, {run.llm_calls} model calls, "
@@ -268,6 +290,7 @@ def summarize_for_console(run: DataRun) -> str:
 
 
 def summarize(run: DataRun) -> dict[str, Any]:
+    """汇总成字典：总数、通过数、应回答/应拒绝各自的通过数、没通过的题号、用量。"""
     answerable = [r for r in run.results if r.question.should_answer]
     refused = [r for r in run.results if not r.question.should_answer]
     by_type: dict[str, list[DataResult]] = {}

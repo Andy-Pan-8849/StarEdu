@@ -1,5 +1,21 @@
 "use client";
 
+/**
+ * 文件：components/chat.tsx
+ * 作用：聊天界面本体：左边会话列表（新建、改名、归档），右边消息区、输入框，
+ *   点引用在右侧抽屉看原文。
+ * 主要思想（流式显示，最需要读懂的部分在 send 函数）：
+ *   1. 发消息时请求 SSE 事件流，按事件更新界面：
+ *      - message.delta：把新到的文字累加到“草稿”消息上，边写边显示；
+ *      - message.retract：草稿没通过校验被撤回——清掉草稿并提示“正在重写更正后的回答”；
+ *      - citations：记下引用；
+ *      - run.ended：用最终回复（带消息 ID、结局、引用）替换草稿，这才是定稿；
+ *      - error：抛出错误显示给用户。
+ *   2. 草稿用临时 ID（draft-…）区分，定稿后换成真实消息 ID。
+ *   3. 非“已回答”的结局（拒绝、没找到等）用浅灰底显示，和正常回答区分开。
+ *   4. 刷新会话列表（标题由后端从首条消息生成）。
+ */
+
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { CitationDrawer } from "@/components/citation-drawer";
@@ -10,8 +26,14 @@ import { readEvents } from "@/lib/sse";
 import type { Citation, Conversation, EndState, Message, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/**
+ * 界面上显示的消息：在 Message 之外多记结局（决定样式）和是否正在流式输出。
+ */
 type Shown = Message & { endState?: EndState; streaming?: boolean };
 
+/**
+ * 聊天界面。会话和消息都从 API 取；发送消息走流式接口。
+ */
 export function Chat() {
   const { api } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -25,6 +47,7 @@ export function Chat() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
+  // 会话列表：取最近 50 个，过滤掉已归档的
   const loadConversations = useCallback(async () => {
     try {
       const page = await api.json<Page<Conversation>>("/conversations?limit=50");
@@ -39,9 +62,13 @@ export function Chat() {
   }, [loadConversations]);
 
   useEffect(() => {
+    // 有新消息或开始发送时，滚动到底部
     bottom.current?.scrollIntoView?.({ block: "end" });
   }, [messages, sending]);
 
+  /**
+   * 打开一个已有会话：取它的消息（按时间排序）显示。
+   */
   async function open(id: string) {
     setActiveId(id);
     setCitation(null);
@@ -56,6 +83,9 @@ export function Chat() {
     }
   }
 
+  /**
+   * 开始新会话：清空当前选择与消息。真正的会话在第一次发送时才创建。
+   */
   function startNew() {
     setActiveId(null);
     setMessages([]);
@@ -63,6 +93,9 @@ export function Chat() {
     setError(null);
   }
 
+  /**
+   * 发送一条消息并按事件流更新界面（流程见文件头）。没有当前会话时先创建；发送中不能重复发送。
+   */
   async function send(event: FormEvent) {
     event.preventDefault();
     const text_ = draft.trim();
@@ -70,6 +103,7 @@ export function Chat() {
     setSending(true);
     setError(null);
     try {
+      // 还没有会话就先创建一个
       let id = activeId;
       if (id === null) {
         const created = await api.json<Conversation>("/conversations", { method: "POST" });
@@ -84,12 +118,14 @@ export function Chat() {
       let finalCitations: Citation[] = [];
       const draftId = `draft-${Date.now()}`;
       let text = "";
+      // patch：更新草稿消息，不存在就新建一条
       const patch = (changes: Partial<Shown>) =>
         setMessages((m) =>
           m.some((x) => x.id === draftId)
             ? m.map((x) => (x.id === draftId ? { ...x, ...changes } : x))
             : [...m, { id: draftId, role: "assistant", content: "", citations: [], ...changes }],
         );
+      // 发起流式请求，按事件逐个处理
       const response = await api.stream(`/conversations/${id}/messages`, { content: text_ });
       for await (const ev of readEvents(response)) {
         if (ev.name === "message.delta") {
@@ -125,6 +161,9 @@ export function Chat() {
     }
   }
 
+  /**
+   * 给会话改名（空标题忽略）。
+   */
   async function rename(id: string, title: string) {
     setRenaming(null);
     if (!title.trim()) return;
@@ -136,6 +175,9 @@ export function Chat() {
     }
   }
 
+  /**
+   * 归档会话（隐藏，不删除），先让用户确认；归档的是当前会话就回到新会话状态。
+   */
   async function archive(id: string) {
     if (!window.confirm("Archive this conversation?")) return;
     try {

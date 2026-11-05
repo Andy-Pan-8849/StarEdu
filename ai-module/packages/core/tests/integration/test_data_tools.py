@@ -1,4 +1,7 @@
-"""The six data tools against the seeded business data, as different people."""
+"""文件：测试——六个数据工具（集成）
+测什么：针对种子业务数据，以不同的人调用六个工具——学员只看到自己，主管看本校区，总部看全部；
+越权返回 forbidden / not_found；参数校验；每次调用都写审计。
+"""
 
 import csv
 from collections.abc import AsyncIterator

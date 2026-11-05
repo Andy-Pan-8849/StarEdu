@@ -1,3 +1,11 @@
+"""文件：测试——检索的各个小部件
+测什么：RRF 融合（名次、空列表、k 的影响）；assemble（数量上限、token 预算、第一块总保留、去重）
+  ；
+重排结果解析（正常、带围栏、坏/重复/缺少的编号、完全无效）；重排提示的内容；
+  重排失败时保持融合顺序；
+关键词查询的构造。
+"""
+
 import dataclasses
 import json
 from uuid import uuid4

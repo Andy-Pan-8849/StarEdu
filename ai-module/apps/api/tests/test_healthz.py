@@ -1,3 +1,8 @@
+"""文件：测试——健康检查与请求 ID
+测什么：数据库正常时 /healthz 返回 ok，数据库故障时返回 503 degraded；
+请求 ID 没给就生成、给了就原样回写到响应头。
+"""
+
 from collections.abc import Iterator
 
 import pytest

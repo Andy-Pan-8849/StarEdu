@@ -1,9 +1,9 @@
-"""Reranking: ask a model to order the candidates by how well they answer the question.
-
-The model sees numbered passages and returns JSON with the numbers in order, best first.
-Reranking only reorders chunks the caller was already allowed to read. If the model fails or
-answers badly, the fused order is kept and the result is marked, so one bad answer from a model
-never turns into a failed search.
+"""文件：retrieval/rerank.py
+作用：重排——让模型按“对回答问题有多大帮助”给候选重新排序。
+主要思想：把编号的段落发给模型，要求只回 JSON（按好坏排好的编号和 0-10 分）。
+重排只重新排列用户本来就有权读的块；如果模型失败或回答无法解析，
+保留融合后的顺序并标记失败，所以模型的一次出错不会让整次检索失败。
+对旧版本（superseded）的文档不特别惩罚，只是同一政策的现行版应排在它前面。
 """
 
 import json
@@ -26,6 +26,10 @@ version of the same policy should come before it unless the question asks about 
 
 @dataclass
 class RerankOutcome:
+    """一次重排的结果。order 是候选下标的排列（最好的在前，永远是完整排列）；
+    failed 表示模型出错或回答不可用（此时 order 保持原顺序）；partial 表示模型漏了一部分编号。
+    """
+
     order: list[int]  # indexes into the candidate list, best first; always a permutation
     scores: dict[int, float] = field(default_factory=dict)
     input_tokens: int = 0
@@ -36,6 +40,8 @@ class RerankOutcome:
 
 
 class Reranker(Protocol):
+    """重排器的接口（协议）：评测里可以换成假实现。"""
+
     async def rerank(self, query: str, candidates: Sequence[Candidate]) -> RerankOutcome: ...
 
 
@@ -46,6 +52,11 @@ class RerankParseError(ValueError):
 def build_messages(
     query: str, candidates: Sequence[Candidate], passage_tokens: int
 ) -> list[dict[str, str]]:
+    """生成发给模型的消息：系统提示 + 带编号的段落。
+
+    参数：query 用户问题；candidates 候选；
+    passage_tokens 每段最多保留多少 token（超出截断，控制成本）。
+    """
     passages = []
     for number, c in enumerate(candidates, start=1):
         where = " > ".join(c.heading_path)
@@ -61,10 +72,12 @@ _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
 
 def parse_ranking(text: str, count: int) -> tuple[list[int], dict[int, float], bool]:
-    """Read the model's answer. Returns (order, scores, partial).
+    """读取模型返回的排名。
 
-    Ids that are out of range or repeated are ignored; ids the model left out are appended in
-    their original order (partial). If nothing usable is found, raises RerankParseError.
+    参数：text 模型原始回答（可带 ```json 围栏）；count 候选数量。
+    返回：(order, scores, partial)——order 是候选下标排列，scores 是 {下标: 模型打分}，
+    partial 为 True 表示模型漏了某些编号（漏的按原顺序补在后面）。
+    越界或重复的编号忽略；一个有效编号都没有就抛 RerankParseError。
     """
     try:
         data: Any = json.loads(_FENCE.sub("", text.strip()))
@@ -97,6 +110,8 @@ def parse_ranking(text: str, count: int) -> tuple[list[int], dict[int, float], b
 
 
 class LLMReranker:
+    """用聊天模型做重排。出错时不抛异常，而是返回 failed=True 并保持原顺序。"""
+
     def __init__(self, client: ChatClient, model: str, passage_tokens: int = 350) -> None:
         self._client = client
         self._model = model
@@ -104,6 +119,7 @@ class LLMReranker:
 
     async def rerank(self, query: str, candidates: Sequence[Candidate]) -> RerankOutcome:
         keep_order = list(range(len(candidates)))
+        # 少于 2 个候选没有排序的意义，省一次模型调用
         if len(candidates) < 2:
             return RerankOutcome(order=keep_order)
         messages = build_messages(query, candidates, self._passage_tokens)

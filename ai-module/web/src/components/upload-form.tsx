@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * 文件：components/upload-form.tsx
+ * 作用：上传文档的表单：选文件，填编号、版本、标题、领域，选谁能读、状态、生效日、校区范围、
+ * 最低职等和额外允许的用户。
+ * 主要思想：先用 validateUpload 做前端校验（与服务端规则一致，错误立刻显示在字段旁）；
+ * 通过后用 FormData 提交到 POST /documents（服务端返回 202，解析和嵌入在后台进行）；
+ * 成功后清空表单并通知父组件刷新列表。服务端仍会重新校验，前端校验只是为了少一次来回。
+ */
+
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Button, Field, Input, Select } from "@/components/ui";
@@ -7,6 +16,7 @@ import { userMessage } from "@/lib/api";
 import { ACCESS_LEVELS, DOMAINS, type DocumentMeta } from "@/lib/types";
 import { splitList, validateUpload } from "@/lib/validation";
 
+// 表单初始值（也是成功后重置的值）
 const EMPTY = {
   doc_code: "",
   title: "",
@@ -20,6 +30,9 @@ const EMPTY = {
   min_level: "",
 };
 
+/**
+ * 上传表单。参数：onUploaded——上传成功后的回调，带回新建的文档。
+ */
 export function UploadForm({ onUploaded }: { onUploaded: (document: DocumentMeta) => void }) {
   const { api } = useAuth();
   const [fields, setFields] = useState(EMPTY);
@@ -29,9 +42,14 @@ export function UploadForm({ onUploaded }: { onUploaded: (document: DocumentMeta
   const [busy, setBusy] = useState(false);
   const [fileKey, setFileKey] = useState(0);
 
+  // 生成某个字段的 onChange 处理函数
   const set = (name: keyof typeof EMPTY) => (event: { target: { value: string } }) =>
     setFields((f) => ({ ...f, [name]: event.target.value }));
 
+  /**
+   * 提交：前端校验 -> 组装 FormData（逗号分隔的校区和用户拆成多个同名字段）-> 调接口 ->
+   *   重置表单。
+   */
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(null);
@@ -62,6 +80,7 @@ export function UploadForm({ onUploaded }: { onUploaded: (document: DocumentMeta
       });
       setFields(EMPTY);
       setFile(null);
+      // 换一个 key 让文件选择框重新创建，从而清空已选文件（文件框不能用代码清空）
       setFileKey((k) => k + 1);
       onUploaded(created.document);
     } catch (e) {

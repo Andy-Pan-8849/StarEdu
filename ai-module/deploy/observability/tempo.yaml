@@ -1,3 +1,6 @@
+# 文件：deploy/observability/tempo.yaml
+# 作用：Tempo（链路存储）配置：单进程、本地磁盘存储，接收 Collector 发来的 OTLP/gRPC。
+
 # Single-binary Tempo with local storage (Tempo 3.x monolithic mode).
 stream_over_http_enabled: true
 

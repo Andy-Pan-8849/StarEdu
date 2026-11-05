@@ -1,3 +1,17 @@
+/**
+ * 文件：tests/components.test.tsx
+ * 作用：前端组件的单元测试（Vitest + Testing Library，在 jsdom 里运行，不连真实后端，用模拟的
+ *   API）。
+ * 覆盖：菜单（管理角色才看到 Documents；登录中显示等待；非管理角色直接访问文档页被拒）；
+ * MessageBody（[n] 变成可点按钮、文字按纯文本显示）；CitationDrawer（数据来源显示视图和行数；
+ * 文档来源取回被引用的段落并高亮；读不到时给提示；老回答没有文档 ID 时说明原因）；
+ * UploadForm（有错误时不发送；类型不对的文件上传前拒绝；正确地提交文件和字段；
+ *   显示服务端原因如重复）；
+ * DocumentsAdmin（列表与确认后删除；筛选通过查询字符串；显示入库状态和失败原因）；
+ * Chat（创建会话、发送并显示带来源的回答；服务拒绝时显示平实的提示；
+ *   草稿校验失败被撤回后显示更正的回答）。
+ */
+
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";

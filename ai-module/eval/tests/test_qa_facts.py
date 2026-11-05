@@ -1,5 +1,8 @@
-"""The questions' `facts` are checked against the documents by sample-data/tools/check_qa_facts.py;
-this runs the same check in the test suite, so a typo in a question cannot become a "wrong answer"."""
+"""文件：测试——题库的 facts 与文档一致
+测什么：题目里的 facts（必须出现的数字、编号）用 sample-data/tools/check_qa_facts.py
+  逐条对照源文档核查，
+防止参考答案本身写错。
+"""
 
 import importlib.util
 import json

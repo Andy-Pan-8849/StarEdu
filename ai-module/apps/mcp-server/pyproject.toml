@@ -1,3 +1,6 @@
+# 文件：apps/mcp-server/pyproject.toml
+# 作用：MCP 服务器的包定义与依赖；依赖 starit-core。
+
 [project]
 name = "starit-mcp-server"
 version = "0.0.0"

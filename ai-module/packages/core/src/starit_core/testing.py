@@ -1,7 +1,12 @@
-"""Test doubles for the assistant: a chat client that answers by step, and a retrieval stub.
-
-They live here, beside the other fakes (FakeChatClient, FakeEmbeddingClient, InMemoryStorage),
-so that tests in different directories can share them.
+"""文件：testing.py
+作用：测试替身(test doubles)集中放这里，让不同目录的测试共用。
+主要内容：
+  - ScriptedChat：按“步骤”给模型脚本化回答（也支持分块流式、流中途失败），用来测整个助手流程。
+  - StubRetrieval：替代检索函数，按序返回预设结果。
+  - candidate / retrieval_result / *_json：快速构造候选块、检索结果和各步骤的 JSON 回复。
+  - Harness：搭好数据库里的运行环境（会话等），提供 ask() 等便利方法。
+  - InMemoryTelemetry：把链路和指标留在内存里，方便断言“记录了什么、没记录什么”。
+主要思想：用脚本化的模型替身让助手流程变成确定性的，不花钱、不联网，可重复。
 """
 
 import asyncio
@@ -32,6 +37,7 @@ def understand_json(
     *,
     clarify: str = "",
 ) -> str:
+    """构造 understand 步骤的模型回复(JSON)；clarify 非空表示需要反问。"""
     return json.dumps(
         {
             "intent": intent,
@@ -48,10 +54,12 @@ def generate_json(
     sufficient: bool = True,
     citations: Sequence[int] = (1,),
 ) -> str:
+    """构造 generate 步骤的模型回复：{sufficient, answer, citations}。"""
     return json.dumps({"sufficient": sufficient, "answer": answer, "citations": list(citations)})
 
 
 def plan_json(path: str = "sql", tool: str = "", **arguments: Any) -> str:
+    """构造数据规划步骤的回复：走 sql 还是调用某个工具及参数。"""
     return json.dumps({"path": path, "tool": tool, "arguments": arguments})
 
 
@@ -64,6 +72,7 @@ def answer_data_json(answer: str = "The data shows 3 [1].") -> str:
 
 
 def step_of(messages: Sequence[Mapping[str, str]]) -> str:
+    """根据系统提示里的特征词判断这次模型调用属于哪个步骤(understand/generate/rerank/…)。"""
     system = messages[0]["content"]
     if "intake step" in system:
         return "understand"
@@ -87,8 +96,13 @@ def step_of(messages: Sequence[Mapping[str, str]]) -> str:
 
 
 class ScriptedChat:
-    """Answers each assistant step from a script. For a step give a string, an exception to raise,
-    a function of (messages, call number), or a list of those used in turn (the last repeats)."""
+    """按步骤脚本化回答的聊天替身。
+
+    某步骤可以给：字符串、要抛出的异常、函数(消息, 第几次调用)，或这些的列表（依次使用，
+      最后一个重复）。
+    属性：calls 记录全部调用；chunk_size 流式时每块几个字符；fail_stream_after
+      指定某步骤在送出多少字符后失败。
+    """
 
     def __init__(self, **script: Answer | Sequence[Answer]) -> None:
         self._script = script
@@ -124,8 +138,7 @@ class ScriptedChat:
         request_timeout: float | None = None,
         on_chunk: Callable[[str], Awaitable[None]],
     ) -> ChatResult:
-        """The scripted reply, delivered `chunk_size` characters at a time. Give a step the value
-        `fail_stream_after[step] = n` to fail once n characters were delivered."""
+        """流式回答：把脚本回复按 chunk_size 个字符一块送出；可设定送出若干字符后抛 ChatError。"""
         step = step_of(messages)
         text = self._next(messages)
         fail_after = self.fail_stream_after.get(step)
@@ -159,6 +172,7 @@ def candidate(
     title: str = "Recruitment Policy",
     tokens: int = 20,
 ) -> Candidate:
+    """快速构造一个检索候选块（默认是招聘政策里的推荐奖金那段）。"""
     return Candidate(
         chunk_id=uuid4(),
         document_id=uuid4(),
@@ -181,6 +195,7 @@ def retrieval_result(
     restricted_score: float | None = None,
     rerank_failed: bool = False,
 ) -> RetrievalResult:
+    """快速构造检索结果；top_rerank/restricted_* 参数用来模拟各种评分与被挡住的情况。"""
     chunks = list(chunks)
     if chunks and top_score is not None:
         chunks[0].rerank_score = top_score
@@ -196,7 +211,9 @@ def retrieval_result(
 
 
 class StubRetrieval:
-    """Stands in for `retrieve`: returns the given results in turn (the last repeats)."""
+    """替代 retrieve 的桩：按调用顺序返回预设结果（最后一个重复），可模拟延迟和异常，
+    并记录调用参数。
+    """
 
     def __init__(self, *results: RetrievalResult | Exception, delay: float = 0.0) -> None:
         self._results = results
@@ -216,6 +233,8 @@ class StubRetrieval:
 
 
 class Harness:
+    """测试用运行环境：持有数据库引擎和身份，按需创建会话，提供 runtime()/ask()/rows() 等方法。"""
+
     def __init__(self, owner: AsyncEngine, app: AsyncEngine, identity: Identity) -> None:
         self.owner, self.app, self.identity = owner, app, identity
         self.conversation_id: UUID | None = None
@@ -261,8 +280,10 @@ class Harness:
 
 
 class InMemoryTelemetry:
-    """Real OpenTelemetry providers that keep everything in memory, for asserting on what the
-    code records. `install()` makes it current; `restore()` puts back what was there."""
+    """内存版 OpenTelemetry：真实的提供者，但数据留在内存。
+    install() 设为当前，restore() 还原；spans()/metric_total() 查询；
+    everything_recorded() 把所有记录拼成一个字符串，用来断言“某些内容绝不能出现在里面”。
+    """
 
     def __init__(self, *, capture_content: bool = False) -> None:
         from opentelemetry.sdk.metrics import MeterProvider

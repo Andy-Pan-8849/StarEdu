@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
-"""Build the StarIT sample documents in mixed formats from Markdown sources.
-
-Reads  ../_markdown-source/<domain>/*.md   (YAML-ish front matter + Markdown)
-Writes ../documents/<domain>/<doc_id>_<slug>.<ext>   (ext chosen by `format:` in front matter)
-       ../documents/manifest.csv                     (metadata for the ingestion pipeline)
-
-Converters:
-  docx -> python-docx (real Title / Heading styles, list styles and tables)
-  pdf  -> headless Google Chrome (HTML -> PDF)
-  md / txt -> written directly
-python-docx is needed only for docx (run with `uv run python tools/build_documents.py` from
-ai-module/, or `uv run --with python-docx python ...`). PDF output needs macOS and Google Chrome.
-On another system, set the format to md/txt or swap the converter functions.
-
-Usage:  build_documents.py            rebuild every document and the manifest
-        build_documents.py --only docx   rebuild only the documents of that format
+"""文件：sample-data/tools/build_documents.py
+作用：把 Markdown 源文件生成 28 份不同格式（docx / pdf / md / txt）的示例文档，并写出清单
+  manifest.csv。
+输入：../_markdown-source/<领域>/*.md（文件头是元数据，后面是 Markdown 正文）
+输出：../documents/<领域>/<文档编号>_<名字>.<扩展名>（扩展名由元数据里的 format 决定）
+      ../documents/manifest.csv（入库流水线读取的元数据清单）
+转换方式：docx 用 python-docx（真实的 Title/Heading 样式、列表、表格）；pdf 用无界面的 Google
+  Chrome
+（HTML 转 PDF）；md、txt 直接写。
+说明：只有 docx 需要 python-docx；PDF 需要 macOS 和 Google Chrome，别的系统可把格式改成 md/txt。
+运行：在 ai-module/ 下 `uv run python tools/build_documents.py`。--only <格式>
+  只重建某一种格式（不改清单）。
 """
 import csv
 import html
@@ -39,6 +35,7 @@ th{background:#e8e8e8} .meta td{font-size:9pt;color:#333}
 
 
 def parse(path):
+    """读取一个 Markdown 源文件，返回 (元数据字典, 正文, 原文)。"""
     text = path.read_text(encoding="utf-8")
     m = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.S)
     if not m:
@@ -51,6 +48,7 @@ def parse(path):
 
 
 def inline(s):
+    """把行内 Markdown（加粗、行内代码等）转成 HTML。"""
     s = html.escape(s)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
     s = re.sub(r"`(.+?)`", r"<code>\1</code>", s)
@@ -58,6 +56,7 @@ def inline(s):
 
 
 def md_to_html(body):
+    """把 Markdown 正文转成 HTML（标题、段落、列表、表格、代码块），用来生成 PDF。"""
     out, lines, i = [], body.splitlines(), 0
     list_tag = None
 
@@ -105,6 +104,7 @@ def md_to_html(body):
 
 
 def meta_table(meta):
+    """文档顶部的元数据表（Document ID、Version、Status 等）的 HTML；入库时解析器会把它丢掉。"""
     cells = [("Document ID", "doc_id"), ("Version", "version"), ("Status", "status"),
              ("Effective", "effective_date"), ("Audience", "access"), ("Campus scope", "campus_scope")]
     rows = "".join(f"<tr><td><b>{a}</b></td><td>{html.escape(meta.get(k, ''))}</td></tr>" for a, k in cells)
@@ -112,11 +112,13 @@ def meta_table(meta):
 
 
 def full_html(meta, body):
+    """拼出完整的 HTML 页面（含样式、元数据表和正文）。"""
     return (f'<html><head><meta charset="utf-8"><style>{CSS}</style></head><body>'
             f"{meta_table(meta)}{md_to_html(body)}</body></html>")
 
 
 def to_plain(meta, body):
+    """生成纯文本版本：开头是 key: value 元数据行，空行，标题，然后各章节。"""
     t = re.sub(r"\*\*(.+?)\*\*", r"\1", body)
     t = re.sub(r"`(.+?)`", r"\1", t)
     t = re.sub(r"^#{1,3} ", "", t, flags=re.M)
@@ -130,7 +132,7 @@ META_FIELDS = [("Document ID", "doc_id"), ("Version", "version"), ("Status", "st
 
 
 def add_runs(paragraph, text):
-    """Add text to a paragraph, turning **bold** and `code` into formatted runs."""
+    """把一段含加粗标记的文字拆成多个 run，加进 Word 段落。"""
     for part in re.split(r"(\*\*.+?\*\*|`.+?`)", text):
         if len(part) > 4 and part.startswith("**") and part.endswith("**"):
             paragraph.add_run(part[2:-2]).bold = True
@@ -141,7 +143,7 @@ def add_runs(paragraph, text):
 
 
 def build_docx(meta, body, dest):
-    """Write a docx with real styles: # is the Title, ## Heading 1, ### Heading 2."""
+    """生成 Word 文档：用真正的 Title/Heading 样式、列表样式和表格。"""
     try:
         from docx import Document
     except ImportError:
@@ -194,6 +196,7 @@ def build_docx(meta, body, dest):
 
 
 def build_pdf(htm, dest):
+    """调用无界面 Chrome 把 HTML 打印成 PDF。"""
     with tempfile.TemporaryDirectory() as td:
         src = Path(td) / "d.html"
         src.write_text(htm, encoding="utf-8")
@@ -203,6 +206,7 @@ def build_pdf(htm, dest):
 
 
 def main():
+    """遍历所有 Markdown 源，按各自的 format 生成文件，最后写出 manifest.csv。"""
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     if only is None and OUT.exists():
         shutil.rmtree(OUT)

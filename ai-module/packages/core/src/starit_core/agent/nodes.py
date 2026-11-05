@@ -1,4 +1,17 @@
-"""The steps of the assistant. Each takes the graph state and returns what changes."""
+"""文件：agent/nodes.py
+作用：助手流程图里每一个“步骤”的实现。每个步骤接收当前状态，返回要改动的字段
+（包括 `route`——下一步去哪）。步骤之间怎么连见 graph.py。
+主要内容（按流程顺序）：
+  - 上下文与输入检查：load_context、guard_input
+  - 理解：understand（判断意图、把问题改写成独立问题、必要时只反问一次）、chitchat_reply
+  - 文档检索：retrieve_docs、grade_retrieval（够不够好）、rewrite_query（重写再试）
+  - 作答：generate（生成并引用）、verify_answer（对照原文校验，失败重试）
+  - 业务数据：plan_data_access（选工具还是写 SQL）、call_data_tool、run_sql、answer_from_data
+  - 六个结局：end_answered / need_clarification / no_permission / not_found / refused / error
+  - BudgetedChat：包住聊天客户端，统计调用次数、token、费用，并限制每次运行的调用上限。
+主要思想：权限由数据库层面保证（检索和 SQL 都按提问者身份过滤），模型只会看到用户有权读的内容；
+“没找到”和“没权限”对用户说同一句话，避免泄露受限内容的存在。
+"""
 
 import json
 import logging
@@ -29,6 +42,7 @@ from starit_core.streaming import AnswerStream
 
 logger = logging.getLogger("starit.agent")
 
+# 规划器允许选择的数据工具（白名单，其余一律走 SQL 路径）
 PLANNED_TOOLS = (
     "list_assignments",
     "list_students",
@@ -36,9 +50,13 @@ PLANNED_TOOLS = (
     "get_expense_claim_status",
     "list_my_expense_claims",
 )
+# 写 SQL 时附带给模型的相关政策摘录最多几段
 POLICY_EXCERPTS = 3
+# understand 步骤允许模型返回的意图；其余值按 doc_qa 处理
 INTENTS = ("doc_qa", "data_query", "action", "chitchat", "out_of_scope")
+# 回答的最大长度，超过视为不合格
 MAX_ANSWER_CHARS = 4000
+# 匹配回答里的引用标记，如 [1]
 _CITATION = re.compile(r"\[(\d+)\]")
 # Only the plainest attempts; the real protection is that the model is never given anything the
 # user may not read.
@@ -49,11 +67,12 @@ _INJECTION = re.compile(
     re.IGNORECASE,
 )
 
+# 检索函数的类型；测试里可以替换成假的
 RetrieveFn = Callable[..., Awaitable[RetrievalResult]]
 
 
 class AgentFailure(Exception):
-    """A step failed in a way that ends the run in the `error` state."""
+    """步骤以可预期的方式失败，运行以 error 结局结束。reason 是简短原因码，detail 是排查细节。"""
 
     def __init__(self, reason: str, detail: str = "") -> None:
         super().__init__(detail or reason)
@@ -68,7 +87,12 @@ def _same_model(answered: str, requested: str) -> bool:
 
 
 class BudgetedChat:
-    """Wraps the chat client for one run: counts calls and tokens, enforces the call limit."""
+    """包住聊天客户端，为一次运行服务：
+    1. 统计模型调用次数、token、费用和用到的模型；
+    2. 限制每次运行的最多调用数（防止流程陷入循环烧钱）；
+    3. 记录链路 span 和指标，发现“备用模型作答”（fallback）；
+    4. 把费用累加到每日预算。
+    """
 
     def __init__(
         self,
@@ -115,8 +139,9 @@ class BudgetedChat:
         request_timeout: float | None = None,
         on_chunk: Callable[[str], Awaitable[None]],
     ) -> ChatResult:
-        """Like `complete`, with `on_chunk` called for each piece of text as it arrives. A client
-        that cannot stream answers in one piece, so callers need not care which they have."""
+        """与 complete 相同，但每收到一段文字就调用 on_chunk。
+        客户端不支持流式时一次性给完整文字，调用方不用关心差别。
+        """
         inner_stream = getattr(self._inner, "stream", None)
         first = [True]
         started = time.perf_counter()
@@ -162,6 +187,12 @@ class BudgetedChat:
         model: str,
         call: Callable[[], Awaitable[ChatResult]],
     ) -> ChatResult:
+        """所有模型调用的统一入口：检查上限、计数、开 span、计费、记录指标。
+
+        参数：messages 发送的消息；model 请求的模型；call 真正发起调用的函数。
+        返回：模型结果。超过调用上限抛 AgentFailure("step_limit")。
+        """
+        # 先检查本次运行的调用上限
         if self._totals.llm_calls >= self._limit:
             raise AgentFailure("step_limit", f"more than {self._limit} model calls in one run")
         self._totals.llm_calls += 1
@@ -188,11 +219,13 @@ class BudgetedChat:
             active.set_attribute("gen_ai.usage.output_tokens", result.output_tokens)
             answered_by = result.model or model
             active.set_attribute("gen_ai.response.model", answered_by)
+            # 实际作答的模型与请求的不同 = 触发了备用链
             if result.model and not _same_model(result.model, model):
                 active.set_attribute("llm.fallback", True)
                 tele.llm_fallbacks.add(1, {"requested": model, "answered": result.model})
                 self._totals.fallbacks += 1
                 logger.warning("%s did not answer; %s did (fallback)", model, result.model)
+            # 按实际作答的模型计费，并累加到整日预算
             cost = call_cost_usd(answered_by, result.input_tokens, result.output_tokens)
             self._totals.cost_usd += cost
             tele.llm_cost.add(cost, {"model": answered_by})
@@ -208,11 +241,13 @@ class BudgetedChat:
 
 
 def _ctx(config: RunnableConfig) -> RunContext:
+    """从 LangGraph 的 config 里取出本次运行的上下文 RunContext。"""
     ctx: RunContext = config["configurable"]["ctx"]
     return ctx
 
 
 def excerpt_block(chunks: Sequence[Candidate]) -> str:
+    """把文本块排成带编号的摘录，放进提示词；模型回答里的 [n] 对应这里的编号。"""
     parts = []
     for number, c in enumerate(chunks, start=1):
         where = " > ".join(c.heading_path)
@@ -222,6 +257,7 @@ def excerpt_block(chunks: Sequence[Candidate]) -> str:
 
 
 def citation_info(number: int, c: Candidate) -> dict[str, Any]:
+    """生成返回给前端的引用信息（文档编号、版本、标题、章节路径、页码等）。"""
     return {
         "n": number,
         "doc_code": c.doc_code,
@@ -237,6 +273,8 @@ def citation_info(number: int, c: Candidate) -> dict[str, Any]:
 
 
 class AgentNodes:
+    """流程图的全部步骤。依赖（数据库、配置、嵌入客户端、检索函数）在构造时注入，便于测试。"""
+
     def __init__(
         self,
         *,
@@ -253,6 +291,7 @@ class AgentNodes:
     # --- context and input checks ----------------------------------------------------------
 
     async def load_context(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """读取会话状态（是否在等澄清）和最近几轮对话，并清零本次运行的重试计数。"""
         ctx = _ctx(config)
         async with self._engine.connect() as conn:
             row = (
@@ -282,6 +321,9 @@ class AgentNodes:
         }
 
     async def guard_input(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """输入检查：空消息、过长消息，或明显的提示词注入话术直接拒绝。
+        这只是最浅的一层；真正的保护是模型永远拿不到用户无权读的内容。
+        """
         text_in = state["user_text"].strip()
         if (
             not text_in
@@ -294,6 +336,12 @@ class AgentNodes:
     # --- understanding ---------------------------------------------------------------------
 
     async def understand(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """理解问题：让模型判断意图，并把问题（结合上下文）改写成可以独立检索的一句话。
+
+        意图 -> 去向：doc_qa 去检索；data_query 去数据；chitchat 打招呼；
+        action（写操作）和 out_of_scope 拒绝；含糊的文档类问题只反问一次（超过次数则当作没找到）。
+        模型返回无法解析时不报错，直接用用户原话继续。
+        """
         ctx = _ctx(config)
         lines = [f"{m['role']}: {m['content']}" for m in state.get("history", [])]
         user = "Conversation so far:\n" + ("\n".join(lines) or "(none)")
@@ -341,6 +389,7 @@ class AgentNodes:
         return {**update, "route": "retrieve_docs"}
 
     async def chitchat_reply(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """闲聊：固定回复，介绍能回答哪些问题。"""
         return {
             "reply": messages.CHITCHAT,
             "answer": messages.CHITCHAT,
@@ -351,6 +400,11 @@ class AgentNodes:
     # --- retrieval -------------------------------------------------------------------------
 
     async def retrieve_docs(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """文档检索：按提问者身份检索，并顺便统计“被权限挡住的强相关内容”。
+
+        restricted 的含义：有强相关的命中但用户无权读。它只用来决定“没权限”还是“没找到”，
+        内容绝不会进入提示词。同时把读到的文档 ID 记入统计（写审计用）。
+        """
         ctx = _ctx(config)
         try:
             async with self._engine.connect() as conn:
@@ -392,9 +446,14 @@ class AgentNodes:
         }
 
     async def grade_retrieval(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """判断检索结果够不够好：
+        够 -> 去生成；不够且是因为有内容被权限挡住 -> 没权限（重试没用）；
+        不够且还有重试次数 -> 改写问题再检索；否则 -> 没找到。
+        """
         chunks = state.get("chunks", [])
         top = state.get("top_rerank_score")
         # No rerank score (reranking off or failed): the answer step makes the decision.
+        # 没有重排分数（没开重排或重排失败）时不在这里判断，交给生成步骤决定
         enough = bool(chunks) and (top is None or top >= self._settings.grade_min_rerank_score)
         if enough:
             return {"route": "generate"}
@@ -406,6 +465,7 @@ class AgentNodes:
         return {"route": "end_not_found", "end_reason": "no_relevant_documents"}
 
     async def rewrite_query(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """检索效果不好时，让模型换一种说法重写查询；模型失败则保留原查询。"""
         ctx = _ctx(config)
         try:
             result = await ctx.chat.complete(
@@ -430,6 +490,11 @@ class AgentNodes:
     # --- the answer ------------------------------------------------------------------------
 
     async def generate(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """生成回答：把带编号的摘录和问题交给模型，要求返回 JSON
+        {"sufficient", "answer", "citations"}。sufficient 表示摘录足以回答。
+        流式时回答文字边生成边发给客户端，但只在模型确认 sufficient 之后才放出（见 streaming.py）。
+        若上一轮校验未通过，会把原因附在提示词里让模型重写。
+        """
         ctx = _ctx(config)
         chunks = state["chunks"]
         question = state["standalone_query"]
@@ -469,8 +534,12 @@ class AgentNodes:
         model: str,
         parser: AnswerStream,
     ) -> ChatResult:
-        """One JSON-mode model call. When a client is listening, the answer text is passed on as
-        it is written (see streaming.py); otherwise the reply is simply waited for."""
+        """发起一次 JSON 模式的模型调用。
+
+        有客户端在监听时，回答文字边写边通过 parser 筛选并转发；否则直接等完整结果。
+        参数：ctx 运行上下文；messages 消息；model 模型名；parser 流式文字解析器。
+        返回：模型结果。
+        """
         emitter = ctx.emitter
         if emitter is None:
             plain: ChatResult = await ctx.chat.complete(messages, model=model, json_mode=True)
@@ -486,6 +555,10 @@ class AgentNodes:
         return streamed
 
     async def verify_answer(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """校验回答（对照原文）：
+        1. 校验通过且 sufficient -> 带引用结束；通过但 sufficient 为假 -> 没找到；
+        2. 校验不通过 -> 撤回已流出的草稿（如果有），在重试次数内重新生成，否则出错。
+        """
         attempts = state.get("verify_attempts", 0) + 1
         problem = self._problem(state)
         if problem is None:
@@ -509,7 +582,9 @@ class AgentNodes:
         return {"route": "end_error", "end_reason": "llm_error", "verify_attempts": attempts}
 
     def _problem(self, state: AgentState) -> str | None:
-        """Why the answer cannot be used, or None when it can."""
+        """回答不可用的原因，可用则返回 None。检查：JSON 是否有效、是否为空或过长、
+        是否至少引用了一段摘录、引用的编号是否真实存在。
+        """
         if not state.get("generation_ok", False):
             return state.get("verify_feedback") or "the reply was not valid JSON."
         if not state["sufficient"]:
@@ -533,6 +608,9 @@ class AgentNodes:
     # --- business data ---------------------------------------------------------------------
 
     async def plan_data_access(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """规划数据访问：让模型在“固定工具”和“自己写 SQL”之间选。
+        只有模型选了白名单里的工具、参数是字典、且工具客户端可用，才走工具；否则走 SQL。
+        """
         ctx = _ctx(config)
         try:
             result = await ctx.chat.complete(
@@ -565,6 +643,10 @@ class AgentNodes:
         return {"plan_path": "sql", "sql_attempts": 0, "route": "run_sql"}
 
     async def call_data_tool(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """调用 MCP 数据工具（身份令牌随调用带上，权限由工具端再校验一次）。
+        结果：成功 -> 据此作答；forbidden -> 没权限；not_found -> 没找到；
+        参数错误 -> 退回 SQL 路径让它自己写；其余错误抛 AgentFailure。
+        """
         ctx = _ctx(config)
         outcome = await ctx.data_tools.call(
             ctx.identity, state["tool_name"], state["tool_args"], token=ctx.access_token
@@ -588,6 +670,9 @@ class AgentNodes:
         raise AgentFailure("tool_error", str(outcome.get("error")))
 
     async def _policy_excerpts(self, state: AgentState, ctx: RunContext) -> str:
+        """取少量相关政策摘录给 SQL 步骤参考（比如“超过酒店上限”要知道上限是多少）。
+        同一次运行只取一次；取不到时静默返回空，不影响主流程。
+        """
         if state.get("policy_excerpts") is not None:
             return state["policy_excerpts"]
         try:
@@ -610,6 +695,12 @@ class AgentNodes:
         return excerpt_block(chunks)
 
     async def run_sql(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """让模型写一条只读 SQL 并执行：
+        1. 模型写 SQL（提示词里只有该用户能看到的视图结构）；
+        2. validate_sql 校验：只允许白名单视图里的 SELECT；碰了无权的表 -> 没权限；
+        3. 在事务内切换到只读角色并设置超时、行数上限后执行，视图按提问者身份过滤行；
+        4. 校验或执行失败，把原因反馈给模型重写，超过重试次数则出错；没有行 -> 没找到。
+        """
         ctx = _ctx(config)
         attempts = state.get("sql_attempts", 0)
         excerpts = await self._policy_excerpts(state, ctx)
@@ -636,6 +727,7 @@ class AgentNodes:
         retry = {"policy_excerpts": excerpts, "sql_attempts": attempts + 1, "route": "run_sql"}
         give_up: AgentState = {"route": "end_error", "end_reason": "sql_failed"}
 
+        # 失败处理：还有重试次数就带着反馈重写，否则以 sql_failed 结束
         def failed(feedback: str) -> AgentState:
             if attempts >= self._settings.agent_max_sql_retries:
                 ctx.totals.failure_detail = f"sql: {feedback}"
@@ -670,6 +762,9 @@ class AgentNodes:
         }
 
     async def answer_from_data(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """用查到的数据作答：只把前若干行（含总行数）交给模型，要求引用 [1]，
+        引用信息里记录用了哪些视图、多少行。回答为空或过长视为失败。
+        """
         ctx = _ctx(config)
         rows = state["data_rows"][: self._settings.data_rows_to_model]
         payload = json.dumps(
@@ -697,6 +792,7 @@ class AgentNodes:
             raise AgentFailure("llm_error", str(exc)) from exc
         if not answer or len(answer) > MAX_ANSWER_CHARS:
             raise AgentFailure("llm_error", "the data answer was empty or too long")
+        # 数据类回答必须带引用，模型漏了就补上
         if "[1]" not in answer:
             answer += " [1]"
         citation = {
@@ -709,6 +805,7 @@ class AgentNodes:
 
     # --- the six ways a run can end --------------------------------------------------------
 
+    # —— 以下是六个结局：把结局和回复文字写入状态，由 runtime 统一落库
     async def end_answered(self, state: AgentState, config: RunnableConfig) -> AgentState:
         return {"end_state": "answered", "end_reason": None, "reply": state["answer"]}
 
@@ -720,6 +817,9 @@ class AgentNodes:
         }
 
     async def end_no_permission(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """无权限：对用户说的话与“没找到”完全相同，避免泄露受限内容的存在。
+        end_reason 仍保留真实原因，供审计使用。
+        """
         return {
             "end_state": "no_permission",
             "end_reason": state.get("end_reason") or "restricted_document",
@@ -747,6 +847,7 @@ class AgentNodes:
         }
 
     async def end_error(self, state: AgentState, config: RunnableConfig) -> AgentState:
+        """出错：回复里带运行 ID，用户反馈时可据此在审计里查到详情。"""
         ctx = _ctx(config)
         return {
             "end_state": "error",

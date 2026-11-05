@@ -1,9 +1,6 @@
-"""Retrieval on the ingested sample documents (scratch database, fake embeddings).
-
-The vector side is meaningless here (fake vectors), so these tests check what does not depend on
-meaning: the permission filter, the plumbing of the four modes, exact identifiers (a keyword
-matter), versions, and the probe. How well the real embeddings rank is measured by the
-evaluation runner (starit-eval), not here.
+"""文件：测试——检索（集成）
+测什么：在已入库的示例文档上（临时库、假嵌入）：四种模式的行为，编号精确命中，
+旧版本政策被标注，权限过滤在排序之前，被挡住的命中只以数字形式出现。
 """
 
 import asyncio

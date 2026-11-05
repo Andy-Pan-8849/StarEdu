@@ -1,8 +1,9 @@
-"""Document registration and permission changes.
-
-A chunk carries a copy of its document's permission, status and version fields, so retrieval
-can filter a single table. These functions are the only place those fields change, and they
-change the document and all of its chunks in one transaction.
+"""文件：documents.py
+作用：文档的登记、权限修改、删除与查询（管理类操作的核心逻辑）。
+主要思想：文本块里冗余保存了所属文档的权限、状态、版本字段，这样检索只查一张表就能过滤。
+代价是这些字段必须保持同步，所以修改它们的入口只有本文件：
+改文档和改它的全部文本块在同一个事务（保存点）里完成，要么都改要么都不改，
+并且每次改动都写一条审计记录。
 """
 
 from dataclasses import dataclass, field
@@ -17,9 +18,11 @@ from starit_core.audit import write_audit
 from starit_core.auth import Identity
 from starit_core.permissions import chunk_access_clause, chunks, expand_access_level
 
+# 文档状态：现行 / 已被取代 / 草稿
 STATUSES = ("active", "superseded", "draft")
 
 # The columns a chunk copies from its document.
+# 文本块从文档复制的列（权限、状态、版本相关）
 _SYNCED = (
     "allowed_roles, allowed_users, campus_scope, min_level_rank, status, effective_date, "
     "doc_code, version"
@@ -28,6 +31,8 @@ _SYNCED = (
 
 @dataclass(frozen=True)
 class NewDocument:
+    """登记新文档所需的信息：编号、标题、领域、版本、格式、权限级别，以及可选的指名用户、校区范围、最低职等等。"""
+
     doc_code: str
     title: str
     domain: str
@@ -45,6 +50,11 @@ class NewDocument:
 
 
 async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: Identity) -> UUID:
+    """登记一份新文档（只写文档记录和审计，文本块由入库流水线之后生成）。
+
+    参数：conn 连接；doc 文档信息；actor 操作者。
+    返回：新文档的 ID。状态不合法抛 ValueError。
+    """
     if doc.status not in STATUSES:
         raise ValueError(f"unknown status: {doc.status!r}")
     allowed_roles = expand_access_level(doc.access_level)
@@ -107,7 +117,7 @@ async def add_chunk(
     identifiers: list[str] | None = None,
     token_count: int = 0,
 ) -> UUID:
-    """Insert a chunk and copy the document's permission fields onto it in the same statement."""
+    """插入一个文本块，并在同一条语句里把文档的权限字段复制到块上，保证两边起点一致。"""
     chunk_id = (
         await conn.execute(
             text(
@@ -137,6 +147,7 @@ async def add_chunk(
 
 
 async def _sync_chunks(conn: AsyncConnection, document_id: UUID) -> int:
+    """把文档的权限/状态/版本字段同步到它的全部文本块；返回更新了几块。"""
     result = await conn.execute(
         text(
             """
@@ -165,7 +176,11 @@ async def update_access(
     min_level_rank: int | None = None,
     clear_min_level: bool = False,
 ) -> int:
-    """Change who may read a document. Returns the number of chunks updated."""
+    """修改谁能读一份文档，并同步到所有块。返回更新的块数。
+
+    参数：access_level 新的权限级别；allowed_users 指名用户；campus_scope 校区范围；
+      min_level_rank 最低职等；clear_min_level=True 表示去掉职等要求。
+    """
     sets: dict[str, object] = {}
     if access_level is not None:
         sets["access_level"] = access_level
@@ -184,6 +199,7 @@ async def update_access(
 async def set_status(
     conn: AsyncConnection, document_id: UUID, status: str, *, actor: Identity
 ) -> int:
+    """修改文档状态（active/superseded/draft）并同步到所有块，返回更新的块数。"""
     if status not in STATUSES:
         raise ValueError(f"unknown status: {status!r}")
     return await _change_document(conn, document_id, {"status": status}, actor, "doc.set_status")
@@ -196,6 +212,12 @@ async def _change_document(
     actor: Identity,
     action: str,
 ) -> int:
+    """所有文档变更的公共路径：更新文档 -> 同步文本块 -> 写审计，放在一个保存点里。
+
+    参数：sets 要改的列和新值（列名只来自本文件固定的集合，绝不来自调用方，避免 SQL 注入）；
+      action 审计动作名。
+    异常：文档不存在抛 LookupError。
+    """
     if not sets:
         return 0
     # Column names come from the fixed set above, never from callers.
@@ -220,6 +242,7 @@ async def _change_document(
 
 
 async def delete_document(conn: AsyncConnection, document_id: UUID, *, actor: Identity) -> None:
+    """删除文档（文本块、向量、任务随外键级联删除）并写审计。不存在抛 LookupError。"""
     async with conn.begin_nested():
         deleted = await conn.execute(
             text("DELETE FROM ai.documents WHERE id = :id"), {"id": document_id}
@@ -232,6 +255,7 @@ async def delete_document(conn: AsyncConnection, document_id: UUID, *, actor: Id
 async def find_document(
     conn: AsyncConnection, doc_code: str, version: str
 ) -> dict[str, object] | None:
+    """按（文档编号, 版本）找文档，返回其状态等信息；没有则 None。入库幂等判断用它。"""
     row = (
         (
             await conn.execute(
@@ -256,7 +280,7 @@ async def set_content(
     content_hash: str,
     actor: Identity,
 ) -> None:
-    """Record that a document's original file was replaced; the caller queues re-ingestion."""
+    """记录文档的原始文件被替换了（新的对象键和内容哈希）；调用方随后要排队重新入库。"""
     async with conn.begin_nested():
         updated = await conn.execute(
             text(
@@ -278,6 +302,7 @@ async def set_content(
 
 # --- reading and managing documents through the API -------------------------------------------
 
+# —— 以下是通过 API 读取和管理文档的函数。列表里不含正文
 _LISTED = (
     "id, doc_code, title, domain, version, status, effective_date, access_level, allowed_users, "
     "campus_scope, min_level_rank, format, ingest_status, content_hash, uploaded_by, "
@@ -295,10 +320,14 @@ async def list_documents(
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
-    """Document metadata (never content), newest first. Asks for one row more than `limit`'s worth
-    is the caller's job: pass limit + 1 to learn whether another page exists."""
+    """文档元数据列表（不含内容），最新的在前。
+
+    参数：domain/status/ingest_status 过滤；q 按标题或编号模糊搜；limit/offset 分页。
+    说明：调用方传 limit+1 来判断是否还有下一页。
+    """
     pattern = None
     if q:
+        # 转义 LIKE 的通配符，让用户输入的 % 和 _ 按字面匹配
         escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
     rows = await conn.execute(
@@ -323,6 +352,7 @@ async def list_documents(
 
 
 async def get_document(conn: AsyncConnection, document_id: UUID) -> dict[str, Any] | None:
+    """取单个文档的元数据（含对象键）；没有则 None。"""
     row = (
         (
             await conn.execute(
@@ -337,6 +367,7 @@ async def get_document(conn: AsyncConnection, document_id: UUID) -> dict[str, An
 
 
 async def list_jobs(conn: AsyncConnection, document_id: UUID) -> list[dict[str, Any]]:
+    """某文档的入库任务历史，最近的在前（状态、阶段、重试次数、错误）。"""
     rows = await conn.execute(
         text(
             "SELECT id, status, stage, attempt, max_attempts, error_code, error_message, "
@@ -361,7 +392,7 @@ async def update_document(
     min_level_rank: int | None = None,
     clear_min_level: bool = False,
 ) -> int:
-    """Change metadata and permissions in one step: the document and every chunk together."""
+    """一次修改标题、状态和权限：文档和所有文本块一起变；返回更新的块数。"""
     sets: dict[str, object] = {}
     if title is not None:
         sets["title"] = title
@@ -392,9 +423,11 @@ async def readable_chunks(
     window: int = 2,
     limit: int = 50,
 ) -> list[dict[str, Any]] | None:
-    """The chunks of a document that `identity` may read (the same condition retrieval uses),
-    or None when there are none: a document you may not read looks like one that does not exist.
-    With `around`, only that chunk and `window` chunks on each side."""
+    """某文档里该用户有权读的文本块，用于点开引用看原文。
+
+    参数：around 指定某块 ID 时只返回它和前后各 window 块；limit 无 around 时的最多块数。
+    返回：块列表；一块也读不到则返回 None——无权读的文档看起来与不存在的完全一样。
+    """
     statement = (
         select(
             chunks.c.id,
@@ -417,6 +450,7 @@ async def readable_chunks(
 
 
 async def can_read_document(conn: AsyncConnection, identity: Identity, document_id: UUID) -> bool:
+    """该用户是否至少能读这份文档的一块（用与检索同一个权限条件）。"""
     found = await conn.execute(
         select(chunks.c.id)
         .where(chunks.c.document_id == document_id, chunk_access_clause(identity))

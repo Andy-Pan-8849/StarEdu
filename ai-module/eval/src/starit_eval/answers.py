@@ -1,14 +1,13 @@
-"""Ask the assistant the document questions for real and grade what it says.
-
-Grading, in the order a question is judged:
-- A question that must be refused passes when the run ends in a refusal state and cites nothing
-  from the document it must not reveal.
-- An answerable question passes only if the run ended as `answered`. Then the `facts` written
-  with the question (figures, identifiers, words) must all be in the answer: a deterministic
-  check. Questions without `facts` are graded by a language model against the reference answer.
-- Every run must end in a legal (state, reason) pair, whatever the question.
-A random fifth of all results is exported for a person to check; the automatic verdicts are not
-trusted until that has been done.
+"""文件：answers.py
+作用：真正调用助手回答 114 道文档题，并给回答打分。
+判分顺序（每道题）：
+  1. 该拒绝的题：运行以拒绝类结局结束、并且没有引用被保护的那份文档，才算通过；
+  2. 该回答的题：必须以 answered 结束。然后：
+     - 题目带 facts（必须出现的数字、编号、词）的，做确定性检查：全部出现才通过；
+     - 不带 facts 的，让另一个模型（判官）对照参考答案判断；
+  3. 任何题的（结局, 原因）组合都必须合法。
+人工复核：随机抽 1/5（固定随机种子，可复现）导出成 CSV 给人检查；
+在抽查完成之前，自动判分的结论不能当作事实（判官可能偏严或偏松）。
 """
 
 import json
@@ -36,7 +35,9 @@ from starit_core.llm import ChatClient, ChatError, ChatResult, parse_json_object
 from starit_eval.dataset import Question
 from starit_eval.pricing import cost_usd
 
+# 算“拒绝”的结局：无权限 / 没找到 / 拒绝
 REFUSAL_STATES = ("no_permission", "not_found", "refused")
+# 每种结局允许出现的原因；不在表里的组合说明流程有 bug
 LEGAL_REASONS: dict[str, tuple[str | None, ...]] = {
     "answered": (None,),
     "need_clarification": ("ambiguous_question",),
@@ -44,9 +45,11 @@ LEGAL_REASONS: dict[str, tuple[str | None, ...]] = {
     "not_found": ("no_relevant_documents", "no_matching_rows", "clarification_limit"),
     "refused": ("out_of_scope", "input_blocked", "write_not_enabled"),
 }
+# 人工抽查比例（1/5）与固定随机种子，保证每次抽到同样的题
 SAMPLE_FRACTION = 0.2
 SAMPLE_SEED = 20261104
 
+# 判官的指令：只对照参考答案判断关键事实对不对，返回 JSON {verdict, reason}
 JUDGE_SYSTEM = (
     "You grade answers of a company assistant. You get a question, a reference answer written by "
     "the dataset's author, and the assistant's answer. Reply with one JSON object and nothing "
@@ -59,7 +62,7 @@ JUDGE_SYSTEM = (
 
 
 class UsageChat:
-    """Counts calls and tokens per model, so the cost can be priced model by model."""
+    """包住聊天客户端，按模型统计调用次数和 token，以便逐个模型计价。"""
 
     def __init__(self, inner: ChatClient) -> None:
         self._inner = inner
@@ -88,6 +91,7 @@ class UsageChat:
         )
 
     def cost(self) -> float | None:
+        """按价目表合计费用；只要有模型没标价就返回 None（宁可说不知道）。"""
         parts = [cost_usd(m, u["input"], u["output"]) for m, u in self.by_model.items()]
         return (
             None if any(p is None for p in parts) else float(sum(p for p in parts if p is not None))
@@ -97,7 +101,11 @@ class UsageChat:
 def estimate(
     settings: Settings, questions: Sequence[Question], avg_chunk_tokens: int
 ) -> tuple[dict[str, int], float | None]:
-    """Upper bound of the model calls of a run (no retries) and their cost at list price."""
+    """运行前估算：模型调用次数的上限（不含重试）和按标价的费用。
+
+    参数：settings 配置；questions 题目；avg_chunk_tokens 平均块大小。
+    返回：({步骤: 调用次数}, 费用或 None)。管理角色没有可读文档，不会走检索和生成，所以不计入。
+    """
     readers = [q for q in questions if q.role not in ("Admin", "RAGETLADMIN", "RAGETLAdmin")]
     judged = sum(1 for q in readers if q.should_answer and not q.facts)
     calls = {
@@ -121,11 +129,14 @@ def estimate(
 
 
 def normalize(value: str) -> str:
-    """Lower case, thousands separators removed (3,000 and 3000 are the same figure)."""
+    """统一写法再比较：转小写，数字里的千分位逗号去掉（3,000 与 3000 视为同一个数）。"""
     return re.sub(r"(?<=\d),(?=\d)", "", value).lower()
 
 
 def missing_facts(facts: Sequence[str], answer: str) -> list[str]:
+    """返回回答里缺少的事实。每个事实要作为独立的词出现（前后不能是字母数字，
+    也不能是小数的一部分）；开头允许多一个 v，这样事实 2.1 能匹配常见写法 v2.1。
+    """
     haystack = normalize(answer)
     absent = []
     for fact in facts:
@@ -138,6 +149,7 @@ def missing_facts(facts: Sequence[str], answer: str) -> list[str]:
 
 
 def end_state_is_legal(end_state: str, end_reason: str | None) -> bool:
+    """（结局, 原因）组合是否合法；error 结局只要求有原因。"""
     if end_state == "error":
         return bool(end_reason)
     return end_reason in LEGAL_REASONS.get(end_state, ())
@@ -146,7 +158,9 @@ def end_state_is_legal(end_state: str, end_reason: str | None) -> bool:
 async def judge_answer(
     chat: ChatClient, model: str, question: str, reference: str, answer: str
 ) -> tuple[bool | None, str]:
-    """(verdict, reason). None means the judge gave no usable verdict."""
+    """让判官对照参考答案判断回答对不对。返回 (True/False/None, 理由)，None
+    表示判官没给出可用结论。
+    """
     user = f"Question: {question}\n\nReference answer: {reference}\n\nAssistant's answer: {answer}"
     try:
         reply = await chat.complete(
@@ -169,6 +183,8 @@ async def judge_answer(
 
 @dataclass
 class AnswerResult:
+    """一道题的结果：结局、回答、引用的文档、是否通过、判分方法(refusal/facts/judge)、问题列表等。"""
+
     question: Question
     end_state: str
     end_reason: str | None
@@ -186,6 +202,8 @@ class AnswerResult:
 
 @dataclass
 class AnswersRun:
+    """一次答案评测的全部结果，以及所用模型、token 用量和费用。"""
+
     results: list[AnswerResult] = field(default_factory=list)
     models: dict[str, str] = field(default_factory=dict)
     usage: dict[str, dict[str, int]] = field(default_factory=dict)
@@ -200,7 +218,12 @@ async def grade(
     cited_docs: list[str],
     judge: Any,
 ) -> tuple[bool, str, list[str], str]:
-    """(passed, method, problems, judge_reason). `judge` is async: (question, answer) -> verdict."""
+    """给一道题的回答判分，返回 (是否通过, 判分方法, 问题列表, 判官理由)。
+
+    参数：question 题；end_state/end_reason 结局；content 回答；cited_docs 回答引用的文档；
+      judge 异步函数 (题, 回答) -> 判官结论。
+    规则见文件头。
+    """
     problems: list[str] = []
     if not question.should_answer:
         if end_state not in REFUSAL_STATES:
@@ -235,6 +258,13 @@ async def run_answers(
     progress: Any = None,
     retrieve_fn: Any = None,
 ) -> AnswersRun:
+    """依次让助手回答每道题（每题新开一个会话），并判分。
+
+    参数：engine 引擎；settings 配置；embedder 嵌入客户端；chat 带用量统计的聊天客户端；
+      identities 角色->身份；questions 题目；with_data_tools 是否接入数据工具；
+      progress 进度回调(第几题, 共几题)；retrieve_fn 可替换的检索函数。
+    返回：AnswersRun。
+    """
     runtime = AgentRuntime(
         engine=engine,
         settings=settings,
@@ -305,6 +335,7 @@ async def run_answers(
 
 
 def percentile(values: Sequence[float], q: float) -> float:
+    """线性插值的百分位数（q 取 0~1）；没有数据返回 0。"""
     ordered = sorted(values)
     if not ordered:
         return 0.0
@@ -315,6 +346,9 @@ def percentile(values: Sequence[float], q: float) -> float:
 
 
 def summarize(run: AnswersRun) -> dict[str, Any]:
+    """汇总：通过数（总体/应回答/应拒绝）、按题型和角色、判分方式分布、引用来源比例、延迟、token、
+    费用。
+    """
     results = run.results
     answerable = [r for r in results if r.question.should_answer]
     refused = [r for r in results if not r.question.should_answer]
@@ -358,7 +392,7 @@ def summarize(run: AnswersRun) -> dict[str, Any]:
 
 
 def review_sample(results: Sequence[AnswerResult]) -> list[AnswerResult]:
-    """A reproducible fifth of the results, for a person to check against the answers."""
+    """取可复现的 1/5 结果，按题号排序，交给人工检查。"""
     count = max(1, round(len(results) * SAMPLE_FRACTION))
     return sorted(
         random.Random(SAMPLE_SEED).sample(list(results), count), key=lambda r: r.question.id
@@ -366,6 +400,7 @@ def review_sample(results: Sequence[AnswerResult]) -> list[AnswerResult]:
 
 
 def review_csv(results: Sequence[AnswerResult]) -> str:
+    """生成人工抽查表 CSV：题、参考答案、助手回答、自动结论，以及留空的人工结论列。"""
     import csv
     import io
 
@@ -406,6 +441,7 @@ def review_csv(results: Sequence[AnswerResult]) -> str:
 
 
 def render(run: AnswersRun, summary: dict[str, Any], estimate_usd: float | None) -> str:
+    """生成中文 Markdown 报告：总体数字、按题型/角色、没通过的题（带参考答案和助手回答）。"""
     date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     a, m = summary["answerable"], summary["must_refuse"]
     lines = [
@@ -453,6 +489,7 @@ def render(run: AnswersRun, summary: dict[str, Any], estimate_usd: float | None)
 def write(
     out_dir: Path, run: AnswersRun, summary: dict[str, Any], estimate_usd: float | None
 ) -> Path:
+    """写出 .md 报告、.csv 抽查表和 .json 明细，返回 .md 的路径。"""
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M")
     base = out_dir / f"answers-{stamp}"
@@ -485,7 +522,7 @@ def write(
 async def store(
     engine: AsyncEngine, run: AnswersRun, summary: dict[str, Any], sha: str | None, label: str
 ) -> str:
-    """Record the run in ai.eval_runs and one row per question in ai.eval_results."""
+    """把这次运行写入 ai.eval_runs，每题一行写入 ai.eval_results。返回运行 ID。"""
     async with engine.begin() as conn:
         run_id = (
             await conn.execute(

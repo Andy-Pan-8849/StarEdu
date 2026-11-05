@@ -1,4 +1,11 @@
-"""Document management and reading on a scratch database, with the real ingestion worker."""
+"""文件：测试——文档管理与阅读接口（集成）
+测什么：在临时数据库上、使用真实的入库 worker：管理接口需要登录且只有 RAGETLAdmin 能用；
+上传被接受并排队；重复上传是冲突（指出已有文档）；坏文件、缺字段、超过 20 MB、
+  带路径的文件名都处理妥当；
+从上传到可检索，且只有该读的人能检索到；引用原文可连同前后块查看；改权限时文档和块一起移动；
+草稿不可读；职等要求可设置和清除；删除保留审计；重新入库替换文本块；列表筛选与分页；
+CORS 只允许前端来源。
+"""
 
 import asyncio
 import time

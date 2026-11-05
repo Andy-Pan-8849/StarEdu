@@ -1,3 +1,8 @@
+# 文件：deploy/compose/langfuse.yaml
+# 作用：可选的 Langfuse（make up-langfuse，包含 observability）：把同样的链路送进 Langfuse，
+# 查看每次模型调用的输入输出。很重（自带数据库、ClickHouse、Redis、对象存储，约 5 GB 内存），
+# 凭据是固定的本地值，对外暴露前必须改。
+
 # Optional, on top of observability.yaml: Langfuse, fed with the same traces by the Collector.
 # Start with `make up-langfuse`. Heavy (web, worker, Postgres, ClickHouse, Redis, MinIO of its own).
 # Adapted from Langfuse's own docker-compose.yml; its services are renamed so they cannot collide

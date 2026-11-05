@@ -1,4 +1,7 @@
-"""Fixtures shared by every test directory."""
+"""文件：conftest.py（项目根的 pytest 共享夹具）
+作用：所有测试目录共用的夹具。主要是“临时数据库”夹具：为集成测试创建一个全新的、
+已迁移好的数据库（测完删除），这样测试互不干扰，也不会碰开发用的数据库。
+"""
 
 import os
 import subprocess

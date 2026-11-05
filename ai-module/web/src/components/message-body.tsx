@@ -1,9 +1,17 @@
 "use client";
 
+/**
+ * 文件：components/message-body.tsx
+ * 作用：显示一条回答：纯文本，其中的 [n] 引用标记变成可点击按钮，点击打开对应来源。
+ * 安全：文字以纯文本渲染（不是 HTML），模型输出里的任何标签都不会被执行。
+ */
+
 import { splitCitations } from "@/lib/citations";
 import type { Citation } from "@/lib/types";
 
-/** An answer as plain text, with each [n] that matches a citation turned into a button. */
+/**
+ * 把回答渲染成文字 + 引用按钮。参数：content 回答；citations 引用列表；onCite 点击引用的回调。
+ */
 export function MessageBody({
   content,
   citations,

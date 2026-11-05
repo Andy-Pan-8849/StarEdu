@@ -1,3 +1,9 @@
+"""文件：测试——令牌校验与 /me
+测什么：有效令牌得到正确身份；缺令牌、无效、过期、受众不对都是 401 且错误格式统一；
+身份服务（取公钥）不可用时是 503 而不是 401；角色门（require_roles）放行/拒绝；healthz
+  保持公开。
+"""
+
 import time
 from collections.abc import Iterator
 from typing import Any

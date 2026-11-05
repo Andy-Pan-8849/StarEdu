@@ -1,13 +1,12 @@
-"""Save and restore the knowledge base (documents, chunks, vectors, derived content).
-
-The dump is what a real ingestion produced, written as gzip-compressed JSON lines: a header, then
-one line per row. Restoring it gives a working knowledge base without a model key, which is what
-`make seed` does. Conversations, audit records and evaluation results are not part of it.
-
-Rows are written and read through `row_to_json` and `jsonb_populate_recordset`, so every column
-type (arrays, dates, the pgvector column) goes through Postgres' own text forms, and a column added
-by a later migration is picked up without changing this file. Generated columns (the full-text
-vector) are left out and recomputed by the database.
+"""文件：seed_ai.py
+作用：保存和恢复知识库（文档、文本块、向量、衍生内容）。
+主要思想：转储文件是一次真实入库的产物，写成 gzip 压缩的 JSON 行（首行是文件头，
+  之后每行一条记录）。
+恢复它就能得到一个可用的知识库，不需要模型密钥——`make seed` 就是这么做的。
+对话、审计、评测结果不在其中。
+读写都通过 Postgres 自己的 row_to_json / jsonb_populate_recordset，
+所以数组、日期、pgvector 等所有类型都走 Postgres 的文本形式，
+以后迁移新增的列也不用改本文件；生成列(全文检索向量)不导出，恢复时由数据库重算。
 """
 
 import csv
@@ -22,16 +21,19 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+# 转储格式版本；格式变了要升版本，旧文件会被拒绝
 FORMAT = 1
+# 要导出的表，顺序是“父表在前，子表在后”（恢复时按此顺序插入）
 TABLES = ("documents", "document_chunks", "chunk_embeddings", "chunk_derived")
 BATCH = 100
 
 
 class SeedError(Exception):
-    """The dump cannot be restored as it is."""
+    """转储文件无法按原样恢复（格式不认识、不完整、与权限不一致等）。"""
 
 
 async def _columns(conn: AsyncConnection, table: str) -> list[str]:
+    """某表可导出的列（排除生成列），按列顺序；表读不到则抛 SeedError。"""
     rows = await conn.execute(
         text(
             "SELECT column_name FROM information_schema.columns "
@@ -47,6 +49,11 @@ async def _columns(conn: AsyncConnection, table: str) -> list[str]:
 
 
 async def dump_ai(engine: AsyncEngine, *, git_sha: str | None = None) -> bytes:
+    """把知识库导出成转储文件的字节。
+
+    参数：engine 数据库引擎；git_sha 记入文件头，便于追溯。
+    返回：gzip 压缩的字节。mtime=0 让相同内容得到完全相同的字节（便于比较和提交）。
+    """
     lines: list[str] = []
     async with engine.connect() as conn:
         counts: dict[str, int] = {}
@@ -85,6 +92,7 @@ async def dump_ai(engine: AsyncEngine, *, git_sha: str | None = None) -> bytes:
 
 
 def read_dump(data: bytes) -> tuple[dict[str, Any], Iterator[tuple[str, dict[str, Any]]]]:
+    """解析转储字节，返回（文件头, 逐条记录的迭代器）；空文件或格式不认识抛 SeedError。"""
     raw = gzip.decompress(data).decode().splitlines()
     if not raw:
         raise SeedError("the dump is empty")
@@ -101,8 +109,14 @@ def read_dump(data: bytes) -> tuple[dict[str, Any], Iterator[tuple[str, dict[str
 
 
 async def load_ai(engine: AsyncEngine, data: bytes, *, replace: bool = True) -> dict[str, int]:
-    """Restore the dump in one transaction. With `replace` the existing documents (and with them
-    their chunks, vectors and jobs) are removed first; without it the tables must not clash."""
+    """在一个事务里恢复转储。
+
+    参数：data 转储字节；replace 为真时先删除现有文档（块、向量、任务随外键级联删），
+      否则表里不能有冲突。
+    返回：各表恢复后的行数。
+    校验：每表行数与文件头一致；恢复后文本块的权限必须与所属文档一致（v_chunk_permission_drift
+      为 0）。
+    """
     header, rows = read_dump(data)
     per_table: dict[str, list[dict[str, Any]]] = {t: [] for t in TABLES}
     for table, row in rows:
@@ -138,8 +152,9 @@ async def load_ai(engine: AsyncEngine, data: bytes, *, replace: bool = True) -> 
 
 
 async def upload_originals(storage: Any, documents_dir: Path) -> int:
-    """Put each sample file in object storage under the key ingestion gives it
-    (documents/<code>/<version>/<file>), so a restored document's original can be opened."""
+    """把示例原文件放进对象存储，键与入库流水线给的一致，这样恢复出来的文档也能打开原文。
+    返回文件数。
+    """
     count = 0
     manifest = (documents_dir / "manifest.csv").read_text(encoding="utf-8").splitlines()
     for row in csv.DictReader(manifest):

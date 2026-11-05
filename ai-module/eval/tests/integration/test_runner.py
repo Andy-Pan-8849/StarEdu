@@ -1,4 +1,6 @@
-"""The evaluation runner end to end on the ingested sample documents (fake models)."""
+"""文件：测试——评测运行器（集成）
+测什么：在已入库的示例文档上（假模型）跑检索评测：各模式结果、越权检查、越权扫描。
+"""
 
 import asyncio
 from collections.abc import AsyncIterator

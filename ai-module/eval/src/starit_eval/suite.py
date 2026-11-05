@@ -1,7 +1,7 @@
-"""One report for everything the evaluation measures: retrieval, permissions, answers, data.
-
-The permission result is the gate: any document leaked to a role that may not read it fails the
-whole run, whatever the other numbers say. The other numbers are a baseline, not a target.
+"""文件：suite.py
+作用：把检索、权限、答案、数据题的结果合成一份“完整评测报告”（Markdown）。
+主要思想：权限是“闸门”——只要有任何一份文档泄露给无权的角色，整个评测就算失败，
+不管其他数字多好；其他数字只是基线，不是目标。样本量小，报告里会提醒不要过度解读。
 """
 
 from datetime import UTC, datetime
@@ -22,7 +22,16 @@ def render_all(
     models: dict[str, str],
     git_sha: str | None,
 ) -> str:
+    """生成完整评测报告文字。
+
+    参数：retrieval 各检索模式的结果；permission_violations 越权次数；
+      sweep_checked 权限扫描检查了多少次（没做扫描为 None）；
+      answers/data 答案评测与数据题评测的汇总；files 各子报告文件；corpus 知识库规模；
+      questions 题数；models 使用的模型；git_sha 提交号。
+    返回：Markdown 文本。
+    """
     date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    # 闸门：越权为 0 才算通过
     gate = "通过" if permission_violations == 0 else f"**失败：{permission_violations} 次越权**"
     swept = "" if sweep_checked is None else f"，权限扫描检查了 {sweep_checked} 次检索"
     lines = [

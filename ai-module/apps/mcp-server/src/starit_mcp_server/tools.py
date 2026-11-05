@@ -1,5 +1,9 @@
-"""Register the six data tools. Each handler only identifies the caller and hands over to
-`DataTools`, so the MCP server and the in-process backend behave identically."""
+"""文件：tools.py
+作用：把六个数据工具注册到 MCP 服务器上。
+主要思想：每个 MCP 工具只做两件事——从请求里的令牌得到调用者身份，然后交给 `DataTools.call`；
+具体的校验、查询、审计都在 core 的 DataTools 里，所以 MCP 路径和进程内路径行为完全一致。
+值为 None 的可选参数在这里去掉，让 DataTools 用默认值。令牌无效统一返回 forbidden。
+"""
 
 import json
 from typing import Any
@@ -11,10 +15,17 @@ from starit_core.dataaccess.tools import DataTools
 
 from starit_mcp_server.auth import JwtTokenVerifier
 
+# 令牌缺失或无效时的统一返回（用 forbidden，不区分原因）
 UNAUTHENTICATED = {"ok": False, "error": {"code": "forbidden", "message": "Invalid token."}}
 
 
 def register_tools(server: MCPServer, tools: DataTools, verifier: JwtTokenVerifier) -> None:
+    """把六个工具登记到 server：search_documents、list_assignments、list_students、
+    get_student_progress、get_expense_claim_status、list_my_expense_claims。
+    """
+
+    # run：所有工具共用的执行入口——取令牌 -> 校验成身份 -> 去掉 None 参数 -> 调 DataTools ->
+    #   返回 JSON 文本
     async def run(name: str, arguments: dict[str, Any]) -> str:
         access = get_access_token()
         if access is None:

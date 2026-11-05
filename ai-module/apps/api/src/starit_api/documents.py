@@ -1,4 +1,13 @@
-"""Document management (RAGETLAdmin) and reading (design 03, sections 4.2 and 5)."""
+"""文件：documents.py
+作用：文档相关的 HTTP 接口（设计见 docs/design/03 第 4.2、5 节）。分两类：
+  - 管理（仅 RAGETLAdmin）：上传、列表、详情、修改（含权限）、删除、重新入库、入库任务历史；
+  - 阅读（任何有权读该文档的人）：/chunks 看引用对应的原文片段，/file 下载/查看原文件。
+主要思想：
+  - 上传只做“收文件 + 登记 + 排队”，立刻返回 202；解析切块嵌入由 worker 异步完成。
+  - 上传时校验：扩展名白名单、文件头与扩展名一致（PDF 以 %PDF- 开头、docx 是 zip）、
+    文本必须是 UTF-8 且不含二进制、最大 20 MB、文件名净化。
+  - 阅读接口用与检索同一个权限条件；无权读的文档返回 404，与不存在无法区分。
+"""
 
 import base64
 import hashlib
@@ -26,22 +35,28 @@ from starit_api.errors import ApiError
 log = logging.getLogger("starit.api")
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+# 管理接口的依赖：只有 RAGETLAdmin 角色能调用
 admin = require_roles("RAGETLAdmin")
 
+# 上传文件大小上限 20 MB
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+# 文档所属领域
 DOMAINS = ("hr", "finance", "tech-support")
+# 格式 -> 响应的媒体类型（同时也是允许上传的格式白名单）
 MEDIA_TYPES = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "md": "text/markdown; charset=utf-8",
     "txt": "text/plain; charset=utf-8",
 }
+# 文档编号、版本号、文件名的合法字符（文件名里其他字符会被替换成下划线）
 _CODE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{1,39}$")
 _VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,19}$")
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def _plain(value: Any) -> Any:
+    """把 UUID、日期转成 JSON 能表示的字符串。"""
     if isinstance(value, UUID):
         return str(value)
     if isinstance(value, datetime | date):
@@ -50,11 +65,14 @@ def _plain(value: Any) -> Any:
 
 
 def _meta(row: dict[str, Any]) -> dict[str, Any]:
+    """整理文档元数据给前端：转换类型，且不暴露内部的对象存储键。"""
     return {k: _plain(v) for k, v in row.items() if k != "object_key"}
 
 
 def _check_file(extension: str, data: bytes) -> None:
-    """The extension names the format; the first bytes must agree with it."""
+    """校验上传的文件：扩展名在白名单内，非空，内容开头与扩展名相符；文本文件还要是 UTF-8
+    且无二进制字节。不合格抛 422。
+    """
     if extension not in MEDIA_TYPES:
         raise ApiError(422, "validation_error", "Only docx, pdf, md and txt files are accepted")
     if not data:
@@ -73,10 +91,12 @@ def _check_file(extension: str, data: bytes) -> None:
 
 
 def _encode_cursor(offset: int) -> str:
+    """分页游标：把偏移量编码成不透明的字符串。"""
     return base64.urlsafe_b64encode(str(offset).encode()).decode()
 
 
 def _decode_cursor(cursor: str | None) -> int:
+    """解码分页游标；没有游标从 0 开始，格式不对或为负抛 422。"""
     if not cursor:
         return 0
     try:
@@ -89,6 +109,7 @@ def _decode_cursor(cursor: str | None) -> int:
 
 
 async def _existing(engine: AsyncEngine, document_id: UUID) -> dict[str, Any]:
+    """取文档元数据，不存在抛 404。"""
     async with engine.connect() as conn:
         found = await store.get_document(conn, document_id)
     if found is None:
@@ -96,6 +117,7 @@ async def _existing(engine: AsyncEngine, document_id: UUID) -> dict[str, Any]:
     return found
 
 
+# —— 管理接口（仅 RAGETLAdmin）
 # --- management ---------------------------------------------------------------------------
 
 
@@ -117,6 +139,13 @@ async def upload(
     engine: AsyncEngine = Depends(get_engine),
     storage: ObjectStorage = Depends(get_storage),
 ) -> JSONResponse:
+    """上传并登记一份文档，排入入库队列，返回 202。
+
+    表单字段：file 文件；doc_code/version 编号与版本；title 标题；domain 领域；
+      access_level 谁能读；status 状态；effective_date 生效日；allowed_users 指名用户；
+      campus_scope 校区范围；min_level 最低职等；supersedes 它取代的旧版本文档 ID。
+    失败：参数不合法或文件不合格 422；同编号同版本已存在 409。
+    """
     if not _CODE.match(doc_code) or not _VERSION.match(version):
         raise ApiError(422, "validation_error", "Invalid doc_code or version")
     try:
@@ -132,12 +161,14 @@ async def upload(
     digest = hashlib.sha256(data).hexdigest()
     key = f"documents/{doc_code}/{version}/{name}"
 
+    # 同一（编号, 版本）不能重复上传
     async with engine.connect() as probe:
         existing = await find_document(probe, doc_code, version)
     if existing is not None:
         raise ApiError(
             409, "conflict", f"{doc_code} version {version} already exists (id {existing['id']})"
         )
+    # 先存原文件；之后数据库登记失败就把文件删掉，不留孤儿文件
     await storage.put(key, data)
     try:
         async with engine.begin() as conn:
@@ -182,6 +213,7 @@ async def list_documents(
     _: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
+    """文档列表（不含内容），可按领域、状态、入库状态、标题/编号关键字过滤，游标分页。"""
     offset = _decode_cursor(cursor)
     async with engine.connect() as conn:
         rows = await store.list_documents(
@@ -201,6 +233,8 @@ async def list_documents(
 
 
 class DocumentPatch(BaseModel):
+    """修改文档的字段（都可选）：标题、状态、权限级别、指名用户、校区范围、最低职等。"""
+
     title: str | None = Field(default=None, min_length=1, max_length=200)
     status: Literal["active", "superseded", "draft"] | None = None
     access_level: str | None = None
@@ -215,6 +249,7 @@ async def get_document(
     _: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
+    """某文档的元数据。"""
     return _meta(await _existing(engine, document_id))
 
 
@@ -225,6 +260,9 @@ async def patch_document(
     identity: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
+    """修改文档的元数据和权限。文档及其全部文本块在一个事务里一起改，并写审计。
+    min_level 显式传 null 表示去掉职等要求（与“没传”区分开）。
+    """
     await _existing(engine, document_id)
     try:
         async with engine.begin() as conn:
@@ -254,6 +292,9 @@ async def delete_document(
     engine: AsyncEngine = Depends(get_engine),
     storage: ObjectStorage = Depends(get_storage),
 ) -> Response:
+    """删除文档（数据库里的块、向量、任务随之级联删除）并尽力删除对象存储里的原文件；
+    原文件删不掉只记日志。
+    """
     found = await _existing(engine, document_id)
     try:
         async with engine.begin() as conn:
@@ -274,6 +315,7 @@ async def reindex(
     identity: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
+    """重新排一个入库任务（比如换了嵌入模型），写审计。"""
     await _existing(engine, document_id)
     async with engine.begin() as conn:
         job_id = await queue.enqueue(conn, document_id)
@@ -287,12 +329,14 @@ async def jobs(
     _: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
+    """某文档的入库任务历史：状态、阶段、重试次数、错误。"""
     await _existing(engine, document_id)
     async with engine.connect() as conn:
         rows = await store.list_jobs(conn, document_id)
     return {"items": [{k: _plain(v) for k, v in r.items()} for r in rows]}
 
 
+# —— 阅读接口（任何有权读该文档的人）
 # --- reading (anyone who may read the document) -------------------------------------------
 
 
@@ -304,6 +348,9 @@ async def chunks(
     identity: Identity = Depends(get_identity),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
+    """某文档里当前用户有权读的文本块，网页点开引用时用。
+    around 指定某块 ID 时只返回它和前后各 window 块。读不到（不存在或无权）统一 404。
+    """
     async with engine.connect() as conn:
         found = await store.readable_chunks(
             conn, identity, document_id, around=around, window=window
@@ -326,6 +373,7 @@ async def original_file(
     engine: AsyncEngine = Depends(get_engine),
     storage: ObjectStorage = Depends(get_storage),
 ) -> Response:
+    """下载/查看原文件（inline），仅限有权读该文档的人；其余统一 404。"""
     async with engine.connect() as conn:
         allowed = await store.can_read_document(conn, identity, document_id)
         meta = await store.get_document(conn, document_id) if allowed else None

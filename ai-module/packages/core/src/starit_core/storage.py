@@ -1,4 +1,8 @@
-"""Original documents in S3-compatible object storage (MinIO-compatible in Compose)."""
+"""文件：storage.py
+作用：原始文档的对象存储（S3 兼容；Compose 里用 MinIO）。
+主要思想：上层只依赖 `ObjectStorage` 接口（建桶/存/取/删）；boto3 是同步库，
+这里用 asyncio.to_thread 放到线程里，不阻塞事件循环。测试用 InMemoryStorage。
+"""
 
 import asyncio
 from typing import Any, Protocol
@@ -11,6 +15,10 @@ from starit_core.config import Settings
 
 
 class ObjectStorage(Protocol):
+    """对象存储接口：ensure_bucket 建桶，put 存，
+    get 取（不存在抛 FileNotFoundError），delete 删。
+    """
+
     async def ensure_bucket(self) -> None: ...
 
     async def put(self, key: str, data: bytes) -> None: ...
@@ -21,6 +29,8 @@ class ObjectStorage(Protocol):
 
 
 class S3Storage:
+    """用 boto3 访问 S3 兼容服务。path 寻址风格是为了兼容 MinIO。"""
+
     def __init__(self, settings: Settings) -> None:
         self._bucket = settings.s3_bucket
         self._client: Any = boto3.client(
@@ -33,6 +43,7 @@ class S3Storage:
         )
 
     async def ensure_bucket(self) -> None:
+        """桶不存在就创建（幂等）。"""
         await asyncio.to_thread(self._ensure_bucket)
 
     def _ensure_bucket(self) -> None:
@@ -45,6 +56,7 @@ class S3Storage:
         await asyncio.to_thread(self._client.put_object, Bucket=self._bucket, Key=key, Body=data)
 
     async def get(self, key: str) -> bytes:
+        """读取对象；键不存在统一转成 FileNotFoundError。"""
         try:
             response = await asyncio.to_thread(
                 self._client.get_object, Bucket=self._bucket, Key=key
@@ -61,7 +73,7 @@ class S3Storage:
 
 
 class InMemoryStorage:
-    """For tests."""
+    """内存实现，用于测试。"""
 
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}

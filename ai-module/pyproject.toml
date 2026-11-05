@@ -1,3 +1,9 @@
+# 文件：pyproject.toml（ai-module 根）
+# 作用：uv 工作区的根配置。工作区成员：packages/core（共享核心）、apps/api、apps/worker、
+# apps/mcp-server、eval。同时放全仓库共用的工具配置：ruff（代码风格，行宽 100）、
+# mypy（严格类型检查）、pytest（测试发现与异步模式）。
+# 根本身不是一个可安装的包（package=false），只负责把成员组织在一起并统一依赖版本（uv.lock）。
+
 [project]
 name = "starit-ai-module"
 version = "0.0.0"

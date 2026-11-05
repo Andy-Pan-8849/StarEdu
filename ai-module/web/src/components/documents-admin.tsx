@@ -1,5 +1,18 @@
 "use client";
 
+/**
+ * 文件：components/documents-admin.tsx
+ * 作用：文档管理页（仅 RAGETLAdmin）：文档列表、搜索与筛选、上传、编辑权限、查看入库任务、
+ *   重新入库、删除。
+ * 主要思想：
+ *   - DocumentsAdmin 先检查角色，没有权限显示提示（这只是方便，API 会再校验）；有权限才渲染
+ *     Manager。
+ *   - Manager 的列表可按标题/编号搜索，按领域、状态、入库状态筛选，游标分页（Load more）。
+ *   - 入库是后台异步的：只要有文档处于 queued 或 running，每 3 秒自动刷新一次，直到都结束，
+ *     所以上传后能看到状态 queued -> running -> ready。
+ *   - 各种操作的对话框在 document-dialogs.tsx，上传表单在 upload-form.tsx。
+ */
+
 import { useCallback, useEffect, useState } from "react";
 import { useAuth, useMe } from "@/components/auth-provider";
 import { DeleteDialog, EditDialog, JobsDialog } from "@/components/document-dialogs";
@@ -10,10 +23,15 @@ import { userMessage } from "@/lib/api";
 import { DOMAINS, type DocumentMeta, type Page } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 
+// 入库进行中时的刷新间隔（毫秒）
 const POLL_MS = 3000;
 
+// 入库状态 -> 徽标颜色
 const INGEST_TONE = { queued: "gray", running: "blue", ready: "green", failed: "red" } as const;
 
+/**
+ * 入口：没有文档管理角色就显示无权限提示，否则显示管理界面。
+ */
 export function DocumentsAdmin() {
   const me = useMe();
   if (!canManageDocuments(me.roles)) {
@@ -26,6 +44,9 @@ export function DocumentsAdmin() {
   return <Manager />;
 }
 
+/**
+ * 管理界面本体：状态、列表、筛选、上传和各对话框的开关都在这里。
+ */
 function Manager() {
   const { api } = useAuth();
   const [items, setItems] = useState<DocumentMeta[]>([]);
@@ -41,6 +62,7 @@ function Manager() {
   const [jobsFor, setJobsFor] = useState<DocumentMeta | null>(null);
   const [deleting, setDeleting] = useState<DocumentMeta | null>(null);
 
+  // 把当前搜索/筛选条件拼成 /documents 的请求地址（cursor 用于翻页）
   const query = useCallback(
     (cursor?: string) => {
       const params = new URLSearchParams({ limit: "50" });
@@ -54,6 +76,7 @@ function Manager() {
     [q, domain, status, ingest],
   );
 
+  // 重新取第一页并替换列表
   const refresh = useCallback(async () => {
     try {
       const page = await api.json<Page<DocumentMeta>>(query());
@@ -69,6 +92,7 @@ function Manager() {
     void refresh();
   }, [refresh]);
 
+  // 有文档还在排队或入库：开启定时刷新，全部结束后自动停止
   const working = items.some((d) => d.ingest_status === "queued" || d.ingest_status === "running");
   useEffect(() => {
     if (!working) return;
@@ -76,6 +100,9 @@ function Manager() {
     return () => clearInterval(timer);
   }, [working, refresh]);
 
+  /**
+   * 加载下一页并追加到列表末尾。
+   */
   async function more() {
     if (!next) return;
     try {
@@ -87,6 +114,9 @@ function Manager() {
     }
   }
 
+  /**
+   * 让这份文档重新排入入库队列（比如换了嵌入模型之后）。
+   */
   async function reindex(document: DocumentMeta) {
     try {
       await api.json(`/documents/${document.id}/reindex`, { method: "POST" });
