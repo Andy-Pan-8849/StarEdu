@@ -1,3 +1,11 @@
+"""文件：retrieval/models.py
+作用：检索包里在各步骤之间传递的数据结构。
+主要内容：
+  - Candidate：一个命中的文本块，带它在每种检索里的名次和分数。
+  - RetrievalDiagnostics：一次检索的统计（候选数、重排是否失败、耗时、被权限挡住的命中数）。
+  - RetrievalResult：最终返回给调用方的结果（文本块列表 + 诊断）。
+"""
+
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
@@ -5,7 +13,11 @@ from uuid import UUID
 
 @dataclass
 class Candidate:
-    """A chunk that matched, with where it ranked in each search and its scores."""
+    """一个命中的文本块，以及它在各次检索里的名次和得分。
+
+    keyword_*/vector_* 是单项检索的名次和分数；fused_score 是 RRF 融合后的分数；
+    rerank_score 是模型重排给的 0-10 分。没参与的检索对应字段保持 None。
+    """
 
     chunk_id: UUID
     document_id: UUID
@@ -26,6 +38,7 @@ class Candidate:
 
     @classmethod
     def from_row(cls, row: Any) -> "Candidate":
+        """把数据库查询的一行转成 Candidate（名次和分数由各检索步骤随后填入）。"""
         return cls(
             chunk_id=row["id"],
             document_id=row["document_id"],
@@ -42,6 +55,8 @@ class Candidate:
 
 @dataclass
 class RetrievalDiagnostics:
+    """一次检索的统计信息，用于评测、审计和排查，不会展示给用户。"""
+
     mode: str
     keyword_candidates: int = 0
     vector_candidates: int = 0
@@ -59,5 +74,7 @@ class RetrievalDiagnostics:
 
 @dataclass
 class RetrievalResult:
+    """检索的最终结果：按相关度排好序、已通过权限过滤的文本块，加上诊断信息。"""
+
     chunks: list[Candidate]
     diagnostics: RetrievalDiagnostics
