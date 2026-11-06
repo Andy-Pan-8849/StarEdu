@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img">
+<title>StarIT</title>
+<desc>A lighthouse sends its beams toward an arc of stars.</desc>
+<circle cx="100" cy="100" r="96" fill="#4338CA"/>
+<g fill="#FBBF24">
+<polygon points="0,-20 4.7,-6.47 19.02,-6.18 7.61,2.47 11.76,16.18 0,8 -11.76,16.18 -7.61,2.47 -19.02,-6.18 -4.7,-6.47" transform="translate(44.6 68) rotate(-60) scale(0.6)"/>
+<polygon points="0,-20 4.7,-6.47 19.02,-6.18 7.61,2.47 11.76,16.18 0,8 -11.76,16.18 -7.61,2.47 -19.02,-6.18 -4.7,-6.47" transform="translate(68 44.6) rotate(-30) scale(0.75)"/>
+<polygon points="0,-20 4.7,-6.47 19.02,-6.18 7.61,2.47 11.76,16.18 0,8 -11.76,16.18 -7.61,2.47 -19.02,-6.18 -4.7,-6.47" transform="translate(100 36) scale(0.95)"/>
+<polygon points="0,-20 4.7,-6.47 19.02,-6.18 7.61,2.47 11.76,16.18 0,8 -11.76,16.18 -7.61,2.47 -19.02,-6.18 -4.7,-6.47" transform="translate(132 44.6) rotate(30) scale(0.75)"/>
+<polygon points="0,-20 4.7,-6.47 19.02,-6.18 7.61,2.47 11.76,16.18 0,8 -11.76,16.18 -7.61,2.47 -19.02,-6.18 -4.7,-6.47" transform="translate(155.4 68) rotate(60) scale(0.6)"/>
+</g>
+<g transform="translate(0 8) translate(100 150) scale(1.1) translate(-100 -150)">
+<polygon points="94,86 66,73 66,99 94,92" fill="#FDE68A" fill-opacity="0.5"/>
+<polygon points="106,86 134,73 134,99 106,92" fill="#FDE68A" fill-opacity="0.5"/>
+<path d="M64 150 Q82 134 100 140 Q118 134 136 150 Z" fill="#818CF8"/>
+<polygon points="86,146 114,146 107,96 93,96" fill="#fff"/>
+<polygon points="91.32,108 108.68,108 110.08,118 89.92,118" fill="#4338CA"/>
+<polygon points="88.24,128 111.76,128 112.88,136 87.12,136" fill="#4338CA"/>
+<rect x="88" y="94" width="24" height="3.5" fill="#fff"/>
+<rect x="92" y="83" width="16" height="11" fill="#FBBF24"/>
+<polygon points="89,83 111,83 100,72" fill="#fff"/>
+</g>
+</svg>

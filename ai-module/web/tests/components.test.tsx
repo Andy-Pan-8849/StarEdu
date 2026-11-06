@@ -86,6 +86,15 @@ describe("menu", () => {
     );
   });
 
+  it("shows the logo next to the product name, hidden from screen readers", () => {
+    auth.me = person("student");
+    const { container } = render(<AppShell>content</AppShell>);
+    const logo = container.querySelector("header svg");
+    expect(logo).toHaveAttribute("aria-hidden", "true");
+    expect(logo).toHaveAttribute("width", "28");
+    expect(screen.getByText("StarIT Assistant")).toBeInTheDocument();
+  });
+
   it("waits while signing in", () => {
     render(<AppShell>content</AppShell>);
     expect(screen.getByText("Signing in…")).toBeInTheDocument();

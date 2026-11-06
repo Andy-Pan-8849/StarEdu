@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/logo/logo.svg" alt="StarIT Education 标志：灯塔把光射向一弧星星" width="140">
+</p>
+
 # AI 模块
 
 公司 StarIT Education 的企业知识助手。里程碑 M2–M9 已完成（tag `ai-m2` … `ai-m9`、`v0.1.0`），全部可在本机用 Docker Compose 跑起来。
@@ -311,6 +315,7 @@ StarEdu/
 │   ├── seed/              预制的知识库转储
 │   ├── deploy/            Docker Compose、Dockerfile、网关与监控配置
 │   └── sample-data/       虚构公司的示例数据与评测题
+├── assets/logo/           品牌标志：logo.svg（完整版）、logo-mark.svg（小图标，无文字）
 ├── business-module/       传统业务后台（占位，未开始）
 └── docs/                  设计文档与评测报告
 ```
