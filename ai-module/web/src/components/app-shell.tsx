@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="flex items-center gap-6 border-b border-slate-200 bg-white px-5 py-2">
         <span className="flex items-center gap-2 font-semibold text-slate-900">
           <LogoMark size={40} />
-          StarIT Assistant
+          StarIT
         </span>
         <nav aria-label="Main" className="flex gap-1">
           {links.map((link) => (
