@@ -4,7 +4,7 @@
  *   app/icon.svg（Next.js 会自动识别）。
  * 主要思想：图标直接内联成 SVG，不依赖 public/ 目录里的静态文件（Docker 镜像只带
  *   standalone 产物，不带 public/）。图形与仓库根目录 assets/logo/logo-mark.svg 完全一致，
- *   改图标时两处一起改。纯装饰，所以对读屏软件隐藏（旁边已有文字“StarIT Assistant”）。
+ *   改图标时两处一起改。纯装饰，所以对读屏软件隐藏（旁边已有文字“StarIT”）。
  */
 
 /** 圆形品牌图标；size 是边长（像素），默认 28。 */

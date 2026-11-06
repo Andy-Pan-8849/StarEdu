@@ -92,7 +92,7 @@ describe("menu", () => {
     const logo = container.querySelector("header svg");
     expect(logo).toHaveAttribute("aria-hidden", "true");
     expect(logo).toHaveAttribute("width", "40");
-    expect(screen.getByText("StarIT Assistant")).toBeInTheDocument();
+    expect(screen.getByText("StarIT")).toBeInTheDocument();
   });
 
   it("waits while signing in", () => {
