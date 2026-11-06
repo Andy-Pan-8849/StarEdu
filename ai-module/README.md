@@ -17,6 +17,35 @@
 11. **可观测（可选）**：OpenTelemetry 链路、Prometheus、Grafana 看板、Langfuse。
 12. **评测**：114 道文档题、41 道数据题、权限泄露扫描、检索/切块实验。最近一次答案评测 **107/114**（M8 基线 99/114）；20% 人工抽查与判官一致 21/23。
 
+### 助手怎么分流（有没有 Router Agent？）
+
+没有单独的 Router Agent。助手是**一张固定的 LangGraph 图**，“分流”只是图里的一个步骤。下面两件事是各自独立的，容易混在一起：
+
+| 问题 | 由什么决定 | 在哪里发生 |
+|---|---|---|
+| **这个问题走哪条路？** | **问题的类型** | `understand` 步骤：一次模型调用，判断意图 |
+| **这个人能看到什么？** | **登录的账号** | 数据库查询和数据工具内部，**不经过模型** |
+
+```mermaid
+flowchart LR
+    Q["问题 + 登录身份（JWT）"] --> U["understand：判断问题类型"]
+    U -->|doc_qa 文档问答| D["检索文档 → 评估命中 → 带引用作答 → 校验"]
+    U -->|data_query 数据问答| A["MCP 数据工具或只读 SQL → 依据查询结果作答"]
+    U -->|chitchat 闲聊| C["简短回复"]
+    U -->|"action 写操作 / out_of_scope 越界"| R["拒绝并给出原因码"]
+    U -->|"问题含糊"| K["只反问一次"]
+```
+
+- **问题类型决定走哪条路。** 同一个账号先问制度、再问数字，会走两个不同的分支。模型看不到提问者的身份，也不允许自己判断身份。
+- **账号只决定“能看到什么”。** 身份来自登录令牌（JWT），一次运行开始后只读。文档权限在检索 SQL 里、排序之前过滤；数据问答跑在按提问者过滤行的视图上，MCP 工具会把用户的令牌原样转发。
+- **所以同一个问题，不同账号走同一条路，看到的结果不同。** 例如用 `qing.hr.bj`（HR）和 `wei.stu.sh`（学员）分别问 `What is the base salary band for a Senior Instructor at a Tier 1 campus?`：HR 得到薪资带并带引用，学员得到固定的“找不到”话术。“没找到”和“没权限”说的是同一句话，不会透露受限文档是否存在。
+
+`understand` 就相当于 Router Agent 的角色，只是它不是独立的 Agent，而是图里的一个节点，由问题类型来选择分支。
+
+**为什么是一张图，而不是多个 Agent：** 外层流程（检索、权限过滤、校验、收尾）是固定的代码，模型只用在几个明确的步骤里。这样每次运行可预期、可测试、评测成本低。数据路径里的 SQL 部分是有次数上限的小循环（设计文档里叫 SQL Agent 子图）。Analytics Agent、Web Search Agent 在 [第二阶段计划](../docs/design/09-phase2-plan.md) 里是候选项，**还没有做**。
+
+代码位置：路由表在 [`graph.py`](packages/core/src/starit_core/agent/graph.py)，`understand` 在 [`nodes.py`](packages/core/src/starit_core/agent/nodes.py)，它的提示词在 `packages/core/src/starit_core/agent/prompts/`。设计说明见 [`docs/design/04-agent-flow.md`](../docs/design/04-agent-flow.md)。
+
 ## 二、启动（首次约 15 分钟）
 
 **系统需求**：Docker Compose（建议 ≥ 8 GB 内存、≥ 20 GB 磁盘）、[uv](https://docs.astral.sh/uv/)、`make`、`git`、OpenAI 密钥。

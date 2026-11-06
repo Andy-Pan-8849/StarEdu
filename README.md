@@ -16,6 +16,31 @@ An open-source blueprint for adding AI to a traditional business system. It pair
 - **Operations.** A LiteLLM gateway with a model fallback chain (OpenAI, then Anthropic), per-user / per-IP rate limits, a daily cost budget, Keycloak login, an append-only audit log, and OpenTelemetry / Grafana / Langfuse (optional).
 - **Evaluation.** 114 document questions, 41 data questions and a permission leak sweep, with reports in [`docs/eval/`](docs/eval/). Latest answer run: 107/114, and a human review of a 20% sample agreed with the model judge on 21 of 23 items.
 
+## How a question is routed
+
+There is no separate "router agent". The assistant is one fixed LangGraph graph, and routing is a single step inside it. Two questions are answered independently, and they are easy to mix up:
+
+| Question | Decided by | Where it happens |
+|---|---|---|
+| **Which path does this question take?** | The **type of the question** | The `understand` step: one model call that classifies the intent |
+| **What may this person see?** | The **signed-in account** | Inside the database query and the data tools, never in the model |
+
+```mermaid
+flowchart LR
+    Q["Question + signed-in identity (JWT)"] --> U["understand: classify the question"]
+    U -->|doc_qa| D["search documents, check hits, answer with citations, verify"]
+    U -->|data_query| A["MCP data tools or read-only SQL, answer from rows"]
+    U -->|chitchat| C["short reply"]
+    U -->|"action / out_of_scope"| R["refuse with a reason code"]
+    U -->|"unclear"| K["ask one clarifying question"]
+```
+
+- **The question type chooses the path.** The same account asking about a policy and then about a number goes down two different branches. The model never sees the asker's identity, and it is not allowed to decide on one.
+- **The account decides only what is visible.** Identity comes from the signed token and is read-only once a run starts. Document permissions are applied inside the search SQL before ranking; data questions run on views that filter rows by the asker, and the MCP tools forward the user's token.
+- **So the same question from two accounts takes the same path and returns different results.** Ask "What is the base salary band for a Senior Instructor at a Tier 1 campus?" as `qing.hr.bj` (HR) and as `wei.stu.sh` (a student): HR gets the band with a citation, the student gets the fixed "could not find" reply. A missing document and a forbidden one read the same, so the answer does not reveal that a restricted document exists.
+
+Why one graph rather than several agents: the outer flow (search, permission filter, verification, wrap-up) is fixed code, and the model is used only in a few named steps. That keeps runs predictable, testable and cheap to evaluate. The SQL part of the data path is a bounded sub-loop. Analytics and web-search agents are listed in the [phase 2 plan](docs/design/09-phase2-plan.md) as candidates and are not built. The code is in [`graph.py`](ai-module/packages/core/src/starit_core/agent/graph.py) (the routing table) and [`nodes.py`](ai-module/packages/core/src/starit_core/agent/nodes.py) (`understand`).
+
 ## Quick start
 
 Requirements: Docker Compose (8 GB of memory or more), [uv](https://docs.astral.sh/uv/), `make`, and an OpenAI API key.
