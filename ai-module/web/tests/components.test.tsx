@@ -91,7 +91,7 @@ describe("menu", () => {
     const { container } = render(<AppShell>content</AppShell>);
     const logo = container.querySelector("header svg");
     expect(logo).toHaveAttribute("aria-hidden", "true");
-    expect(logo).toHaveAttribute("width", "28");
+    expect(logo).toHaveAttribute("width", "40");
     expect(screen.getByText("StarIT Assistant")).toBeInTheDocument();
   });
 
