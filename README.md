@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo/logo.svg" alt="StarIT Education logo: a lighthouse sending its beams toward an arc of stars" width="160">
+</p>
+
 # StarEdu
 
 An open-source blueprint for adding AI to a traditional business system. It pairs an enterprise back office with an AI knowledge assistant and agents, using one sample company, **StarIT Education** (an IT training company with eight campuses all around the country), as the running example.
@@ -92,6 +96,7 @@ StarEdu/
 │   ├── seed/              ready-made knowledge base dump, so `make seed` needs no model key
 │   ├── deploy/            Docker Compose files, Dockerfiles, LiteLLM, Grafana/Tempo/Prometheus config
 │   └── sample-data/       synthetic company: documents, tables, demo accounts, evaluation questions
+├── assets/logo/           brand logo: logo.svg (full) and logo-mark.svg (small, no lettering)
 ├── business-module/       placeholder for the traditional back office (not started)
 └── docs/                  design documents and evaluation reports
     ├── design/            numbered design documents 01-09 and the milestone checklists
