@@ -210,16 +210,17 @@ async def test_bad_calls_are_rejected(
 async def test_exact_identifier_questions_find_their_source(
     conn: AsyncConnection, make_identity: Callable[..., Identity], question_id: str
 ) -> None:
-    """Keyword search puts the source in the top three. Hybrid only promises the result list:
-    here the vectors are fake and random, and rank fusion can let a random vector rank outvote
-    a single exact keyword hit. With real embeddings the evaluation runner measures this."""
+    """Keyword search puts the source in the top three. Hybrid is only checked to return a
+    result list: here the vectors are fake and random, and rank fusion can let a random vector
+    rank outvote a single exact keyword hit, so asserting the source would fail at random.
+    With real embeddings the evaluation runner measures this."""
     q = question(question_id)
     sources = set(q["source_docs"])  # type: ignore[call-overload]
     asker = identity_for_role(str(q["role"]), make_identity)
     keyword = await search(conn, asker, str(q["question"]), "keyword")
     assert set(docs_of(keyword)[:3]) & sources, (question_id, docs_of(keyword))
     hybrid = await search(conn, asker, str(q["question"]), "hybrid")
-    assert set(docs_of(hybrid)) & sources, (question_id, docs_of(hybrid))
+    assert docs_of(hybrid), question_id
 
 
 async def test_a_document_number_in_the_question_finds_that_document(
