@@ -22,6 +22,13 @@ export const TENANT_MODELS: Record<string, ModelRule> = {
   Role: { nullable: true, softDelete: true },
   Menu: { nullable: true, softDelete: true },
   EntryMenu: { nullable: true, softDelete: false },
+  RoleMenu: { nullable: true, softDelete: false },
+  DataScopeSet: { nullable: true, softDelete: true },
+  DataScopeSetNode: { nullable: false, softDelete: false },
+  RoleDataScope: { nullable: true, softDelete: false },
+  PersonDept: { nullable: false, softDelete: false },
+  LoginLog: { nullable: false, softDelete: false },
+  AuditLog: { nullable: false, softDelete: false },
 };
 
 export class TenantScopeError extends Error {}

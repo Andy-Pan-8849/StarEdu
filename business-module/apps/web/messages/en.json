@@ -1,6 +1,12 @@
 {
-  "app": { "name": "StarIT" },
-  "language": { "label": "Language", "en": "English", "zh": "中文" },
+  "app": {
+    "name": "StarIT"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "zh": "中文"
+  },
   "portal": {
     "title": "Student portal",
     "description": "My courses, enrollment, assignments, grades and transcript will appear here."
@@ -13,5 +19,68 @@
     "title": "Platform console",
     "description": "Tenant management, platform accounts and monitoring for platform operators will appear here."
   },
-  "placeholder": { "status": "Scaffold only (milestone B0). Sign-in is added in B2." }
+  "placeholder": {
+    "status": "Scaffold only (milestone B0)."
+  },
+  "shell": {
+    "closeTab": "Close",
+    "noMenus": "No menus are assigned to your account.",
+    "pageNotBuilt": "This page is not available yet.",
+    "signedInAs": "Signed in as",
+    "signOut": "Sign out"
+  },
+  "table": {
+    "empty": "Nothing to show.",
+    "loading": "Loading…",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {page} of {pages}"
+  },
+  "pages": {
+    "online": {
+      "title": "Online users",
+      "username": "Account",
+      "entry": "Entry",
+      "ip": "IP address",
+      "loginAt": "Signed in",
+      "lastSeen": "Last active",
+      "forceLogout": "Force logout",
+      "confirm": "Sign {name} out now?",
+      "done": "{name} was signed out."
+    },
+    "loginLog": {
+      "title": "Login log",
+      "time": "Time",
+      "username": "Account",
+      "entry": "Entry",
+      "result": "Result",
+      "reason": "Reason",
+      "ip": "IP address",
+      "success": "Success",
+      "denied": "Denied"
+    },
+    "auditLog": {
+      "title": "Audit log",
+      "time": "Time",
+      "action": "Action",
+      "target": "Target",
+      "actor": "By"
+    }
+  },
+  "menu": {
+    "system": "System management",
+    "system:user": "Accounts",
+    "system:role": "Roles",
+    "system:menu": "Menus",
+    "system:entry": "Entry assignment",
+    "system:dataScope": "Data scopes",
+    "system:dept": "Departments",
+    "system:campus": "Campuses",
+    "system:post": "Posts",
+    "system:online": "Online users",
+    "system:loginLog": "Login log",
+    "system:auditLog": "Audit log",
+    "hr": "Human resources",
+    "hr:person": "People"
+  }
 }

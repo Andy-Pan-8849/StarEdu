@@ -21,16 +21,25 @@ describe("tenant provisioning", () => {
   const codes: string[] = [];
   let templateId: string | undefined;
   let menuId: string | undefined;
+  let platformOnlyMenuId: string | undefined;
 
   beforeAll(async () => {
     keycloak = await connectKeycloak();
     templateId = (await owner.role.create({ data: { tenantId: null, code: `tpl-${randomCode()}`, name: "Template", isTemplate: true } })).id;
     menuId = (await owner.menu.create({ data: { tenantId: null, name: "Test menu", type: "directory" } })).id;
+    platformOnlyMenuId = (await owner.menu.create({ data: { tenantId: null, name: "Platform-only menu", type: "directory" } })).id;
+    const entries = new Map((await owner.entry.findMany()).map((e) => [e.code, e.id]));
+    await owner.entryMenu.create({ data: { tenantId: null, entryId: entries.get("admin") as string, menuId } });
+    await owner.entryMenu.create({ data: { tenantId: null, entryId: entries.get("platform") as string, menuId: platformOnlyMenuId } });
   });
   afterAll(async () => {
     for (const code of codes) await removeTestTenant(owner, keycloak, code);
     // 平台提供的测试行也要清掉，否则会混进别的测试开通的租户
-    if (menuId) await owner.$executeRaw`DELETE FROM biz.menu WHERE id = ${menuId}::uuid`;
+    for (const id of [menuId, platformOnlyMenuId]) {
+      if (!id) continue;
+      await owner.$executeRaw`DELETE FROM biz.entry_menu WHERE menu_id = ${id}::uuid`;
+      await owner.$executeRaw`DELETE FROM biz.menu WHERE id = ${id}::uuid`;
+    }
     if (templateId) await owner.$executeRaw`DELETE FROM biz.role WHERE template_id = ${templateId}::uuid`;
     if (templateId) await owner.$executeRaw`DELETE FROM biz.role WHERE id = ${templateId}::uuid`;
     await owner.$disconnect();
@@ -58,6 +67,15 @@ describe("tenant provisioning", () => {
     expect(copy).toBeDefined(); // 平台角色模板被复制给了租户
 
     expect(await owner.tenantMenuGrant.count({ where: { tenantId: t.tenantId, menuId } })).toBe(1); // 默认授权全部平台菜单
+    // 只分配给"平台"入口的菜单不授权给租户；目录里的系统管理等菜单已授权
+    expect(await owner.tenantMenuGrant.count({ where: { tenantId: t.tenantId, menuId: platformOnlyMenuId } })).toBe(0);
+    const systemMenu = await owner.menu.findFirstOrThrow({ where: { tenantId: null, code: "system:role:add" } });
+    expect(await owner.tenantMenuGrant.count({ where: { tenantId: t.tenantId, menuId: systemMenu.id } })).toBe(1);
+    // 角色模板连同菜单勾选和数据权限集一起复制
+    const hr = roles.find((r) => r.code === "hr-manager");
+    expect(hr).toBeDefined();
+    expect(await owner.roleMenu.count({ where: { roleId: hr!.id, tenantId: t.tenantId } })).toBeGreaterThan(0);
+    expect(await owner.roleDataScope.count({ where: { roleId: hr!.id, tenantId: t.tenantId } })).toBe(1);
 
     const admin = await owner.account.findFirstOrThrow({ where: { tenantId: t.tenantId, isBuiltinAdmin: true }, include: { roles: true } });
     expect(admin).toMatchObject({ username: "admin", personId: null, status: "pending" });

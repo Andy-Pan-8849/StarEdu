@@ -5,6 +5,7 @@ import { checkTenantCode, realmName } from "@staredu/shared";
 import { PrismaClient, TenantType } from "../generated/prisma";
 import { KeycloakAdmin } from "../keycloak/keycloak-admin";
 import { createRealm, smtpFromEnv, tenantOrigin } from "../keycloak/realm-provisioner";
+import { applyCatalogToTenant, copyMissingTemplates, grantMissingMenus, syncPlatformMenus, syncRoleTemplates } from "../catalog/menu-sync";
 
 export interface ProvisionInput {
   code: string;
@@ -45,7 +46,9 @@ export class ProvisioningService {
     let tenant = await this.owner.tenant.findUnique({ where: { code: input.code } });
     const created = !tenant;
     if (tenant?.status === "active" || tenant?.status === "notified" || tenant?.status === "suspended") {
-      return { tenantId: tenant.id, code: tenant.code, created: false, steps: ["already provisioned"], inviteSent: false };
+      // 已开通：只把最新的菜单目录和角色模板补应用到该租户（升级），没有新东西就什么都不做
+      const upgraded = await applyCatalogToTenant(this.owner, tenant.id);
+      return { tenantId: tenant.id, code: tenant.code, created: false, steps: upgraded.length ? upgraded : ["already provisioned"], inviteSent: false };
     }
     if (!tenant) {
       tenant = await this.owner.tenant.create({
@@ -85,7 +88,9 @@ export class ProvisioningService {
     }
     await this.mark(tenantId, "structure");
 
-    // 3. 角色：内置两个 + 复制平台角色模板
+    // 3. 角色：内置两个 + 复制平台角色模板（先把菜单目录和角色模板同步到最新）
+    await syncPlatformMenus(this.owner);
+    await syncRoleTemplates(this.owner);
     const builtin: Array<{ code: string; name: string; kind: "tenant_admin" | "student" }> = [
       { code: ROLE_TENANT_ADMIN, name: "Tenant administrator", kind: "tenant_admin" },
       { code: ROLE_STUDENT, name: "Student", kind: "student" },
@@ -97,31 +102,12 @@ export class ProvisioningService {
         steps.push(`role ${r.code}`);
       }
     }
-    const templates = await this.owner.role.findMany({ where: { tenantId: null, isTemplate: true, deletedAt: null } });
-    for (const t of templates) {
-      const exists = await this.owner.role.findFirst({ where: { tenantId, code: t.code } });
-      if (!exists) {
-        await this.owner.role.create({
-          data: { tenantId, code: t.code, name: t.name, kind: "custom", templateId: t.id, sort: t.sort },
-        });
-        steps.push(`role template ${t.code}`);
-      }
-    }
+    steps.push(...(await copyMissingTemplates(this.owner, tenantId)));
     await this.mark(tenantId, "roles");
 
-    // 4. 功能授权：开通时默认授权全部平台提供的菜单和按钮（入口为"平台"的菜单不授权给租户）
-    const platformMenus = await this.owner.menu.findMany({
-      where: { tenantId: null, deletedAt: null, status: true },
-      select: { id: true },
-    });
-    const granted = new Set(
-      (await this.owner.tenantMenuGrant.findMany({ where: { tenantId }, select: { menuId: true } })).map((g) => g.menuId),
-    );
-    const toGrant = platformMenus.filter((m) => !granted.has(m.id));
-    if (toGrant.length > 0) {
-      await this.owner.tenantMenuGrant.createMany({ data: toGrant.map((m) => ({ tenantId, menuId: m.id })) });
-      steps.push(`menu grants (${toGrant.length})`);
-    }
+    // 4. 功能授权：开通时默认授权全部平台提供的菜单和按钮（只分配给"平台"入口或未分配入口的不授权给租户）
+    const granted = await grantMissingMenus(this.owner, tenantId);
+    if (granted > 0) steps.push(`menu grants (${granted})`);
     await this.mark(tenantId, "menus");
 
     // 5. 内置租户管理员：不关联人员，不能删除；先写业务库（待激活），再建 Keycloak 用户
