@@ -4,8 +4,9 @@
 //   3) 连续输错 5 次后账号被临时锁定；
 //   4) 管理员触发的"设置密码"邮件到达 Mailpit。
 // 最后无论成败都删除这个临时域。用法：pnpm smoke（需要先 make up）。
-import { createRealm } from "./create-realm";
-import { KeycloakAdmin, loadLocalEnv } from "./lib/keycloak";
+import { KeycloakAdmin } from "../apps/api/src/keycloak/keycloak-admin";
+import { createRealm, smtpFromEnv, tenantOrigin } from "../apps/api/src/keycloak/realm-provisioner";
+import { loadLocalEnv } from "./lib/keycloak";
 
 const CODE = "smoke";
 const REALM = `tenant-${CODE}`;
@@ -48,7 +49,17 @@ async function main(): Promise<void> {
   const admin = await KeycloakAdmin.connect();
   const mailpit = process.env.MAILPIT_API_URL ?? "http://localhost:8125";
   try {
-    console.log(await createRealm(admin, { kind: "tenant", code: CODE, name: "Smoke", recreate: true, allowDirectGrant: true }));
+    const result = await createRealm(admin, {
+      kind: "tenant",
+      code: CODE,
+      name: "Smoke",
+      tenantId: CODE,
+      webOrigin: tenantOrigin(CODE),
+      smtp: smtpFromEnv(),
+      recreate: true,
+      allowDirectGrant: true,
+    });
+    console.log(`${REALM}: ${result}`);
 
     // 2) 弱密码
     for (const [label, password] of [
