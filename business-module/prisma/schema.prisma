@@ -113,6 +113,10 @@ model Tenant {
   contactEmail     String?      @map("contact_email")
   plannedSuspendAt DateTime?    @map("planned_suspend_at")
   noticeText       String?      @map("notice_text")
+  contactPhone     String?      @map("contact_phone")
+  remark           String?
+  notifiedAt       DateTime?    @map("notified_at")
+  suspendedAt      DateTime?    @map("suspended_at")
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at")
 
@@ -276,6 +280,7 @@ model Menu {
   grants   TenantMenuGrant[]
   entries  EntryMenu[]
   roles    RoleMenu[]
+  platformRoles PlatformRoleMenu[]
 
   @@index([tenantId])
   @@index([parentId])
@@ -501,4 +506,108 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@map("audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// 平台域（B3）：平台账号、平台角色、平台日志、定时任务。不属于任何租户，没有 tenant_id，
+// 只有"平台入口"的请求（主机名 platform.*、平台域令牌）才会读写，用平台专用的数据库连接。
+// ---------------------------------------------------------------------------
+
+/// 平台账号（运营 SaaS 的人），在 Keycloak 的 platform 域里认证
+model PlatformAccount {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username       String        @unique
+  email          String?       @unique
+  keycloakUserId String?       @unique @map("keycloak_user_id")
+  status         AccountStatus @default(pending)
+  /// 内置的第一个平台账号：不能停用、不能改角色
+  isBuiltin      Boolean       @default(false) @map("is_builtin")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
+
+  roles PlatformAccountRole[]
+
+  @@map("platform_account")
+}
+
+model PlatformRole {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String    @unique
+  name      String
+  /// super = 内置"平台超级管理员"：自动拥有平台入口下全部操作权限，不可改删
+  kind      String    @default("custom")
+  sort      Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  accounts PlatformAccountRole[]
+  menus    PlatformRoleMenu[]
+
+  @@map("platform_role")
+}
+
+model PlatformAccountRole {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId String   @map("account_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account PlatformAccount @relation(fields: [accountId], references: [id])
+  role    PlatformRole    @relation(fields: [roleId], references: [id])
+
+  @@unique([accountId, roleId])
+  @@map("platform_account_role")
+}
+
+model PlatformRoleMenu {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  menuId String @map("menu_id") @db.Uuid
+
+  role PlatformRole @relation(fields: [roleId], references: [id])
+  menu Menu         @relation(fields: [menuId], references: [id])
+
+  @@unique([roleId, menuId])
+  @@map("platform_role_menu")
+}
+
+/// 平台操作日志：开通租户、改状态、改功能授权、平台账号与角色变更、任务执行
+model PlatformAuditLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorAccountId String?  @map("actor_account_id") @db.Uuid
+  action         String
+  targetType     String   @map("target_type")
+  targetId       String?  @map("target_id")
+  detail         Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("platform_audit_log")
+}
+
+/// 定时任务：任务名只能取自代码里的注册表（白名单），这里只存调度设置和最近一次结果
+model ScheduledJob {
+  code        String    @id
+  cron        String
+  enabled     Boolean   @default(false)
+  lastRunAt   DateTime? @map("last_run_at")
+  lastStatus  String?   @map("last_status")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("scheduled_job")
+}
+
+model JobRun {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobCode    String    @map("job_code")
+  trigger    String
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  status     String
+  message    String?
+
+  @@index([jobCode, startedAt])
+  @@map("job_run")
 }

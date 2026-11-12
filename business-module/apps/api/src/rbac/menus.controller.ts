@@ -76,7 +76,7 @@ export class MenusController {
       for (const top of graph.topsOfEntry(code).keys()) entryOf.set(top, [...(entryOf.get(top) ?? []), code]);
     }
     return graph.menus
-      .filter((m) => m.tenantId !== null ? graph.effective(m.id) : true)
+      .filter((m) => (m.tenantId === null ? graph.effective(m.id) : true)) // 平台提供的只列本租户已开通的；自建的都列
       .map((m) => ({
         id: m.id,
         parentId: m.parentId,

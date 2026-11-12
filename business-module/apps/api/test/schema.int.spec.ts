@@ -2,7 +2,9 @@
 import { appClient, ownerClient } from "./helpers/fixtures";
 
 // 没有 tenant_id 的表：租户表本身、固定入口、迁移历史
-const NO_TENANT_COLUMN = new Set(["tenant", "entry", "_prisma_migrations"]);
+// 平台表：只给平台专用连接用，应用账号 biz_app 没有任何权限（下面有测试）
+const PLATFORM_TABLES = ["platform_account", "platform_role", "platform_account_role", "platform_role_menu", "platform_audit_log", "scheduled_job", "job_run"];
+const NO_TENANT_COLUMN = new Set(["tenant", "entry", "_prisma_migrations", ...PLATFORM_TABLES]);
 
 describe("schema invariants", () => {
   const owner = ownerClient();
@@ -37,7 +39,7 @@ describe("schema invariants", () => {
       SELECT tablename FROM pg_policies WHERE schemaname = 'biz'`;
     const withPolicy = new Set(policies.map((p) => p.tablename));
     const unprotected = rls
-      .filter((r) => r.relname !== "entry" && r.relname !== "_prisma_migrations")
+      .filter((r) => r.relname !== "entry" && r.relname !== "_prisma_migrations" && !PLATFORM_TABLES.includes(r.relname))
       .filter((r) => !r.relrowsecurity || !withPolicy.has(r.relname))
       .map((r) => r.relname);
     expect(unprotected).toEqual([]);
@@ -49,6 +51,12 @@ describe("schema invariants", () => {
     expect(role).toEqual({ rolsuper: false, rolbypassrls: false });
     const [current] = await app.$queryRaw<Array<{ current_user: string }>>`SELECT current_user`;
     expect(current.current_user).toBe("biz_app");
+  });
+
+  it("the application role has no access at all to the platform tables", async () => {
+    for (const table of PLATFORM_TABLES) {
+      await expect(app.$queryRawUnsafe(`SELECT 1 FROM biz.${table} LIMIT 1`)).rejects.toThrow(/permission denied/);
+    }
   });
 
   it("the application role cannot create tenants or touch the migration history", async () => {

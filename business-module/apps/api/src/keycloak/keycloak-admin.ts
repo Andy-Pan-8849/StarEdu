@@ -166,6 +166,12 @@ export class KeycloakAdmin {
     if (res.status !== 204) throw new KeycloakError(`update user failed: ${res.status} ${await res.text()}`, res.status);
   }
 
+  /** 解除登录失败造成的临时锁定。 */
+  async unlockUser(realm: string, userId: string): Promise<void> {
+    const res = await this.request(`/realms/${realm}/attack-detection/brute-force/users/${userId}`, { method: "DELETE" });
+    if (res.status !== 204 && res.status !== 404) throw new KeycloakError(`unlock user failed: ${res.status}`, res.status);
+  }
+
   /** 结束一个登录会话（强退时同时让刷新令牌失效）。会话已不存在也算成功。 */
   async deleteSession(realm: string, sessionId: string): Promise<void> {
     const res = await this.request(`/realms/${realm}/sessions/${sessionId}`, { method: "DELETE" });

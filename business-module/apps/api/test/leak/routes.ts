@@ -2,11 +2,14 @@
 import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { RequestMethod } from "@nestjs/common";
 import { IS_PUBLIC } from "../../src/auth/public.decorator";
+import { PLATFORM_ROUTE } from "../../src/platform/platform.decorators";
 
 export interface RouteInfo {
   method: string;
   path: string;
   isPublic: boolean;
+  /** 平台入口的接口（只在主机名 platform.* 上可用） */
+  isPlatform: boolean;
 }
 
 function join(...parts: string[]): string {
@@ -17,6 +20,7 @@ export function listRoutes(controllers: Array<new (...args: never[]) => unknown>
   const out: RouteInfo[] = [];
   for (const controller of controllers) {
     const base: string = Reflect.getMetadata(PATH_METADATA, controller) ?? "";
+    const classPlatform = Reflect.getMetadata(PLATFORM_ROUTE, controller) === true;
     const classPublic = Reflect.getMetadata(IS_PUBLIC, controller) === true;
     for (const name of Object.getOwnPropertyNames(controller.prototype)) {
       const handler = (controller.prototype as Record<string, unknown>)[name];
@@ -27,6 +31,7 @@ export function listRoutes(controllers: Array<new (...args: never[]) => unknown>
       out.push({
         method: RequestMethod[method],
         path: join(base, path),
+        isPlatform: classPlatform || Reflect.getMetadata(PLATFORM_ROUTE, handler) === true,
         isPublic: classPublic || Reflect.getMetadata(IS_PUBLIC, handler) === true,
       });
     }

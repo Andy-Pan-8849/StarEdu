@@ -7,13 +7,13 @@ import { loadLocalEnv } from "./lib/keycloak";
 
 async function main(): Promise<void> {
   loadLocalEnv();
-  const { values } = parseArgs({ options: { code: { type: "string" }, username: { type: "string", default: "admin" }, password: { type: "string" } } });
-  if (!values.code || !values.password) throw new Error("usage: pnpm dev:password --code <tenant code> [--username admin] --password <password>");
+  const { values } = parseArgs({ options: { code: { type: "string" }, platform: { type: "boolean", default: false }, username: { type: "string", default: "admin" }, password: { type: "string" } } });
+  if ((!values.code && !values.platform) || !values.password) throw new Error("usage: pnpm dev:password (--code <tenant code> | --platform) [--username admin] --password <password>");
   const env = keycloakEnv();
   const host = new URL(env.url).hostname;
   if (host !== "localhost" && host !== "127.0.0.1") throw new Error(`refusing to set a password on a non-local Keycloak (${host})`);
   const admin = await KeycloakAdmin.connect(env);
-  const realm = `tenant-${values.code}`; // 与 packages/shared 的 realmName 同一规则
+  const realm = values.platform ? "platform" : `tenant-${values.code}`; // 与 packages/shared 的 realmName 同一规则
   const user = await admin.findUser(realm, values.username as string);
   if (!user) throw new Error(`user "${values.username}" not found in ${realm}`);
   const res = await admin.request(`/realms/${realm}/users/${user.id}/reset-password`, {

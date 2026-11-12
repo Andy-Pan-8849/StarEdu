@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { entryParams, realmFor, safeReturnPath, tenantCodeFromHost } from "../src/lib/auth/host";
+import { entryParams, isPlatformHostName, realmFor, safeReturnPath, tenantCodeFromHost } from "../src/lib/auth/host";
 import { authorizeUrl, exchangeCode, logoutUrl, OidcError, refreshTokens } from "../src/lib/auth/oidc";
 import { challengeFor, randomToken } from "../src/lib/auth/pkce";
 import { freshSession, loadSession } from "../src/lib/auth/server-session";
@@ -35,6 +35,19 @@ describe("host and entry rules", () => {
     expect(safeReturnPath("/bff/me", "portal")).toBe("/");
     expect(safeReturnPath(null, "portal")).toBe("/");
     expect(safeReturnPath("/courses", "portal")).toBe("/courses");
+  });
+});
+
+describe("platform entry", () => {
+  it("uses the platform realm and client, with callbacks at the root", () => {
+    expect(realmFor("platform")).toBe("platform");
+    expect(entryParams("platform")).toEqual({ clientId: "platform", base: "" });
+    expect(isPlatformHostName("platform.localhost:3001")).toBe(true);
+    expect(isPlatformHostName("hq.localhost:3001")).toBe(false);
+    const url = new URL(authorizeUrl({ publicUrl: "http://kc", tenantCode: "platform", entry: "platform", origin: "http://platform.localhost:3001", state: "s", verifier: "v" }));
+    expect(url.pathname).toBe("/realms/platform/protocol/openid-connect/auth");
+    expect(url.searchParams.get("client_id")).toBe("platform");
+    expect(url.searchParams.get("redirect_uri")).toBe("http://platform.localhost:3001/auth/callback");
   });
 });
 

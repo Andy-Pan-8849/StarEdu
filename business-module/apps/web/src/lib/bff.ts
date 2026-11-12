@@ -19,7 +19,8 @@ export async function bff<T>(path: string, init: { method?: string; body?: unkno
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   });
   if (res.status === 401) {
-    window.location.assign(`/admin/auth/login?return=${encodeURIComponent(window.location.pathname)}`);
+    const platform = window.location.hostname.split(".")[0] === "platform";
+    window.location.assign(`${platform ? "" : "/admin"}/auth/login?return=${encodeURIComponent(window.location.pathname)}`);
     throw new BffError("Not signed in", 401);
   }
   const text = await res.text();

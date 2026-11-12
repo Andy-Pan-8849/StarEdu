@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callApi } from "./api-client";
 import { webAuthConfig } from "./config";
-import { entryParams, safeReturnPath, tenantCodeFromHost, type Entry } from "./host";
+import { entryParams, isPlatformHostName, PLATFORM_REALM_CODE, safeReturnPath, tenantCodeFromHost, type Entry } from "./host";
 import { authorizeUrl, exchangeCode, logoutUrl } from "./oidc";
 import { randomToken } from "./pkce";
 import { OIDC_COOKIE, SESSION_COOKIE } from "./server-session";
@@ -34,7 +34,9 @@ function page(status: number, title: string, message: string, link: { href: stri
 export async function handleAuth(entry: Entry, action: string, req: NextRequest): Promise<NextResponse> {
   const config = webAuthConfig();
   const { origin: self, host, secure } = origin(req);
-  const tenantCode = tenantCodeFromHost(host);
+  // 平台入口只在平台主机上登录，租户入口只在租户主机上登录
+  if ((entry === "platform") !== isPlatformHostName(host)) return new NextResponse("Not found", { status: 404 });
+  const tenantCode = entry === "platform" ? PLATFORM_REALM_CODE : tenantCodeFromHost(host);
   const { base } = entryParams(entry);
   if (!tenantCode) return new NextResponse("Unknown tenant", { status: 404 });
 
@@ -68,9 +70,9 @@ export async function handleAuth(entry: Entry, action: string, req: NextRequest)
       apiUrl: config.apiUrl,
       host,
       method: "POST",
-      path: "/api/auth/session",
+      path: entry === "platform" ? "/api/platform/auth/session" : "/api/auth/session",
       token: tokens.accessToken,
-      body: Buffer.from(JSON.stringify({ entry })),
+      body: entry === "platform" ? undefined : Buffer.from(JSON.stringify({ entry })),
       contentType: "application/json",
       clientIp: req.headers.get("x-forwarded-for") ?? undefined,
       userAgent: req.headers.get("user-agent") ?? undefined,

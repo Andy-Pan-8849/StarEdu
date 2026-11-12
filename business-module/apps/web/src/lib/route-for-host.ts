@@ -12,5 +12,6 @@ export function isPlatformHost(host: string | null | undefined): boolean {
 export function rewriteTarget(host: string | null | undefined, pathname: string): string | null {
   if (!isPlatformHost(host)) return null;
   if (pathname === "/platform" || pathname.startsWith("/platform/")) return null;
+  if (pathname.startsWith("/bff/")) return null; // 浏览器调接口的通道，平台和租户共用一个处理器
   return pathname === "/" ? "/platform" : `/platform${pathname}`;
 }
