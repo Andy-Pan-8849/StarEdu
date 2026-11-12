@@ -119,10 +119,27 @@ describe("cross-tenant leak scan", () => {
       ...MUTATION_REGISTRY.map((e) => `${e.method} ${e.path}`),
       ...Object.keys(OTHER_ROUTES),
     ]);
-    const missing = routes.filter((r) => !r.isPublic && !registered.has(`${r.method} ${r.path}`)).map((r) => `${r.method} ${r.path}`);
+    const missing = routes.filter((r) => !r.isPublic && !r.isPlatform && !registered.has(`${r.method} ${r.path}`)).map((r) => `${r.method} ${r.path}`);
     expect(missing).toEqual([]);
-    const known = new Set(routes.map((r) => `${r.method} ${r.path}`));
+    const known = new Set(routes.filter((r) => !r.isPlatform).map((r) => `${r.method} ${r.path}`));
     expect([...registered].filter((r) => !known.has(r))).toEqual([]); // 登记表里没有已不存在的接口
+  });
+
+  it("platform endpoints are unreachable from tenant hosts, and need a platform token on the platform host", async () => {
+    const platformRoutes = listRoutes(CONTROLLERS).filter((r) => r.isPlatform);
+    expect(platformRoutes.length).toBeGreaterThan(20);
+    for (const r of platformRoutes) {
+      const path = r.path.replace(/:\w+/g, "11111111-1111-4111-8111-111111111111");
+      const verb = r.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
+      const call = (host: string, token: string | null) => {
+        const req = request(app.getHttpServer())[verb](path).set("Host", host);
+        return (token ? req.set("Authorization", `Bearer ${token}`) : req).send({});
+      };
+      expect({ at: `${r.method} ${r.path}: tenant token on tenant host`, status: (await call(a.host, a.token)).status }).toEqual({ at: `${r.method} ${r.path}: tenant token on tenant host`, status: 403 });
+      expect({ at: `${r.method} ${r.path}: no token on tenant host`, status: (await call(a.host, null)).status }).toEqual({ at: `${r.method} ${r.path}: no token on tenant host`, status: 403 });
+      expect({ at: `${r.method} ${r.path}: no token on platform host`, status: (await call("platform.localhost", null)).status }).toEqual({ at: `${r.method} ${r.path}: no token on platform host`, status: 401 });
+      expect({ at: `${r.method} ${r.path}: tenant token on platform host`, status: (await call("platform.localhost", a.token)).status }).toEqual({ at: `${r.method} ${r.path}: tenant token on platform host`, status: 401 });
+    }
   });
 
   it("the health check needs no token and no tenant", async () => {

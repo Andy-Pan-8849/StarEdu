@@ -18,6 +18,8 @@ import type { JWTPayload } from "jose";
 import { AuthzService, type Authz } from "../rbac/authz.service";
 import { currentScope } from "../tenancy/request-scope";
 import { ANY_AUTHENTICATED, REQUIRED_PERMISSIONS } from "./decorators";
+import { PLATFORM_ROUTE } from "../platform/platform.decorators";
+import { PlatformAuthzService } from "../platform/platform-authz.service";
 import { IS_PUBLIC } from "./public.decorator";
 import { SessionStore } from "./session-store";
 import { InvalidTokenError, TokenVerifier } from "./token-verifier";
@@ -39,6 +41,7 @@ export class TenantTokenGuard implements CanActivate {
     private readonly verifier: TokenVerifier,
     private readonly authzService: AuthzService,
     private readonly sessions: SessionStore,
+    private readonly platformAuthz: PlatformAuthzService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,6 +49,11 @@ export class TenantTokenGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
     const scope = currentScope();
+    // 平台入口的接口（主机名 platform.*）和租户的接口互相隔离：各自只在自己的主机上可用
+    if (this.reflector.getAllAndOverride<boolean>(PLATFORM_ROUTE, targets) === true) {
+      if (!scope || scope.kind !== "platform") throw new ForbiddenException("This endpoint is for the platform host only");
+      return this.canActivatePlatform(context, targets);
+    }
     if (!scope || scope.kind !== "tenant") throw new ForbiddenException("This endpoint is for tenant hosts only");
 
     const req = context.switchToHttp().getRequest();
@@ -94,6 +102,45 @@ export class TenantTokenGuard implements CanActivate {
         .touch(scope.tenantId, { sid, accountId: authz.accountId, username: authz.username, ip: req.ip, userAgent: req.headers["user-agent"] })
         .catch(() => undefined); // 在线状态只是展示用，写失败不影响请求
     }
+    return true;
+  }
+
+  /** 平台入口：平台域令牌 + 平台账号 + 平台权限（与租户互不相通）。 */
+  private async canActivatePlatform(context: ExecutionContext, targets: Array<unknown>): Promise<boolean> {
+    const req = context.switchToHttp().getRequest();
+    const header: string | undefined = req.headers.authorization;
+    if (!header?.startsWith("Bearer ")) throw new UnauthorizedException("Missing bearer token");
+    let verified;
+    try {
+      verified = await this.verifier.verify(header.slice(7));
+    } catch (err) {
+      if (err instanceof InvalidTokenError) throw new UnauthorizedException("Invalid token");
+      throw err;
+    }
+    const { claims } = verified;
+    if (verified.kind !== "platform" || claims.tenant_id !== "platform") throw new UnauthorizedException("Token is not valid for the platform");
+    if (typeof claims.account_id !== "string") throw new UnauthorizedException("Token has no account");
+    const sid = typeof claims.sid === "string" ? claims.sid : null;
+    let authz;
+    try {
+      if (sid && (await this.sessions.isDenied(verified.realm, sid))) throw new UnauthorizedException("Session ended");
+      authz = await this.platformAuthz.load(claims.account_id);
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new ServiceUnavailableException("Authorization service unavailable");
+    }
+    if (!authz) throw new UnauthorizedException("Unknown account");
+    if (authz.status === "disabled" || authz.status === "locked") throw new ForbiddenException("Account is not active");
+    const t = targets as never[];
+    const required = this.reflector.getAllAndOverride<string[] | undefined>(REQUIRED_PERMISSIONS, t);
+    const anyAuth = this.reflector.getAllAndOverride<boolean | undefined>(ANY_AUTHENTICATED, t) === true;
+    if (authz.status === "pending" && !anyAuth) throw new ForbiddenException("Account is not activated");
+    if (!required && !anyAuth) throw new ForbiddenException("No permission declared for this endpoint");
+    if (required) {
+      const have = new Set(authz.perms);
+      if (!required.every((p) => have.has(p))) throw new ForbiddenException("Missing permission");
+    }
+    req.platformAuth = { accountId: authz.accountId, username: authz.username, claims, sid, realm: verified.realm, perms: authz.perms, isSuper: authz.isSuper };
     return true;
   }
 }

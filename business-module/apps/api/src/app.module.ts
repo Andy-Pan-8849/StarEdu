@@ -12,6 +12,15 @@ import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
 import { PersonsController } from "./hr/persons.controller";
 import { KeycloakService } from "./keycloak/keycloak.service";
+import { MailService } from "./mail/mail.service";
+import { JobsService } from "./platform/jobs/jobs.service";
+import { MonitorController } from "./platform/monitor.controller";
+import { PlatformController } from "./platform/platform-accounts.controller";
+import { PlatformAuditService } from "./platform/platform-audit.service";
+import { PlatformAuthzService } from "./platform/platform-authz.service";
+import { PlatformPrismaService } from "./platform/platform-prisma.service";
+import { TenantsController } from "./platform/tenants.controller";
+import { TenantsService } from "./platform/tenants.service";
 import { MeController } from "./me/me.controller";
 import { OrgController } from "./org/org.controller";
 import { PrismaService } from "./prisma/prisma.service";
@@ -36,6 +45,9 @@ export const CONTROLLERS = [
   OnlineController,
   LogsController,
   PersonsController,
+  TenantsController,
+  PlatformController,
+  MonitorController,
 ];
 
 @Module({
@@ -52,6 +64,12 @@ export const CONTROLLERS = [
     AuditService,
     KeycloakService,
     AccountsService,
+    MailService,
+    PlatformPrismaService,
+    PlatformAuthzService,
+    PlatformAuditService,
+    TenantsService,
+    JobsService,
     { provide: APP_GUARD, useClass: TenantTokenGuard },
   ],
 })

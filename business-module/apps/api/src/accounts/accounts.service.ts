@@ -176,7 +176,7 @@ export class AccountsService {
   }
 
   /** 对账：业务库与 Keycloak 域逐个账号比对。fix 为真时按业务库为准补推（不会删除任何一边的数据）。 */
-  async reconcile(actor: Authz, fix: boolean): Promise<ReconcileReport> {
+  async reconcile(actor: { accountId: string | null }, fix: boolean): Promise<ReconcileReport> {
     const tenant = requireTenant("reconcile accounts");
     const realm = realmName("tenant", tenant.code);
     const admin = await this.keycloak.client();

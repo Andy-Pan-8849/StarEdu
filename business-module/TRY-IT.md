@@ -85,9 +85,20 @@ The administrator has every operation permission of the features enabled for the
 | Teacher | see their own classes; set assignments; grade submissions; grant extensions; publish grades | B6-B8 |
 | Student | see their own courses, submit assignments, see grades and transcript, get notifications, ask the AI assistant | B6-B10 |
 
-### Platform operator
+### Platform operator (works today)
 
-Opens and manages companies (tenants) and platform accounts. Screens arrive in B3; today a company is opened with `pnpm provision` (see the main README).
+Signs in at **http://platform.localhost:3001** (create the first account with `pnpm realm` and `pnpm bootstrap:platform`; locally set a password with `pnpm dev:password --platform --username root --password '...'`).
+
+| Flow | Available |
+|---|---|
+| See all companies with status and administrator | Works today |
+| **Open a company**: code, name, type, administrator e-mail; the administrator receives an invitation (Mailpit) | Works today |
+| **Notify** a planned suspension (e-mail to the administrator), **suspend** (the company's users are refused, data is kept), **restore** | Works today |
+| **Features**: switch features (menus) on or off for one company; its menus and permissions change at once | Works today |
+| **Administrator**: resend the invitation, send a password reset link, unlock after failed sign-ins, change the e-mail | Works today (API; resend and unlock are buttons) |
+| **Scheduled jobs**: enable a job, change its schedule, run it now, see the run log | Works today |
+| **Monitoring**: server, cache and database health; links to API documentation and Grafana | Works today |
+| Platform accounts and roles, menus, entry assignment | API today (`/api/platform/...`); screens later |
 
 ### Things to try across companies (the "why is this safe" tour)
 

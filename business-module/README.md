@@ -2,7 +2,7 @@
 
 The traditional business back office of StarEdu: a multi-tenant SaaS back office (accounts, roles and permissions, organization, people, teaching, assignments, grades, notifications, document library) built with NestJS, Prisma, Next.js 15, Tailwind and shadcn/ui-style components, with Keycloak for sign-in.
 
-Status: **milestone B2 (authentication, roles and permissions, data scope).** Every request is bound to a tenant by its host name and isolation is enforced three times (request scope, Prisma extension, database row-level security) and checked by a cross-tenant leak scan (B1). On top of that, sign-in works end to end (Keycloak, one realm per tenant), the API checks a permission code on every endpoint, roles pick menus and buttons, and data scopes limit which rows a role can see or change. The admin console has a menu-tree shell with tabs and three working pages (online users, login log, audit log); the other pages arrive with their milestones.
+Status: **milestone B3 (platform console).** The platform operator signs in at `platform.localhost:3001` and can open, edit, notify, suspend and restore tenants, switch tenant features on and off, manage the tenant administrator, manage platform accounts and roles, and run scheduled jobs; there is a monitoring page. Before that, milestone B2 added authentication, roles and permissions, and data scope. Every request is bound to a tenant by its host name and isolation is enforced three times (request scope, Prisma extension, database row-level security) and checked by a cross-tenant leak scan (B1). On top of that, sign-in works end to end (Keycloak, one realm per tenant), the API checks a permission code on every endpoint, roles pick menus and buttons, and data scopes limit which rows a role can see or change. The admin console has a menu-tree shell with tabs and three working pages (online users, login log, audit log); the other pages arrive with their milestones.
 
 To try it as a learner or employer, see **[TRY-IT.md](TRY-IT.md)** (accounts, walk-through by role; it grows with each milestone).
 
@@ -15,7 +15,7 @@ To try it as a learner or employer, see **[TRY-IT.md](TRY-IT.md)** (accounts, wa
 | `packages/shared` | Shared code: tenant-code rules (reserved words) and the **Keycloak realm template** (all tunable parameters in `src/realm-config.json`). |
 | `prisma/` | Prisma schema and migrations (`biz` schema), including hand-written SQL for row-level security, triggers and the low-privilege role `biz_app`. |
 | `deploy/compose/biz.yaml` | Postgres, Redis, S3-compatible object storage, Keycloak, Mailpit. Separate Compose project from the AI module, with different ports. |
-| `scripts/` | `dev-set-password.ts` (local only: set a password for a user so you can sign in without the invite email), `provision-tenant.ts` (open a tenant: Keycloak realm, headquarters campus, roles, built-in admin, invite email; safe to repeat), `seed.ts` (two demo tenants, `hq` and `riverside-franchise`), `create-realm.ts` (platform realm), `smoke-b0.ts` (end-to-end check of the realm template). |
+| `scripts/` | `bootstrap-platform.ts` (create the first platform account), `dev-set-password.ts` (local only: set a password for a user or a platform account so you can sign in without the invite email), `provision-tenant.ts` (open a tenant: Keycloak realm, headquarters campus, roles, built-in admin, invite email; safe to repeat), `seed.ts` (two demo tenants, `hq` and `riverside-franchise`), `create-realm.ts` (platform realm), `smoke-b0.ts` (end-to-end check of the realm template). |
 
 ## Run it
 
@@ -28,6 +28,7 @@ pnpm install
 make up                     # Postgres, Redis, object store, Keycloak, Mailpit
 pnpm migrate                # apply Prisma migrations
 pnpm realm                  # create the platform realm from the template
+pnpm bootstrap:platform     # first platform account (username root) and its invitation e-mail
 pnpm seed                   # open two demo tenants: hq and riverside-franchise (safe to repeat)
 pnpm dev:api                # http://localhost:4000/healthz
 pnpm dev:web                # http://hq.localhost:3001  (and platform.localhost:3001)
@@ -79,3 +80,11 @@ Foreign keys are **not** covered by row-level security (Postgres skips policies 
 Postgres 5433, Redis 6380, object store 9100/9101, Keycloak 8180, Mailpit SMTP 1125 and web 8125, API 4000, web 3001.
 
 The synthetic company data in `../ai-module/sample-data/structured/` is meant to seed this module too, so both systems describe the same company.
+
+## Platform console
+
+- Address: `http://platform.localhost:3001` (host name `platform.*`). Platform accounts live in their own Keycloak realm (`platform`) and their own tables, which the tenant-facing database account cannot read; platform permissions and tenant permissions never mix.
+- First account: `pnpm realm` (once), `pnpm bootstrap:platform --username root --email you@example.test`, then either follow the invitation in Mailpit or, locally, `pnpm dev:password --platform --username root --password '...'`.
+- Tenants cannot be deleted, only suspended. Status: active, suspension notified (e-mail to the administrator), suspended (users refused, data kept), and back to active.
+- Scheduled jobs come from a fixed registry in `apps/api/src/platform/jobs/job-registry.ts`; names and schedules are validated, only one instance of a job runs at a time (Redis lock), and every run is logged. Jobs are off until you switch them on.
+- API documentation: `http://localhost:4000/api-docs`, on by default in development and off in production (`SWAGGER_ENABLED=true` to turn it on). The page itself has no sign-in, so do not expose it publicly. Grafana: set `GRAFANA_URL`; the monitoring page shows "Grafana is not running" when it does not answer.

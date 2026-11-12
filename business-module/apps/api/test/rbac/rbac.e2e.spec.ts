@@ -68,6 +68,8 @@ describe("RBAC", () => {
         expect(tree.map((n) => n.code)).toEqual(["system"]); // 角色勾选树里没有了
         expect((await admin().put(`/api/roles/${roleId}/menus`, { menuIds: ids("hr") })).status).toBe(400); // 也不能再勾
         expect((await admin().get("/api/me/menus?entry=admin")).body.map((n: { code: string }) => n.code)).toEqual(["system"]);
+        // 菜单管理的列表也不再列出未开通的平台菜单（B3 发现并修复：之前会列出）
+        expect(((await admin().get("/api/menus")).body as Array<{ code: string | null }>).some((m) => m.code === "hr" || m.code?.startsWith("hr:"))).toBe(false);
       } finally {
         await h.owner.tenantMenuGrant.create({ data: { tenantId: h.tenant.tenantId, menuId: hr.id } });
         await h.bump();

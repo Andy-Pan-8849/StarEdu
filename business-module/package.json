@@ -20,7 +20,8 @@
     "provision": "tsx scripts/provision-tenant.ts",
     "seed": "tsx scripts/seed.ts",
     "dev:password": "tsx scripts/dev-set-password.ts",
-    "test:leak": "pnpm --filter @staredu/api test -- test/leak"
+    "test:leak": "pnpm --filter @staredu/api test -- test/leak",
+    "bootstrap:platform": "tsx scripts/bootstrap-platform.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

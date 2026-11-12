@@ -17,6 +17,7 @@ export async function syncPlatformMenus(owner: PrismaClient): Promise<MenuSyncRe
   const existing = await owner.menu.findMany({ where: { tenantId: null, code: { not: null } } });
   const byCode = new Map(existing.map((m) => [m.code as string, m]));
   const idOf = new Map<string, string>();
+  const createdCodes = new Set<string>();
 
   for (const item of MENU_CATALOG) {
     const parentId = item.parent ? (idOf.get(item.parent) ?? null) : null;
@@ -30,14 +31,15 @@ export async function syncPlatformMenus(owner: PrismaClient): Promise<MenuSyncRe
       perms: item.perms ?? null,
       icon: item.icon ?? null,
       sort: item.sort,
-      visible: true,
-      status: true,
       deletedAt: null,
     };
+    // 显示/启用由平台管理员在"菜单管理"里调整，同步只在新增时给默认值，不覆盖
+    const defaults = { visible: true, status: true };
     const current = byCode.get(item.code);
     if (!current) {
-      const row = await owner.menu.create({ data: { ...data, code: item.code, tenantId: null } });
+      const row = await owner.menu.create({ data: { ...data, ...defaults, code: item.code, tenantId: null } });
       idOf.set(item.code, row.id);
+      createdCodes.add(item.code);
       result.created += 1;
     } else {
       idOf.set(item.code, current.id);
@@ -56,26 +58,16 @@ export async function syncPlatformMenus(owner: PrismaClient): Promise<MenuSyncRe
     }
   }
 
-  // 顶层菜单 → 入口（平台分配，tenant_id 为空）
+  // 顶层菜单 → 入口（平台分配，tenant_id 为空）。只给"这次新增的"菜单补默认分配；
+  // 已有菜单的分配由平台管理员在"入口管理"里调整，同步不覆盖、不删除。
   const entries = new Map((await owner.entry.findMany()).map((e) => [e.code, e.id]));
-  const wanted = new Set<string>();
   for (const item of MENU_CATALOG) {
+    if (!createdCodes.has(item.code)) continue;
     for (const code of item.entries ?? []) {
       const entryId = entries.get(code);
       if (!entryId) throw new Error(`unknown entry "${code}" in menu catalog`);
-      wanted.add(`${entryId}:${idOf.get(item.code)}`);
+      await owner.entryMenu.create({ data: { tenantId: null, entryId, menuId: idOf.get(item.code) as string, sort: item.sort } });
     }
-  }
-  const assigned = await owner.entryMenu.findMany({ where: { tenantId: null, menuId: { in: [...idOf.values()] } } });
-  const have = new Set(assigned.map((a) => `${a.entryId}:${a.menuId}`));
-  for (const key of wanted) {
-    if (have.has(key)) continue;
-    const [entryId, menuId] = key.split(":");
-    const sort = MENU_CATALOG.find((m) => idOf.get(m.code) === menuId)?.sort ?? 0;
-    await owner.entryMenu.create({ data: { tenantId: null, entryId, menuId, sort } });
-  }
-  for (const a of assigned) {
-    if (!wanted.has(`${a.entryId}:${a.menuId}`)) await owner.entryMenu.delete({ where: { id: a.id } });
   }
   return result;
 }

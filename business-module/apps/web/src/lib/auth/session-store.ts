@@ -5,7 +5,7 @@ import { randomToken } from "./pkce";
 
 export interface WebSession {
   tenantCode: string;
-  entry: "admin" | "portal";
+  entry: "admin" | "portal" | "platform";
   accessToken: string;
   refreshToken: string;
   idToken?: string;

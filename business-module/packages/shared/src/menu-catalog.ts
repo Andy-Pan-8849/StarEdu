@@ -82,6 +82,35 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("system:loginLog", "system", "Login log", "login-log", 10, PERMS.loginLogList, []),
   ...menuWithButtons("system:auditLog", "system", "Audit log", "audit-log", 11, PERMS.auditLogList, []),
 
+  // 平台入口（只分配给"平台"入口；租户的功能授权树里不出现）
+  { code: "platform", type: "directory", name: "Platform", nameKey: "menu.platform", route: "platform", icon: "building", sort: 10, entries: ["platform"] },
+  ...menuWithButtons("platform:tenant", "platform", "Tenants", "tenant", 1, PERMS.platformTenantList, [
+    ["add", "Add", PERMS.platformTenantAdd],
+    ["edit", "Edit", PERMS.platformTenantEdit],
+    ["status", "Status", PERMS.platformTenantStatus],
+    ["grant", "Features", PERMS.platformTenantGrant],
+    ["admin", "Administrator", PERMS.platformTenantAdmin],
+  ]),
+  ...menuWithButtons("platform:account", "platform", "Platform accounts", "account", 2, PERMS.platformAccountList, [
+    ["add", "Add", PERMS.platformAccountAdd],
+    ["edit", "Edit", PERMS.platformAccountEdit],
+    ["assignRole", "Assign roles", PERMS.platformAccountAssignRole],
+  ]),
+  ...menuWithButtons("platform:role", "platform", "Platform roles", "role", 3, PERMS.platformRoleList, [
+    ["add", "Add", PERMS.platformRoleAdd],
+    ["edit", "Edit", PERMS.platformRoleEdit],
+    ["remove", "Remove", PERMS.platformRoleRemove],
+    ["authorize", "Permissions", PERMS.platformRoleAuthorize],
+  ]),
+  ...menuWithButtons("platform:menu", "platform", "Menus", "menu", 4, PERMS.platformMenuList, [["edit", "Edit", PERMS.platformMenuEdit]]),
+  ...menuWithButtons("platform:entry", "platform", "Entry assignment", "entry", 5, PERMS.platformEntryList, [["edit", "Assign", PERMS.platformEntryEdit]]),
+  ...menuWithButtons("platform:monitor", "platform", "Monitoring", "monitor", 6, PERMS.platformMonitorList, []),
+  ...menuWithButtons("platform:job", "platform", "Scheduled jobs", "job", 7, PERMS.platformJobList, [
+    ["edit", "Edit", PERMS.platformJobEdit],
+    ["run", "Run now", PERMS.platformJobRun],
+  ]),
+  ...menuWithButtons("platform:log", "platform", "Audit log", "log", 8, PERMS.platformLogList, []),
+
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },
   ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [["edit", "Edit", PERMS.hrPersonEdit]]),
 ];

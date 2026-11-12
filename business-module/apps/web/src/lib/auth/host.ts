@@ -9,14 +9,23 @@ export function tenantCodeFromHost(host: string | null | undefined): string | nu
   return code === "platform" ? null : code;
 }
 
-export const realmFor = (code: string): string => `tenant-${code}`;
+export const realmFor = (code: string): string => (code === "platform" ? "platform" : `tenant-${code}`);
 
-export type Entry = "admin" | "portal";
+export type Entry = "admin" | "portal" | "platform";
 
 /** 每个入口对应的 Keycloak 客户端、回调路径（要与域模板里登记的回调地址一致：门户 /*，后台 /admin/*）。 */
 export function entryParams(entry: Entry): { clientId: string; base: string } {
+  if (entry === "platform") return { clientId: "platform", base: "" }; // 平台域一个客户端，回调地址 /*
   return entry === "admin" ? { clientId: "admin", base: "/admin" } : { clientId: "portal", base: "" };
 }
+
+/** 主机名是平台入口（platform.*）。 */
+export function isPlatformHostName(host: string | null | undefined): boolean {
+  return (host ?? "").split(":")[0].toLowerCase().split(".")[0] === "platform";
+}
+
+/** 登录会话的域：平台入口是 platform 域，其余按租户代码。 */
+export const PLATFORM_REALM_CODE = "platform";
 
 /** 登录后回到哪里：只允许本站内、且在该入口下的路径，防止开放重定向。 */
 export function safeReturnPath(value: string | null | undefined, entry: Entry): string {

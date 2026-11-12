@@ -14,6 +14,11 @@ describe("rewriteTarget (which entry a host and path belong to)", () => {
     expect(rewriteTarget("platform.staredu.com", "/tenants")).toBe("/platform/tenants");
   });
 
+  it("leaves the browser-to-API channel (/bff) alone on the platform host", () => {
+    expect(rewriteTarget("platform.localhost:3001", "/bff/tenants")).toBeNull();
+    expect(rewriteTarget("platform.localhost:3001", "/auth/login")).toBe("/platform/auth/login"); // 登录路由仍改写到平台入口
+  });
+
   it("does not rewrite twice", () => {
     expect(rewriteTarget("platform.localhost:3001", "/platform")).toBeNull();
     expect(rewriteTarget("platform.localhost:3001", "/platform/tenants")).toBeNull();
