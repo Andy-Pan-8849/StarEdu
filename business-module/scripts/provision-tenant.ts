@@ -16,6 +16,7 @@ export async function provisionFromCli(args: string[]): Promise<void> {
       type: { type: "string", default: "direct" },
       timezone: { type: "string", default: "UTC" },
       "admin-email": { type: "string" },
+      "hq-campus-name": { type: "string" },
     },
   });
   if (!values.code || !values.name || !values["admin-email"]) {
@@ -30,6 +31,7 @@ export async function provisionFromCli(args: string[]): Promise<void> {
       type: values.type as TenantType,
       timezone: values.timezone,
       adminEmail: values["admin-email"],
+      hqCampusName: values["hq-campus-name"],
     });
     console.log(JSON.stringify(result, null, 2));
   } finally {

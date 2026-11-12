@@ -15,7 +15,7 @@ To try it as a learner or employer, see **[TRY-IT.md](TRY-IT.md)** (accounts, wa
 | `packages/shared` | Shared code: tenant-code rules (reserved words) and the **Keycloak realm template** (all tunable parameters in `src/realm-config.json`). |
 | `prisma/` | Prisma schema and migrations (`biz` schema), including hand-written SQL for row-level security, triggers and the low-privilege role `biz_app`. |
 | `deploy/compose/biz.yaml` | Postgres, Redis, S3-compatible object storage, Keycloak, Mailpit. Separate Compose project from the AI module, with different ports. |
-| `scripts/` | `dev-set-password.ts` (local only: set a password for a user so you can sign in without the invite email), `provision-tenant.ts` (open a tenant: Keycloak realm, headquarters campus, roles, built-in admin, invite email; safe to repeat), `seed.ts` (two demo tenants, `hq` and `franchise`), `create-realm.ts` (platform realm), `smoke-b0.ts` (end-to-end check of the realm template). |
+| `scripts/` | `dev-set-password.ts` (local only: set a password for a user so you can sign in without the invite email), `provision-tenant.ts` (open a tenant: Keycloak realm, headquarters campus, roles, built-in admin, invite email; safe to repeat), `seed.ts` (two demo tenants, `hq` and `riverside-franchise`), `create-realm.ts` (platform realm), `smoke-b0.ts` (end-to-end check of the realm template). |
 
 ## Run it
 
@@ -28,7 +28,7 @@ pnpm install
 make up                     # Postgres, Redis, object store, Keycloak, Mailpit
 pnpm migrate                # apply Prisma migrations
 pnpm realm                  # create the platform realm from the template
-pnpm seed                   # open two demo tenants: hq and franchise (safe to repeat)
+pnpm seed                   # open two demo tenants: hq and riverside-franchise (safe to repeat)
 pnpm dev:api                # http://localhost:4000/healthz
 pnpm dev:web                # http://hq.localhost:3001  (and platform.localhost:3001)
 ```
