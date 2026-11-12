@@ -1,0 +1,105 @@
+# 文件：deploy/compose/biz.yaml
+# 作用：业务模块的基础设施（make up）：Postgres、Redis、对象存储、Keycloak、Mailpit。
+# 说明：
+#   - 项目名 starit-biz，和 AI 模块（starit-ai）互不干扰，端口全部错开（见 .env.example）。
+#   - NestJS 和 Next.js 在本机用 pnpm 运行（pnpm dev:api / dev:web），暂不进 Compose；
+#     镜像化放到部署相关的里程碑。
+#   - Postgres 先独立一个实例；与 AI 模块共用实例（不同 schema）放到 B10 衔接时处理。
+#   - 默认值只用于本地演示，对外开放前必须改。
+
+name: starit-biz
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-starit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-starit}
+      POSTGRES_DB: ${POSTGRES_DB:-starit_biz}
+    ports:
+      - "${BIZ_PG_PORT:-5433}:5432"
+    volumes:
+      - bizpgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${BIZ_REDIS_PORT:-6380}:6379"
+    volumes:
+      - bizredisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3 兼容对象存储（MinIO 兼容分支，和 AI 模块同一个镜像）；代码只依赖 S3 接口。
+  objectstore:
+    image: pgsty/silo:RELEASE.2026-08-06T00-00-00Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-starit}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-starit-secret}
+    ports:
+      - "${BIZ_S3_PORT:-9100}:9000"
+      - "${BIZ_S3_CONSOLE_PORT:-9101}:9001"
+    volumes:
+      - bizobjectdata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # 邮件只接收不真发：Keycloak 和以后的 NestJS 都把 SMTP 指向这里（Q8）。
+  # 网页界面 http://localhost:8125 ；接口 http://localhost:8125/api/v1/messages
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "${BIZ_MAILPIT_SMTP_PORT:-1125}:1025"
+      - "${BIZ_MAILPIT_UI_PORT:-8125}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # 身份：Keycloak。这里不导入任何域——租户域和平台域由脚本用"域模板"创建
+  # （pnpm realm，见 scripts/create-realm.ts），和以后"新增租户"走同一条路。
+  # start-dev + 内置文件数据库只用于本地。
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${BIZ_KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ../keycloak/password-blacklists:/opt/keycloak/data/password-blacklists:ro
+      - bizkeycloakdata:/opt/keycloak/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  bizpgdata:
+  bizredisdata:
+  bizobjectdata:
+  bizkeycloakdata:

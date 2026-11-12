@@ -66,3 +66,60 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+
+  business-module:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: business-module
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17
+        env:
+          POSTGRES_USER: starit
+          POSTGRES_PASSWORD: starit
+          POSTGRES_DB: starit_biz
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U starit -d starit_biz"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://starit:starit@localhost:5433/starit_biz?schema=biz
+      REDIS_URL: redis://localhost:6380/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: business-module/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: business-module/.nvmrc
+          cache: pnpm
+          cache-dependency-path: business-module/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm typecheck
+      - name: Migrations run on an empty database
+        run: pnpm migrate
+      - name: Tests (unit and integration, real Postgres and Redis)
+        run: pnpm test
+      - name: Start Keycloak and Mailpit
+        run: docker compose --env-file .env.example -f deploy/compose/biz.yaml up -d --wait keycloak mailpit
+      - name: Keycloak realm template smoke test
+        run: pnpm smoke
+      - name: Keycloak logs (on failure)
+        if: failure()
+        run: docker compose --env-file .env.example -f deploy/compose/biz.yaml logs keycloak --tail 100
