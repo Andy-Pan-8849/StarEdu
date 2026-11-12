@@ -87,6 +87,15 @@ describe("tenant provisioning", () => {
     expect(await mailTo(t.adminEmail)).toBe(true);
   });
 
+  it("names the headquarters campus (and its department root) as asked", async () => {
+    const code = randomCode();
+    codes.push(code);
+    const r = await new ProvisioningService(owner, keycloak).provision({ code, name: "Group", hqCampusName: "HQ Campus", adminEmail: `a@${code}.example.test`, allowDirectGrant: true });
+    const campus = await owner.campus.findFirstOrThrow({ where: { tenantId: r.tenantId } });
+    expect(campus).toMatchObject({ code: "HQ", name: "HQ Campus", type: "hq" });
+    expect((await owner.dept.findUniqueOrThrow({ where: { id: campus.deptId } })).name).toBe("HQ Campus");
+  });
+
   it("running it again changes nothing", async () => {
     const t = await provisionTestTenant(owner, keycloak);
     codes.push(t.code);

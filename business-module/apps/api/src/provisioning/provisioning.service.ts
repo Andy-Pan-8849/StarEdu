@@ -13,6 +13,8 @@ export interface ProvisionInput {
   type?: TenantType;
   timezone?: string;
   adminEmail: string;
+  /** 总部校区（和部门树根）的名称，默认用租户名 */
+  hqCampusName?: string;
   /** 仅测试：让该租户域允许密码直连授权 */
   allowDirectGrant?: boolean;
 }
@@ -80,9 +82,10 @@ export class ProvisioningService {
 
     // 2. 总部校区 = 部门树根节点 + 校区记录（总部也是一个校区，不能关闭）
     if (!(await this.owner.campus.findFirst({ where: { tenantId, type: "hq" } }))) {
-      const dept = await this.owner.dept.create({ data: { tenantId, name: tenant.name } });
+      const hqName = input.hqCampusName ?? tenant.name;
+      const dept = await this.owner.dept.create({ data: { tenantId, name: hqName } });
       await this.owner.campus.create({
-        data: { tenantId, deptId: dept.id, code: "HQ", name: tenant.name, type: "hq", timezone: tenant.timezone },
+        data: { tenantId, deptId: dept.id, code: "HQ", name: hqName, type: "hq", timezone: tenant.timezone },
       });
       steps.push("headquarters campus");
     }

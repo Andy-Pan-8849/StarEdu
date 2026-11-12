@@ -14,7 +14,7 @@ pnpm install
 make up            # Postgres, Redis, object store, Keycloak, Mailpit
 pnpm migrate
 pnpm realm         # platform realm
-pnpm seed          # opens two demo companies: hq (headquarters) and franchise
+pnpm seed          # opens two demo companies: hq (StarIT) and riverside-franchise (StarIT-RiverSide)
 pnpm dev:api       # terminal 1
 pnpm dev:web       # terminal 2
 ```
@@ -25,58 +25,77 @@ Open **http://hq.localhost:3001/admin** (`*.localhost` names resolve to your mac
 
 ## 2. Demo companies and accounts
 
-| Company | Address | Type |
+| Company | Address | What it shows |
 |---|---|---|
-| StarIT (headquarters) | http://hq.localhost:3001 | direct |
-| StarIT Franchise | http://franchise.localhost:3001 | franchise |
+| **StarIT** (headquarters group) | http://hq.localhost:3001 | The Beijing campus ("StarIT北京总部", code `HQ`) is the headquarters and has the **fullest data**: every feature and the edge cases can be tried here. Shanghai is a branch campus with the organization structure and the basic flows. |
+| **StarIT-RiverSide** (中文名 StarIT 河岸教育) | http://riverside-franchise.localhost:3001 | A franchisee: a separate company on the same system, with basic data and the main flows. Use it to see that two companies never see each other's data. |
 
-Each company is a separate tenant with its own users, roles and data; a person in one company can never see the other's data.
+Each company is a separate tenant with its own users, roles and data.
+
+**Accounts available today**
 
 | Account | Company | Role | Password |
 |---|---|---|---|
 | `admin` | hq | Tenant administrator (built-in) | you set it, see below |
-| `admin` | franchise | Tenant administrator (built-in) | you set it, see below |
-
-Set a password for the built-in administrator (local use only; the real flow is the invitation e-mail in Mailpit):
+| `admin` | riverside-franchise | Tenant administrator (built-in) | you set it, see below |
 
 ```bash
+# local use only; the real flow is the invitation e-mail in Mailpit
 pnpm dev:password --code hq --username admin --password '<10+ characters, upper and lower case, digit, special character>'
+pnpm dev:password --code riverside-franchise --username admin --password '<...>'
 ```
 
-**More demo accounts (teacher, student, HR manager, academic manager, campus lead, franchise staff) and sample data (campuses, departments, courses, classes, assignments, grades) arrive with the milestones that need them** and will be created by `pnpm seed`. They will be listed in this table. Until then you can create accounts yourself, see "Create an account" below.
+**Accounts coming with later milestones.** They are created by `pnpm seed` and share one public demo password that will be written here (for local and trial use only).
+
+| Account | Company | Role | Available from |
+|---|---|---|---|
+| `ling.mgr.bj`, `peng.mgr.sh` | hq | Campus lead (Beijing, Shanghai) | B5 |
+| `qing.hr.bj` | hq | HR manager | B5 |
+| `hui.acad.bj` | hq | Academic manager | B6 |
+| `fang.tch.bj`, `wei.acad.sh` | hq | Teacher | B6 |
+| `peng.stu.bj`, `kai.stu.bj` (on leave), `wei.stu.sh` | hq | Student | B6 |
+| `tao.admin.bj` | hq | System operator (system management only) | B4 |
+| `ning.adm.bj`, `ning.fin.bj`, `min.ragetl.bj` | hq | Staff with few permissions (used to show what the AI assistant may answer) | B5 |
+| `river.hr`, `river.acad`, `river.tch`, `river.stu` | riverside-franchise | HR manager, academic manager, teacher, student | B5-B6 |
 
 ## 3. Walk-through by role
 
-### Tenant administrator (works today)
+Every flow below says when it can be tried. "Works today" means you can do it now.
 
-Signs in at `/admin`. The administrator has every operation permission of the features the platform enabled for the company, but **no access to business data** (students, grades) by design. The administrator manages the system itself.
+### Tenant administrator (`admin`)
 
-What you can do now:
+The administrator has every operation permission of the features enabled for the company, but **no access to business data** (students, grades) by design: it manages the system itself.
 
-1. **See your menu.** The left tree shows only what your roles allow. Click a menu to open it in a tab; close tabs with ×.
-2. **Online users** (System management): who is signed in, from where, since when. **Force logout** ends a person's session; their next request is refused.
-3. **Login log**: every sign-in to the admin console or portal, including refused ones and why.
-4. **Audit log**: who changed roles, permissions, menus, accounts or sessions, and what changed.
-5. **Roles, menus, entries, data scopes, accounts**: the rules and the API are in place; the screens arrive in milestone B4. Until then use the API (section 4).
-6. **Sign out** with the link at the top right.
+| Flow | Available |
+|---|---|
+| Sign in to `/admin`; the menu shows only system management and what your roles allow | Works today |
+| **Online users**: see who is signed in; **Force logout** ends a session (the person's next request is refused) | Works today |
+| **Login log** and **Audit log**: who signed in, who changed roles, permissions, menus, accounts or sessions | Works today |
+| Create a role, tick its menus and buttons, choose its data scope, give it to an account, watch that account's menu change | API today (section 4); screens in B4 |
+| Create an account and send the invitation; the person sets a password from the e-mail in Mailpit | API today; screens in B4 |
+| Add an external-link menu and assign it to the admin console | B4 |
 
-### HR manager, academic manager, campus lead, teacher, student
+### HR manager, campus lead, academic manager, teacher, student
 
-These roles exist as templates (the student role is built in), but **their screens do not exist yet**:
-
-| Role | Typical work | Arrives in |
+| Role | Typical work | Available from |
 |---|---|---|
-| HR manager | staff records, departments, posts | B5 |
-| Academic manager | programs, courses, classes, enrollment | B6 |
-| Campus lead | the same work, limited to their own campus | B5-B8 |
-| Teacher | their classes, assignments, grading | B6-B8 |
-| Student | courses, assignments, grades, transcript, AI assistant | B6-B10 |
-
-Each section of this guide will be filled in with the exact steps when its milestone is done.
+| HR manager | add staff, open their accounts, transfer departments, end employment | B5 |
+| Campus lead | see only their own campus's people, classes and grades; post announcements | B5-B9 |
+| Academic manager | create programs, courses, terms and classes; enrollment; publish grades; official transcripts | B6-B8 |
+| Teacher | see their own classes; set assignments; grade submissions; grant extensions; publish grades | B6-B8 |
+| Student | see their own courses, submit assignments, see grades and transcript, get notifications, ask the AI assistant | B6-B10 |
 
 ### Platform operator
 
-Opens tenants and manages platform accounts. Screens arrive in B3. Today a tenant is opened with `pnpm provision` (see the main README).
+Opens and manages companies (tenants) and platform accounts. Screens arrive in B3; today a company is opened with `pnpm provision` (see the main README).
+
+### Things to try across companies (the "why is this safe" tour)
+
+| Try | Available |
+|---|---|
+| Sign in as `admin` of hq, then of riverside-franchise: different people and roles; a token for one company is refused on the other's address | Works today |
+| Two teachers with the same role but different departments see different students | B5-B6 |
+| The Beijing campus lead cannot find Shanghai students; the group HR manager sees both | B5 |
 
 ## 4. Create an account and a role (API, until the screens arrive)
 
