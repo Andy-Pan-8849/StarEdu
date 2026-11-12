@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { AccountsController } from "./accounts/accounts.controller";
 import { AccountsService } from "./accounts/accounts.service";
 import { LogsController, OnlineController } from "./accounts/online.controller";
@@ -10,6 +10,10 @@ import { TokenVerifier } from "./auth/token-verifier";
 import { DataScopeService } from "./data-scope/data-scope.service";
 import { HealthController } from "./health/health.controller";
 import { HealthService } from "./health/health.service";
+import { OperationLogController } from "./oplog/operation-log.controller";
+import { OperationLogInterceptor } from "./oplog/operation-log.interceptor";
+import { DictController } from "./sysdata/dict.controller";
+import { ParamsController } from "./sysdata/params.controller";
 import { PersonsController } from "./hr/persons.controller";
 import { KeycloakService } from "./keycloak/keycloak.service";
 import { MailService } from "./mail/mail.service";
@@ -22,7 +26,9 @@ import { PlatformPrismaService } from "./platform/platform-prisma.service";
 import { TenantsController } from "./platform/tenants.controller";
 import { TenantsService } from "./platform/tenants.service";
 import { MeController } from "./me/me.controller";
-import { OrgController } from "./org/org.controller";
+import { CampusesController } from "./org/campuses.controller";
+import { DeptsController } from "./org/depts.controller";
+import { PostsController } from "./org/posts.controller";
 import { PrismaService } from "./prisma/prisma.service";
 import { AuthzService } from "./rbac/authz.service";
 import { DataScopeSetsController } from "./rbac/data-scope-sets.controller";
@@ -36,7 +42,9 @@ import { TenantResolverMiddleware } from "./tenancy/tenant-resolver.middleware";
 export const CONTROLLERS = [
   HealthController,
   MeController,
-  OrgController,
+  CampusesController,
+  DeptsController,
+  PostsController,
   RolesController,
   MenusController,
   EntriesController,
@@ -45,6 +53,9 @@ export const CONTROLLERS = [
   OnlineController,
   LogsController,
   PersonsController,
+  DictController,
+  ParamsController,
+  OperationLogController,
   TenantsController,
   PlatformController,
   MonitorController,
@@ -71,6 +82,7 @@ export const CONTROLLERS = [
     TenantsService,
     JobsService,
     { provide: APP_GUARD, useClass: TenantTokenGuard },
+    { provide: APP_INTERCEPTOR, useClass: OperationLogInterceptor },
   ],
 })
 export class AppModule implements NestModule {

@@ -137,6 +137,10 @@ model Tenant {
   personDepts    PersonDept[]
   loginLogs      LoginLog[]
   auditLogs      AuditLog[]
+  dictTypes      DictType[]
+  dictItems      DictItem[]
+  sysParams      SysParam[]
+  operationLogs  OperationLog[]
 
   @@map("tenant")
 }
@@ -610,4 +614,95 @@ model JobRun {
 
   @@index([jobCode, startedAt])
   @@map("job_run")
+}
+
+// ---------------------------------------------------------------------------
+// B4：字典、参数、操作日志
+// ---------------------------------------------------------------------------
+
+/// 字典类型。tenant_id 为空 = 平台提供（租户只读）；租户可以建自己的类型。
+model DictType {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  /// 翻译键（界面按语言取文字）；租户自建的直接存名称
+  nameKey   String?   @map("name_key")
+  status    Boolean   @default(true)
+  remark    String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant?    @relation(fields: [tenantId], references: [id])
+  items  DictItem[]
+
+  @@unique([tenantId, code])
+  @@map("dict_type")
+}
+
+model DictItem {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
+  typeId    String    @map("type_id") @db.Uuid
+  value     String
+  label     String
+  labelKey  String?   @map("label_key")
+  sort      Int       @default(0)
+  status    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant?  @relation(fields: [tenantId], references: [id])
+  type   DictType @relation(fields: [typeId], references: [id])
+
+  @@unique([typeId, value])
+  @@map("dict_item")
+}
+
+/// 参数。平台提供的只读；租户可以建自己的。
+model SysParam {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
+  key       String
+  value     String
+  name      String
+  nameKey   String?   @map("name_key")
+  remark    String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
+  @@map("sys_param")
+}
+
+/// 操作日志：谁、对哪个接口、做了什么（请求参数脱敏，不记返回内容）。参数保留 180 天，之后清空参数、保留其余。
+model OperationLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  accountId  String?  @map("account_id") @db.Uuid
+  username   String?
+  method     String
+  path       String
+  status     Int
+  durationMs Int      @map("duration_ms")
+  ip         String?
+  params     Json?
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("operation_log")
 }

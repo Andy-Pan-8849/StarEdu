@@ -57,6 +57,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["edit", "Edit", PERMS.userEdit],
     ["assignRole", "Assign roles", PERMS.userAssignRole],
     ["reconcile", "Reconcile", PERMS.userReconcile],
+    ["resetPwd", "Reset password", PERMS.userResetPwd],
   ]),
   ...menuWithButtons("system:role", "system", "Roles", "role", 2, PERMS.roleList, [
     ["add", "Add", PERMS.roleAdd],
@@ -75,9 +76,33 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["edit", "Edit", PERMS.dataScopeEdit],
     ["remove", "Remove", PERMS.dataScopeRemove],
   ]),
-  ...menuWithButtons("system:dept", "system", "Departments", "dept", 6, PERMS.deptList, []),
-  ...menuWithButtons("system:campus", "system", "Campuses", "campus", 7, PERMS.campusList, []),
-  ...menuWithButtons("system:post", "system", "Posts", "post", 8, PERMS.postList, []),
+  // 校区管理排在部门管理之前
+  ...menuWithButtons("system:campus", "system", "Campuses", "campus", 6, PERMS.campusList, [
+    ["add", "Add", PERMS.campusAdd],
+    ["edit", "Edit", PERMS.campusEdit],
+    ["close", "Change status", PERMS.campusClose],
+  ]),
+  ...menuWithButtons("system:dept", "system", "Departments", "dept", 7, PERMS.deptList, [
+    ["add", "Add", PERMS.deptAdd],
+    ["edit", "Edit", PERMS.deptEdit],
+    ["remove", "Remove", PERMS.deptRemove],
+  ]),
+  ...menuWithButtons("system:post", "system", "Posts", "post", 8, PERMS.postList, [
+    ["add", "Add", PERMS.postAdd],
+    ["edit", "Edit", PERMS.postEdit],
+    ["remove", "Remove", PERMS.postRemove],
+  ]),
+  ...menuWithButtons("system:dict", "system", "Dictionaries", "dict", 12, PERMS.dictList, [
+    ["add", "Add", PERMS.dictAdd],
+    ["edit", "Edit", PERMS.dictEdit],
+    ["remove", "Remove", PERMS.dictRemove],
+  ]),
+  ...menuWithButtons("system:param", "system", "Parameters", "param", 13, PERMS.paramList, [
+    ["add", "Add", PERMS.paramAdd],
+    ["edit", "Edit", PERMS.paramEdit],
+    ["remove", "Remove", PERMS.paramRemove],
+  ]),
+  ...menuWithButtons("system:operationLog", "system", "Operation log", "operation-log", 14, PERMS.operationLogList, [["clear", "Clear", PERMS.operationLogClear]]),
   ...menuWithButtons("system:online", "system", "Online users", "online", 9, PERMS.onlineList, [["forceLogout", "Force logout", PERMS.onlineForceLogout]]),
   ...menuWithButtons("system:loginLog", "system", "Login log", "login-log", 10, PERMS.loginLogList, []),
   ...menuWithButtons("system:auditLog", "system", "Audit log", "audit-log", 11, PERMS.auditLogList, []),
