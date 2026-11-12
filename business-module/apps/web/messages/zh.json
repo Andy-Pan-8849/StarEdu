@@ -1,6 +1,12 @@
 {
-  "app": { "name": "StarIT" },
-  "language": { "label": "语言", "en": "English", "zh": "中文" },
+  "app": {
+    "name": "StarIT"
+  },
+  "language": {
+    "label": "语言",
+    "en": "English",
+    "zh": "中文"
+  },
   "portal": {
     "title": "学生门户",
     "description": "我的课程、选课、作业、成绩和成绩单将出现在这里。"
@@ -13,5 +19,68 @@
     "title": "平台入口",
     "description": "平台运营人员使用的租户管理、平台账号和监控将出现在这里。"
   },
-  "placeholder": { "status": "目前只有脚手架（里程碑 B0），登录在 B2 加入。" }
+  "placeholder": {
+    "status": "目前只有脚手架（里程碑 B0）。"
+  },
+  "shell": {
+    "closeTab": "关闭",
+    "noMenus": "没有给你的账号分配任何菜单。",
+    "pageNotBuilt": "这个页面还没有提供。",
+    "signedInAs": "当前账号",
+    "signOut": "退出登录"
+  },
+  "table": {
+    "empty": "没有数据。",
+    "loading": "加载中…",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "第 {page} 页，共 {pages} 页"
+  },
+  "pages": {
+    "online": {
+      "title": "在线用户",
+      "username": "账号",
+      "entry": "入口",
+      "ip": "IP 地址",
+      "loginAt": "登录时间",
+      "lastSeen": "最近活动",
+      "forceLogout": "强制退出",
+      "confirm": "确定让 {name} 退出登录吗？",
+      "done": "{name} 已被强制退出。"
+    },
+    "loginLog": {
+      "title": "登录日志",
+      "time": "时间",
+      "username": "账号",
+      "entry": "入口",
+      "result": "结果",
+      "reason": "原因",
+      "ip": "IP 地址",
+      "success": "成功",
+      "denied": "被拒"
+    },
+    "auditLog": {
+      "title": "操作日志",
+      "time": "时间",
+      "action": "操作",
+      "target": "对象",
+      "actor": "操作人"
+    }
+  },
+  "menu": {
+    "system": "系统管理",
+    "system:user": "账号管理",
+    "system:role": "角色管理",
+    "system:menu": "菜单管理",
+    "system:entry": "入口管理",
+    "system:dataScope": "数据权限集",
+    "system:dept": "部门管理",
+    "system:campus": "校区管理",
+    "system:post": "岗位管理",
+    "system:online": "在线用户",
+    "system:loginLog": "登录日志",
+    "system:auditLog": "操作日志",
+    "hr": "人事",
+    "hr:person": "人员档案"
+  }
 }

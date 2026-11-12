@@ -2,30 +2,35 @@
 import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
-import { AppModule } from "../../src/app.module";
-import { HealthController } from "../../src/health/health.controller";
-import { MeController } from "../../src/me/me.controller";
-import { OrgController } from "../../src/org/org.controller";
+import Redis from "ioredis";
+import { AppModule, CONTROLLERS } from "../../src/app.module";
 import type { KeycloakAdmin } from "../../src/keycloak/keycloak-admin";
 import {
   connectKeycloak,
   createUser,
+  giveRole,
   ownerClient,
   provisionTestTenant,
   removeTestTenant,
   type TestTenant,
 } from "../helpers/fixtures";
-import { LEAK_REGISTRY } from "./registry";
+import { LEAK_REGISTRY, MUTATION_REGISTRY, OTHER_ROUTES, type Fixture } from "./registry";
 import { listRoutes } from "./routes";
 
 interface Side {
   tenant: TestTenant;
   host: string;
   token: string;
-  accountId: string;
-  ids: { campusId: string; deptId: string; postId: string };
+  /** alice：带"租户管理员"角色的教职员工，扫描用她的令牌 */
+  aliceId: string;
+  ids: Record<Fixture, string>;
   allIds: Set<string>;
 }
+
+const TABLES = [
+  "role", "menu", "data_scope_set", "data_scope_set_node", "account", "account_role", "person", "person_dept",
+  "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log",
+];
 
 describe("cross-tenant leak scan", () => {
   const owner = ownerClient();
@@ -33,24 +38,51 @@ describe("cross-tenant leak scan", () => {
   let app: INestApplication;
   let a: Side;
   let b: Side;
+  const redis = new Redis(process.env.REDIS_URL as string);
 
   async function build(): Promise<Side> {
     const tenant = await provisionTestTenant(owner, keycloak);
+    const tenantId = tenant.tenantId;
     const user = await createUser(owner, keycloak, tenant, "alice");
-    const campus = await owner.campus.findFirstOrThrow({ where: { tenantId: tenant.tenantId } });
-    const dept = await owner.dept.create({ data: { tenantId: tenant.tenantId, name: "Dept", parentId: campus.deptId } });
-    const post = await owner.post.create({ data: { tenantId: tenant.tenantId, code: "teacher", name: "Teacher" } });
-    const extraCampusDept = await owner.dept.create({ data: { tenantId: tenant.tenantId, name: "Second campus" } });
+    const person = await owner.person.create({ data: { tenantId, type: "staff", fullName: "Alice" } });
+    await owner.account.update({ where: { id: user.accountId }, data: { personId: person.id } });
+    await giveRole(owner, tenantId, user.accountId, "tenant-admin");
+    const campus = await owner.campus.findFirstOrThrow({ where: { tenantId } });
+    const dept = await owner.dept.create({ data: { tenantId, name: "Dept", parentId: campus.deptId } });
+    const post = await owner.post.create({ data: { tenantId, code: "teacher", name: "Teacher" } });
+    const extraCampusDept = await owner.dept.create({ data: { tenantId, name: "Second campus" } });
     const extraCampus = await owner.campus.create({
-      data: { tenantId: tenant.tenantId, deptId: extraCampusDept.id, code: "SH", name: "Second", timezone: "UTC" },
+      data: { tenantId, deptId: extraCampusDept.id, code: "SH", name: "Second", timezone: "UTC" },
     });
+    const bob = await owner.account.create({ data: { tenantId, username: "bob", status: "active" } });
+    const role = await owner.role.findFirstOrThrow({ where: { tenantId, code: "hr-manager" } });
+    const menu = await owner.menu.create({ data: { tenantId, name: "Own link", type: "link", route: "https://example.test" } });
+    const set = await owner.dataScopeSet.create({ data: { tenantId, code: "custom-scan", name: "Scan set", kind: "custom" } });
+    await owner.dataScopeSetNode.create({ data: { tenantId, setId: set.id, deptId: dept.id } });
+
+    const token = await user.token();
+    const sid = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8")).sid as string;
+    const everyId = async (table: string) =>
+      (await owner.$queryRawUnsafe<Array<{ id: string }>>(`SELECT id::text FROM biz.${table} WHERE tenant_id = '${tenantId}'`)).map((r) => r.id);
+    const allIds = new Set<string>([tenantId, sid]);
+    for (const t of ["role", "menu", "data_scope_set", "account", "person", "dept", "campus", "post"]) (await everyId(t)).forEach((i) => allIds.add(i));
     return {
       tenant,
       host: `${tenant.code}.localhost`,
-      token: await user.token(),
-      accountId: user.accountId,
-      ids: { campusId: campus.id, deptId: dept.id, postId: post.id },
-      allIds: new Set([tenant.tenantId, campus.id, campus.deptId, dept.id, post.id, extraCampus.id, extraCampusDept.id, user.accountId]),
+      token,
+      aliceId: user.accountId,
+      ids: {
+        campusId: campus.id,
+        deptId: dept.id,
+        postId: post.id,
+        roleId: role.id,
+        accountId: bob.id,
+        personId: person.id,
+        menuId: menu.id,
+        setId: set.id,
+        sid,
+      },
+      allIds: new Set([...allIds, extraCampus.id, extraCampusDept.id]),
     };
   }
 
@@ -67,6 +99,7 @@ describe("cross-tenant leak scan", () => {
     await removeTestTenant(owner, keycloak, a.tenant.code);
     await removeTestTenant(owner, keycloak, b.tenant.code);
     await owner.$disconnect();
+    redis.disconnect();
   });
 
   const get = (side: Side, path: string, opts: { host?: string; token?: string | null; headers?: Record<string, string> } = {}) => {
@@ -80,8 +113,12 @@ describe("cross-tenant leak scan", () => {
     entry.fixture ? entry.path.replace(":id", side.ids[entry.fixture]) : entry.path;
 
   it("every route is either public or registered in the leak registry", () => {
-    const routes = listRoutes([HealthController, MeController, OrgController]);
-    const registered = new Set(LEAK_REGISTRY.map((e) => `${e.method} ${e.path}`));
+    const routes = listRoutes(CONTROLLERS);
+    const registered = new Set([
+      ...LEAK_REGISTRY.map((e) => `${e.method} ${e.path.split("?")[0]}`),
+      ...MUTATION_REGISTRY.map((e) => `${e.method} ${e.path}`),
+      ...Object.keys(OTHER_ROUTES),
+    ]);
     const missing = routes.filter((r) => !r.isPublic && !registered.has(`${r.method} ${r.path}`)).map((r) => `${r.method} ${r.path}`);
     expect(missing).toEqual([]);
     const known = new Set(routes.map((r) => `${r.method} ${r.path}`));
@@ -104,7 +141,7 @@ describe("cross-tenant leak scan", () => {
         expect(res.body.length).toBeGreaterThan(0);
         expect(res.body.every((row: { tenantId: string }) => row.tenantId === a.tenant.tenantId)).toBe(true);
       }
-      if (entry.kind === "self") expect(res.body.id).toBe(a.accountId);
+      if (entry.kind === "self") expect(res.body.id).toBe(a.aliceId);
     });
 
     it("rejects A's token on B's host, and B's token on A's host", async () => {
@@ -151,12 +188,44 @@ describe("cross-tenant leak scan", () => {
     expect((await get(a, "/api/campuses")).status).toBe(200);
   });
 
-  it("a token for a deleted account finds nothing in /api/me", async () => {
-    await owner.account.update({ where: { id: a.accountId }, data: { deletedAt: new Date() } });
+  it("a token for a deleted account is refused once permissions are reloaded", async () => {
+    expect((await get(a, "/api/me")).status).toBe(200);
+    await owner.account.update({ where: { id: a.aliceId }, data: { deletedAt: new Date() } });
+    await redis.incr(`perm:v:${a.tenant.tenantId}`); // 真实流程里删账号会让权限版本号加一
     try {
-      expect((await get(a, "/api/me")).status).toBe(404);
+      expect((await get(a, "/api/me")).status).toBe(401);
     } finally {
-      await owner.account.update({ where: { id: a.accountId }, data: { deletedAt: null } });
+      await owner.account.update({ where: { id: a.aliceId }, data: { deletedAt: null } });
+      await redis.incr(`perm:v:${a.tenant.tenantId}`);
     }
+    expect((await get(a, "/api/me")).status).toBe(200);
+  });
+
+  describe("mutations aimed at another tenant", () => {
+    const fill = (value: unknown): unknown =>
+      JSON.parse(JSON.stringify(value).replace(/\{\{([AB])\.(\w+)\}\}/g, (_m, who: string, key: string) => (who === "A" ? a : b).ids[key as Fixture]));
+    const fingerprint = async (side: Side) => {
+      const out: Record<string, string | null> = {};
+      for (const table of TABLES) {
+        const rows = await owner.$queryRawUnsafe<Array<{ h: string | null }>>(
+          `SELECT md5(string_agg(t::text, ',' ORDER BY t.id)) AS h FROM biz.${table} t WHERE t.tenant_id = '${side.tenant.tenantId}'`,
+        );
+        out[table] = rows[0].h;
+      }
+      return out;
+    };
+
+    it.each(MUTATION_REGISTRY.map((m) => [`${m.method} ${m.path} (${m.target}): ${m.note}`, m] as const))("%s", async (_name, m) => {
+      const beforeA = await fingerprint(a);
+      const beforeB = await fingerprint(b);
+      const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
+      const path = m.path.replace(/:(id|sid)/, id).replace(":code", "admin");
+      const verb = m.method.toLowerCase() as "post" | "put" | "patch" | "delete";
+      const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
+      // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400
+      expect(res.status).toBe(m.target === "foreign" ? 404 : 400);
+      expect(await fingerprint(a)).toEqual(beforeA);
+      expect(await fingerprint(b)).toEqual(beforeB);
+    });
   });
 });

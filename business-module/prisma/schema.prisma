@@ -80,6 +80,25 @@ enum PersonType {
   @@map("person_type")
 }
 
+/// 数据权限集的种类。内置五种由平台提供（tenant_id 为空），custom 是租户在组织树上勾选的。
+enum ScopeKind {
+  all // 全部
+  own_dept // 本部门
+  own_dept_tree // 本部门及以下
+  self // 仅本人
+  own_classes // 本人任教/就读的班级
+  custom // 自定义：组织树上勾选的节点，可含下级
+
+  @@map("scope_kind")
+}
+
+enum LoginResult {
+  success
+  denied
+
+  @@map("login_result")
+}
+
 model Tenant {
   id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code             String       @unique // 登录网址的第一段，开通后不可修改（数据库触发器保证）
@@ -107,6 +126,13 @@ model Tenant {
   depts      Dept[]
   campuses   Campus[]
   posts      Post[]
+  roleMenus      RoleMenu[]
+  dataScopeSets  DataScopeSet[]
+  dataScopeNodes DataScopeSetNode[]
+  roleDataScopes RoleDataScope[]
+  personDepts    PersonDept[]
+  loginLogs      LoginLog[]
+  auditLogs      AuditLog[]
 
   @@map("tenant")
 }
@@ -139,6 +165,7 @@ model Person {
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   account Account?
+  depts   PersonDept[]
 
   @@index([tenantId])
   @@map("person")
@@ -193,6 +220,8 @@ model Role {
   template Role?         @relation("RoleTemplate", fields: [templateId], references: [id])
   copies   Role[]        @relation("RoleTemplate")
   accounts AccountRole[]
+  menus    RoleMenu[]
+  scopes   RoleDataScope[]
 
   @@unique([tenantId, code])
   @@map("role")
@@ -225,6 +254,8 @@ model Menu {
   route       String?
   /// 页面组件路径：构建时打包的页面，租户不能新增
   component   String?
+  /// 平台提供的菜单的稳定标识（菜单目录同步用），如 system:role；租户自建菜单为空
+  code        String?
   /// 权限标识，如 system:user:add
   perms       String?
   icon        String?
@@ -244,6 +275,7 @@ model Menu {
   children Menu[]            @relation("MenuTree")
   grants   TenantMenuGrant[]
   entries  EntryMenu[]
+  roles    RoleMenu[]
 
   @@index([tenantId])
   @@index([parentId])
@@ -345,4 +377,128 @@ model Post {
 
   @@unique([tenantId, code])
   @@map("post")
+}
+
+/// 角色勾选的菜单/按钮（操作权限）。角色模板的行 tenant_id 为空。
+model RoleMenu {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  menuId    String   @map("menu_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  role   Role    @relation(fields: [roleId], references: [id])
+  menu   Menu    @relation(fields: [menuId], references: [id])
+
+  @@unique([roleId, menuId])
+  @@index([tenantId])
+  @@map("role_menu")
+}
+
+/// 数据权限集。内置五种（tenant_id 为空）+ 租户自定义。
+model DataScopeSet {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  kind      ScopeKind
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant?            @relation(fields: [tenantId], references: [id])
+  nodes  DataScopeSetNode[]
+  roles  RoleDataScope[]
+
+  @@unique([tenantId, code])
+  @@map("data_scope_set")
+}
+
+/// 自定义数据权限集在组织树上勾选的节点（校区也是部门树上的节点）
+model DataScopeSetNode {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  setId           String   @map("set_id") @db.Uuid
+  deptId          String   @map("dept_id") @db.Uuid
+  includeChildren Boolean  @default(true) @map("include_children")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id])
+  set    DataScopeSet @relation(fields: [setId], references: [id])
+
+  @@unique([setId, deptId])
+  @@map("data_scope_set_node")
+}
+
+/// 角色拥有的数据权限集（多个取并集）。角色模板的行 tenant_id 为空。
+model RoleDataScope {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  setId     String   @map("set_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant?      @relation(fields: [tenantId], references: [id])
+  role   Role         @relation(fields: [roleId], references: [id])
+  set    DataScopeSet @relation(fields: [setId], references: [id])
+
+  @@unique([roleId, setId])
+  @@index([tenantId])
+  @@map("role_data_scope")
+}
+
+/// 任职记录：人员所属部门，可有多个，其中一个为主部门（B5 扩展岗位、起止日期等）
+model PersonDept {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  personId  String   @map("person_id") @db.Uuid
+  deptId    String   @map("dept_id") @db.Uuid
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  person Person @relation(fields: [personId], references: [id])
+
+  @@unique([personId, deptId])
+  @@index([tenantId, deptId])
+  @@map("person_dept")
+}
+
+/// 登录日志：进入某个入口的成功/被拒记录（认证本身在 Keycloak，这里记业务侧的入口资格检查）
+model LoginLog {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String      @map("tenant_id") @db.Uuid
+  accountId String?     @map("account_id") @db.Uuid
+  username  String?
+  entry     String
+  result    LoginResult
+  reason    String?
+  ip        String?
+  userAgent String?     @map("user_agent")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("login_log")
+}
+
+/// 操作日志：权限变更、角色分配等敏感写操作
+model AuditLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  actorAccountId String?  @map("actor_account_id") @db.Uuid
+  action         String
+  targetType     String   @map("target_type")
+  targetId       String?  @map("target_id")
+  detail         Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("audit_log")
 }

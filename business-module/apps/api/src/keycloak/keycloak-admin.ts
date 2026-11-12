@@ -133,4 +133,51 @@ export class KeycloakAdmin {
     );
     if (res.status !== 204) throw new KeycloakError(`send invite failed: ${res.status} ${await res.text()}`, res.status);
   }
+
+  /** 按 id 取用户；不存在返回 null。 */
+  async getUser(realm: string, userId: string): Promise<KeycloakUser | null> {
+    const res = await this.request(`/realms/${realm}/users/${userId}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new KeycloakError(`get user failed: ${res.status}`, res.status);
+    return (await res.json()) as KeycloakUser;
+  }
+
+  /** 列出域内全部用户（对账用，分页取完）。 */
+  async listUsers(realm: string): Promise<KeycloakUser[]> {
+    const out: KeycloakUser[] = [];
+    const page = 100;
+    for (let first = 0; ; first += page) {
+      const res = await this.request(`/realms/${realm}/users?first=${first}&max=${page}&briefRepresentation=false`);
+      if (!res.ok) throw new KeycloakError(`list users failed: ${res.status}`, res.status);
+      const rows = (await res.json()) as KeycloakUser[];
+      out.push(...rows);
+      if (rows.length < page) return out;
+    }
+  }
+
+  /** 推送账号资料：邮箱、启用状态（先读后改，保留 Keycloak 里的其他字段）。 */
+  async updateUser(realm: string, userId: string, patch: { email?: string | null; enabled?: boolean }): Promise<void> {
+    const current = await this.getUser(realm, userId);
+    if (!current) throw new KeycloakError("user not found", 404);
+    const body: KeycloakUser = { ...current };
+    if (patch.email !== undefined) body.email = patch.email ?? undefined;
+    if (patch.enabled !== undefined) body.enabled = patch.enabled;
+    const res = await this.request(`/realms/${realm}/users/${userId}`, { method: "PUT", body: JSON.stringify(body) });
+    if (res.status !== 204) throw new KeycloakError(`update user failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  /** 结束一个登录会话（强退时同时让刷新令牌失效）。会话已不存在也算成功。 */
+  async deleteSession(realm: string, sessionId: string): Promise<void> {
+    const res = await this.request(`/realms/${realm}/sessions/${sessionId}`, { method: "DELETE" });
+    if (res.status !== 204 && res.status !== 404) throw new KeycloakError(`delete session failed: ${res.status}`, res.status);
+  }
+}
+
+export interface KeycloakUser {
+  id: string;
+  username: string;
+  email?: string;
+  enabled?: boolean;
+  attributes?: Record<string, string[]>;
+  [key: string]: unknown;
 }

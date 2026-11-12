@@ -106,7 +106,8 @@ function client(
     rootUrl: params.webOrigin,
     redirectUris: [`${params.webOrigin}${redirectPath}`],
     webOrigins: [params.webOrigin],
-    attributes: { "pkce.code.challenge.method": "S256" },
+    // 退出登录后允许回到的地址（与登录回调同一范围）
+    attributes: { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": `${params.webOrigin}${redirectPath}` },
     protocolMappers: protocolMappers(params, cfg),
   };
 }

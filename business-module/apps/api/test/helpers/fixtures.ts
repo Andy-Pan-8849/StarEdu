@@ -83,12 +83,29 @@ export async function createUser(
   };
 }
 
+/** 给账号分配角色（按角色编码，如 tenant-admin / hr-manager / student），库所有者账号直接写。 */
+export async function giveRole(owner: PrismaClient, tenantId: string, accountId: string, roleCode: string): Promise<string> {
+  const role = await owner.role.findFirstOrThrow({ where: { tenantId, code: roleCode } });
+  await owner.accountRole.upsert({
+    where: { accountId_roleId: { accountId, roleId: role.id } },
+    create: { tenantId, accountId, roleId: role.id },
+    update: {},
+  });
+  return role.id;
+}
+
 /** 删除一个测试租户的全部数据和 Keycloak 域（用库所有者账号，按外键顺序）。 */
 export async function removeTestTenant(owner: PrismaClient, keycloak: KeycloakAdmin, code: string): Promise<void> {
   const tenant = await owner.tenant.findUnique({ where: { code } });
   if (tenant) {
     const id = tenant.id;
     await owner.$transaction([
+      owner.$executeRaw`DELETE FROM biz.login_log WHERE tenant_id = ${id}::uuid`,
+      owner.$executeRaw`DELETE FROM biz.audit_log WHERE tenant_id = ${id}::uuid`,
+      owner.$executeRaw`DELETE FROM biz.person_dept WHERE tenant_id = ${id}::uuid`,
+      owner.$executeRaw`DELETE FROM biz.data_scope_set_node WHERE tenant_id = ${id}::uuid`,
+      owner.$executeRaw`DELETE FROM biz.role_data_scope WHERE tenant_id = ${id}::uuid`,
+      owner.$executeRaw`DELETE FROM biz.role_menu WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.account_role WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.account WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.person WHERE tenant_id = ${id}::uuid`,
@@ -100,6 +117,7 @@ export async function removeTestTenant(owner: PrismaClient, keycloak: KeycloakAd
       owner.$executeRaw`DELETE FROM biz.entry_menu WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.tenant_menu_grant WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.menu WHERE tenant_id = ${id}::uuid`,
+      owner.$executeRaw`DELETE FROM biz.data_scope_set WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.role WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.tenant WHERE id = ${id}::uuid`,
     ]);
