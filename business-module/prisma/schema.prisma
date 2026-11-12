@@ -1,0 +1,20 @@
+// 业务模块数据模型。B0 只有一张占位表，用来证明迁移和连接可用；
+// 真正的表从 B1 开始加（每张业务表带 tenant_id）。
+generator client {
+  provider = "prisma-client-js"
+  output   = "../apps/api/src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 占位：记录库的版本信息，B1 之后可删除。
+model SystemInfo {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("system_info")
+}

@@ -1,0 +1,17 @@
+{
+  "app": { "name": "StarIT" },
+  "language": { "label": "Language", "en": "English", "zh": "中文" },
+  "portal": {
+    "title": "Student portal",
+    "description": "My courses, enrollment, assignments, grades and transcript will appear here."
+  },
+  "admin": {
+    "title": "Admin console",
+    "description": "People, teaching, grades and system management for staff will appear here."
+  },
+  "platform": {
+    "title": "Platform console",
+    "description": "Tenant management, platform accounts and monitoring for platform operators will appear here."
+  },
+  "placeholder": { "status": "Scaffold only (milestone B0). Sign-in is added in B2." }
+}

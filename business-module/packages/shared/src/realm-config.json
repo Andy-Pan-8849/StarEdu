@@ -1,0 +1,29 @@
+{
+  "_comment": "Keycloak 域模板的全部可调参数，集中在这一个文件（11 号文档 4D、B3）。改这里，新开通的租户域就跟着变。",
+  "sslRequired": "external",
+  "accessTokenLifespanSeconds": 900,
+  "ssoSessionIdleTimeoutSeconds": 1800,
+  "ssoSessionMaxLifespanSeconds": 36000,
+  "inviteLinkLifespanSeconds": 259200,
+  "resetLinkLifespanSeconds": 1800,
+  "passwordPolicy": {
+    "length": 10,
+    "upperCase": 1,
+    "lowerCase": 1,
+    "digits": 1,
+    "specialChars": 1,
+    "notUsername": true,
+    "notEmail": true,
+    "history": 2,
+    "blacklistFile": "common-weak.txt"
+  },
+  "bruteForce": {
+    "failureFactor": 5,
+    "waitIncrementSeconds": 600,
+    "maxFailureWaitSeconds": 3600,
+    "maxDeltaTimeSeconds": 43200,
+    "minimumQuickLoginWaitSeconds": 60,
+    "permanentLockout": false
+  },
+  "audience": "staredu-api"
+}

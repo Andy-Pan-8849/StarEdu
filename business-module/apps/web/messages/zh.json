@@ -1,0 +1,17 @@
+{
+  "app": { "name": "StarIT" },
+  "language": { "label": "语言", "en": "English", "zh": "中文" },
+  "portal": {
+    "title": "学生门户",
+    "description": "我的课程、选课、作业、成绩和成绩单将出现在这里。"
+  },
+  "admin": {
+    "title": "管理后台",
+    "description": "教职员工使用的人员、教学、成绩和系统管理功能将出现在这里。"
+  },
+  "platform": {
+    "title": "平台入口",
+    "description": "平台运营人员使用的租户管理、平台账号和监控将出现在这里。"
+  },
+  "placeholder": { "status": "目前只有脚手架（里程碑 B0），登录在 B2 加入。" }
+}
