@@ -16,7 +16,9 @@
     "dev:api": "pnpm --filter @staredu/api dev",
     "dev:web": "pnpm --filter @staredu/web dev",
     "realm": "tsx scripts/create-realm.ts",
-    "smoke": "tsx scripts/smoke-b0.ts"
+    "smoke": "tsx scripts/smoke-b0.ts",
+    "provision": "tsx scripts/provision-tenant.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

@@ -1,20 +1,348 @@
-// 业务模块数据模型。B0 只有一张占位表，用来证明迁移和连接可用；
-// 真正的表从 B1 开始加（每张业务表带 tenant_id）。
+// 业务模块数据模型（B1：租户、账号、人员、组织、角色、菜单、入口的基础表）。
+//
+// 约定（11 号文档第 9 节）：
+//   - 每张业务表有 tenant_id；平台提供的行（角色模板、平台菜单、入口）tenant_id 为空，租户只读。
+//   - 主键 uuid；基础字段 created_at / updated_at / created_by / updated_by；业务删除用 deleted_at 软删除。
+//   - 行级安全（RLS）在迁移 SQL 里启用；应用用低权限账号 biz_app 连库，迁移用库所有者账号。
+//   - 部门祖先链 ancestors 是 text[]（含自己）+ GIN 索引，由数据库触发器维护。
 generator client {
   provider = "prisma-client-js"
   output   = "../apps/api/src/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("MIGRATION_DATABASE_URL")
 }
 
-// 占位：记录库的版本信息，B1 之后可删除。
-model SystemInfo {
-  key       String   @id
-  value     String
-  updatedAt DateTime @default(now()) @map("updated_at")
+enum TenantStatus {
+  provisioning // 正在开通（失败可重试）
+  active // 正常
+  notified // 已通知待停用
+  suspended // 已停用：登录被拒，数据保留
 
-  @@map("system_info")
+  @@map("tenant_status")
+}
+
+enum TenantType {
+  direct // 直营
+  franchise // 加盟（仅标注）
+
+  @@map("tenant_type")
+}
+
+enum AccountStatus {
+  pending // 待激活：已发邀请、未设密码
+  active
+  locked
+  disabled
+
+  @@map("account_status")
+}
+
+enum CampusType {
+  hq // 总部（不能关闭）
+  campus
+
+  @@map("campus_type")
+}
+
+enum CampusStatus {
+  normal
+  stop_new // 停止新增（过渡期）
+  closed
+
+  @@map("campus_status")
+}
+
+enum RoleKind {
+  custom // 租户自建或平台模板
+  tenant_admin // 内置：租户管理员
+  student // 内置：学生
+
+  @@map("role_kind")
+}
+
+enum MenuType {
+  directory
+  menu
+  button
+  link
+
+  @@map("menu_type")
+}
+
+enum PersonType {
+  staff
+  student
+
+  @@map("person_type")
+}
+
+model Tenant {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String       @unique // 登录网址的第一段，开通后不可修改（数据库触发器保证）
+  name             String
+  shortName        String?      @map("short_name")
+  type             TenantType   @default(direct)
+  status           TenantStatus @default(provisioning)
+  /// 开通进度，每一步完成后记录，重试时从断点继续
+  provisionStep    String       @default("created") @map("provision_step")
+  timezone         String       @default("UTC")
+  contactName      String?      @map("contact_name")
+  contactEmail     String?      @map("contact_email")
+  plannedSuspendAt DateTime?    @map("planned_suspend_at")
+  noticeText       String?      @map("notice_text")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  menuGrants TenantMenuGrant[]
+  accounts   Account[]
+  persons    Person[]
+  roles      Role[]
+  accountRoles AccountRole[]
+  menus      Menu[]
+  entryMenus EntryMenu[]
+  depts      Dept[]
+  campuses   Campus[]
+  posts      Post[]
+
+  @@map("tenant")
+}
+
+/// 租户功能授权：平台管理员对某个租户开通的菜单/按钮
+model TenantMenuGrant {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  menuId    String   @map("menu_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  menu   Menu   @relation(fields: [menuId], references: [id])
+
+  @@unique([tenantId, menuId])
+  @@map("tenant_menu_grant")
+}
+
+model Person {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String     @map("tenant_id") @db.Uuid
+  type       PersonType
+  fullName   String     @map("full_name")
+  workEmail  String?    @map("work_email")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at")
+  createdBy  String?    @map("created_by") @db.Uuid
+  updatedBy  String?    @map("updated_by") @db.Uuid
+  deletedAt  DateTime?  @map("deleted_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  account Account?
+
+  @@index([tenantId])
+  @@map("person")
+}
+
+model Account {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  /// 租户内唯一
+  username       String
+  /// 可选，租户内唯一
+  email          String?
+  /// 与人员 1:1；内置租户管理员、服务账号没有人员
+  personId       String?       @unique @map("person_id") @db.Uuid
+  keycloakUserId String?       @unique @map("keycloak_user_id")
+  status         AccountStatus @default(pending)
+  isBuiltinAdmin Boolean       @default(false) @map("is_builtin_admin")
+  isService      Boolean       @default(false) @map("is_service")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at")
+  createdBy      String?       @map("created_by") @db.Uuid
+  updatedBy      String?       @map("updated_by") @db.Uuid
+  deletedAt      DateTime?     @map("deleted_at")
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id])
+  person Person?       @relation(fields: [personId], references: [id])
+  roles  AccountRole[]
+
+  @@unique([tenantId, username])
+  @@unique([tenantId, email])
+  @@map("account")
+}
+
+model Role {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// 为空 = 平台角色模板，开通租户时复制给租户
+  tenantId    String?   @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  kind        RoleKind  @default(custom)
+  isTemplate  Boolean   @default(false) @map("is_template")
+  /// 租户的角色由哪个模板复制而来
+  templateId  String?   @map("template_id") @db.Uuid
+  sort        Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedBy   String?   @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at")
+
+  tenant   Tenant?       @relation(fields: [tenantId], references: [id])
+  template Role?         @relation("RoleTemplate", fields: [templateId], references: [id])
+  copies   Role[]        @relation("RoleTemplate")
+  accounts AccountRole[]
+
+  @@unique([tenantId, code])
+  @@map("role")
+}
+
+model AccountRole {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  accountId String   @map("account_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  @@unique([accountId, roleId])
+  @@map("account_role")
+}
+
+model Menu {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// 为空 = 平台提供（租户只读）
+  tenantId    String?   @map("tenant_id") @db.Uuid
+  parentId    String?   @map("parent_id") @db.Uuid
+  /// 翻译键，界面按语言取文字（Q4）；租户自建菜单直接存名称
+  nameKey     String?   @map("name_key")
+  name        String
+  type        MenuType
+  route       String?
+  /// 页面组件路径：构建时打包的页面，租户不能新增
+  component   String?
+  /// 权限标识，如 system:user:add
+  perms       String?
+  icon        String?
+  sort        Int       @default(0)
+  visible     Boolean   @default(true)
+  status      Boolean   @default(true)
+  /// 学生门户菜单适用的学籍状态（逗号分隔，默认在读）
+  applicableStatuses String? @map("applicable_statuses")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedBy   String?   @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at")
+
+  tenant   Tenant?           @relation(fields: [tenantId], references: [id])
+  parent   Menu?             @relation("MenuTree", fields: [parentId], references: [id])
+  children Menu[]            @relation("MenuTree")
+  grants   TenantMenuGrant[]
+  entries  EntryMenu[]
+
+  @@index([tenantId])
+  @@index([parentId])
+  @@map("menu")
+}
+
+/// 入口：管理后台 / 学生门户 / 平台。固定，由平台提供，租户不能新建。
+model Entry {
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code String @unique
+  name String
+
+  menus EntryMenu[]
+
+  @@map("entry")
+}
+
+/// 入口管理：把顶层菜单分配给入口。平台分配的行 tenant_id 为空（租户只读）。
+model EntryMenu {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId String? @map("tenant_id") @db.Uuid
+  entryId  String  @map("entry_id") @db.Uuid
+  menuId   String  @map("menu_id") @db.Uuid
+  sort     Int     @default(0)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  entry  Entry   @relation(fields: [entryId], references: [id])
+  menu   Menu    @relation(fields: [menuId], references: [id])
+
+  @@unique([entryId, menuId, tenantId])
+  @@map("entry_menu")
+}
+
+/// 部门树。ancestors 含自己，由触发器维护；"本部门及以下" = ancestors @> ARRAY[部门id]
+model Dept {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  parentId  String?   @map("parent_id") @db.Uuid
+  name      String
+  sort      Int       @default(0)
+  status    Boolean   @default(true)
+  ancestors String[]  @default([])
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  parent   Dept?   @relation("DeptTree", fields: [parentId], references: [id])
+  children Dept[]  @relation("DeptTree")
+  campus   Campus?
+
+  @@index([tenantId])
+  @@index([parentId])
+  @@index([ancestors], type: Gin)
+  @@map("dept")
+}
+
+/// 校区 = 部门树上的一个根节点；总部也是一个校区。
+model Campus {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String       @map("tenant_id") @db.Uuid
+  deptId    String       @unique @map("dept_id") @db.Uuid
+  code      String
+  name      String
+  shortName String?      @map("short_name")
+  address   String?
+  timezone  String       @default("UTC")
+  type      CampusType   @default(campus)
+  status    CampusStatus @default(normal)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @default(now()) @updatedAt @map("updated_at")
+  createdBy String?      @map("created_by") @db.Uuid
+  updatedBy String?      @map("updated_by") @db.Uuid
+  deletedAt DateTime?    @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  dept   Dept   @relation(fields: [deptId], references: [id])
+
+  @@unique([tenantId, code])
+  @@map("campus")
+}
+
+model Post {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  sort      Int       @default(0)
+  status    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+  @@map("post")
 }

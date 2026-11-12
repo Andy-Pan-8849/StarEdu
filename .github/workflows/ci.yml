@@ -96,8 +96,11 @@ jobs:
           --health-timeout 3s
           --health-retries 20
     env:
-      DATABASE_URL: postgresql://starit:starit@localhost:5433/starit_biz?schema=biz
+      # 应用用低权限账号 biz_app（受行级安全约束，由迁移创建）；迁移用库所有者
+      DATABASE_URL: postgresql://biz_app:starit-app@localhost:5433/starit_biz?schema=biz
+      MIGRATION_DATABASE_URL: postgresql://starit:starit@localhost:5433/starit_biz?schema=biz
       REDIS_URL: redis://localhost:6380/0
+      KEYCLOAK_URL: http://localhost:8180
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -114,12 +117,14 @@ jobs:
       - run: pnpm typecheck
       - name: Migrations run on an empty database
         run: pnpm migrate
-      - name: Tests (unit and integration, real Postgres and Redis)
-        run: pnpm test
       - name: Start Keycloak and Mailpit
         run: docker compose --env-file .env.example -f deploy/compose/biz.yaml up -d --wait keycloak mailpit
+      - name: Tests (unit, integration and cross-tenant leak scan; real Postgres, Redis, Keycloak)
+        run: pnpm test
       - name: Keycloak realm template smoke test
         run: pnpm smoke
+      - name: Provision the two demo tenants (twice, to prove it can be repeated)
+        run: pnpm seed && pnpm seed
       - name: Keycloak logs (on failure)
         if: failure()
         run: docker compose --env-file .env.example -f deploy/compose/biz.yaml logs keycloak --tail 100

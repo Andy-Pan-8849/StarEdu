@@ -5,6 +5,9 @@ const schema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
+  KEYCLOAK_URL: z.string().default("http://localhost:8180"),
+  /** 令牌里 iss 的前缀；Keycloak 按请求地址生成 iss，容器内外地址不同时才需要单独设置 */
+  KEYCLOAK_ISSUER_BASE: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof schema>;
