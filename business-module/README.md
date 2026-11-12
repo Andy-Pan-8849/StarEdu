@@ -4,6 +4,8 @@ The traditional business back office of StarEdu: a multi-tenant SaaS back office
 
 Status: **milestone B2 (authentication, roles and permissions, data scope).** Every request is bound to a tenant by its host name and isolation is enforced three times (request scope, Prisma extension, database row-level security) and checked by a cross-tenant leak scan (B1). On top of that, sign-in works end to end (Keycloak, one realm per tenant), the API checks a permission code on every endpoint, roles pick menus and buttons, and data scopes limit which rows a role can see or change. The admin console has a menu-tree shell with tabs and three working pages (online users, login log, audit log); the other pages arrive with their milestones.
 
+To try it as a learner or employer, see **[TRY-IT.md](TRY-IT.md)** (accounts, walk-through by role; it grows with each milestone).
+
 ## What is here
 
 | Path | What |
