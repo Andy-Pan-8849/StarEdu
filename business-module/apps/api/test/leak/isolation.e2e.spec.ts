@@ -31,6 +31,7 @@ const TABLES = [
   "role", "menu", "data_scope_set", "data_scope_set_node", "account", "account_role", "person", "person_dept",
   "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log", "dict_type", "dict_item", "sys_param",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "section_instructor", "section_material", "student_major",
+  "assignment_group", "assignment", "rubric_item", "assignment_extension", "submission", "submission_version", "submission_file", "submission_score",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course",
 ];
 
@@ -253,7 +254,7 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId)/, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
       const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400

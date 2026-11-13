@@ -3,6 +3,7 @@
 import type * as React from "react";
 import { JobsPage, MonitorPage, PlatformAuditPage, TenantsPage } from "./pages/platform-pages";
 import { CoursesPage, MajorsPage, PortalEnrollPage, PortalPlanPage, SectionsPage, TermsPage } from "./pages/edu-pages";
+import { PortalAssignmentsPage } from "./pages/assignment-pages";
 import { StaffPage, StudentsPage } from "./pages/hr-pages";
 import { DataScopesPage, EntriesPage, MenusPage, RolesPage, UsersPage } from "./pages/access-pages";
 import { CampusesPage, DeptsPage, DictsPage, OperationLogPage, ParamsPage, PostsPage } from "./pages/system-pages";
@@ -15,6 +16,7 @@ export const PAGES: Record<string, React.ComponentType> = {
   "edu/section/index": SectionsPage,
   "portal/enroll/index": PortalEnrollPage,
   "portal/plan/index": PortalPlanPage,
+  "portal/assignment/index": PortalAssignmentsPage,
   "hr/staff/index": StaffPage,
   "hr/student/index": StudentsPage,
   "system/user/index": UsersPage,

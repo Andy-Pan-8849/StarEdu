@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B6.** Sign-in, the platform console and all system-management pages work. The business pages (people, teaching, assignments, grades) are not built yet; their menus show "This page is not available yet."
+Status: **milestone B7.** Sign-in, the platform console, system management, people, teaching and assignments work. Grades, notifications and the AI assistant are not built yet; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -19,7 +19,7 @@ pnpm dev:api       # terminal 1
 pnpm dev:web       # terminal 2
 ```
 
-If you started this stack with an earlier milestone, run `make reset` first, then the steps above.
+If you started this stack with an earlier milestone, run `make reset` first, then the steps above. (Or keep your data: `pnpm migrate`, then `pnpm seed`, then `make up` so the object store is running.) Assignment files go to the object store (`objectstore`, port 9100); the first upload creates the bucket.
 
 Open **http://hq.localhost:3001/admin** (`*.localhost` names resolve to your machine in most browsers; otherwise add them to `/etc/hosts`). Outgoing mail (invitations, password links) appears in Mailpit at http://localhost:8125.
 
@@ -112,7 +112,10 @@ To load the sample company into `hq`: `pnpm import:sample`.
 |---|---|
 | See only your own sections and their rosters; you cannot change a section's capacity or status | Works today |
 | **Course materials** (title and link; draft or published) for your own sections; read-only after the section ends | Works today |
-| Assignments, grading | B7-B8 |
+| **Assignments** tab on a section: create an assignment (due date, rubric of items with points, optional late-work rule), organise them in groups, publish when ready | Works today |
+| **Submissions**: see every student of the section (those who have not submitted too), open a submission (all versions, download the files), **score each rubric item**, add feedback, **publish** one score or all that are fully scored | Works today |
+| **Extensions**: give one student 1-3 more days with a reason (the deadline moves for that student only; it is logged) | Works today |
+| Grade book, final grades | B8 |
 
 ### Student (portal at `/`; demo accounts arrive with the demo seed)
 
@@ -122,7 +125,10 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **Enroll** and **Drop** (the screen warns when a drop will become a W) | Works today |
 | **Degree plan**: your major's courses as passed / in progress / not taken, credits earned | Works today |
 | Course materials of the sections you are in | Works today (API) |
-| Assignments, grades, transcript, notifications, AI assistant | B7-B10 |
+| **My assignments**: the published assignments of your sections with deadline (23:59 campus time), rubric and your status; **submit** text and files (up to 10 files, 20 MB each; files go straight to the object store), submit again before the deadline (the last one counts, earlier versions are kept) | Works today |
+| After the deadline you can still submit if the assignment accepts late work: 10% off up to 24 hours late, 20% up to 48, 30% up to 72, nothing after that (the teacher can change the table per assignment) | Works today |
+| Your score, the points per rubric item and the feedback appear **only after the teacher publishes** | Works today |
+| Grades, transcript, notifications, AI assistant | B8-B10 |
 
 ### Campus lead
 
@@ -149,6 +155,7 @@ Signs in at **http://platform.localhost:3001** (create the first account with `p
 |---|---|
 | Sign in as `admin` of hq, then of riverside-franchise: different people and roles; a token for one company is refused on the other's address | Works today |
 | Two teachers with the same role but different departments see different students | B5-B6 |
+| A teacher who does not teach a section cannot see or grade its assignments; a student never sees another student's submission | Works today |
 | The Beijing campus lead cannot find Shanghai students; the group HR manager sees both | B5 |
 
 ## 4. Using the API directly (optional)

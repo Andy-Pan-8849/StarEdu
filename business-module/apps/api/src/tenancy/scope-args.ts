@@ -47,6 +47,14 @@ export const TENANT_MODELS: Record<string, ModelRule> = {
   Enrollment: { nullable: false, softDelete: false },
   SectionMaterial: { nullable: false, softDelete: false },
   OutboxEvent: { nullable: false, softDelete: false },
+  AssignmentGroup: { nullable: false, softDelete: false },
+  Assignment: { nullable: false, softDelete: false },
+  RubricItem: { nullable: false, softDelete: false },
+  AssignmentExtension: { nullable: false, softDelete: false },
+  Submission: { nullable: false, softDelete: false },
+  SubmissionVersion: { nullable: false, softDelete: false },
+  SubmissionFile: { nullable: false, softDelete: false },
+  SubmissionScore: { nullable: false, softDelete: false },
 };
 
 export class TenantScopeError extends Error {}
