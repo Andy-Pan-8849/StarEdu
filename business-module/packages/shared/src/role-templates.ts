@@ -30,11 +30,16 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     menuCodes: [
       "edu", "edu:term", "edu:term:add", "edu:term:edit", "edu:major", "edu:major:add", "edu:major:edit", "edu:course", "edu:course:add", "edu:course:edit",
       "edu:section", "edu:section:add", "edu:section:edit", "edu:section:status", "edu:section:roster", "edu:section:enroll", "edu:section:unenroll", "edu:section:materials",
+      "edu:section:assignments", "edu:section:submissions", "edu:section:extension",
       "hr", "hr:student",
     ],
   },
   { code: "campus-lead", name: "Campus lead", sort: 30, scopes: ["own_dept_tree"], menuCodes: ["hr", "hr:person", "hr:staff", "hr:student"] },
-  { code: "teacher", name: "Teacher", sort: 40, scopes: ["self", "own_classes"], menuCodes: ["edu", "edu:term", "edu:course", "edu:section", "edu:section:roster", "edu:section:materials"] },
+  { code: "teacher", name: "Teacher", sort: 40, scopes: ["self", "own_classes"], menuCodes: [
+      "edu", "edu:term", "edu:course", "edu:section", "edu:section:roster", "edu:section:materials",
+      "edu:section:assignments", "edu:section:assignmentEdit", "edu:section:submissions", "edu:section:grade", "edu:section:extension",
+    ],
+  },
 ];
 
 export const BUILTIN_SCOPE_CODES = ["all", "own_dept", "own_dept_tree", "self", "own_classes"] as const;

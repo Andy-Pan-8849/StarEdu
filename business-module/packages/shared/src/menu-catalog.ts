@@ -157,6 +157,11 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["enroll", "Enroll students", PERMS.eduEnrollmentAdd],
     ["unenroll", "Remove students", PERMS.eduEnrollmentRemove],
     ["materials", "Course materials", PERMS.eduMaterialEdit],
+    ["assignments", "Assignments", PERMS.eduAssignmentList],
+    ["assignmentEdit", "Edit assignments", PERMS.eduAssignmentEdit],
+    ["submissions", "Submissions", PERMS.eduSubmissionList],
+    ["grade", "Grade", PERMS.eduSubmissionGrade],
+    ["extension", "Extensions", PERMS.eduExtensionEdit],
   ]),
 
   // 学生门户：学生角色的权限就是这个入口下全部菜单和按钮的权限
@@ -166,6 +171,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["drop", "Drop", PERMS.portalEnrollDrop],
   ]),
   ...menuWithButtons("portal:plan", "portal", "Degree plan", "plan", 2, PERMS.portalPlanView, []),
+  ...menuWithButtons("portal:assignment", "portal", "My assignments", "assignment", 3, PERMS.portalAssignmentList, [["submit", "Submit", PERMS.portalAssignmentSubmit]]),
 
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },
   ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [

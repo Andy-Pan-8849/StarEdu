@@ -117,8 +117,8 @@ jobs:
       - run: pnpm typecheck
       - name: Migrations run on an empty database
         run: pnpm migrate
-      - name: Start Keycloak and Mailpit
-        run: docker compose --env-file .env.example -f deploy/compose/biz.yaml up -d --wait keycloak mailpit
+      - name: Start Keycloak, Mailpit and the object store
+        run: docker compose --env-file .env.example -f deploy/compose/biz.yaml up -d --wait keycloak mailpit objectstore
       - name: Tests (unit, integration and cross-tenant leak scan; real Postgres, Redis, Keycloak)
         run: pnpm test
       - name: Keycloak realm template smoke test

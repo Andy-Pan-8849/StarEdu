@@ -116,11 +116,23 @@ export const PERMS = {
   eduEnrollmentRemove: "edu:enrollment:remove",
   /** 课件：任课教师增删改 */
   eduMaterialEdit: "edu:material:edit",
+  /** 作业：看班级的作业、分组、评分标准 */
+  eduAssignmentList: "edu:assignment:list",
+  /** 作业：任课教师建、改、删、发布，管分组和评分标准 */
+  eduAssignmentEdit: "edu:assignment:edit",
+  /** 看提交（含文件） */
+  eduSubmissionList: "edu:submission:list",
+  /** 批改、发布分数：只有任课教师 */
+  eduSubmissionGrade: "edu:submission:grade",
+  /** 给某个学生的某次作业延期：任课教师或教务 */
+  eduExtensionEdit: "edu:extension:edit",
   // 学生门户
   portalEnrollList: "portal:enroll:list",
   portalEnrollAdd: "portal:enroll:add",
   portalEnrollDrop: "portal:enroll:drop",
   portalPlanView: "portal:plan:view",
+  portalAssignmentList: "portal:assignment:list",
+  portalAssignmentSubmit: "portal:assignment:submit",
 } as const;
 
 export type Permission = (typeof PERMS)[keyof typeof PERMS];
