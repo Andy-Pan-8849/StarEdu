@@ -146,6 +146,165 @@
       "target": "Target",
       "actor": "By",
       "system": "system"
+    },
+    "posts": {
+      "title": "Posts",
+      "code": "Code",
+      "name": "Name"
+    },
+    "campuses": {
+      "title": "Campuses",
+      "code": "Code",
+      "name": "Name",
+      "shortName": "Short name",
+      "address": "Address",
+      "timezone": "Time zone",
+      "hq": "headquarters",
+      "closedSuffix": "(closed)",
+      "status_normal": "Normal",
+      "status_stop_new": "No new intake",
+      "status_closed": "Closed",
+      "stopNew": "Stop new intake",
+      "resume": "Resume",
+      "close": "Close campus",
+      "reopen": "Reopen",
+      "closeCheck": "Closing check",
+      "closeCheckFor": "Before closing {name}",
+      "students": "Students still in the campus: {n}",
+      "staff": "Staff assignments: {n}",
+      "classes": "Classes in progress: {n}",
+      "classesLater": "Classes in progress: checked once the teaching module exists",
+      "typeName": "Type the campus name \"{name}\" to confirm closing it:",
+      "closeNow": "Close campus"
+    },
+    "depts": {
+      "title": "Departments",
+      "hint": "A campus is the root of its own tree. Departments with people, sub-departments or a campus can only be disabled.",
+      "name": "Name",
+      "parent": "Parent department"
+    },
+    "params": {
+      "title": "Parameters",
+      "key": "Key",
+      "name": "Name",
+      "value": "Value",
+      "source": "Source",
+      "platform": "Platform",
+      "own": "Own"
+    },
+    "dicts": {
+      "title": "Dictionaries",
+      "name": "Name",
+      "code": "Code",
+      "source": "Source",
+      "platform": "Platform",
+      "own": "Own",
+      "items": "Items",
+      "itemsOf": "Items of {name}",
+      "value": "Value",
+      "label": "Label",
+      "readOnly": "Platform dictionaries are read-only."
+    },
+    "operationLog": {
+      "title": "Operation log",
+      "time": "Time",
+      "user": "Account",
+      "request": "Request",
+      "duration": "Time taken",
+      "ip": "IP address",
+      "method": "Method",
+      "clear": "Clear log",
+      "confirmClear": "Clear the whole operation log? This is itself recorded in the audit log."
+    },
+    "users": {
+      "title": "Accounts",
+      "username": "User name",
+      "email": "E-mail",
+      "kind": "Kind",
+      "staff": "Staff",
+      "student": "Student",
+      "person": "Person",
+      "builtin": "built-in",
+      "status_pending": "Pending",
+      "status_active": "Active",
+      "status_locked": "Locked",
+      "status_disabled": "Disabled",
+      "roles": "Roles",
+      "assignRoles": "Roles",
+      "rolesOf": "Roles of {name}",
+      "enable": "Enable",
+      "disable": "Disable",
+      "resendInvite": "Resend invite",
+      "resetLink": "Reset link",
+      "tempPassword": "Temporary password",
+      "confirmTemp": "Create a temporary password for {name}? They must change it at next sign-in.",
+      "tempShown": "Temporary password for {name} (shown once, give it to the person yourself):",
+      "tempDone": "I have noted it",
+      "unlock": "Unlock",
+      "sent": "Sent.",
+      "unlocked": "Unlocked.",
+      "created": "Account created.",
+      "search": "Search"
+    },
+    "roles": {
+      "title": "Roles",
+      "name": "Name",
+      "code": "Code",
+      "kind": "Kind",
+      "custom": "Custom",
+      "builtin": "Built-in",
+      "permissions": "Permissions",
+      "permissionsOf": "Permissions of {name}",
+      "operations": "Menus and buttons",
+      "dataScope": "Data scope",
+      "scope_all": "All data",
+      "scope_own_dept": "Own department",
+      "scope_own_dept_tree": "Own department and below",
+      "scope_self": "Own records only",
+      "scope_own_classes": "Classes I teach or attend"
+    },
+    "menus": {
+      "title": "Menus",
+      "hint": "Platform menus are read-only. You can add directories and external links.",
+      "name": "Name",
+      "type": "Type",
+      "directory": "Directory",
+      "menu": "Menu",
+      "link": "External link",
+      "route": "Address",
+      "routeHint": "Full address for a link",
+      "parent": "Under directory",
+      "source": "Source",
+      "platform": "Platform",
+      "own": "Own",
+      "entry": "Entry",
+      "unassigned": "Not assigned",
+      "visible": "Visible"
+    },
+    "entries": {
+      "title": "Entry assignment",
+      "hint": "Assign your own top-level menus to an entry. Menus not assigned to any entry are drafts and appear nowhere.",
+      "entry_admin": "Admin console",
+      "entry_portal": "Student portal",
+      "platformAssigned": "Assigned by the platform",
+      "yourMenus": "Your menus",
+      "noOwnMenus": "You have no top-level menus of your own yet.",
+      "unassignedList": "Not assigned to any entry"
+    },
+    "dataScopes": {
+      "title": "Data scopes",
+      "name": "Name",
+      "source": "Source",
+      "builtin": "Built-in",
+      "custom": "Custom",
+      "nodes": "Departments",
+      "pick": "Pick departments",
+      "includeChildren": "Include sub-departments",
+      "kind_all": "All data",
+      "kind_own_dept": "Own department",
+      "kind_own_dept_tree": "Own department and below",
+      "kind_self": "Own records only",
+      "kind_own_classes": "Classes I teach or attend"
     }
   },
   "menu": {
@@ -171,6 +330,50 @@
     "platform:entry": "Entry assignment",
     "platform:monitor": "Monitoring",
     "platform:job": "Scheduled jobs",
-    "platform:log": "Audit log"
+    "platform:log": "Audit log",
+    "system:dict": "Dictionaries",
+    "system:param": "Parameters",
+    "system:operationLog": "Operation log"
+  },
+  "dict": {
+    "type": {
+      "gender": "Gender",
+      "employment_type": "Employment type"
+    },
+    "gender": {
+      "male": "Male",
+      "female": "Female",
+      "other": "Other",
+      "unknown": "Prefer not to say"
+    },
+    "employment_type": {
+      "full_time": "Full time",
+      "part_time": "Part time"
+    }
+  },
+  "param": {
+    "system": {
+      "ui": {
+        "defaultLocale": "Default language"
+      },
+      "list": {
+        "pageSize": "Default page size"
+      }
+    }
+  },
+  "crud": {
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "done": "Done.",
+    "saved": "Saved.",
+    "confirmDelete": "Delete {name}?",
+    "sort": "Order",
+    "status": "Status",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
   }
 }

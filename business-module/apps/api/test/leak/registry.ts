@@ -20,6 +20,9 @@ export type Fixture =
   | "personId"
   | "menuId"
   | "setId"
+  | "dictTypeId"
+  | "dictItemId"
+  | "paramId"
   | "sid";
 
 export interface LeakEntry {
@@ -35,6 +38,12 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/me/menus?entry=admin", kind: "other" },
   { method: "GET", path: "/api/campuses", kind: "list" },
   { method: "GET", path: "/api/campuses/:id", kind: "detail", fixture: "campusId" },
+  { method: "GET", path: "/api/campuses/:id/closure-check", kind: "detail", fixture: "campusId" },
+  { method: "GET", path: "/api/dict-types", kind: "other" },
+  { method: "GET", path: "/api/dict-types/:id/items", kind: "detail", fixture: "dictTypeId" },
+  { method: "GET", path: "/api/dicts/:code", kind: "other" },
+  { method: "GET", path: "/api/params", kind: "other" },
+  { method: "GET", path: "/api/operation-logs", kind: "other" },
   { method: "GET", path: "/api/depts", kind: "list" },
   { method: "GET", path: "/api/depts/:id", kind: "detail", fixture: "deptId" },
   { method: "GET", path: "/api/posts", kind: "list" },
@@ -82,6 +91,23 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "PUT", path: "/api/accounts/:id/roles", fixture: "accountId", target: "foreign", body: { roleIds: [] }, note: "change another tenant's account roles" },
   { method: "PATCH", path: "/api/persons/:id", fixture: "personId", target: "foreign", body: { fullName: "hacked" }, note: "edit another tenant's person" },
   { method: "DELETE", path: "/api/online/:sid", fixture: "sid", target: "foreign", note: "force logout another tenant's session" },
+  { method: "PATCH", path: "/api/campuses/:id", fixture: "campusId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's campus" },
+  { method: "POST", path: "/api/campuses/:id/status", fixture: "campusId", target: "foreign", body: { status: "stop_new" }, note: "change another tenant's campus status" },
+  { method: "PATCH", path: "/api/depts/:id", fixture: "deptId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's department" },
+  { method: "DELETE", path: "/api/depts/:id", fixture: "deptId", target: "foreign", note: "delete another tenant's department" },
+  { method: "PATCH", path: "/api/posts/:id", fixture: "postId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's post" },
+  { method: "DELETE", path: "/api/posts/:id", fixture: "postId", target: "foreign", note: "delete another tenant's post" },
+  { method: "PATCH", path: "/api/dict-types/:id", fixture: "dictTypeId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's dictionary" },
+  { method: "DELETE", path: "/api/dict-types/:id", fixture: "dictTypeId", target: "foreign", note: "delete another tenant's dictionary" },
+  { method: "POST", path: "/api/dict-types/:id/items", fixture: "dictTypeId", target: "foreign", body: { value: "x", label: "X" }, note: "add an item to another tenant's dictionary" },
+  { method: "PATCH", path: "/api/dict-items/:id", fixture: "dictItemId", target: "foreign", body: { label: "hacked" }, note: "edit another tenant's dictionary item" },
+  { method: "DELETE", path: "/api/dict-items/:id", fixture: "dictItemId", target: "foreign", note: "delete another tenant's dictionary item" },
+  { method: "PATCH", path: "/api/params/:id", fixture: "paramId", target: "foreign", body: { value: "hacked" }, note: "edit another tenant's parameter" },
+  { method: "DELETE", path: "/api/params/:id", fixture: "paramId", target: "foreign", note: "delete another tenant's parameter" },
+  { method: "POST", path: "/api/accounts/:id/invite", fixture: "accountId", target: "foreign", note: "resend an invitation for another tenant's account" },
+  { method: "POST", path: "/api/accounts/:id/reset-link", fixture: "accountId", target: "foreign", note: "send a reset link for another tenant's account" },
+  { method: "POST", path: "/api/accounts/:id/temp-password", fixture: "accountId", target: "foreign", note: "set a temporary password on another tenant's account" },
+  { method: "POST", path: "/api/accounts/:id/unlock", fixture: "accountId", target: "foreign", note: "unlock another tenant's account" },
   // 目标行是 A 的，但请求体里带着 B 的关联 id（外键不受行级安全约束）
   { method: "POST", path: "/api/accounts", target: "own", body: { username: "leak.role", roleIds: ["{{B.roleId}}"] }, note: "create account with another tenant's role" },
   { method: "POST", path: "/api/accounts", target: "own", body: { username: "leak.person", personId: "{{B.personId}}" }, note: "create account linked to another tenant's person" },
@@ -91,6 +117,8 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "POST", path: "/api/data-scope-sets", target: "own", body: { name: "leak", nodes: [{ deptId: "{{B.deptId}}", includeChildren: true }] }, note: "scope node on another tenant's department" },
   { method: "PUT", path: "/api/data-scope-sets/:id", fixture: "setId", target: "own", body: { name: "leak", nodes: [{ deptId: "{{B.deptId}}", includeChildren: true }] }, note: "rewrite own scope onto another tenant's department" },
   { method: "PUT", path: "/api/entries/:code/menus", target: "own", body: { menus: [{ menuId: "{{B.menuId}}", sort: 1 }] }, note: "assign another tenant's menu to an entry" },
+  { method: "POST", path: "/api/depts", target: "own", body: { name: "leak", parentId: "{{B.deptId}}" }, note: "create a department under another tenant's department" },
+  { method: "PATCH", path: "/api/depts/:id", fixture: "deptId", target: "own", body: { parentId: "{{B.deptId}}" }, note: "move own department under another tenant's department" },
   { method: "POST", path: "/api/menus", target: "own", body: { parentId: "{{B.menuId}}", name: "leak", type: "directory" }, note: "create a menu under another tenant's menu" },
 ];
 
@@ -99,5 +127,10 @@ export const OTHER_ROUTES: Record<string, string> = {
   "POST /api/auth/session": "registers the caller's own session; body has only an entry code",
   "POST /api/roles": "creates a role in the caller's tenant from name/code only",
   "POST /api/menus": "tested above with a foreign parent id; otherwise creates in the caller's tenant",
+  "POST /api/campuses": "creates a campus and its root department in the caller's tenant from plain fields",
+  "POST /api/posts": "creates a post from plain fields",
+  "POST /api/dict-types": "creates a dictionary in the caller's tenant from plain fields",
+  "POST /api/params": "creates a parameter in the caller's tenant from plain fields",
+  "DELETE /api/operation-logs": "clears the caller's own tenant's operation log (row-level security limits it to the tenant)",
   "POST /api/accounts/reconcile": "compares the caller's own tenant with its own Keycloak realm",
 };

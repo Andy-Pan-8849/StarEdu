@@ -252,7 +252,7 @@ describe("platform console", () => {
   describe("scheduled jobs", () => {
     it("only registered jobs exist; arbitrary names are refused; cron must be a valid 5-field expression", async () => {
       const jobs = (await root().get("/api/platform/jobs")).body as Array<{ code: string; cron: string; enabled: boolean }>;
-      expect(jobs.map((j) => j.code).sort()).toEqual(["accounts.reconcile", "tenants.suspend-due"]);
+      expect(jobs.map((j) => j.code).sort()).toEqual(["accounts.reconcile", "logs.purge-params", "tenants.suspend-due"]);
       expect((await root().patch("/api/platform/jobs/rm -rf /", { enabled: true })).status).toBe(404);
       expect((await root().post("/api/platform/jobs/not.a.job/run")).status).toBe(404);
       expect((await root().patch("/api/platform/jobs/tenants.suspend-due", { cron: "every day" })).status).toBe(409);

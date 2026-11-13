@@ -2,6 +2,7 @@
 //   创建顺序：业务库写一条"待激活"账号 → 在该租户的 Keycloak 域建用户 → 回写 Keycloak 用户 id → 发邀请邮件。
 //   中途失败账号留在"待激活、没有 Keycloak 用户"，对账能发现并补建。
 //   改邮箱、停用/启用从这里推送给 Keycloak；定时对账发现两边不一致（以业务库为准）。
+import { randomInt } from "node:crypto";
 import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { realmName } from "@staredu/shared";
 import { AuditService } from "../audit/audit.service";
@@ -175,6 +176,45 @@ export class AccountsService {
     return { id: accountId, roleIds: wanted };
   }
 
+  private async keycloakTarget(accountId: string) {
+    const tenant = requireTenant("manage account credentials");
+    const account = await this.tenantDb.db.account.findUnique({ where: { id: accountId } });
+    if (!account) throw new NotFoundException();
+    // 内置租户管理员只有平台管理员能重置
+    if (account.isBuiltinAdmin) throw new ForbiddenException("Only a platform administrator can reset the built-in administrator");
+    if (!account.keycloakUserId) throw new BadRequestException("The account has no identity-service user yet; run reconcile first");
+    return { tenant, account, realm: realmName("tenant", tenant.code) };
+  }
+
+  /** 重发邀请 / 发重设密码链接（都是"设置密码"邮件，学生走门户、教职员工走后台）。 */
+  async sendLink(actor: Authz, accountId: string, kind: "invite" | "reset") {
+    const { tenant, account, realm } = await this.keycloakTarget(accountId);
+    if (!account.email) throw new BadRequestException("The account has no e-mail address; use a temporary password instead");
+    const person = account.personId ? await this.tenantDb.db.person.findUnique({ where: { id: account.personId } }) : null;
+    const portal = person?.type === "student";
+    await (await this.keycloak.client()).sendInvite(realm, account.keycloakUserId as string, portal ? "portal" : "admin", `${tenantOrigin(tenant.code)}${portal ? "/" : "/admin"}`);
+    await this.audit.record(actor.accountId, `account.${kind}`, "account", accountId, { email: account.email });
+    return { sent: true };
+  }
+
+  /** 临时密码：随机 12 位（含大小写、数字、特殊字符），只在这次响应里显示；用户登录后被强制改密。密码不写日志。 */
+  async tempPassword(actor: Authz, accountId: string) {
+    const { account, realm } = await this.keycloakTarget(accountId);
+    let password = "";
+    do password = generateTempPassword();
+    while (password.toLowerCase().includes(account.username.toLowerCase()) || (account.email && password.toLowerCase().includes(account.email.toLowerCase())));
+    await (await this.keycloak.client()).resetPassword(realm, account.keycloakUserId as string, password, true);
+    await this.audit.record(actor.accountId, "account.tempPassword", "account", accountId);
+    return { password, mustChange: true };
+  }
+
+  async unlock(actor: Authz, accountId: string) {
+    const { account, realm } = await this.keycloakTarget(accountId);
+    await (await this.keycloak.client()).unlockUser(realm, account.keycloakUserId as string);
+    await this.audit.record(actor.accountId, "account.unlock", "account", accountId);
+    return { unlocked: true };
+  }
+
   /** 对账：业务库与 Keycloak 域逐个账号比对。fix 为真时按业务库为准补推（不会删除任何一边的数据）。 */
   async reconcile(actor: { accountId: string | null }, fix: boolean): Promise<ReconcileReport> {
     const tenant = requireTenant("reconcile accounts");
@@ -227,4 +267,22 @@ export class AccountsService {
     await this.audit.record(actor.accountId, "account.reconcile", "tenant", tenant.tenantId, { discrepancies: discrepancies.length, fixed, fix });
     return { checked: accounts.length, discrepancies, fixed };
   }
+}
+
+const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const LOWER = "abcdefghijkmnpqrstuvwxyz";
+const DIGITS = "23456789";
+const SPECIAL = "!@#$%^&*-_=+";
+
+/** 12 位随机密码：每类字符至少一个（去掉了容易看混的 0/O、1/l/I），再整体洗牌。 */
+export function generateTempPassword(length = 12): string {
+  const pick = (set: string) => set[randomInt(set.length)];
+  const chars = [pick(UPPER), pick(LOWER), pick(DIGITS), pick(SPECIAL)];
+  const all = UPPER + LOWER + DIGITS + SPECIAL;
+  while (chars.length < length) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
 }

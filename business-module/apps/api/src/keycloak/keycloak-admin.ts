@@ -166,6 +166,21 @@ export class KeycloakAdmin {
     if (res.status !== 204) throw new KeycloakError(`update user failed: ${res.status} ${await res.text()}`, res.status);
   }
 
+  /** 设置密码；temporary=true 时用户下次登录必须改密（Required Action）。 */
+  async resetPassword(realm: string, userId: string, value: string, temporary: boolean): Promise<void> {
+    const res = await this.request(`/realms/${realm}/users/${userId}/reset-password`, { method: "PUT", body: JSON.stringify({ type: "password", value, temporary }) });
+    if (res.status !== 204) throw new KeycloakError(`reset password failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  /** 某个客户端下的在线会话（最多 max 条）。 */
+  async clientSessions(realm: string, clientId: string, max = 200): Promise<KeycloakSession[]> {
+    const clients = (await (await this.request(`/realms/${realm}/clients?clientId=${encodeURIComponent(clientId)}`)).json()) as Array<{ id: string }>;
+    if (!clients[0]) return [];
+    const res = await this.request(`/realms/${realm}/clients/${clients[0].id}/user-sessions?first=0&max=${max}`);
+    if (!res.ok) throw new KeycloakError(`list sessions failed: ${res.status}`, res.status);
+    return (await res.json()) as KeycloakSession[];
+  }
+
   /** 解除登录失败造成的临时锁定。 */
   async unlockUser(realm: string, userId: string): Promise<void> {
     const res = await this.request(`/realms/${realm}/attack-detection/brute-force/users/${userId}`, { method: "DELETE" });
@@ -186,4 +201,14 @@ export interface KeycloakUser {
   enabled?: boolean;
   attributes?: Record<string, string[]>;
   [key: string]: unknown;
+}
+
+export interface KeycloakSession {
+  id: string;
+  username: string;
+  userId: string;
+  ipAddress: string;
+  /** 毫秒时间戳 */
+  start: number;
+  lastAccess: number;
 }

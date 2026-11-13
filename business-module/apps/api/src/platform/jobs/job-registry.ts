@@ -59,4 +59,18 @@ export const JOBS: JobDefinition[] = [
   },
 ];
 
+export const OPERATION_LOG_PARAM_DAYS = 180;
+
+JOBS.push({
+  code: "logs.purge-params",
+  name: "Remove request parameters from old operation logs",
+  description: `Operation log entries keep their parameters for ${OPERATION_LOG_PARAM_DAYS} days; after that the parameters are cleared and the rest of the entry is kept.`,
+  defaultCron: "15 2 * * *",
+  async run({ db }) {
+    const cutoff = new Date(Date.now() - OPERATION_LOG_PARAM_DAYS * 864e5);
+    const count = await db.$executeRaw`UPDATE biz.operation_log SET params = NULL WHERE created_at < ${cutoff} AND params IS NOT NULL`;
+    return `parameters cleared on ${count} entries older than ${OPERATION_LOG_PARAM_DAYS} days`;
+  },
+});
+
 export const jobByCode = (code: string): JobDefinition | undefined => JOBS.find((j) => j.code === code);

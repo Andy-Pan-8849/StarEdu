@@ -31,9 +31,11 @@ export class AccountsController {
 
   @Get()
   @RequirePermissions(PERMS.userList)
-  async list(@Query() query: { page?: string; size?: string }) {
+  async list(@Query() query: { page?: string; size?: string; q?: string }) {
     const db = this.tenantDb.db;
-    const rows = await db.account.findMany({ orderBy: { username: "asc" }, ...paging(query) });
+    const q = query.q?.trim();
+    const where = q ? { OR: [{ username: { contains: q, mode: "insensitive" as const } }, { email: { contains: q, mode: "insensitive" as const } }] } : undefined;
+    const rows = await db.account.findMany({ where, orderBy: { username: "asc" }, ...paging(query) });
     const links = rows.length ? await db.accountRole.findMany({ where: { accountId: { in: rows.map((r) => r.id) } } }) : [];
     return rows.map((r) => ({ ...r, roleIds: links.filter((l) => l.accountId === r.id).map((l) => l.roleId) }));
   }
@@ -64,6 +66,30 @@ export class AccountsController {
   @RequirePermissions(PERMS.userEdit)
   status(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     return this.accounts.setStatus(auth.authz, id, parse(statusSchema, body).status);
+  }
+
+  @Post(":id/invite")
+  @RequirePermissions(PERMS.userResetPwd)
+  invite(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    return this.accounts.sendLink(auth.authz, id, "invite");
+  }
+
+  @Post(":id/reset-link")
+  @RequirePermissions(PERMS.userResetPwd)
+  resetLink(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    return this.accounts.sendLink(auth.authz, id, "reset");
+  }
+
+  @Post(":id/temp-password")
+  @RequirePermissions(PERMS.userResetPwd)
+  tempPassword(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    return this.accounts.tempPassword(auth.authz, id);
+  }
+
+  @Post(":id/unlock")
+  @RequirePermissions(PERMS.userEdit)
+  unlock(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    return this.accounts.unlock(auth.authz, id);
   }
 
   @Patch(":id/email")

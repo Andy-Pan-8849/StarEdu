@@ -146,6 +146,165 @@
       "target": "对象",
       "actor": "操作人",
       "system": "系统"
+    },
+    "posts": {
+      "title": "岗位管理",
+      "code": "编码",
+      "name": "名称"
+    },
+    "campuses": {
+      "title": "校区管理",
+      "code": "代码",
+      "name": "名称",
+      "shortName": "简称",
+      "address": "地址",
+      "timezone": "时区",
+      "hq": "总部",
+      "closedSuffix": "（已关闭）",
+      "status_normal": "正常",
+      "status_stop_new": "停止新增",
+      "status_closed": "已关闭",
+      "stopNew": "停止新增",
+      "resume": "恢复正常",
+      "close": "关闭校区",
+      "reopen": "重新开放",
+      "closeCheck": "关闭前检查",
+      "closeCheckFor": "关闭 {name} 之前",
+      "students": "仍在校区的学生：{n}",
+      "staff": "有效任职的教职员工：{n}",
+      "classes": "进行中的班级：{n}",
+      "classesLater": "进行中的班级：教学模块上线后检查",
+      "typeName": "请输入校区名称“{name}”以确认关闭：",
+      "closeNow": "关闭校区"
+    },
+    "depts": {
+      "title": "部门管理",
+      "hint": "校区是各自部门树的根。有人员、有下级或关联校区的部门只能停用，不能删除。",
+      "name": "名称",
+      "parent": "上级部门"
+    },
+    "params": {
+      "title": "参数管理",
+      "key": "键",
+      "name": "名称",
+      "value": "值",
+      "source": "来源",
+      "platform": "平台提供",
+      "own": "自有"
+    },
+    "dicts": {
+      "title": "字典管理",
+      "name": "名称",
+      "code": "编码",
+      "source": "来源",
+      "platform": "平台提供",
+      "own": "自有",
+      "items": "条目",
+      "itemsOf": "{name} 的条目",
+      "value": "值",
+      "label": "显示文字",
+      "readOnly": "平台提供的字典只读。"
+    },
+    "operationLog": {
+      "title": "操作日志",
+      "time": "时间",
+      "user": "账号",
+      "request": "请求",
+      "duration": "耗时",
+      "ip": "IP 地址",
+      "method": "方法",
+      "clear": "清空日志",
+      "confirmClear": "确定清空整个操作日志吗？清空这件事本身会记入审计日志。"
+    },
+    "users": {
+      "title": "账号管理",
+      "username": "用户名",
+      "email": "邮箱",
+      "kind": "类型",
+      "staff": "教职员工",
+      "student": "学生",
+      "person": "人员",
+      "builtin": "内置",
+      "status_pending": "待激活",
+      "status_active": "正常",
+      "status_locked": "已锁定",
+      "status_disabled": "已停用",
+      "roles": "角色",
+      "assignRoles": "角色",
+      "rolesOf": "{name} 的角色",
+      "enable": "启用",
+      "disable": "停用",
+      "resendInvite": "重发邀请",
+      "resetLink": "重置链接",
+      "tempPassword": "临时密码",
+      "confirmTemp": "为 {name} 生成临时密码吗？对方下次登录必须改密。",
+      "tempShown": "{name} 的临时密码（只显示这一次，请自己转交给本人）：",
+      "tempDone": "我已记下",
+      "unlock": "解锁",
+      "sent": "已发送。",
+      "unlocked": "已解锁。",
+      "created": "账号已创建。",
+      "search": "搜索"
+    },
+    "roles": {
+      "title": "角色管理",
+      "name": "名称",
+      "code": "编码",
+      "kind": "类型",
+      "custom": "自定义",
+      "builtin": "内置",
+      "permissions": "权限",
+      "permissionsOf": "{name} 的权限",
+      "operations": "菜单和按钮",
+      "dataScope": "数据权限",
+      "scope_all": "全部数据",
+      "scope_own_dept": "本部门",
+      "scope_own_dept_tree": "本部门及以下",
+      "scope_self": "仅本人",
+      "scope_own_classes": "本人任教/就读的班级"
+    },
+    "menus": {
+      "title": "菜单管理",
+      "hint": "平台提供的菜单只读；你可以新增目录和外链。",
+      "name": "名称",
+      "type": "类型",
+      "directory": "目录",
+      "menu": "菜单",
+      "link": "外链",
+      "route": "地址",
+      "routeHint": "外链的完整网址",
+      "parent": "所属目录",
+      "source": "来源",
+      "platform": "平台提供",
+      "own": "自建",
+      "entry": "入口",
+      "unassigned": "未分配入口",
+      "visible": "显示"
+    },
+    "entries": {
+      "title": "入口管理",
+      "hint": "把你自己的顶层菜单分配给入口。没有分配到任何入口的菜单是草稿，哪里都不显示。",
+      "entry_admin": "管理后台",
+      "entry_portal": "学生门户",
+      "platformAssigned": "平台分配的",
+      "yourMenus": "你的菜单",
+      "noOwnMenus": "你还没有自己的顶层菜单。",
+      "unassignedList": "未分配入口的菜单"
+    },
+    "dataScopes": {
+      "title": "数据权限集",
+      "name": "名称",
+      "source": "来源",
+      "builtin": "内置",
+      "custom": "自定义",
+      "nodes": "部门数",
+      "pick": "选择部门",
+      "includeChildren": "包含下级部门",
+      "kind_all": "全部数据",
+      "kind_own_dept": "本部门",
+      "kind_own_dept_tree": "本部门及以下",
+      "kind_self": "仅本人",
+      "kind_own_classes": "本人任教/就读的班级"
     }
   },
   "menu": {
@@ -160,7 +319,7 @@
     "system:post": "岗位管理",
     "system:online": "在线用户",
     "system:loginLog": "登录日志",
-    "system:auditLog": "操作日志",
+    "system:auditLog": "审计日志",
     "hr": "人事",
     "hr:person": "人员档案",
     "platform": "平台管理",
@@ -171,6 +330,50 @@
     "platform:entry": "入口管理",
     "platform:monitor": "监控",
     "platform:job": "定时任务",
-    "platform:log": "操作日志"
+    "platform:log": "操作日志",
+    "system:dict": "字典管理",
+    "system:param": "参数管理",
+    "system:operationLog": "操作日志"
+  },
+  "dict": {
+    "type": {
+      "gender": "性别",
+      "employment_type": "雇佣类型"
+    },
+    "gender": {
+      "male": "男",
+      "female": "女",
+      "other": "其他",
+      "unknown": "不愿透露"
+    },
+    "employment_type": {
+      "full_time": "全职",
+      "part_time": "兼职"
+    }
+  },
+  "param": {
+    "system": {
+      "ui": {
+        "defaultLocale": "默认语言"
+      },
+      "list": {
+        "pageSize": "默认每页条数"
+      }
+    }
+  },
+  "crud": {
+    "add": "新增",
+    "edit": "修改",
+    "delete": "删除",
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "done": "已完成。",
+    "saved": "已保存。",
+    "confirmDelete": "确定删除 {name} 吗？",
+    "sort": "排序",
+    "status": "状态",
+    "enabled": "启用",
+    "disabled": "停用"
   }
 }

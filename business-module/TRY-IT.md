@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B2.** Sign-in, roles and permissions, and the admin shell work. Most business pages (people, teaching, assignments, grades) are not built yet; their menus show "This page is not available yet."
+Status: **milestone B4.** Sign-in, the platform console and all system-management pages work. The business pages (people, teaching, assignments, grades) are not built yet; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -71,9 +71,14 @@ The administrator has every operation permission of the features enabled for the
 | Sign in to `/admin`; the menu shows only system management and what your roles allow | Works today |
 | **Online users**: see who is signed in; **Force logout** ends a session (the person's next request is refused) | Works today |
 | **Login log** and **Audit log**: who signed in, who changed roles, permissions, menus, accounts or sessions | Works today |
-| Create a role, tick its menus and buttons, choose its data scope, give it to an account, watch that account's menu change | API today (section 4); screens in B4 |
-| Create an account and send the invitation; the person sets a password from the e-mail in Mailpit | API today; screens in B4 |
-| Add an external-link menu and assign it to the admin console | B4 |
+| **Accounts**: create an account (invitation e-mail), assign roles, enable or disable, resend the invitation, send a reset link, create a **temporary password** (12 characters, shown once, the person must change it at next sign-in), unlock | Works today |
+| **Roles**: create a role, tick its menus and buttons, choose its data scopes; watch an account's menu change | Works today |
+| **Data scopes**: pick departments in the tree (with or without sub-departments) | Works today |
+| **Menus** and **Entry assignment**: add a directory or an external link, assign it to the admin console or the student portal | Works today |
+| **Campuses**: add a campus (its root department is created for you); stop new intake; close it only when no students or staff assignments are left (type its name to confirm); reopen | Works today |
+| **Departments** and **Posts**: build the tree, move departments, disable or delete (departments with people, sub-departments or a campus can only be disabled) | Works today |
+| **Dictionaries** and **Parameters**: the platform's are read-only; add your own | Works today |
+| **Operation log**: who changed what (passwords and tokens are masked, responses are never stored); clearing needs its own permission | Works today |
 
 ### HR manager, campus lead, academic manager, teacher, student
 
@@ -108,9 +113,9 @@ Signs in at **http://platform.localhost:3001** (create the first account with `p
 | Two teachers with the same role but different departments see different students | B5-B6 |
 | The Beijing campus lead cannot find Shanghai students; the group HR manager sees both | B5 |
 
-## 4. Create an account and a role (API, until the screens arrive)
+## 4. Using the API directly (optional)
 
-Everything below is also what the screens will call. A convenient way to try it is the browser's developer console on an admin page, after signing in:
+The screens above call the same endpoints. A convenient way to try it is the browser's developer console on an admin page, after signing in:
 
 ```js
 const call = (path, method = "GET", body) =>

@@ -29,7 +29,7 @@ interface Side {
 
 const TABLES = [
   "role", "menu", "data_scope_set", "data_scope_set_node", "account", "account_role", "person", "person_dept",
-  "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log",
+  "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log", "dict_type", "dict_item", "sys_param",
 ];
 
 describe("cross-tenant leak scan", () => {
@@ -59,13 +59,16 @@ describe("cross-tenant leak scan", () => {
     const menu = await owner.menu.create({ data: { tenantId, name: "Own link", type: "link", route: "https://example.test" } });
     const set = await owner.dataScopeSet.create({ data: { tenantId, code: "custom-scan", name: "Scan set", kind: "custom" } });
     await owner.dataScopeSetNode.create({ data: { tenantId, setId: set.id, deptId: dept.id } });
+    const dictType = await owner.dictType.create({ data: { tenantId, code: "scan_dict", name: "Scan dictionary" } });
+    const dictItem = await owner.dictItem.create({ data: { tenantId, typeId: dictType.id, value: "one", label: "One" } });
+    const param = await owner.sysParam.create({ data: { tenantId, key: "scan.param", value: "1", name: "Scan parameter" } });
 
     const token = await user.token();
     const sid = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8")).sid as string;
     const everyId = async (table: string) =>
       (await owner.$queryRawUnsafe<Array<{ id: string }>>(`SELECT id::text FROM biz.${table} WHERE tenant_id = '${tenantId}'`)).map((r) => r.id);
     const allIds = new Set<string>([tenantId, sid]);
-    for (const t of ["role", "menu", "data_scope_set", "account", "person", "dept", "campus", "post"]) (await everyId(t)).forEach((i) => allIds.add(i));
+    for (const t of ["role", "menu", "data_scope_set", "account", "person", "dept", "campus", "post", "dict_type", "dict_item", "sys_param"]) (await everyId(t)).forEach((i) => allIds.add(i));
     return {
       tenant,
       host: `${tenant.code}.localhost`,
@@ -80,6 +83,9 @@ describe("cross-tenant leak scan", () => {
         personId: person.id,
         menuId: menu.id,
         setId: set.id,
+        dictTypeId: dictType.id,
+        dictItemId: dictItem.id,
+        paramId: param.id,
         sid,
       },
       allIds: new Set([...allIds, extraCampus.id, extraCampusDept.id]),
@@ -110,7 +116,7 @@ describe("cross-tenant leak scan", () => {
     return req;
   };
   const pathFor = (entry: (typeof LEAK_REGISTRY)[number], side: Side) =>
-    entry.fixture ? entry.path.replace(":id", side.ids[entry.fixture]) : entry.path;
+    (entry.fixture ? entry.path.replace(":id", side.ids[entry.fixture]) : entry.path).replace(":code", "gender");
 
   it("every route is either public or registered in the leak registry", () => {
     const routes = listRoutes(CONTROLLERS);
