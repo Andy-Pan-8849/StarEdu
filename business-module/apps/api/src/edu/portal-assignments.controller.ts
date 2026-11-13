@@ -50,6 +50,7 @@ export class PortalAssignmentsController {
 
   /** 现在能不能交：在读、"已选"（不是已完成）、班级没结课取消、没过截止或允许迟交。 */
   private async assertCanSubmit(auth: AuthContext, a: Awaited<ReturnType<PortalAssignmentsController["visible"]>>, personId: string, status: string, at: Date) {
+    if (a.manualOnly) throw new ConflictException("This assignment is scored by the teacher; there is nothing to submit");
     if (status !== "enrolled") throw new ForbiddenException("You are on leave; assignments are read-only");
     if (a.section.status === "ended" || a.section.status === "cancelled") throw new ConflictException(`The section is ${a.section.status}`);
     if (!(await this.db.enrollment.findFirst({ where: { sectionId: a.sectionId, studentPersonId: personId, status: "enrolled" } }))) throw new ConflictException("You are not enrolled in this section");
@@ -95,7 +96,7 @@ export class PortalAssignmentsController {
       ? await Promise.all(s.versions.map(async (v) => ({ version: v.version, textAnswer: v.textAnswer, submittedAt: v.submittedAt, isLate: v.isLate, files: await Promise.all(v.files.map(async (f) => ({ id: f.id, fileName: f.fileName, size: f.size, downloadUrl: await this.store.presignDownload(f.storageKey, f.fileName) }))) })))
       : [];
     const deadline = effectiveDeadline(a.dueAt, ext?.days);
-    const canSubmit = status === "enrolled" && a.section.status !== "ended" && a.section.status !== "cancelled" && (!s || s.status === "submitted") && (a.allowLate || new Date() <= deadline);
+    const canSubmit = !a.manualOnly && status === "enrolled" && a.section.status !== "ended" && a.section.status !== "cancelled" && (!s || s.status === "submitted") && (a.allowLate || new Date() <= deadline);
     return {
       id: a.id, title: a.title, description: a.description, attachments: a.attachments, section: { id: a.sectionId, name: a.section.name, course: a.section.course.name }, group: a.group?.name ?? null,
       dueDate: dayString(a.dueDate), deadline, extension: ext ? { days: ext.days, reason: ext.reason } : null, allowLate: a.allowLate, latePolicy: a.latePolicy, maxScore: num(a.maxScore),

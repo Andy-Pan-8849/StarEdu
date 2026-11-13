@@ -1109,6 +1109,8 @@ model AssignmentGroup {
   sectionId String   @map("section_id") @db.Uuid
   name      String
   sort      Int      @default(0)
+  /// 权重（百分点）；班级所有分组的权重合计必须是 100 才能算总评
+  weight    Decimal  @default(0) @db.Decimal(5, 2)
   createdAt DateTime @default(now()) @map("created_at")
 
   section     Section      @relation(fields: [sectionId], references: [id])
@@ -1135,6 +1137,8 @@ model Assignment {
   latePolicy  Json      @map("late_policy")
   /// 满分 = 评分标准各项之和（改评分标准时重算）
   maxScore    Decimal   @default(0) @map("max_score") @db.Decimal(7, 2)
+  /// 只能手工录分（期中、期末、课堂参与）：学生不提交
+  manualOnly  Boolean   @default(false) @map("manual_only")
   published   Boolean   @default(false)
   publishedAt DateTime? @map("published_at")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -1265,4 +1269,81 @@ model SubmissionScore {
 
   @@unique([submissionId, rubricItemId])
   @@map("submission_score")
+}
+
+/// 成绩等级表（租户级；没有记录时用默认表）。passing 为真的是及格档
+model GradingScaleItem {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  grade      String
+  minPercent Decimal @map("min_percent") @db.Decimal(5, 1)
+  points     Decimal @db.Decimal(3, 1)
+  passing    Boolean
+
+  @@unique([tenantId, grade])
+  @@map("grading_scale_item")
+}
+
+/// 手工录入的单次成绩（没有提交的作业，如期中、期末、参与）
+model ManualGrade {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  assignmentId    String   @map("assignment_id") @db.Uuid
+  studentPersonId String   @map("student_person_id") @db.Uuid
+  points          Decimal  @db.Decimal(7, 2)
+  enteredBy       String?  @map("entered_by") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([assignmentId, studentPersonId])
+  @@map("manual_grade")
+}
+
+/// 最终成绩（每条选课一条）。publishedAt 为空 = 草稿，学生看不到
+model FinalGrade {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  enrollmentId String    @unique @map("enrollment_id") @db.Uuid
+  total        Decimal   @db.Decimal(5, 1)
+  grade        String
+  gradePoints  Decimal   @map("grade_points") @db.Decimal(3, 1)
+  passed       Boolean
+  /// 各分组的得分率和权重，留作依据
+  breakdown    Json      @default("[]")
+  computedBy   String?   @map("computed_by") @db.Uuid
+  computedAt   DateTime  @default(now()) @map("computed_at")
+  publishedAt  DateTime? @map("published_at")
+
+  @@map("final_grade")
+}
+
+/// 最终成绩的改动记录：改前、改后、原因、谁改的（发布后的改动不静默）
+model GradeChange {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  enrollmentId String   @map("enrollment_id") @db.Uuid
+  kind         String
+  before       Json?
+  after        Json
+  reason       String?
+  changedBy    String?  @map("changed_by") @db.Uuid
+  changedAt    DateTime @default(now()) @map("changed_at")
+
+  @@index([enrollmentId])
+  @@map("grade_change")
+}
+
+/// 成绩单生成记录：每份有唯一文档编号
+model TranscriptIssue {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  studentPersonId String   @map("student_person_id") @db.Uuid
+  docNumber       String   @map("doc_number")
+  /// informal / formal
+  version         String
+  generatedBy     String?  @map("generated_by") @db.Uuid
+  generatedAt     DateTime @default(now()) @map("generated_at")
+
+  @@unique([tenantId, docNumber])
+  @@index([tenantId, studentPersonId])
+  @@map("transcript_issue")
 }

@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B7.** Sign-in, the platform console, system management, people, teaching and assignments work. Grades, notifications and the AI assistant are not built yet; their menus show "This page is not available yet."
+Status: **milestone B8.** Sign-in, the platform console, system management, people, teaching, assignments and grades work. Notifications and the AI assistant are not built yet; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -19,7 +19,7 @@ pnpm dev:api       # terminal 1
 pnpm dev:web       # terminal 2
 ```
 
-If you started this stack with an earlier milestone, run `make reset` first, then the steps above. (Or keep your data: `pnpm migrate`, then `pnpm seed`, then `make up` so the object store is running.) Assignment files go to the object store (`objectstore`, port 9100); the first upload creates the bucket.
+If you started this stack with an earlier milestone, run `make reset` first, then the steps above. (Or keep your data: `pnpm migrate`, then `pnpm seed`, then `make up` so the object store is running.) Transcript PDFs show Latin letters only unless you set `TRANSCRIPT_FONT_PATH` to a font file that has Chinese characters (for example Noto Sans SC). Assignment files go to the object store (`objectstore`, port 9100); the first upload creates the bucket.
 
 Open **http://hq.localhost:3001/admin** (`*.localhost` names resolve to your machine in most browsers; otherwise add them to `/etc/hosts`). Outgoing mail (invitations, password links) appears in Mailpit at http://localhost:8125.
 
@@ -105,6 +105,9 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **Sections**: create (course, term, campus, capacity), assign instructors, open, cancel | Works today |
 | **Enroll students for them**: over capacity, missing prerequisite, clash or outside the window need a reason and are logged | Works today |
 | Remove a student: before the drop deadline the record is voided, after it W | Works today |
+| **Grading scale**: edit the grades, minimum percentages, grade points and the pass line for the whole company | Works today |
+| **Transcripts**: open a student's transcript (GPA by term and cumulative), issue the **official** PDF (numbered, recorded) | Works today |
+| **Dashboard**: students, sections, assignment completion, average score and late rate per campus, only for the campuses you may see | Works today |
 
 ### Teacher (`teacher` role)
 
@@ -115,7 +118,8 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **Assignments** tab on a section: create an assignment (due date, rubric of items with points, optional late-work rule), organise them in groups, publish when ready | Works today |
 | **Submissions**: see every student of the section (those who have not submitted too), open a submission (all versions, download the files), **score each rubric item**, add feedback, **publish** one score or all that are fully scored | Works today |
 | **Extensions**: give one student 1-3 more days with a reason (the deadline moves for that student only; it is logged) | Works today |
-| Grade book, final grades | B8 |
+| **Grades** tab: set the weight of each assignment group (must total 100%), see the grade book (students by assignments; missing work counts as 0), enter scores for exams by hand, **calculate** and **publish** final grades, export CSV | Works today |
+| After the section ends the grades are locked; only the registrar can amend them (reason required, before and after are recorded) | Works today |
 
 ### Student (portal at `/`; demo accounts arrive with the demo seed)
 
@@ -128,7 +132,8 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **My assignments**: the published assignments of your sections with deadline (23:59 campus time), rubric and your status; **submit** text and files (up to 10 files, 20 MB each; files go straight to the object store), submit again before the deadline (the last one counts, earlier versions are kept) | Works today |
 | After the deadline you can still submit if the assignment accepts late work: 10% off up to 24 hours late, 20% up to 48, 30% up to 72, nothing after that (the teacher can change the table per assignment) | Works today |
 | Your score, the points per rubric item and the feedback appear **only after the teacher publishes** | Works today |
-| Grades, transcript, notifications, AI assistant | B8-B10 |
+| **My grades**: published final grades by term, GPA by term and cumulative, credits earned; **download an unofficial transcript** (PDF, numbered, footer "for reference only"). Graduated or withdrawn students can still read their grades and download it | Works today |
+| Notifications, AI assistant | B9-B10 |
 
 ### Campus lead
 

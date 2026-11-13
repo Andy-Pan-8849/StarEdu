@@ -32,6 +32,7 @@ const TABLES = [
   "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log", "dict_type", "dict_item", "sys_param",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "section_instructor", "section_material", "student_major",
   "assignment_group", "assignment", "rubric_item", "assignment_extension", "submission", "submission_version", "submission_file", "submission_score",
+  "grading_scale_item", "manual_grade", "final_grade", "grade_change", "transcript_issue",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course",
 ];
 

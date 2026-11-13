@@ -22,6 +22,11 @@ import { EnrollmentService } from "./edu/enrollment.service";
 import { OutboxService } from "./edu/outbox.service";
 import { PortalController } from "./edu/portal.controller";
 import { SectionsController } from "./edu/sections.controller";
+import { GradesController } from "./edu/grades.controller";
+import { GradeAdminController } from "./edu/grade-admin.controller";
+import { PortalGradesController } from "./edu/portal-grades.controller";
+import { GradesService } from "./edu/grades.service";
+import { TranscriptService } from "./edu/transcript.service";
 import { AssignmentsController } from "./edu/assignments.controller";
 import { PortalAssignmentsController } from "./edu/portal-assignments.controller";
 import { ObjectStoreService } from "./storage/object-store.service";
@@ -77,6 +82,9 @@ export const CONTROLLERS = [
   CatalogController,
   SectionsController,
   AssignmentsController,
+  GradesController,
+  GradeAdminController,
+  PortalGradesController,
   PortalAssignmentsController,
   PortalController,
   DictController,
@@ -107,6 +115,8 @@ export const CONTROLLERS = [
     EnrollmentService,
     OutboxService,
     ObjectStoreService,
+    GradesService,
+    TranscriptService,
     { provide: CLASS_MEMBERSHIP, useClass: ClassMembershipService },
     MailService,
     PlatformPrismaService,
