@@ -2,9 +2,22 @@
 // 还没有页面的菜单，外壳显示"页面尚未提供"。新里程碑的页面在这里登记。
 import type * as React from "react";
 import { JobsPage, MonitorPage, PlatformAuditPage, TenantsPage } from "./pages/platform-pages";
+import { DataScopesPage, EntriesPage, MenusPage, RolesPage, UsersPage } from "./pages/access-pages";
+import { CampusesPage, DeptsPage, DictsPage, OperationLogPage, ParamsPage, PostsPage } from "./pages/system-pages";
 import { AuditLogPage, LoginLogPage, OnlineUsersPage } from "./pages/log-pages";
 
 export const PAGES: Record<string, React.ComponentType> = {
+  "system/user/index": UsersPage,
+  "system/role/index": RolesPage,
+  "system/menu/index": MenusPage,
+  "system/entry/index": EntriesPage,
+  "system/dataScope/index": DataScopesPage,
+  "system/campus/index": CampusesPage,
+  "system/dept/index": DeptsPage,
+  "system/post/index": PostsPage,
+  "system/dict/index": DictsPage,
+  "system/param/index": ParamsPage,
+  "system/operationLog/index": OperationLogPage,
   "system/online/index": OnlineUsersPage,
   "system/loginLog/index": LoginLogPage,
   "system/auditLog/index": AuditLogPage,

@@ -16,7 +16,7 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
     it("platform dictionaries are read-only for the tenant and carry translation keys", async () => {
       const types = (await admin().get("/api/dict-types")).body as Array<{ id: string; code: string; platformProvided: boolean; nameKey: string | null }>;
       const gender = types.find((t) => t.code === "gender")!;
-      expect(gender).toMatchObject({ platformProvided: true, nameKey: "dict.gender" });
+      expect(gender).toMatchObject({ platformProvided: true, nameKey: "dict.type.gender" });
       expect((await admin().patch(`/api/dict-types/${gender.id}`, { name: "x" })).status).toBe(403);
       expect((await admin().del(`/api/dict-types/${gender.id}`)).status).toBe(403);
       expect((await admin().post(`/api/dict-types/${gender.id}/items`, { value: "z", label: "Z" })).status).toBe(403);
