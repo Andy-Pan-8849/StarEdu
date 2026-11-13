@@ -2,9 +2,11 @@
 //   - 只统计已发布的最终成绩；退课（W）列出但不计 GPA；进行中的列出但不计 GPA。
 //   - 重修：同一门课最新一次替代旧的，旧记录标"已重修，不计 GPA"，学分只算一次。
 //   - 非正式版（学生自助下载，页脚"仅供参考"）和正式版（教务生成）；每份有唯一文档编号，生成记录入库。
-//   - PDF 用 pdfkit。内置字体只含拉丁字符；要显示中文，把环境变量 TRANSCRIPT_FONT_PATH 指向一个支持中文的 TTF/OTF 字体（如 Noto Sans SC，OFL 许可）。
+//   - PDF 用 pdfkit，全部用一种字体：仓库自带的 Noto Sans SC 子集（apps/api/assets/fonts，OFL 许可，含常用 3755 个汉字）。
+//     字体里没有的字显示成"?"；要换字体，把环境变量 TRANSCRIPT_FONT_PATH 指向另一个 TTF/OTF 文件。
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import { Prisma } from "../generated/prisma";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
@@ -32,7 +34,8 @@ export interface Transcript {
   cumulative: { gpa: number | null; creditsAttempted: number; creditsEarned: number };
 }
 
-const latinSafe = (text: string): string => [...text].map((c) => (c.charCodeAt(0) > 0x24f ? "?" : c)).join("");
+/** 仓库自带的字体（src/edu 和 dist/edu 到 apps/api/assets 的相对位置相同）。 */
+export const BUNDLED_FONT = join(__dirname, "../../assets/fonts/NotoSansSC-Regular-subset.ttf");
 
 @Injectable()
 export class TranscriptService {
@@ -99,11 +102,14 @@ export class TranscriptService {
   }
 
   async pdf(t: Transcript, meta: { version: "informal" | "formal"; docNumber: string; generatedAt: Date; institution: string }): Promise<Buffer> {
-    const font = process.env.TRANSCRIPT_FONT_PATH && existsSync(process.env.TRANSCRIPT_FONT_PATH) ? process.env.TRANSCRIPT_FONT_PATH : null;
-    const text = (s: string) => (font ? s : latinSafe(s));
+    const configured = process.env.TRANSCRIPT_FONT_PATH;
+    const font = configured && existsSync(configured) ? configured : BUNDLED_FONT;
     const doc = new PDFDocument({ size: "A4", margin: 48, info: { Title: `Transcript ${meta.docNumber}` } });
-    if (font) doc.registerFont("body", font);
-    const body = () => doc.font(font ? "body" : "Helvetica").fontSize(9);
+    doc.registerFont("body", font);
+    const body = () => doc.font("body").fontSize(9);
+    // 字体里没有的字符换成"?"，免得出现空白方块
+    const has = (cp: number): boolean => ((doc as unknown as { _font?: { font?: { hasGlyphForCodePoint?: (c: number) => boolean } } })._font?.font?.hasGlyphForCodePoint?.(cp)) ?? true;
+    const text = (s: string) => [...s].map((c) => (c === "\n" || has(c.codePointAt(0)!) ? c : "?")).join("");
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
     const done = new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
