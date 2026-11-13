@@ -5,13 +5,21 @@ import { currentScope, TenantContextMissingError, requireTenant } from "./reques
 import { filterSoftDeleted, scopeArgs, TENANT_MODELS } from "./scope-args";
 
 
+interface OpParams {
+  model: string;
+  operation: string;
+  args: unknown;
+  query: (args: never) => Promise<unknown>;
+}
+
 /** 事务里的客户端：只改写参数；租户会话变量已经在事务开头设好。 */
 function scopeOnly() {
   return Prisma.defineExtension({
     name: "tenant-scope-in-transaction",
     query: {
       $allModels: {
-        async $allOperations({ model, operation, args, query }) {
+        // 模型多了以后，按推断类型展开会超出 TypeScript 的联合类型上限（TS2590），这里显式写成宽类型
+        async $allOperations({ model, operation, args, query }: OpParams) {
           const tenantId = TENANT_MODELS[model] ? requireTenant(`${operation} ${model}`).tenantId : null;
           const rewritten = tenantId ? scopeArgs(model, operation, args as never, tenantId) : args;
           return filterSoftDeleted(model, operation, await query(rewritten as never));
@@ -45,10 +53,10 @@ export class TenantPrismaService {
       name: "tenant-scope",
       query: {
         $allModels: {
-          async $allOperations({ model, operation, args, query }) {
+          async $allOperations({ model, operation, args, query }: OpParams) {
             const scope = currentScope();
             if (!TENANT_MODELS[model] && model !== "Tenant") {
-              return query(args); // 入口等全局只读表
+              return query(args as never); // 入口等全局只读表
             }
             if (!scope || scope.kind !== "tenant") {
               throw new TenantContextMissingError(`${operation} ${model}`);

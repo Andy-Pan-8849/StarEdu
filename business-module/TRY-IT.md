@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B8.** Sign-in, the platform console, system management, people, teaching, assignments and grades work. Notifications and the AI assistant are not built yet; their menus show "This page is not available yet."
+Status: **milestone B9.** Sign-in, the platform console, system management, people, teaching, assignments, grades and notifications work. The AI assistant and the discussion tab are not built yet; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -107,6 +107,7 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | Remove a student: before the drop deadline the record is voided, after it W | Works today |
 | **Grading scale**: edit the grades, minimum percentages, grade points and the pass line for the whole company | Works today |
 | **Transcripts**: open a student's transcript (GPA by term and cumulative), issue the **official** PDF (numbered, recorded) | Works today |
+| **Announcements** (Messages menu): publish to the whole company (needs the all-data scope), one campus or one section; see who has read it; withdraw | Works today |
 | **Dashboard**: students, sections, assignment completion, average score and late rate per campus, only for the campuses you may see | Works today |
 
 ### Teacher (`teacher` role)
@@ -133,7 +134,8 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | After the deadline you can still submit if the assignment accepts late work: 10% off up to 24 hours late, 20% up to 48, 30% up to 72, nothing after that (the teacher can change the table per assignment) | Works today |
 | Your score, the points per rubric item and the feedback appear **only after the teacher publishes** | Works today |
 | **My grades**: published final grades by term, GPA by term and cumulative, credits earned; **download an unofficial transcript** (PDF, numbered, footer "for reference only"). Graduated or withdrawn students can still read their grades and download it | Works today |
-| Notifications, AI assistant | B9-B10 |
+| **Notifications** (the bell in the top bar): new assignments, published scores and final grades, enrollment changes, announcements, and a reminder in the last 24 hours before a deadline. New ones appear at once. **Settings** in the bell: language, and per category whether you want it in the app and by e-mail. Every e-mail has an unsubscribe link (see them in Mailpit at http://localhost:8125) | Works today |
+| AI assistant | B10 |
 
 ### Campus lead
 
@@ -150,7 +152,8 @@ Signs in at **http://platform.localhost:3001** (create the first account with `p
 | **Notify** a planned suspension (e-mail to the administrator), **suspend** (the company's users are refused, data is kept), **restore** | Works today |
 | **Features**: switch features (menus) on or off for one company; its menus and permissions change at once | Works today |
 | **Administrator**: resend the invitation, send a password reset link, unlock after failed sign-ins, change the e-mail | Works today (API; resend and unlock are buttons) |
-| **Scheduled jobs**: enable a job, change its schedule, run it now, see the run log | Works today |
+| **Scheduled jobs**: enable a job, change its schedule, run it now, see the run log (new: **Send assignment deadline reminders**, enable it to get reminders) | Works today |
+| **Platform announcements**: a banner for every company during a time window | API today (`/api/platform/announcements`) |
 | **Monitoring**: server, cache and database health; links to API documentation and Grafana | Works today |
 | Platform accounts and roles, menus, entry assignment | API today (`/api/platform/...`); screens later |
 

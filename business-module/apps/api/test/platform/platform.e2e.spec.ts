@@ -151,7 +151,7 @@ describe("platform console", () => {
       await h.keycloak.request(`/realms/tenant-${code}/clients/${portal[0].id}`, { method: "PUT", body: JSON.stringify({ ...portal[0], directAccessGrantsEnabled: true }) });
       const tenantUserToken = await (await h.user("grant.user", { tenant: { tenantId: id, code } as never, roles: ["tenant-admin"], person: "staff" })).token();
       const menus = (await h.call(tenantUserToken, `${code}.localhost`).get("/api/me/menus?entry=admin")).body as Array<{ code: string }>;
-      expect(menus.map((m) => m.code)).toEqual(["edu", "system"]);
+      expect(menus.map((m) => m.code)).toEqual(["edu", "msg", "system"]);
       expect((await h.call(tenantUserToken, `${code}.localhost`).get("/api/persons")).status).toBe(403);
       // 平台入口的菜单不能授权给租户
       const platformMenu = await h.owner.menu.findFirstOrThrow({ where: { tenantId: null, code: "platform:tenant" } });
@@ -252,7 +252,7 @@ describe("platform console", () => {
   describe("scheduled jobs", () => {
     it("only registered jobs exist; arbitrary names are refused; cron must be a valid 5-field expression", async () => {
       const jobs = (await root().get("/api/platform/jobs")).body as Array<{ code: string; cron: string; enabled: boolean }>;
-      expect(jobs.map((j) => j.code).sort()).toEqual(["accounts.reconcile", "logs.purge-params", "staff.apply-effective", "tenants.suspend-due"]);
+      expect(jobs.map((j) => j.code).sort()).toEqual(["accounts.reconcile", "logs.purge-params", "notify.deadline-reminders", "staff.apply-effective", "tenants.suspend-due"]);
       expect((await root().patch("/api/platform/jobs/rm -rf /", { enabled: true })).status).toBe(404);
       expect((await root().post("/api/platform/jobs/not.a.job/run")).status).toBe(404);
       expect((await root().patch("/api/platform/jobs/tenants.suspend-due", { cron: "every day" })).status).toBe(409);

@@ -3,6 +3,7 @@
 import { realmName } from "@staredu/shared";
 import type { AccountsService } from "../../accounts/accounts.service";
 import type { StaffService } from "../../hr/staff.service";
+import type { NotificationService } from "../../notify/notification.service";
 import type { PlatformPrismaService } from "../platform-prisma.service";
 import { runInScope } from "../../tenancy/request-scope";
 
@@ -10,6 +11,7 @@ export interface JobDeps {
   db: PlatformPrismaService;
   accounts: AccountsService;
   staff: StaffService;
+  notify: NotificationService;
 }
 
 export interface JobDefinition {
@@ -71,6 +73,17 @@ JOBS.push({
     let applied = 0;
     for (const t of tenants) applied += await runInScope({ kind: "tenant", tenantId: t.id, code: t.code, name: t.name, status: t.status }, () => staff.applyDue());
     return `${applied} changes applied across ${tenants.length} tenants`;
+  },
+});
+
+JOBS.push({
+  code: "notify.deadline-reminders",
+  name: "Send assignment deadline reminders",
+  description: "Students who have not submitted get one reminder in the last 24 hours before their deadline (extensions included). Each assignment and student is reminded once.",
+  defaultCron: "7 * * * *",
+  async run({ notify }) {
+    const { reminded } = await notify.deadlineReminders();
+    return `${reminded} reminders created`;
   },
 });
 

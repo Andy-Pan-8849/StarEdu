@@ -24,6 +24,7 @@ export type Fixture =
   | "courseId"
   | "majorId"
   | "sectionId"
+  | "announcementId"
   | "dictTypeId"
   | "dictItemId"
   | "paramId"
@@ -190,6 +191,10 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "GET", path: "/api/dashboard/sections/:id", fixture: "sectionId", target: "foreign", note: "analyse another tenant's section" },
   { method: "GET", path: "/api/transcripts/:personId", fixture: "personId", target: "foreign", note: "read another tenant's transcript" },
   { method: "POST", path: "/api/transcripts/:personId/formal", fixture: "personId", target: "foreign", note: "issue another tenant's transcript" },
+  { method: "GET", path: "/api/announcements/:id/readers", fixture: "announcementId", target: "foreign", note: "read another tenant's announcement readers" },
+  { method: "DELETE", path: "/api/announcements/:id", fixture: "announcementId", target: "foreign", note: "withdraw another tenant's announcement" },
+  { method: "POST", path: "/api/announcements", target: "own", body: { title: "leak", body: "x", target: { kind: "campus", campusId: "{{B.campusId}}" } }, note: "announce to another tenant's campus" },
+  { method: "POST", path: "/api/announcements", target: "own", expectStatus: 404, body: { title: "leak", body: "x", target: { kind: "section", sectionId: "{{B.sectionId}}" } }, note: "announce to another tenant's section" },
   { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{B.courseId}}", termId: "{{A.termId}}", campusId: "{{A.campusId}}", number: "01", capacity: 5 }, note: "section of another tenant's course" },
   { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{A.courseId}}", termId: "{{B.termId}}", campusId: "{{A.campusId}}", number: "02", capacity: 5 }, note: "section in another tenant's term" },
   { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{A.courseId}}", termId: "{{A.termId}}", campusId: "{{B.campusId}}", number: "03", capacity: 5 }, note: "section on another tenant's campus" },
@@ -239,6 +244,19 @@ export const OTHER_ROUTES: Record<string, string> = {
   "GET /api/dashboard/overview": "aggregates only inside the caller's data scope; scope-limited totals are tested in grades.e2e.spec.ts",
   "GET /api/portal/grades": "student portal: the caller's own grades only (grades.e2e.spec.ts)",
   "GET /api/portal/transcript.pdf": "student portal: the caller's own transcript only; the number is allocated per tenant (grades.e2e.spec.ts)",
+  "GET /api/notifications": "the caller's own messages only (notify.e2e.spec.ts)",
+  "POST /api/notifications/read": "marks only the caller's own messages as read (notify.e2e.spec.ts)",
+  "POST /api/notifications/ws-ticket": "issues a ticket bound to the caller's own tenant and account (notify.e2e.spec.ts)",
+  "GET /api/notifications/preferences": "the caller's own settings only",
+  "PUT /api/notifications/preferences": "changes the caller's own settings only",
+  "GET /api/banners": "platform announcements: global data without any tenant row",
+  "GET /api/portal/banners": "platform announcements: global data without any tenant row",
+  "GET /api/announcements": "lists the caller's tenant's announcements (row-level security), limited to the caller's own unless they have the all-data scope (notify.e2e.spec.ts)",
+"GET /api/portal/notifications": "the caller's own messages only (notify.e2e.spec.ts)",
+  "POST /api/portal/notifications/read": "marks only the caller's own messages as read (notify.e2e.spec.ts)",
+  "POST /api/portal/notifications/ws-ticket": "issues a ticket bound to the caller's own tenant and account (notify.e2e.spec.ts)",
+  "GET /api/portal/notifications/preferences": "the caller's own settings only",
+  "PUT /api/portal/notifications/preferences": "changes the caller's own settings only",
   "POST /api/campuses": "creates a campus and its root department in the caller's tenant from plain fields",
   "POST /api/posts": "creates a post from plain fields",
   "POST /api/dict-types": "creates a dictionary in the caller's tenant from plain fields",

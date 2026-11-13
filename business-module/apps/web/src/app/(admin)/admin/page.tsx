@@ -22,5 +22,5 @@ export default async function AdminHome() {
   if (me.status === 401 || menus.status === 401) redirect("/admin/auth/login?return=/admin");
   if (me.status !== 200 || menus.status !== 200) throw new Error(`Could not load the menu (${me.status}/${menus.status})`);
   const account = JSON.parse(me.body.toString("utf8")) as { username: string; permissions: string[] };
-  return <AdminShell menus={JSON.parse(menus.body.toString("utf8"))} permissions={account.permissions} userName={account.username} />;
+  return <AdminShell menus={JSON.parse(menus.body.toString("utf8"))} permissions={account.permissions} userName={account.username} wsPort={new URL(config.apiUrl).port} />;
 }

@@ -268,6 +268,8 @@ model Account {
   createdBy      String?       @map("created_by") @db.Uuid
   updatedBy      String?       @map("updated_by") @db.Uuid
   deletedAt      DateTime?     @map("deleted_at")
+  /// 通知和邮件的语言（en / zh）；空 = 跟随请求语言，邮件默认 en
+  locale         String?
 
   tenant Tenant        @relation(fields: [tenantId], references: [id])
   person Person?       @relation(fields: [personId], references: [id])
@@ -1095,6 +1097,10 @@ model OutboxEvent {
   payload     Json
   createdAt   DateTime  @default(now()) @map("created_at")
   processedAt DateTime? @map("processed_at")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  /// 重试多次仍失败：不再自动处理，留着排查
+  failedAt    DateTime? @map("failed_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -1346,4 +1352,77 @@ model TranscriptIssue {
   @@unique([tenantId, docNumber])
   @@index([tenantId, studentPersonId])
   @@map("transcript_issue")
+}
+
+/// 站内消息（也是邮件的发送队列）。dedupeKey 保证同一个事件对同一个人只生成一条
+model Notification {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  accountId     String    @map("account_id") @db.Uuid
+  category      String
+  /// 模板类型：消息文字按收件人的语言在读取时渲染；公告是自由文字（type = announcement）
+  type          String
+  params        Json      @default("{}")
+  title         String?
+  body          String?
+  /// 为假：用户关掉了站内消息，只为邮件排队和去重而存在，不在消息中心出现
+  inApp         Boolean   @default(true) @map("in_app")
+  dedupeKey     String    @map("dedupe_key")
+  /// none / pending / sent / failed
+  emailStatus   String    @default("none") @map("email_status")
+  emailAttempts Int       @default(0) @map("email_attempts")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  readAt        DateTime? @map("read_at")
+
+  @@unique([accountId, dedupeKey])
+  @@index([accountId, createdAt])
+  @@map("notification")
+}
+
+/// 用户按类别关闭站内消息或邮件（没有记录 = 都开）
+model NotificationPreference {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  accountId String  @map("account_id") @db.Uuid
+  category  String
+  inApp     Boolean @default(true) @map("in_app")
+  email     Boolean @default(true)
+
+  @@unique([accountId, category])
+  @@map("notification_preference")
+}
+
+/// 租户公告：面向全公司、一个校区或一个班级；阅读名单就是它生成的那批消息的已读情况
+model Announcement {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  title       String
+  body        String
+  /// tenant / campus / section
+  scopeKind   String    @map("scope_kind")
+  campusId    String?   @map("campus_id") @db.Uuid
+  sectionId   String?   @map("section_id") @db.Uuid
+  recipients  Int       @default(0)
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  withdrawnAt DateTime? @map("withdrawn_at")
+
+  @@index([tenantId, createdAt])
+  @@map("announcement")
+}
+
+/// 平台公告（横幅）：平台表，没有 tenant_id，租户的数据库账号碰不到；租户用户经接口读取当前有效的
+model PlatformAnnouncement {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title     String
+  body      String
+  /// info / warning
+  severity  String   @default("info")
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime @map("ends_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([startsAt, endsAt])
+  @@map("platform_announcement")
 }

@@ -21,3 +21,6 @@ function parseEnv(file: string): Record<string, string> {
   }
   return out;
 }
+
+// 测试里不跑后台轮询；需要时直接调用 NotifyWorker.tick()
+process.env.NOTIFY_WORKER = "off";

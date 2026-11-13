@@ -32,13 +32,15 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       "edu:section", "edu:section:add", "edu:section:edit", "edu:section:status", "edu:section:roster", "edu:section:enroll", "edu:section:unenroll", "edu:section:materials",
       "edu:section:assignments", "edu:section:submissions", "edu:section:extension", "edu:section:gradebook", "edu:section:gradeAmend",
       "edu:scale", "edu:scale:edit", "edu:transcript", "edu:transcript:issue", "edu:dashboard",
+      "msg", "msg:announcement", "msg:announcement:add", "msg:announcement:remove",
       "hr", "hr:student",
     ],
   },
-  { code: "campus-lead", name: "Campus lead", sort: 30, scopes: ["own_dept_tree"], menuCodes: ["hr", "hr:person", "hr:staff", "hr:student", "edu", "edu:dashboard"] },
+  { code: "campus-lead", name: "Campus lead", sort: 30, scopes: ["own_dept_tree"], menuCodes: ["hr", "hr:person", "hr:staff", "hr:student", "edu", "edu:dashboard", "msg", "msg:announcement", "msg:announcement:add", "msg:announcement:remove"] },
   { code: "teacher", name: "Teacher", sort: 40, scopes: ["self", "own_classes"], menuCodes: [
       "edu", "edu:term", "edu:course", "edu:section", "edu:section:roster", "edu:section:materials",
       "edu:section:assignments", "edu:section:assignmentEdit", "edu:section:submissions", "edu:section:grade", "edu:section:extension", "edu:section:gradebook", "edu:section:gradeEdit", "edu:dashboard",
+      "msg", "msg:announcement", "msg:announcement:add", "msg:announcement:remove",
     ],
   },
 ];

@@ -16,7 +16,7 @@ export interface RealmParams {
   tenantId: string;
   /** 前端的来源地址，如 http://hq.localhost:3001（回调地址据此生成）。 */
   webOrigin: string;
-  smtp: { host: string; port: number; from: string; fromDisplayName: string };
+  smtp: { host: string; port: number; from: string; fromDisplayName: string; user?: string; password?: string; secure?: "none" | "ssl" | "starttls" };
   /** 仅本地冒烟测试：打开密码直连授权，让脚本不用浏览器就能换令牌。绝不用于正式开通。 */
   allowDirectGrant?: boolean;
   config?: RealmConfig;
@@ -157,9 +157,10 @@ export function buildRealm(params: RealmParams): Record<string, unknown> {
       port: String(params.smtp.port),
       from: params.smtp.from,
       fromDisplayName: params.smtp.fromDisplayName,
-      auth: "false",
-      ssl: "false",
-      starttls: "false",
+      auth: params.smtp.user ? "true" : "false",
+      ...(params.smtp.user ? { user: params.smtp.user, password: params.smtp.password ?? "" } : {}),
+      ssl: params.smtp.secure === "ssl" ? "true" : "false",
+      starttls: params.smtp.secure === "starttls" ? "true" : "false",
     },
     clients,
   };
