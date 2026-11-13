@@ -74,12 +74,13 @@ export class CampusesController {
     const studentsInTree = people.filter((p) => p.type === "student" && (!p.student || p.student.academicStatus === "enrolled" || p.student.academicStatus === "on_leave"));
     const students = [...new Map([...studentsInTree, ...profilePeople].map((p) => [p.id, p])).values()];
     const staff = people.filter((p) => p.type === "staff" && p.staff?.status !== "left");
+    const classes = await db.section.findMany({ where: { campusId: id, status: { in: ["draft", "open", "in_progress"] }, term: { status: { not: "ended" } } }, select: { id: true, name: true, status: true } });
     return {
       students: { count: students.length, items: students.slice(0, 50) },
       staffAssignments: { count: staff.length, items: staff.slice(0, 50) },
-      // 班级在教学模块（B6）里；现在没有班级，按 0 计
-      classes: { count: 0, items: [], implemented: false },
-      canClose: students.length === 0 && staff.length === 0,
+      // 进行中的班级（草稿、开放、进行中，且学期没有结束）：必须结束或转到别的校区才能关闭校区
+      classes: { count: classes.length, items: classes.slice(0, 50), implemented: true },
+      canClose: students.length === 0 && staff.length === 0 && classes.length === 0,
     };
   }
 

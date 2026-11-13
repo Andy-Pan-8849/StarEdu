@@ -70,7 +70,7 @@ export class Harness {
    */
   async user(
     username: string,
-    opts: { roles?: string[]; person?: "staff" | "student"; tenant?: TestTenant; status?: "pending" | "active" | "disabled"; deptIds?: string[] } = {},
+    opts: { roles?: string[]; person?: "staff" | "student"; tenant?: TestTenant; status?: "pending" | "active" | "disabled"; deptIds?: string[]; studentStatus?: "enrolled" | "on_leave" | "graduated" | "withdrawn" | "completed" } = {},
   ): Promise<TestUser> {
     const tenant = opts.tenant ?? this.tenant;
     const created = await createUser(this.owner, this.keycloak, tenant, username);
@@ -78,6 +78,11 @@ export class Harness {
     if (opts.person) {
       const person = await this.owner.person.create({ data: { tenantId: tenant.tenantId, type: opts.person, fullName: username } });
       personId = person.id;
+      if (opts.person === "student") {
+        const campus = await this.owner.campus.findFirstOrThrow({ where: { tenantId: tenant.tenantId, type: "hq" } });
+        await this.owner.studentProfile.create({ data: { tenantId: tenant.tenantId, personId, studentNo: `S-${username}`, campusId: campus.id, academicStatus: opts.studentStatus ?? "enrolled" } });
+        await this.owner.personDept.create({ data: { tenantId: tenant.tenantId, personId, deptId: campus.deptId, kind: "student", isPrimary: true } });
+      }
       if (opts.person === "staff") await this.owner.staffProfile.create({ data: { tenantId: tenant.tenantId, personId, employeeNo: `T-${username}`, hireDate: new Date("2020-01-01") } });
       await this.owner.account.update({ where: { id: created.accountId }, data: { personId } });
       for (const [i, deptId] of (opts.deptIds ?? []).entries()) {

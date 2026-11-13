@@ -136,6 +136,37 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ]),
   ...menuWithButtons("platform:log", "platform", "Audit log", "log", 8, PERMS.platformLogList, []),
 
+  { code: "edu", type: "directory", name: "Teaching", nameKey: "menu.edu", route: "edu", icon: "book", sort: 20, entries: ["admin"] },
+  ...menuWithButtons("edu:term", "edu", "Terms", "term", 1, PERMS.eduTermList, [
+    ["add", "Add", PERMS.eduTermAdd],
+    ["edit", "Edit", PERMS.eduTermEdit],
+  ]),
+  ...menuWithButtons("edu:major", "edu", "Majors", "major", 2, PERMS.eduMajorList, [
+    ["add", "Add", PERMS.eduMajorAdd],
+    ["edit", "Edit", PERMS.eduMajorEdit],
+  ]),
+  ...menuWithButtons("edu:course", "edu", "Courses", "course", 3, PERMS.eduCourseList, [
+    ["add", "Add", PERMS.eduCourseAdd],
+    ["edit", "Edit", PERMS.eduCourseEdit],
+  ]),
+  ...menuWithButtons("edu:section", "edu", "Sections", "section", 4, PERMS.eduSectionList, [
+    ["add", "Add", PERMS.eduSectionAdd],
+    ["edit", "Edit", PERMS.eduSectionEdit],
+    ["status", "Change status", PERMS.eduSectionStatus],
+    ["roster", "Roster", PERMS.eduEnrollmentList],
+    ["enroll", "Enroll students", PERMS.eduEnrollmentAdd],
+    ["unenroll", "Remove students", PERMS.eduEnrollmentRemove],
+    ["materials", "Course materials", PERMS.eduMaterialEdit],
+  ]),
+
+  // 学生门户：学生角色的权限就是这个入口下全部菜单和按钮的权限
+  { code: "portal", type: "directory", name: "My studies", nameKey: "menu.portal", route: "studies", icon: "graduation", sort: 10, entries: ["portal"] },
+  ...menuWithButtons("portal:enroll", "portal", "Course enrollment", "enroll", 1, PERMS.portalEnrollList, [
+    ["add", "Enroll", PERMS.portalEnrollAdd],
+    ["drop", "Drop", PERMS.portalEnrollDrop],
+  ]),
+  ...menuWithButtons("portal:plan", "portal", "Degree plan", "plan", 2, PERMS.portalPlanView, []),
+
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },
   ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [
     ["edit", "Edit", PERMS.hrPersonEdit],

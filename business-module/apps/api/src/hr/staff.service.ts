@@ -206,8 +206,9 @@ export class StaffService {
   }
 
   /** 带班教师离职保存前的提示：仍带的班级清单（教学模块 B6 之后回填，现在没有班级）。 */
-  async classWarnings(_personId: string): Promise<string[]> {
-    return [];
+  async classWarnings(personId: string): Promise<string[]> {
+    const sections = await this.db.section.findMany({ where: { instructors: { some: { personId } }, status: { in: ["open", "in_progress"] }, term: { status: { not: "ended" } } }, select: { name: true } });
+    return sections.map((s) => `Still teaching ${s.name}: hand the class over`);
   }
 
   /** 把状态真正切换：结束有效任职、改档案状态、收回权限、结束会话。 */

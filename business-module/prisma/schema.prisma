@@ -110,6 +110,34 @@ enum StudentStatus {
   @@map("student_status")
 }
 
+enum TermStatus {
+  planned // 计划中
+  enrolling // 选课中
+  in_progress // 进行中
+  ended // 已结束
+
+  @@map("term_status")
+}
+
+enum SectionStatus {
+  draft // 草稿：学生不可见
+  open // 开放选课
+  in_progress // 进行中
+  ended // 已结课：成绩锁定
+  cancelled // 已取消
+
+  @@map("section_status")
+}
+
+enum EnrollmentStatus {
+  enrolled // 已选
+  voided // 作废（截止日前退课、班级取消）：不出现在成绩单上
+  withdrawn // 退课（W）：截止日之后退课，保留并出现在成绩单上，不计 GPA
+  completed // 已完成：学期结束，由成绩模块写入最终成绩
+
+  @@map("enrollment_status")
+}
+
 enum LoginResult {
   success
   denied
@@ -162,6 +190,11 @@ model Tenant {
   dictItems      DictItem[]
   sysParams      SysParam[]
   operationLogs  OperationLog[]
+  terms          Term[]
+  majors         Major[]
+  courses        Course[]
+  sections       Section[]
+  outboxEvents   OutboxEvent[]
 
   @@map("tenant")
 }
@@ -394,6 +427,7 @@ model Campus {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   dept   Dept   @relation(fields: [deptId], references: [id])
+  sections Section[]
 
   @@unique([tenantId, code])
   @@map("campus")
@@ -816,4 +850,244 @@ model OperationLog {
 
   @@index([tenantId, createdAt])
   @@map("operation_log")
+}
+
+// ---------------------------------------------------------------------------
+// B6：教学（学期、专业、课程、班级、选课、课件）
+// ---------------------------------------------------------------------------
+
+/// 学期：租户级，各校区共用
+model Term {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String     @map("tenant_id") @db.Uuid
+  code             String
+  name             String
+  startDate        DateTime   @map("start_date") @db.Date
+  endDate          DateTime   @map("end_date") @db.Date
+  enrollOpenDate   DateTime?  @map("enroll_open_date") @db.Date
+  enrollCloseDate  DateTime?  @map("enroll_close_date") @db.Date
+  /// 退课截止日：之前退课记录作废，之后记 W
+  dropDeadline     DateTime?  @map("drop_deadline") @db.Date
+  status           TermStatus @default(planned)
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at")
+  createdBy        String?    @map("created_by") @db.Uuid
+  updatedBy        String?    @map("updated_by") @db.Uuid
+  deletedAt        DateTime?  @map("deleted_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  sections Section[]
+
+  @@unique([tenantId, code])
+  @@map("term")
+}
+
+model Major {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  code               String
+  name               String
+  degreeType         String?   @map("degree_type")
+  deptId             String?   @map("dept_id") @db.Uuid
+  totalCredits       Decimal   @default(0) @map("total_credits") @db.Decimal(6, 1)
+  electiveMinCredits Decimal   @default(0) @map("elective_min_credits") @db.Decimal(6, 1)
+  description        String?
+  status             Boolean   @default(true)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy          String?   @map("created_by") @db.Uuid
+  updatedBy          String?   @map("updated_by") @db.Uuid
+  deletedAt          DateTime? @map("deleted_at")
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  courses MajorCourse[]
+  students StudentMajor[]
+
+  @@unique([tenantId, code])
+  @@map("major")
+}
+
+/// 课程：目录条目，不属于任何学期。有历史班级后编号和学分只读。
+model Course {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  credits   Decimal   @default(0) @db.Decimal(4, 1)
+  deptId    String?   @map("dept_id") @db.Uuid
+  syllabus  String?
+  status    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  prerequisites CoursePrerequisite[] @relation("CourseOf")
+  requiredBy    CoursePrerequisite[] @relation("CoursePrereq")
+  majors        MajorCourse[]
+  sections      Section[]
+
+  @@unique([tenantId, code])
+  @@map("course")
+}
+
+model CoursePrerequisite {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  courseId       String @map("course_id") @db.Uuid
+  prerequisiteId String @map("prerequisite_id") @db.Uuid
+
+  course       Course @relation("CourseOf", fields: [courseId], references: [id])
+  prerequisite Course @relation("CoursePrereq", fields: [prerequisiteId], references: [id])
+
+  @@unique([courseId, prerequisiteId])
+  @@map("course_prerequisite")
+}
+
+/// 课程设置：专业 ↔ 课程。类别是关系的属性（同一门课对 A 专业必修、对 B 专业选修）。
+model MajorCourse {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  majorId       String  @map("major_id") @db.Uuid
+  courseId      String  @map("course_id") @db.Uuid
+  /// required / elective / general
+  category      String
+  suggestedTerm Int?    @map("suggested_term")
+  note          String?
+
+  major  Major  @relation(fields: [majorId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([majorId, courseId])
+  @@map("major_course")
+}
+
+/// 学生 ↔ 专业申报
+model StudentMajor {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  personId   String   @map("person_id") @db.Uuid
+  majorId    String   @map("major_id") @db.Uuid
+  /// primary / minor
+  kind       String   @default("primary")
+  declaredOn DateTime @default(dbgenerated("CURRENT_DATE")) @map("declared_on") @db.Date
+  active     Boolean  @default(true)
+
+  major Major @relation(fields: [majorId], references: [id])
+
+  @@unique([personId, majorId])
+  @@index([tenantId, personId])
+  @@map("student_major")
+}
+
+/// 班级：某课程在某学期、某校区的一次开课
+model Section {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String        @map("tenant_id") @db.Uuid
+  courseId  String        @map("course_id") @db.Uuid
+  termId    String        @map("term_id") @db.Uuid
+  campusId  String        @map("campus_id") @db.Uuid
+  number    String
+  name      String
+  capacity  Int
+  /// onsite / online / hybrid
+  mode      String        @default("onsite")
+  /// 上课安排：[{weekday: 1-7, start: "HH:MM", end: "HH:MM", room?: string}]，时间是校区当地时间
+  schedule  Json          @default("[]")
+  status    SectionStatus @default(draft)
+  notes     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at")
+  createdBy String?       @map("created_by") @db.Uuid
+  updatedBy String?       @map("updated_by") @db.Uuid
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+  course      Course              @relation(fields: [courseId], references: [id])
+  term        Term                @relation(fields: [termId], references: [id])
+  campus      Campus              @relation(fields: [campusId], references: [id])
+  instructors SectionInstructor[]
+  enrollments Enrollment[]
+  materials   SectionMaterial[]
+
+  @@unique([courseId, termId, number])
+  @@index([tenantId, campusId])
+  @@map("section")
+}
+
+model SectionInstructor {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  sectionId String @map("section_id") @db.Uuid
+  personId  String @map("person_id") @db.Uuid
+  /// lead / assistant
+  role      String @default("lead")
+
+  section Section @relation(fields: [sectionId], references: [id])
+
+  @@unique([sectionId, personId])
+  @@index([tenantId, personId])
+  @@map("section_instructor")
+}
+
+/// 选课：学生 ↔ 班级
+model Enrollment {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  sectionId        String           @map("section_id") @db.Uuid
+  studentPersonId  String           @map("student_person_id") @db.Uuid
+  status           EnrollmentStatus @default(enrolled)
+  /// self / registrar
+  method           String           @default("self")
+  /// 教务代选或特批时的原因
+  reason           String?
+  /// 教务代选时确认过的情形：["capacity", "prerequisite", "conflict", "window"]
+  overrides        Json             @default("[]")
+  enrolledAt       DateTime         @default(now()) @map("enrolled_at")
+  droppedAt        DateTime?        @map("dropped_at")
+  /// 课程是否通过（由成绩模块 B8 写入；先修课校验只认 true）
+  passed           Boolean?
+  createdBy        String?          @map("created_by") @db.Uuid
+
+  section Section @relation(fields: [sectionId], references: [id])
+
+  @@index([tenantId, studentPersonId])
+  @@index([sectionId])
+  @@map("enrollment")
+}
+
+/// 班级课件：任课教师增删改，选课学生可看（第一版只存标题和外链，文件上传在文档库里程碑）
+model SectionMaterial {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  sectionId String   @map("section_id") @db.Uuid
+  title     String
+  /// slides / reference / syllabus
+  category  String   @default("slides")
+  url       String
+  sort      Int      @default(0)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+
+  section Section @relation(fields: [sectionId], references: [id])
+
+  @@index([sectionId])
+  @@map("section_material")
+}
+
+/// 事件（出站箱）：选课作废、班级取消等要通知的事先写在这里，B9 的通知服务消费
+model OutboxEvent {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  type        String
+  payload     Json
+  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, processedAt])
+  @@map("outbox_event")
 }

@@ -30,6 +30,8 @@ interface Side {
 const TABLES = [
   "role", "menu", "data_scope_set", "data_scope_set_node", "account", "account_role", "person", "person_dept",
   "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log", "dict_type", "dict_item", "sys_param",
+  "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "section_instructor", "section_material", "student_major",
+  "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course",
 ];
 
 describe("cross-tenant leak scan", () => {
@@ -60,6 +62,10 @@ describe("cross-tenant leak scan", () => {
     const menu = await owner.menu.create({ data: { tenantId, name: "Own link", type: "link", route: "https://example.test" } });
     const set = await owner.dataScopeSet.create({ data: { tenantId, code: "custom-scan", name: "Scan set", kind: "custom" } });
     await owner.dataScopeSetNode.create({ data: { tenantId, setId: set.id, deptId: dept.id } });
+    const term = await owner.term.create({ data: { tenantId, code: "T1", name: "Term one", startDate: new Date("2026-09-01"), endDate: new Date("2026-12-20") } });
+    const course = await owner.course.create({ data: { tenantId, code: "SCAN101", name: "Scan course", credits: 3 } });
+    const major = await owner.major.create({ data: { tenantId, code: "SCAN", name: "Scan major" } });
+    const section = await owner.section.create({ data: { tenantId, courseId: course.id, termId: term.id, campusId: campus.id, number: "01", name: "SCAN101-01", capacity: 10 } });
     const dictType = await owner.dictType.create({ data: { tenantId, code: "scan_dict", name: "Scan dictionary" } });
     const dictItem = await owner.dictItem.create({ data: { tenantId, typeId: dictType.id, value: "one", label: "One" } });
     const param = await owner.sysParam.create({ data: { tenantId, key: "scan.param", value: "1", name: "Scan parameter" } });
@@ -69,7 +75,7 @@ describe("cross-tenant leak scan", () => {
     const everyId = async (table: string) =>
       (await owner.$queryRawUnsafe<Array<{ id: string }>>(`SELECT id::text FROM biz.${table} WHERE tenant_id = '${tenantId}'`)).map((r) => r.id);
     const allIds = new Set<string>([tenantId, sid]);
-    for (const t of ["role", "menu", "data_scope_set", "account", "person", "dept", "campus", "post", "dict_type", "dict_item", "sys_param"]) (await everyId(t)).forEach((i) => allIds.add(i));
+    for (const t of ["role", "menu", "data_scope_set", "account", "person", "dept", "campus", "post", "dict_type", "dict_item", "sys_param", "term", "major", "course", "section"]) (await everyId(t)).forEach((i) => allIds.add(i));
     return {
       tenant,
       host: `${tenant.code}.localhost`,
@@ -84,6 +90,10 @@ describe("cross-tenant leak scan", () => {
         personId: person.id,
         menuId: menu.id,
         setId: set.id,
+        termId: term.id,
+        courseId: course.id,
+        majorId: major.id,
+        sectionId: section.id,
         dictTypeId: dictType.id,
         dictItemId: dictItem.id,
         paramId: param.id,
@@ -243,7 +253,7 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId)/, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId)/, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
       const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400

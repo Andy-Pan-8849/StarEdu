@@ -20,7 +20,8 @@ export async function bff<T>(path: string, init: { method?: string; body?: unkno
   });
   if (res.status === 401) {
     const platform = window.location.hostname.split(".")[0] === "platform";
-    window.location.assign(`${platform ? "" : "/admin"}/auth/login?return=${encodeURIComponent(window.location.pathname)}`);
+    const admin = window.location.pathname.startsWith("/admin");
+    window.location.assign(`${platform || !admin ? "" : "/admin"}/auth/login?return=${encodeURIComponent(window.location.pathname)}`);
     throw new BffError("Not signed in", 401);
   }
   const text = await res.text();
