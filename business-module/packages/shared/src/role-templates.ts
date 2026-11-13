@@ -11,9 +11,19 @@ export interface RoleTemplate {
 }
 
 export const ROLE_TEMPLATES: RoleTemplate[] = [
-  { code: "hr-manager", name: "HR manager", sort: 10, scopes: ["all"], menuCodes: ["hr", "hr:person", "hr:person:edit"] },
+  {
+    code: "hr-manager",
+    name: "HR manager",
+    sort: 10,
+    scopes: ["all"],
+    menuCodes: [
+      "hr", "hr:person", "hr:person:edit", "hr:person:sensitive", "hr:person:emergencyView", "hr:person:emergencyEdit",
+      "hr:staff", "hr:staff:add", "hr:staff:edit", "hr:staff:assign", "hr:staff:end", "hr:staff:import",
+      "hr:student", "hr:student:add", "hr:student:edit", "hr:student:import",
+    ],
+  },
   { code: "academic-manager", name: "Academic manager", sort: 20, scopes: ["all"], menuCodes: [] },
-  { code: "campus-lead", name: "Campus lead", sort: 30, scopes: ["own_dept_tree"], menuCodes: ["hr", "hr:person"] },
+  { code: "campus-lead", name: "Campus lead", sort: 30, scopes: ["own_dept_tree"], menuCodes: ["hr", "hr:person", "hr:staff", "hr:student"] },
   { code: "teacher", name: "Teacher", sort: 40, scopes: ["self", "own_classes"], menuCodes: [] },
 ];
 

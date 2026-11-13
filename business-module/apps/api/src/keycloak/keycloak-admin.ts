@@ -181,6 +181,12 @@ export class KeycloakAdmin {
     return (await res.json()) as KeycloakSession[];
   }
 
+  /** 结束一个用户在该域里的所有登录会话（离职时用）。 */
+  async logoutUser(realm: string, userId: string): Promise<void> {
+    const res = await this.request(`/realms/${realm}/users/${userId}/logout`, { method: "POST" });
+    if (res.status !== 204 && res.status !== 404) throw new KeycloakError(`logout user failed: ${res.status}`, res.status);
+  }
+
   /** 解除登录失败造成的临时锁定。 */
   async unlockUser(realm: string, userId: string): Promise<void> {
     const res = await this.request(`/realms/${realm}/attack-detection/brute-force/users/${userId}`, { method: "DELETE" });

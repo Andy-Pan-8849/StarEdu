@@ -87,7 +87,10 @@ export class MeController {
     const personId = auth.authz.personId;
     const person = personId ? await this.tenantDb.db.person.findUnique({ where: { id: personId } }) : null;
     if (entry === "admin") {
-      if (!auth.authz.isBuiltinAdmin && person?.type !== "staff") return "Only staff can use the admin console";
+      const staff = personId ? await this.tenantDb.db.staffProfile.findFirst({ where: { personId } }) : null;
+      // 管理入口要求"在职"的教职员工档案（旧数据只有类型、没有档案的按类型认）；离职/停薪留职立即拒绝
+      if (staff && staff.status !== "active" && !auth.authz.isBuiltinAdmin) return "Employment has ended or is suspended";
+      if (!auth.authz.isBuiltinAdmin && !staff && person?.type !== "staff") return "Only staff can use the admin console";
       if ((await this.tree(auth, "admin")).length === 0) return "No menus are assigned to this account";
       return null;
     }

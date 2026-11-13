@@ -11,6 +11,7 @@ import { AuditService } from "../audit/audit.service";
 import { RequirePermissions } from "../auth/decorators";
 import type { AuthContext } from "../auth/tenant-token.guard";
 import { Auth, parse } from "../common/http";
+import { effectiveWhere } from "../hr/effective";
 import { AuthzService } from "../rbac/authz.service";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 
@@ -51,7 +52,7 @@ export class CampusesController {
   @RequirePermissions(PERMS.campusList)
   async closureCheck(@Param("id", ParseUUIDPipe) id: string) {
     const campus = await this.campus(id);
-    return this.check(campus.deptId);
+    return this.check(campus.deptId, id);
   }
 
   private async campus(id: string) {
@@ -60,13 +61,19 @@ export class CampusesController {
     return row;
   }
 
-  private async check(deptId: string) {
+  private async check(deptId: string, id: string) {
     const db = this.tenantDb.db;
     const subtree = (await db.dept.findMany({ where: { ancestors: { has: deptId } }, select: { id: true } })).map((d) => d.id);
-    const links = subtree.length ? await db.personDept.findMany({ where: { deptId: { in: subtree } } }) : [];
-    const people = links.length ? await db.person.findMany({ where: { id: { in: [...new Set(links.map((l) => l.personId))] } }, select: { id: true, fullName: true, type: true } }) : [];
-    const students = people.filter((p) => p.type === "student");
-    const staff = people.filter((p) => p.type === "staff");
+    const links = subtree.length ? await db.personDept.findMany({ where: { deptId: { in: subtree }, ...effectiveWhere() } }) : [];
+    const people = links.length ? await db.person.findMany({ where: { id: { in: [...new Set(links.map((l) => l.personId))] } }, select: { id: true, fullName: true, type: true, staff: { select: { status: true } }, student: { select: { academicStatus: true } } } }) : [];
+    // 在读/休学的学生：学员档案里选了这个校区，或在校区部门子树下有归属；有效任职的教职员工：在职（离职的不算）
+    const profiles = await db.studentProfile.findMany({ where: { campusId: id, academicStatus: { in: ["enrolled", "on_leave"] } }, select: { personId: true } });
+    const profileIds = profiles.map((p) => p.personId);
+    const profilePeople = profileIds.length ? await db.person.findMany({ where: { id: { in: profileIds } }, select: { id: true, fullName: true, type: true, staff: { select: { status: true } }, student: { select: { academicStatus: true } } } }) : [];
+    // 有学员档案的按档案状态算（在读/休学才算），没有档案的旧数据按类型算
+    const studentsInTree = people.filter((p) => p.type === "student" && (!p.student || p.student.academicStatus === "enrolled" || p.student.academicStatus === "on_leave"));
+    const students = [...new Map([...studentsInTree, ...profilePeople].map((p) => [p.id, p])).values()];
+    const staff = people.filter((p) => p.type === "staff" && p.staff?.status !== "left");
     return {
       students: { count: students.length, items: students.slice(0, 50) },
       staffAssignments: { count: staff.length, items: staff.slice(0, 50) },
@@ -121,7 +128,7 @@ export class CampusesController {
     if (!allowed[campus.status].includes(status)) throw new ConflictException(`Cannot go from ${campus.status} to ${status}`);
     if (status === "closed") {
       if (confirmName !== campus.name) throw new BadRequestException("Type the campus name to confirm closing it");
-      const check = await this.check(campus.deptId);
+      const check = await this.check(campus.deptId, id);
       if (!check.canClose) throw new ConflictException({ message: "The campus still has students or staff assignments", check });
     }
     await this.tenantDb.transaction(async (tx) => {

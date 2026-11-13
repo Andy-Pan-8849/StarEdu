@@ -92,6 +92,24 @@ enum ScopeKind {
   @@map("scope_kind")
 }
 
+enum StaffStatus {
+  active // 在职
+  on_leave // 停薪留职
+  left // 离职
+
+  @@map("staff_status")
+}
+
+enum StudentStatus {
+  enrolled // 在读
+  on_leave // 休学
+  graduated // 毕业
+  withdrawn // 退学
+  completed // 结业
+
+  @@map("student_status")
+}
+
 enum LoginResult {
   success
   denied
@@ -135,6 +153,9 @@ model Tenant {
   dataScopeNodes DataScopeSetNode[]
   roleDataScopes RoleDataScope[]
   personDepts    PersonDept[]
+  staffProfiles  StaffProfile[]
+  studentProfiles StudentProfile[]
+  emergencyContacts EmergencyContact[]
   loginLogs      LoginLog[]
   auditLogs      AuditLog[]
   dictTypes      DictType[]
@@ -165,6 +186,12 @@ model Person {
   type       PersonType
   fullName   String     @map("full_name")
   workEmail  String?    @map("work_email")
+  /// 敏感信息（hr:person:sensitive）：出生日期、性别、证件号、个人电话、住址
+  birthDate  DateTime?  @map("birth_date") @db.Date
+  gender     String?
+  idNumber   String?    @map("id_number")
+  phone      String?
+  address    String?
   createdAt  DateTime   @default(now()) @map("created_at")
   updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at")
   createdBy  String?    @map("created_by") @db.Uuid
@@ -174,6 +201,9 @@ model Person {
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   account Account?
   depts   PersonDept[]
+  staff   StaffProfile?
+  student StudentProfile?
+  emergencyContacts EmergencyContact[]
 
   @@index([tenantId])
   @@map("person")
@@ -459,21 +489,102 @@ model RoleDataScope {
   @@map("role_data_scope")
 }
 
-/// 任职记录：人员所属部门，可有多个，其中一个为主部门（B5 扩展岗位、起止日期等）
+/// 任职记录：人员在部门里的任职（教职员工）或在组织树上的归属（学生）。一人多条，调岗不改旧记录，
+/// 新增一条并给旧记录填结束日期，保留历史。"当前有效" = 开始日期 <= 今天 且（没有结束日期 或 结束日期 >= 今天）。
 model PersonDept {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  personId  String   @map("person_id") @db.Uuid
-  deptId    String   @map("dept_id") @db.Uuid
-  isPrimary Boolean  @default(false) @map("is_primary")
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  personId  String    @map("person_id") @db.Uuid
+  deptId    String    @map("dept_id") @db.Uuid
+  postId    String?   @map("post_id") @db.Uuid
+  isPrimary Boolean   @default(false) @map("is_primary")
+  /// staff = 教职员工任职；student = 学生在组织树上的归属
+  kind      String    @default("staff")
+  startDate DateTime  @default(dbgenerated("CURRENT_DATE")) @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   person Person @relation(fields: [personId], references: [id])
 
-  @@unique([personId, deptId])
   @@index([tenantId, deptId])
+  @@index([personId])
   @@map("person_dept")
+}
+
+/// 员工档案（一人一份）
+model StaffProfile {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String      @map("tenant_id") @db.Uuid
+  personId           String      @unique @map("person_id") @db.Uuid
+  employeeNo         String      @map("employee_no")
+  hireDate           DateTime    @map("hire_date") @db.Date
+  status             StaffStatus @default(active)
+  employmentType     String      @default("full_time") @map("employment_type")
+  /// 离职/停薪留职的生效日期：到点由定时任务切换；今天或更早的立即生效
+  pendingStatus      StaffStatus? @map("pending_status")
+  pendingEffectiveOn DateTime?   @map("pending_effective_on") @db.Date
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @default(now()) @updatedAt @map("updated_at")
+  createdBy          String?     @map("created_by") @db.Uuid
+  updatedBy          String?     @map("updated_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  person Person @relation(fields: [personId], references: [id])
+
+  @@unique([tenantId, employeeNo])
+  @@map("staff_profile")
+}
+
+/// 学员档案（一人一份）。专业申报在教学模块（B6）里。
+model StudentProfile {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  personId       String        @unique @map("person_id") @db.Uuid
+  studentNo      String        @map("student_no")
+  /// 所属校区（学员在档案里直接选）
+  campusId       String        @map("campus_id") @db.Uuid
+  enrollTerm     String?       @map("enroll_term")
+  academicStatus StudentStatus @default(enrolled) @map("academic_status")
+  degreeType     String?       @map("degree_type")
+  /// 方向/专业的文字（B6 有专业表之前先记文字，例如样例里的 java / python / typescript）
+  program        String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at")
+  createdBy      String?       @map("created_by") @db.Uuid
+  updatedBy      String?       @map("updated_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  person Person @relation(fields: [personId], references: [id])
+
+  @@unique([tenantId, studentNo])
+  @@index([tenantId, campusId])
+  @@map("student_profile")
+}
+
+/// 紧急联系人：挂在自然人上，员工和学员共用；敏感信息，查看和修改都写日志
+model EmergencyContact {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  personId     String   @map("person_id") @db.Uuid
+  priority     Int      @default(1)
+  name         String
+  relationship String
+  phone        String
+  phone2       String?
+  email        String?
+  address      String?
+  postalCode   String?  @map("postal_code")
+  isGuardian   Boolean  @default(false) @map("is_guardian")
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  person Person @relation(fields: [personId], references: [id])
+
+  @@index([tenantId, personId])
+  @@map("emergency_contact")
 }
 
 /// 登录日志：进入某个入口的成功/被拒记录（认证本身在 Keycloak，这里记业务侧的入口资格检查）

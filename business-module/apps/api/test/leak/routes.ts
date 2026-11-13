@@ -23,7 +23,8 @@ export function listRoutes(controllers: Array<new (...args: never[]) => unknown>
     const classPlatform = Reflect.getMetadata(PLATFORM_ROUTE, controller) === true;
     const classPublic = Reflect.getMetadata(IS_PUBLIC, controller) === true;
     for (const name of Object.getOwnPropertyNames(controller.prototype)) {
-      const handler = (controller.prototype as Record<string, unknown>)[name];
+      // 只看方法：getter（比如 private get db()）在原型上读取会报错
+      const handler = Object.getOwnPropertyDescriptor(controller.prototype, name)?.value;
       if (typeof handler !== "function") continue;
       const method = Reflect.getMetadata(METHOD_METADATA, handler);
       if (method === undefined) continue;

@@ -33,6 +33,9 @@ export const TENANT_MODELS: Record<string, ModelRule> = {
   DictItem: { nullable: true, softDelete: true },
   SysParam: { nullable: true, softDelete: true },
   OperationLog: { nullable: false, softDelete: false },
+  StaffProfile: { nullable: false, softDelete: false },
+  StudentProfile: { nullable: false, softDelete: false },
+  EmergencyContact: { nullable: false, softDelete: false },
 };
 
 export class TenantScopeError extends Error {}
