@@ -20,6 +20,7 @@ export const createAssignmentSchema = z.object({
   dueDate: dayInput,
   groupId: z.string().uuid().nullable().optional(),
   allowLate: z.boolean().optional(),
+  manualOnly: z.boolean().optional(),
   latePolicy: latePolicySchema.optional(),
   attachments: attachmentsSchema.optional(),
   rubric: rubricSchema.optional(),
@@ -32,6 +33,7 @@ export const patchAssignmentSchema = z
     dueDate: dayInput,
     groupId: z.string().uuid().nullable(),
     allowLate: z.boolean(),
+    manualOnly: z.boolean(),
     latePolicy: latePolicySchema,
     attachments: attachmentsSchema,
   })

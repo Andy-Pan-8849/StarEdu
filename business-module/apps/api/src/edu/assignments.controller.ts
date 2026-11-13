@@ -70,7 +70,7 @@ export class AssignmentsController {
   private view(a: Awaited<ReturnType<AssignmentsController["assignmentOf"]>>, extra: Record<string, unknown> = {}) {
     return {
       id: a.id, sectionId: a.sectionId, title: a.title, description: a.description, attachments: a.attachments, dueDate: dayString(a.dueDate), dueAt: a.dueAt,
-      allowLate: a.allowLate, latePolicy: a.latePolicy, maxScore: num(a.maxScore), published: a.published, publishedAt: a.publishedAt,
+      allowLate: a.allowLate, manualOnly: a.manualOnly, latePolicy: a.latePolicy, maxScore: num(a.maxScore), published: a.published, publishedAt: a.publishedAt,
       group: a.group ? { id: a.group.id, name: a.group.name } : null,
       rubric: a.rubric.map((r) => ({ id: r.id, title: r.title, description: r.description, maxPoints: Number(r.maxPoints), sort: r.sort })),
       ...extra,
@@ -162,7 +162,7 @@ export class AssignmentsController {
       const a = await tx.assignment.create({
         data: {
           tenantId: auth.tenantId, sectionId, groupId: input.groupId ?? null, title: input.title, description: input.description ?? "", attachments: (input.attachments ?? []) as never,
-          dueDate: new Date(`${input.dueDate}T00:00:00Z`), dueAt: endOfLocalDay(input.dueDate, section.campus.timezone), allowLate: input.allowLate ?? true,
+          dueDate: new Date(`${input.dueDate}T00:00:00Z`), dueAt: endOfLocalDay(input.dueDate, section.campus.timezone), allowLate: input.allowLate ?? true, manualOnly: input.manualOnly ?? false,
           latePolicy: (input.latePolicy ?? DEFAULT_LATE_POLICY) as never, createdBy: auth.accountId,
         },
       });
@@ -189,6 +189,7 @@ export class AssignmentsController {
       if (input.allowLate === false && (await this.db.submission.count({ where: { assignmentId: id, isLate: true } }))) throw new ConflictException("Late submissions already exist");
     }
     if (input.groupId) await this.checkGroup(sectionId, input.groupId);
+    if (input.manualOnly === true && (await this.db.submission.count({ where: { assignmentId: id } }))) throw new ConflictException("Students have already submitted");
     const { dueDate, latePolicy, attachments, ...rest } = input;
     const data = {
       ...rest,

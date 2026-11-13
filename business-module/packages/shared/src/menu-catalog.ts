@@ -162,7 +162,13 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["submissions", "Submissions", PERMS.eduSubmissionList],
     ["grade", "Grade", PERMS.eduSubmissionGrade],
     ["extension", "Extensions", PERMS.eduExtensionEdit],
+    ["gradebook", "Grade book", PERMS.eduGradeList],
+    ["gradeEdit", "Edit grades", PERMS.eduGradeEdit],
+    ["gradeAmend", "Amend locked grades", PERMS.eduGradeAmend],
   ]),
+  ...menuWithButtons("edu:scale", "edu", "Grading scale", "scale", 5, PERMS.eduScaleList, [["edit", "Edit", PERMS.eduScaleEdit]]),
+  ...menuWithButtons("edu:transcript", "edu", "Transcripts", "transcript", 6, PERMS.eduTranscriptList, [["issue", "Issue formal transcript", PERMS.eduTranscriptIssue]]),
+  ...menuWithButtons("edu:dashboard", "edu", "Dashboard", "dashboard", 7, PERMS.eduDashboardView, []),
 
   // 学生门户：学生角色的权限就是这个入口下全部菜单和按钮的权限
   { code: "portal", type: "directory", name: "My studies", nameKey: "menu.portal", route: "studies", icon: "graduation", sort: 10, entries: ["portal"] },
@@ -172,6 +178,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ]),
   ...menuWithButtons("portal:plan", "portal", "Degree plan", "plan", 2, PERMS.portalPlanView, []),
   ...menuWithButtons("portal:assignment", "portal", "My assignments", "assignment", 3, PERMS.portalAssignmentList, [["submit", "Submit", PERMS.portalAssignmentSubmit]]),
+  ...menuWithButtons("portal:grade", "portal", "My grades", "grade", 4, PERMS.portalGradeList, [["download", "Download transcript", PERMS.portalTranscriptDownload]]),
 
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },
   ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [

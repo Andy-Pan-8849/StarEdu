@@ -126,6 +126,18 @@ export const PERMS = {
   eduSubmissionGrade: "edu:submission:grade",
   /** 给某个学生的某次作业延期：任课教师或教务 */
   eduExtensionEdit: "edu:extension:edit",
+  /** 成绩册、成绩构成、导出：任课教师和教务（在范围内） */
+  eduGradeList: "edu:grade:list",
+  /** 改成绩构成权重、手工录分、算总评、发布最终成绩：只有任课教师 */
+  eduGradeEdit: "edu:grade:edit",
+  /** 结课后改成绩：教务，要填原因，记改前改后 */
+  eduGradeAmend: "edu:grade:amend",
+  eduScaleList: "edu:scale:list",
+  eduScaleEdit: "edu:scale:edit",
+  eduTranscriptList: "edu:transcript:list",
+  /** 生成正式版成绩单（带编号，写日志） */
+  eduTranscriptIssue: "edu:transcript:issue",
+  eduDashboardView: "edu:dashboard:view",
   // 学生门户
   portalEnrollList: "portal:enroll:list",
   portalEnrollAdd: "portal:enroll:add",
@@ -133,6 +145,8 @@ export const PERMS = {
   portalPlanView: "portal:plan:view",
   portalAssignmentList: "portal:assignment:list",
   portalAssignmentSubmit: "portal:assignment:submit",
+  portalGradeList: "portal:grade:list",
+  portalTranscriptDownload: "portal:transcript:download",
 } as const;
 
 export type Permission = (typeof PERMS)[keyof typeof PERMS];
