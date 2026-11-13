@@ -27,8 +27,8 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
     apiUrl: config.apiUrl,
     host: req.headers.get("host") ?? "",
     method: req.method,
-    // 平台入口的会话调 /api/platform/*，租户入口调 /api/*
-    path: `${fresh.session.entry === "platform" ? "/api/platform" : "/api"}/${path}${req.nextUrl.search}`,
+    // 平台入口的会话调 /api/platform/*，学生门户的会话调 /api/portal/*，管理后台调 /api/*
+    path: `${fresh.session.entry === "platform" ? "/api/platform" : fresh.session.entry === "portal" ? "/api/portal" : "/api"}/${path}${req.nextUrl.search}`,
     token: fresh.session.accessToken,
     body: body && body.length > 0 ? body : undefined,
     contentType: req.headers.get("content-type") ?? undefined,

@@ -227,7 +227,7 @@ describe("HR: people, staff, students, emergency contacts, import", () => {
 
       await admin().post(`/api/campuses/${campus.id}/status`, { status: "stop_new" });
       const check = (await admin().get(`/api/campuses/${campus.id}/closure-check`)).body;
-      expect(check).toMatchObject({ canClose: false, students: { count: 1 }, staffAssignments: { count: 2 }, classes: { implemented: false } }); // 教师 + 校区负责人
+      expect(check).toMatchObject({ canClose: false, students: { count: 1 }, staffAssignments: { count: 2 }, classes: { implemented: true, count: 0 } }); // 教师 + 校区负责人
       // 学生退学、教职员工离职后可以关闭
       await hr().patch(`/api/students/${stu}`, { academicStatus: "withdrawn" });
       await hr().post(`/api/staff/${staffSh}/end`, { status: "left" });

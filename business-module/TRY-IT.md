@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B5.** Sign-in, the platform console and all system-management pages work. The business pages (people, teaching, assignments, grades) are not built yet; their menus show "This page is not available yet."
+Status: **milestone B6.** Sign-in, the platform console and all system-management pages work. The business pages (people, teaching, assignments, grades) are not built yet; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -96,14 +96,37 @@ Try this as the tenant administrator too: the **Staff** list shows basic informa
 
 To load the sample company into `hq`: `pnpm import:sample`.
 
-### Campus lead, academic manager, teacher, student
+### Academic manager (`academic-manager` role; demo account `hui.acad.bj` arrives with the demo seed)
 
-| Role | Typical work | Available from |
-|---|---|---|
-| Campus lead | see only their own campus's staff and students (works today with the role template); classes and grades later | classes: B6-B8 |
-| Academic manager | create programs, courses, terms and classes; enrollment; publish grades; official transcripts | B6-B8 |
-| Teacher | see their own classes; set assignments; grade submissions; grant extensions; publish grades | B6-B8 |
-| Student | see their own courses, submit assignments, see grades and transcript, get notifications, ask the AI assistant | B6-B10 |
+| Flow | Available |
+|---|---|
+| **Terms**: create, open enrollment (window and drop deadline), start, end (sections end, enrolled records complete) | Works today |
+| **Courses** and **prerequisites**; **majors** and their **curriculum** (required / elective / general, suggested term) | Works today |
+| **Sections**: create (course, term, campus, capacity), assign instructors, open, cancel | Works today |
+| **Enroll students for them**: over capacity, missing prerequisite, clash or outside the window need a reason and are logged | Works today |
+| Remove a student: before the drop deadline the record is voided, after it W | Works today |
+
+### Teacher (`teacher` role)
+
+| Flow | Available |
+|---|---|
+| See only your own sections and their rosters; you cannot change a section's capacity or status | Works today |
+| **Course materials** (title and link; draft or published) for your own sections; read-only after the section ends | Works today |
+| Assignments, grading | B7-B8 |
+
+### Student (portal at `/`; demo accounts arrive with the demo seed)
+
+| Flow | Available |
+|---|---|
+| Sign in at the portal; **Course enrollment**: open sections with seats left, required/elective label for your major, missing prerequisites, schedule clashes | Works today |
+| **Enroll** and **Drop** (the screen warns when a drop will become a W) | Works today |
+| **Degree plan**: your major's courses as passed / in progress / not taken, credits earned | Works today |
+| Course materials of the sections you are in | Works today (API) |
+| Assignments, grades, transcript, notifications, AI assistant | B7-B10 |
+
+### Campus lead
+
+Sees only their own campus's staff, students and sections (works today with the role template).
 
 ### Platform operator (works today)
 

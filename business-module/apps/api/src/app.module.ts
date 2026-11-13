@@ -16,6 +16,13 @@ import { DictController } from "./sysdata/dict.controller";
 import { ParamsController } from "./sysdata/params.controller";
 import { ImportController } from "./hr/import.controller";
 import { ImportService } from "./hr/import.service";
+import { CatalogController } from "./edu/catalog.controller";
+import { ClassMembershipService } from "./edu/class-membership.service";
+import { EnrollmentService } from "./edu/enrollment.service";
+import { OutboxService } from "./edu/outbox.service";
+import { PortalController } from "./edu/portal.controller";
+import { SectionsController } from "./edu/sections.controller";
+import { CLASS_MEMBERSHIP } from "./data-scope/data-scope.service";
 import { EmergencyController } from "./hr/emergency.controller";
 import { HrAccess } from "./hr/hr-access.service";
 import { PersonsController } from "./hr/persons.controller";
@@ -64,6 +71,9 @@ export const CONTROLLERS = [
   StudentsController,
   EmergencyController,
   ImportController,
+  CatalogController,
+  SectionsController,
+  PortalController,
   DictController,
   ParamsController,
   OperationLogController,
@@ -89,6 +99,9 @@ export const CONTROLLERS = [
     HrAccess,
     StaffService,
     ImportService,
+    EnrollmentService,
+    OutboxService,
+    { provide: CLASS_MEMBERSHIP, useClass: ClassMembershipService },
     MailService,
     PlatformPrismaService,
     PlatformAuthzService,

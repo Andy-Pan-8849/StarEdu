@@ -137,7 +137,7 @@ describe("sessions, force logout and entry qualification", () => {
       expect((await h.call(token).get("/api/persons")).status).toBe(403); // 账号还是"待激活"
       const session = await h.call(token).post("/api/auth/session", { entry: "admin" });
       expect(session.status).toBe(201);
-      expect(session.body.menus.map((m: { code: string }) => m.code).sort()).toEqual(["hr", "system"]);
+      expect(session.body.menus.map((m: { code: string }) => m.code).sort()).toEqual(["edu", "hr", "system"]);
     });
   });
 

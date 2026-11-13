@@ -94,6 +94,33 @@ export const PERMS = {
   hrStudentAdd: "hr:student:add",
   hrStudentEdit: "hr:student:edit",
   hrStudentImport: "hr:student:import",
+  // 教学
+  eduTermList: "edu:term:list",
+  eduTermAdd: "edu:term:add",
+  eduTermEdit: "edu:term:edit",
+  eduMajorList: "edu:major:list",
+  eduMajorAdd: "edu:major:add",
+  eduMajorEdit: "edu:major:edit",
+  eduCourseList: "edu:course:list",
+  eduCourseAdd: "edu:course:add",
+  eduCourseEdit: "edu:course:edit",
+  eduSectionList: "edu:section:list",
+  eduSectionAdd: "edu:section:add",
+  /** 改班级的结构信息（容量、校区、教师……）：教务才有，任课教师没有 */
+  eduSectionEdit: "edu:section:edit",
+  /** 班级状态：开放选课、开课、结课、取消 */
+  eduSectionStatus: "edu:section:status",
+  eduEnrollmentList: "edu:enrollment:list",
+  /** 教务代选/特批 */
+  eduEnrollmentAdd: "edu:enrollment:add",
+  eduEnrollmentRemove: "edu:enrollment:remove",
+  /** 课件：任课教师增删改 */
+  eduMaterialEdit: "edu:material:edit",
+  // 学生门户
+  portalEnrollList: "portal:enroll:list",
+  portalEnrollAdd: "portal:enroll:add",
+  portalEnrollDrop: "portal:enroll:drop",
+  portalPlanView: "portal:plan:view",
 } as const;
 
 export type Permission = (typeof PERMS)[keyof typeof PERMS];

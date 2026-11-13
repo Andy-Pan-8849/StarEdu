@@ -48,7 +48,7 @@ describe("campuses, departments and posts", () => {
       await h.owner.personDept.create({ data: { tenantId: h.tenant.tenantId, personId: staff.id, deptId: sub.id } });
       await h.owner.personDept.create({ data: { tenantId: h.tenant.tenantId, personId: student.id, deptId: campusDeptId } });
       const check = (await admin().get(`/api/campuses/${campusId}/closure-check`)).body;
-      expect(check).toMatchObject({ canClose: false, students: { count: 1 }, staffAssignments: { count: 1 }, classes: { count: 0, implemented: false } });
+      expect(check).toMatchObject({ canClose: false, students: { count: 1 }, staffAssignments: { count: 1 }, classes: { count: 0, implemented: true } });
       expect(check.students.items[0].fullName).toBe("Student Li");
       const refused = await admin().post(`/api/campuses/${campusId}/status`, { status: "closed", confirmName: "Shanghai Pudong" });
       expect(refused.status).toBe(409);

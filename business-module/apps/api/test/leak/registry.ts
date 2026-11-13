@@ -20,6 +20,10 @@ export type Fixture =
   | "personId"
   | "menuId"
   | "setId"
+  | "termId"
+  | "courseId"
+  | "majorId"
+  | "sectionId"
   | "dictTypeId"
   | "dictItemId"
   | "paramId"
@@ -49,6 +53,14 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/staff/export", kind: "other" },
   { method: "GET", path: "/api/students", kind: "other" },
   { method: "GET", path: "/api/students/export", kind: "other" },
+  { method: "GET", path: "/api/terms", kind: "other" },
+  { method: "GET", path: "/api/terms/:id", kind: "detail", fixture: "termId" },
+  { method: "GET", path: "/api/courses", kind: "other" },
+  { method: "GET", path: "/api/courses/:id", kind: "detail", fixture: "courseId" },
+  { method: "GET", path: "/api/majors", kind: "other" },
+  { method: "GET", path: "/api/majors/:id", kind: "detail", fixture: "majorId" },
+  { method: "GET", path: "/api/majors/:id/students", kind: "other", fixture: "majorId" },
+  { method: "GET", path: "/api/sections", kind: "other" },
   { method: "GET", path: "/api/depts", kind: "list" },
   { method: "GET", path: "/api/depts/:id", kind: "detail", fixture: "deptId" },
   { method: "GET", path: "/api/posts", kind: "list" },
@@ -128,6 +140,31 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "DELETE", path: "/api/staff/:id/assignments/:assignmentId", fixture: "personId", target: "foreign", note: "end an assignment of another tenant's staff" },
   { method: "PUT", path: "/api/persons/:personId/emergency-contacts/:id", fixture: "personId", target: "foreign", body: { name: "X", relationship: "friend", phone: "123456" }, note: "change another tenant's emergency contact" },
   { method: "DELETE", path: "/api/persons/:personId/emergency-contacts/:id", fixture: "personId", target: "foreign", note: "delete another tenant's emergency contact" },
+  { method: "PATCH", path: "/api/terms/:id", fixture: "termId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's term" },
+  { method: "POST", path: "/api/terms/:id/status", fixture: "termId", target: "foreign", body: { status: "enrolling" }, note: "change another tenant's term status" },
+  { method: "PATCH", path: "/api/courses/:id", fixture: "courseId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's course" },
+  { method: "PUT", path: "/api/courses/:id/prerequisites", fixture: "courseId", target: "foreign", body: { courseIds: [] }, note: "change another tenant's prerequisites" },
+  { method: "PATCH", path: "/api/majors/:id", fixture: "majorId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's major" },
+  { method: "PUT", path: "/api/majors/:id/courses", fixture: "majorId", target: "foreign", body: { items: [] }, note: "change another tenant's curriculum" },
+  { method: "PUT", path: "/api/majors/:id/students/:personId", fixture: "majorId", target: "foreign", body: {}, note: "declare a major in another tenant" },
+  { method: "DELETE", path: "/api/majors/:id/students/:personId", fixture: "majorId", target: "foreign", note: "undeclare a major in another tenant" },
+  { method: "GET", path: "/api/sections/:id", fixture: "sectionId", target: "foreign", note: "read another tenant's section" },
+  { method: "PATCH", path: "/api/sections/:id", fixture: "sectionId", target: "foreign", body: { capacity: 1 }, note: "change another tenant's section" },
+  { method: "POST", path: "/api/sections/:id/status", fixture: "sectionId", target: "foreign", body: { status: "cancelled" }, note: "cancel another tenant's section" },
+  { method: "PUT", path: "/api/sections/:id/instructors", fixture: "sectionId", target: "foreign", body: { items: [] }, note: "change another tenant's instructors" },
+  { method: "GET", path: "/api/sections/:id/roster", fixture: "sectionId", target: "foreign", note: "read another tenant's roster" },
+  { method: "POST", path: "/api/sections/:id/enrollments", fixture: "sectionId", target: "foreign", body: { studentIds: ["11111111-1111-4111-8111-111111111111"] }, note: "enrol students in another tenant's section" },
+  { method: "DELETE", path: "/api/sections/:id/enrollments/:enrollmentId", fixture: "sectionId", target: "foreign", note: "remove an enrollment of another tenant" },
+  { method: "GET", path: "/api/sections/:id/materials", fixture: "sectionId", target: "foreign", note: "read another tenant's materials" },
+  { method: "POST", path: "/api/sections/:id/materials", fixture: "sectionId", target: "foreign", body: { title: "x", url: "https://example.test" }, note: "add material to another tenant's section" },
+  { method: "PATCH", path: "/api/sections/:id/materials/:materialId", fixture: "sectionId", target: "foreign", body: { title: "x" }, note: "edit another tenant's material" },
+  { method: "DELETE", path: "/api/sections/:id/materials/:materialId", fixture: "sectionId", target: "foreign", note: "delete another tenant's material" },
+  { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{B.courseId}}", termId: "{{A.termId}}", campusId: "{{A.campusId}}", number: "01", capacity: 5 }, note: "section of another tenant's course" },
+  { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{A.courseId}}", termId: "{{B.termId}}", campusId: "{{A.campusId}}", number: "02", capacity: 5 }, note: "section in another tenant's term" },
+  { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{A.courseId}}", termId: "{{A.termId}}", campusId: "{{B.campusId}}", number: "03", capacity: 5 }, note: "section on another tenant's campus" },
+  { method: "PUT", path: "/api/courses/:id/prerequisites", fixture: "courseId", target: "own", body: { courseIds: ["{{B.courseId}}"] }, note: "prerequisite from another tenant" },
+  { method: "PUT", path: "/api/majors/:id/courses", fixture: "majorId", target: "own", body: { items: [{ courseId: "{{B.courseId}}", category: "required" }] }, note: "curriculum with another tenant's course" },
+  { method: "POST", path: "/api/courses", target: "own", body: { code: "LEAK1", name: "x", credits: 1, deptId: "{{B.deptId}}" }, note: "course owned by another tenant's department" },
   // 目标行是 A 的，但请求体里带着 B 的关联 id（外键不受行级安全约束）
   { method: "POST", path: "/api/accounts", target: "own", body: { username: "leak.role", roleIds: ["{{B.roleId}}"] }, note: "create account with another tenant's role" },
   { method: "POST", path: "/api/accounts", target: "own", body: { username: "leak.person", personId: "{{B.personId}}" }, note: "create account linked to another tenant's person" },
@@ -153,6 +190,14 @@ export const OTHER_ROUTES: Record<string, string> = {
   "POST /api/import/campuses": "bulk import into the caller's tenant from CSV text only",
   "POST /api/import/staff": "bulk import into the caller's tenant from CSV text only (campus codes are looked up inside the tenant)",
   "POST /api/import/students": "bulk import into the caller's tenant from CSV text only (campus codes are looked up inside the tenant)",
+  "POST /api/terms": "creates a term in the caller's tenant from plain fields",
+  "POST /api/majors": "creates a major from plain fields",
+  "GET /api/portal/sections": "student portal: answers for the caller's own student record only; tested with students of two tenants in edu.e2e.spec.ts",
+  "POST /api/portal/enrollments": "student portal: acts for the caller's own student record; section ids of other tenants are invisible (edu.e2e.spec.ts)",
+  "DELETE /api/portal/enrollments/:id": "student portal: only the caller's own enrollments (edu.e2e.spec.ts)",
+  "GET /api/portal/my-enrollments": "student portal: the caller's own enrollments only",
+  "GET /api/portal/plan": "student portal: the caller's own plan only",
+  "GET /api/portal/sections/:id/materials": "student portal: members of the section only (edu.e2e.spec.ts)",
   "POST /api/campuses": "creates a campus and its root department in the caller's tenant from plain fields",
   "POST /api/posts": "creates a post from plain fields",
   "POST /api/dict-types": "creates a dictionary in the caller's tenant from plain fields",
