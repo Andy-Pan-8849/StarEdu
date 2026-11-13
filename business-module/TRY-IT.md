@@ -19,7 +19,7 @@ pnpm dev:api       # terminal 1
 pnpm dev:web       # terminal 2
 ```
 
-If you started this stack with an earlier milestone, run `make reset` first, then the steps above. (Or keep your data: `pnpm migrate`, then `pnpm seed`, then `make up` so the object store is running.) Transcript PDFs show Latin letters only unless you set `TRANSCRIPT_FONT_PATH` to a font file that has Chinese characters (for example Noto Sans SC). Assignment files go to the object store (`objectstore`, port 9100); the first upload creates the bucket.
+If you started this stack with an earlier milestone, run `make reset` first, then the steps above. (Or keep your data: `pnpm migrate`, then `pnpm seed`, then `make up` so the object store is running.) Transcript PDFs use a bundled Noto Sans SC subset (the 3,755 most common hanzi); a rarer character prints as `?`. Assignment files go to the object store (`objectstore`, port 9100); the first upload creates the bucket.
 
 Open **http://hq.localhost:3001/admin** (`*.localhost` names resolve to your machine in most browsers; otherwise add them to `/etc/hosts`). Outgoing mail (invitations, password links) appears in Mailpit at http://localhost:8125.
 
