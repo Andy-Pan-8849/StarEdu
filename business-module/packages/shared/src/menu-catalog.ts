@@ -137,7 +137,24 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("platform:log", "platform", "Audit log", "log", 8, PERMS.platformLogList, []),
 
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },
-  ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [["edit", "Edit", PERMS.hrPersonEdit]]),
+  ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [
+    ["edit", "Edit", PERMS.hrPersonEdit],
+    ["sensitive", "Sensitive information", PERMS.hrPersonSensitive],
+    ["emergencyView", "View emergency contacts", PERMS.hrEmergencyView],
+    ["emergencyEdit", "Edit emergency contacts", PERMS.hrEmergencyEdit],
+  ]),
+  ...menuWithButtons("hr:staff", "hr", "Staff", "staff", 2, PERMS.hrStaffList, [
+    ["add", "Add", PERMS.hrStaffAdd],
+    ["edit", "Edit", PERMS.hrStaffEdit],
+    ["assign", "Assignments", PERMS.hrStaffAssign],
+    ["end", "End employment", PERMS.hrStaffEnd],
+    ["import", "Import", PERMS.hrStaffImport],
+  ]),
+  ...menuWithButtons("hr:student", "hr", "Students", "student", 3, PERMS.hrStudentList, [
+    ["add", "Add", PERMS.hrStudentAdd],
+    ["edit", "Edit", PERMS.hrStudentEdit],
+    ["import", "Import", PERMS.hrStudentImport],
+  ]),
 ];
 
 /** 菜单所在入口：顶层条目的 entries。 */

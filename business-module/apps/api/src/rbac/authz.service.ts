@@ -24,6 +24,8 @@ export interface Authz {
   status: "pending" | "active" | "locked" | "disabled";
   isBuiltinAdmin: boolean;
   personId: string | null;
+  /** 离职/停薪留职的教职员工：管理后台的权限一律不给（学生门户的保留） */
+  staffInactive?: boolean;
   roles: AuthzRole[];
   /** 所有角色的权限字符并集 */
   perms: string[];
@@ -110,7 +112,18 @@ export class AuthzService {
     const graph = await this.graph();
     const roleMenus = roles.length ? await db.roleMenu.findMany({ where: { roleId: { in: roles.map((r) => r.id) } } }) : [];
     const authzRoles: AuthzRole[] = roles.map((r) => this.roleView(r, graph, roleMenus));
+    // 员工档案不是"在职"：管理后台入口的权限全部收回，只保留学生门户的（同一个人可能同时是学生）
+    const staff = account.personId ? await db.staffProfile.findFirst({ where: { personId: account.personId } }) : null;
+    const staffInactive = !!staff && staff.status !== "active" && !account.isBuiltinAdmin;
+    if (staffInactive) {
+      const portalMenus = new Set(graph.menusOfEntry("portal").map((m) => m.id));
+      for (const r of authzRoles) {
+        r.menuIds = r.menuIds.filter((id) => portalMenus.has(id));
+        r.perms = [...new Set(r.menuIds.map((id) => graph.byId.get(id)?.perms).filter((p): p is string => !!p))].sort();
+      }
+    }
     return {
+      staffInactive,
       accountId: account.id,
       username: account.username,
       status: account.status,

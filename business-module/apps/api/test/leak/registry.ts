@@ -44,6 +44,11 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/dicts/:code", kind: "other" },
   { method: "GET", path: "/api/params", kind: "other" },
   { method: "GET", path: "/api/operation-logs", kind: "other" },
+  { method: "GET", path: "/api/staff", kind: "list" },
+  { method: "GET", path: "/api/staff/:id", kind: "detail", fixture: "personId" },
+  { method: "GET", path: "/api/staff/export", kind: "other" },
+  { method: "GET", path: "/api/students", kind: "other" },
+  { method: "GET", path: "/api/students/export", kind: "other" },
   { method: "GET", path: "/api/depts", kind: "list" },
   { method: "GET", path: "/api/depts/:id", kind: "detail", fixture: "deptId" },
   { method: "GET", path: "/api/posts", kind: "list" },
@@ -64,7 +69,10 @@ export const LEAK_REGISTRY: LeakEntry[] = [
 ];
 
 export interface MutationEntry {
-  method: "POST" | "PUT" | "PATCH" | "DELETE";
+  /** GET 用于"必须被拒"的敏感读取（如紧急联系人：租户管理员对自己租户的人也读不到，所以不放在普通读取表里） */
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** 期望的状态码；默认：别人的行 404、自己的行带着别人的关联 id 400 */
+  expectStatus?: number;
   /** 路径模板：:id 换成 `target`（A 或 B）的夹具 id */
   path: string;
   /** :id 取哪个夹具；没有 :id 的写 undefined */
@@ -108,6 +116,18 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "POST", path: "/api/accounts/:id/reset-link", fixture: "accountId", target: "foreign", note: "send a reset link for another tenant's account" },
   { method: "POST", path: "/api/accounts/:id/temp-password", fixture: "accountId", target: "foreign", note: "set a temporary password on another tenant's account" },
   { method: "POST", path: "/api/accounts/:id/unlock", fixture: "accountId", target: "foreign", note: "unlock another tenant's account" },
+  { method: "GET", path: "/api/students/:id", fixture: "personId", target: "foreign", note: "read another tenant's student" },
+  { method: "PATCH", path: "/api/students/:id", fixture: "personId", target: "foreign", body: { academicStatus: "withdrawn" }, note: "change another tenant's student" },
+  { method: "PATCH", path: "/api/staff/:id", fixture: "personId", target: "foreign", body: { employmentType: "part_time" }, note: "edit another tenant's staff profile" },
+  { method: "POST", path: "/api/staff/:id/assignments", fixture: "personId", target: "foreign", body: { deptId: "{{A.deptId}}" }, note: "assign another tenant's staff to a department" },
+  { method: "POST", path: "/api/staff/:id/transfer", fixture: "personId", target: "foreign", body: { fromAssignmentId: "11111111-1111-4111-8111-111111111111", deptId: "{{A.deptId}}" }, note: "transfer another tenant's staff" },
+  { method: "POST", path: "/api/staff/:id/end", fixture: "personId", target: "foreign", body: { status: "left" }, note: "end another tenant's staff employment" },
+  { method: "POST", path: "/api/staff/:id/reinstate", fixture: "personId", target: "foreign", note: "reinstate another tenant's staff" },
+  { method: "GET", path: "/api/persons/:personId/emergency-contacts", fixture: "personId", target: "foreign", note: "read another tenant's emergency contacts" },
+  { method: "POST", path: "/api/persons/:personId/emergency-contacts", fixture: "personId", target: "foreign", body: { name: "X", relationship: "friend", phone: "123456" }, note: "add an emergency contact to another tenant's person" },
+  { method: "DELETE", path: "/api/staff/:id/assignments/:assignmentId", fixture: "personId", target: "foreign", note: "end an assignment of another tenant's staff" },
+  { method: "PUT", path: "/api/persons/:personId/emergency-contacts/:id", fixture: "personId", target: "foreign", body: { name: "X", relationship: "friend", phone: "123456" }, note: "change another tenant's emergency contact" },
+  { method: "DELETE", path: "/api/persons/:personId/emergency-contacts/:id", fixture: "personId", target: "foreign", note: "delete another tenant's emergency contact" },
   // 目标行是 A 的，但请求体里带着 B 的关联 id（外键不受行级安全约束）
   { method: "POST", path: "/api/accounts", target: "own", body: { username: "leak.role", roleIds: ["{{B.roleId}}"] }, note: "create account with another tenant's role" },
   { method: "POST", path: "/api/accounts", target: "own", body: { username: "leak.person", personId: "{{B.personId}}" }, note: "create account linked to another tenant's person" },
@@ -117,6 +137,9 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "POST", path: "/api/data-scope-sets", target: "own", body: { name: "leak", nodes: [{ deptId: "{{B.deptId}}", includeChildren: true }] }, note: "scope node on another tenant's department" },
   { method: "PUT", path: "/api/data-scope-sets/:id", fixture: "setId", target: "own", body: { name: "leak", nodes: [{ deptId: "{{B.deptId}}", includeChildren: true }] }, note: "rewrite own scope onto another tenant's department" },
   { method: "PUT", path: "/api/entries/:code/menus", target: "own", body: { menus: [{ menuId: "{{B.menuId}}", sort: 1 }] }, note: "assign another tenant's menu to an entry" },
+  { method: "POST", path: "/api/staff", target: "own", body: { fullName: "Leak", hireDate: "2026-01-01", assignments: [{ deptId: "{{B.deptId}}" }] }, note: "new staff assigned to another tenant's department" },
+  { method: "POST", path: "/api/staff", target: "own", expectStatus: 404, body: { personId: "{{B.personId}}", hireDate: "2026-01-01" }, note: "staff profile on another tenant's person" },
+  { method: "POST", path: "/api/students", target: "own", body: { fullName: "Leak", campusId: "{{B.campusId}}" }, note: "student in another tenant's campus" },
   { method: "POST", path: "/api/depts", target: "own", body: { name: "leak", parentId: "{{B.deptId}}" }, note: "create a department under another tenant's department" },
   { method: "PATCH", path: "/api/depts/:id", fixture: "deptId", target: "own", body: { parentId: "{{B.deptId}}" }, note: "move own department under another tenant's department" },
   { method: "POST", path: "/api/menus", target: "own", body: { parentId: "{{B.menuId}}", name: "leak", type: "directory" }, note: "create a menu under another tenant's menu" },
@@ -127,6 +150,9 @@ export const OTHER_ROUTES: Record<string, string> = {
   "POST /api/auth/session": "registers the caller's own session; body has only an entry code",
   "POST /api/roles": "creates a role in the caller's tenant from name/code only",
   "POST /api/menus": "tested above with a foreign parent id; otherwise creates in the caller's tenant",
+  "POST /api/import/campuses": "bulk import into the caller's tenant from CSV text only",
+  "POST /api/import/staff": "bulk import into the caller's tenant from CSV text only (campus codes are looked up inside the tenant)",
+  "POST /api/import/students": "bulk import into the caller's tenant from CSV text only (campus codes are looked up inside the tenant)",
   "POST /api/campuses": "creates a campus and its root department in the caller's tenant from plain fields",
   "POST /api/posts": "creates a post from plain fields",
   "POST /api/dict-types": "creates a dictionary in the caller's tenant from plain fields",

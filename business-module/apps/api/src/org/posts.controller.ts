@@ -56,12 +56,13 @@ export class PostsController {
     return row;
   }
 
-  /** 软删除，并把编码让出来重新使用。被任职引用时只能停用的规则在 B5（有任职记录后）补上。 */
+  /** 软删除，并把编码让出来重新使用。被任职记录引用过的岗位只能停用，不能删除。 */
   @Delete(":id")
   @RequirePermissions(PERMS.postRemove)
   async remove(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
     const row = await this.tenantDb.db.post.findUnique({ where: { id } });
     if (!row) throw new NotFoundException();
+    if ((await this.tenantDb.db.personDept.count({ where: { postId: id } })) > 0) throw new ConflictException("The post is used by assignments; disable it instead");
     await this.tenantDb.db.post.update({ where: { id }, data: { deletedAt: new Date(), code: `${row.code}~deleted~${Date.now()}`, updatedBy: auth.accountId } });
     await this.audit.record(auth.accountId, "post.delete", "post", id, { code: row.code });
     return { id };

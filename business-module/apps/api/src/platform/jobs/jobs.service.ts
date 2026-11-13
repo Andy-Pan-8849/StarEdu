@@ -2,6 +2,7 @@
 import { ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Cron } from "croner";
 import { AccountsService } from "../../accounts/accounts.service";
+import { StaffService } from "../../hr/staff.service";
 import { RedisService } from "../../redis/redis.service";
 import { PlatformPrismaService } from "../platform-prisma.service";
 import { JOBS, jobByCode } from "./job-registry";
@@ -26,6 +27,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     private readonly db: PlatformPrismaService,
     private readonly redis: RedisService,
     private readonly accounts: AccountsService,
+    private readonly staff: StaffService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -91,7 +93,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     let status = "success";
     let message: string;
     try {
-      message = await def.run({ db: this.db, accounts: this.accounts });
+      message = await def.run({ db: this.db, accounts: this.accounts, staff: this.staff });
     } catch (err) {
       status = "failed";
       message = err instanceof Error ? err.message : String(err);

@@ -2,12 +2,14 @@
 // 加新任务 = 在这里登记一项，别处不用动。
 import { realmName } from "@staredu/shared";
 import type { AccountsService } from "../../accounts/accounts.service";
+import type { StaffService } from "../../hr/staff.service";
 import type { PlatformPrismaService } from "../platform-prisma.service";
 import { runInScope } from "../../tenancy/request-scope";
 
 export interface JobDeps {
   db: PlatformPrismaService;
   accounts: AccountsService;
+  staff: StaffService;
 }
 
 export interface JobDefinition {
@@ -58,6 +60,19 @@ export const JOBS: JobDefinition[] = [
     },
   },
 ];
+
+JOBS.push({
+  code: "staff.apply-effective",
+  name: "Apply scheduled employment changes",
+  description: "Staff whose leave or end-of-employment date has arrived are switched to their new status: assignments end, admin access is withdrawn and sessions are ended.",
+  defaultCron: "5 0 * * *",
+  async run({ db, staff }) {
+    const tenants = await db.tenant.findMany({ where: { status: { in: ["active", "notified"] } } });
+    let applied = 0;
+    for (const t of tenants) applied += await runInScope({ kind: "tenant", tenantId: t.id, code: t.code, name: t.name, status: t.status }, () => staff.applyDue());
+    return `${applied} changes applied across ${tenants.length} tenants`;
+  },
+});
 
 export const OPERATION_LOG_PARAM_DAYS = 180;
 

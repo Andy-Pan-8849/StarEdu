@@ -10,6 +10,7 @@ import { AuditService } from "../audit/audit.service";
 import { RequirePermissions } from "../auth/decorators";
 import type { AuthContext } from "../auth/tenant-token.guard";
 import { Auth, parse } from "../common/http";
+import { effectiveWhere } from "../hr/effective";
 import { AuthzService } from "../rbac/authz.service";
 import { assertVisible } from "../tenancy/owned";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
@@ -50,7 +51,7 @@ export class DeptsController {
     const db = this.tenantDb.db;
     const reasons: string[] = [];
     if ((await db.dept.count({ where: { parentId: id } })) > 0) reasons.push("it has sub-departments");
-    if ((await db.personDept.count({ where: { deptId: id } })) > 0) reasons.push("people are assigned to it");
+    if ((await db.personDept.count({ where: { deptId: id, ...effectiveWhere() } })) > 0) reasons.push("people are assigned to it");
     if ((await db.campus.count({ where: { deptId: id } })) > 0) reasons.push("it belongs to a campus");
     if ((await db.dataScopeSetNode.count({ where: { deptId: id } })) > 0) reasons.push("a data scope refers to it");
     return reasons;

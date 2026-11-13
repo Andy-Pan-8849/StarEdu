@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B4.** Sign-in, the platform console and all system-management pages work. The business pages (people, teaching, assignments, grades) are not built yet; their menus show "This page is not available yet."
+Status: **milestone B5.** Sign-in, the platform console and all system-management pages work. The business pages (people, teaching, assignments, grades) are not built yet; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -80,12 +80,27 @@ The administrator has every operation permission of the features enabled for the
 | **Dictionaries** and **Parameters**: the platform's are read-only; add your own | Works today |
 | **Operation log**: who changed what (passwords and tokens are masked, responses are never stored); clearing needs its own permission | Works today |
 
-### HR manager, campus lead, academic manager, teacher, student
+### HR manager (`hr-manager` role; demo account `qing.hr.bj` arrives with the demo seed)
+
+| Flow | Available |
+|---|---|
+| **Add a staff member** (name, e-mail, hire date, department); a duplicate e-mail is refused and the existing person is shown | Works today |
+| **Assignments**: add a second department, set the primary, **transfer** (old assignment ends, history is kept) | Works today |
+| **End employment** now or on a planned date; the person loses admin access at once and is signed out; **reinstate** | Works today |
+| **Students**: add with a campus, change status (enrolled, on leave, graduated, withdrawn, completed), move to another campus | Works today |
+| One person as both staff and student: add the student profile to the existing person | Works today |
+| **Emergency contacts** and sensitive information (ID number, phone, address) | Works today (API for sensitive fields; emergency contacts have a tab) |
+| **Import CSV** (check first, then import; repeat safely) and **export CSV** | Works today |
+
+Try this as the tenant administrator too: the **Staff** list shows basic information only, **Students** is empty, and emergency contacts and sensitive fields are refused. That is the minimum-data design.
+
+To load the sample company into `hq`: `pnpm import:sample`.
+
+### Campus lead, academic manager, teacher, student
 
 | Role | Typical work | Available from |
 |---|---|---|
-| HR manager | add staff, open their accounts, transfer departments, end employment | B5 |
-| Campus lead | see only their own campus's people, classes and grades; post announcements | B5-B9 |
+| Campus lead | see only their own campus's staff and students (works today with the role template); classes and grades later | classes: B6-B8 |
 | Academic manager | create programs, courses, terms and classes; enrollment; publish grades; official transcripts | B6-B8 |
 | Teacher | see their own classes; set assignments; grade submissions; grant extensions; publish grades | B6-B8 |
 | Student | see their own courses, submit assignments, see grades and transcript, get notifications, ask the AI assistant | B6-B10 |

@@ -79,6 +79,21 @@ export const PERMS = {
   // 人事
   hrPersonList: "hr:person:list",
   hrPersonEdit: "hr:person:edit",
+  /** 敏感信息：出生日期、性别、证件号、个人电话、住址 */
+  hrPersonSensitive: "hr:person:sensitive",
+  /** 紧急联系人：查看和修改都写访问日志 */
+  hrEmergencyView: "hr:emergency:view",
+  hrEmergencyEdit: "hr:emergency:edit",
+  hrStaffList: "hr:staff:list",
+  hrStaffAdd: "hr:staff:add",
+  hrStaffEdit: "hr:staff:edit",
+  hrStaffAssign: "hr:staff:assign",
+  hrStaffEnd: "hr:staff:end",
+  hrStaffImport: "hr:staff:import",
+  hrStudentList: "hr:student:list",
+  hrStudentAdd: "hr:student:add",
+  hrStudentEdit: "hr:student:edit",
+  hrStudentImport: "hr:student:import",
 } as const;
 
 export type Permission = (typeof PERMS)[keyof typeof PERMS];

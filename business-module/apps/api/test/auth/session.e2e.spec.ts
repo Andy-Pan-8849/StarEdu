@@ -94,7 +94,7 @@ describe("sessions, force logout and entry qualification", () => {
       expect(res.body.permissions).toEqual(expect.arrayContaining(["hr:person:list", "hr:person:edit"]));
       const top = res.body.menus.map((m: { code: string }) => m.code);
       expect(top).toEqual(["hr"]); // hr-manager 只勾选了人事；没有勾选的"系统管理"不出现
-      expect(res.body.menus[0].children.map((m: { code: string }) => m.code)).toEqual(["hr:person"]);
+      expect(res.body.menus[0].children.map((m: { code: string }) => m.code)).toEqual(["hr:person", "hr:staff", "hr:student"]);
       expect((await h.owner.account.findUniqueOrThrow({ where: { id: staff.accountId } })).status).toBe("active");
       expect((await h.call(token).get("/api/persons")).status).toBe(200); // 激活后立即生效
       const log = await h.owner.loginLog.findFirstOrThrow({ where: { accountId: staff.accountId }, orderBy: { createdAt: "desc" } });

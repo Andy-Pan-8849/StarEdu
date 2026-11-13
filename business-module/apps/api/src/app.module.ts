@@ -14,7 +14,14 @@ import { OperationLogController } from "./oplog/operation-log.controller";
 import { OperationLogInterceptor } from "./oplog/operation-log.interceptor";
 import { DictController } from "./sysdata/dict.controller";
 import { ParamsController } from "./sysdata/params.controller";
+import { ImportController } from "./hr/import.controller";
+import { ImportService } from "./hr/import.service";
+import { EmergencyController } from "./hr/emergency.controller";
+import { HrAccess } from "./hr/hr-access.service";
 import { PersonsController } from "./hr/persons.controller";
+import { StaffController } from "./hr/staff.controller";
+import { StaffService } from "./hr/staff.service";
+import { StudentsController } from "./hr/students.controller";
 import { KeycloakService } from "./keycloak/keycloak.service";
 import { MailService } from "./mail/mail.service";
 import { JobsService } from "./platform/jobs/jobs.service";
@@ -53,6 +60,10 @@ export const CONTROLLERS = [
   OnlineController,
   LogsController,
   PersonsController,
+  StaffController,
+  StudentsController,
+  EmergencyController,
+  ImportController,
   DictController,
   ParamsController,
   OperationLogController,
@@ -75,6 +86,9 @@ export const CONTROLLERS = [
     AuditService,
     KeycloakService,
     AccountsService,
+    HrAccess,
+    StaffService,
+    ImportService,
     MailService,
     PlatformPrismaService,
     PlatformAuthzService,

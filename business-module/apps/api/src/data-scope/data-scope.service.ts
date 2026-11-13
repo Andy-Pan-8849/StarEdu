@@ -8,6 +8,7 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import { RedisService } from "../redis/redis.service";
 import { Authz, AuthzService } from "../rbac/authz.service";
+import { effectiveWhere } from "../hr/effective";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { EMPTY_SCOPE, unionScopes, type ResolvedScope } from "./scope-filter";
 
@@ -48,7 +49,7 @@ export class DataScopeService {
     if (roles.length === 0) return EMPTY_SCOPE;
 
     const parts: ResolvedScope[] = [];
-    const personDepts = auth.personId ? (await db.personDept.findMany({ where: { personId: auth.personId } })).map((p) => p.deptId) : [];
+    const personDepts = auth.personId ? (await db.personDept.findMany({ where: { personId: auth.personId, ...effectiveWhere() } })).map((p) => p.deptId) : [];
     const expand = async (deptIds: string[]): Promise<string[]> => {
       if (deptIds.length === 0) return [];
       const rows = await db.dept.findMany({ where: { ancestors: { hasSome: deptIds } }, select: { id: true } });

@@ -46,6 +46,7 @@ describe("cross-tenant leak scan", () => {
     const user = await createUser(owner, keycloak, tenant, "alice");
     const person = await owner.person.create({ data: { tenantId, type: "staff", fullName: "Alice" } });
     await owner.account.update({ where: { id: user.accountId }, data: { personId: person.id } });
+    await owner.staffProfile.create({ data: { tenantId, personId: person.id, employeeNo: "E0001", hireDate: new Date("2020-01-01") } });
     await giveRole(owner, tenantId, user.accountId, "tenant-admin");
     const campus = await owner.campus.findFirstOrThrow({ where: { tenantId } });
     const dept = await owner.dept.create({ data: { tenantId, name: "Dept", parentId: campus.deptId } });
@@ -242,11 +243,11 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid)/, id).replace(":code", "admin");
-      const verb = m.method.toLowerCase() as "post" | "put" | "patch" | "delete";
+      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId)/, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400
-      expect(res.status).toBe(m.target === "foreign" ? 404 : 400);
+      expect(res.status).toBe(m.expectStatus ?? (m.target === "foreign" ? 404 : 400));
       expect(await fingerprint(a)).toEqual(beforeA);
       expect(await fingerprint(b)).toEqual(beforeB);
     });
