@@ -40,9 +40,10 @@ export class PortalGradesController {
   async download(@Auth() auth: AuthContext, @Res() res: Response) {
     const personId = await this.me(auth);
     const t = await this.transcripts.build(personId);
-    const issue = await this.transcripts.issue(personId, "informal", auth.accountId);
     const tenant = await this.tenantDb.db.tenant.findUnique({ where: { id: auth.tenantId } });
-    const pdf = await this.transcripts.pdf(t, { version: "informal", docNumber: issue.docNumber, generatedAt: issue.generatedAt, institution: tenant?.name ?? "Institution" });
+    const institution = tenant?.name ?? "Institution";
+    const issue = await this.transcripts.issue(personId, "informal", auth.accountId, t, institution);
+    const pdf = await this.transcripts.pdf(t, { version: "informal", docNumber: issue.docNumber, generatedAt: issue.generatedAt, institution, verify: { url: issue.verifyUrl, fingerprint: issue.fingerprint } });
     res.setHeader("content-type", "application/pdf");
     res.setHeader("content-disposition", `attachment; filename="${issue.docNumber}.pdf"`);
     res.send(pdf);

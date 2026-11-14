@@ -26,4 +26,16 @@ describe("transcript PDF font", () => {
     const pdf = await svc.pdf(transcript("龘 Li"), meta);
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
   });
+
+  it("adds the verification QR and fingerprint without breaking the document; the fingerprint follows the content", async () => {
+    const plain = await svc.pdf(transcript("Li"), meta);
+    const withQr = await svc.pdf(transcript("Li"), { ...meta, verify: { url: "http://hq.localhost:3001/verify/abcdefghijklmnopqrstuvwx", fingerprint: "0123456789ABCDEF" } });
+    expect(withQr.subarray(0, 4).toString()).toBe("%PDF");
+    expect(withQr.length).toBeGreaterThan(plain.length);
+    const a = svc.fingerprint(transcript("Li"));
+    expect(svc.fingerprint(transcript("Li")).full).toBe(a.full);
+    expect(a.short).toMatch(/^[0-9A-F]{16}$/);
+    expect(svc.fingerprint(transcript("Lee")).full).not.toBe(a.full);
+    expect(svc.verifyUrl("hq", "tok")).toMatch(/\/verify\/tok$/);
+  });
 });

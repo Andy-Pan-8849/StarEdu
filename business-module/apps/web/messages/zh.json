@@ -633,7 +633,11 @@
       "myGrades": "我的成绩",
       "progress": "已获 {e} / 要求 {r} 学分",
       "downloadTranscript": "下载成绩单（PDF）",
-      "unofficialNote": "只显示已发布的最终成绩。下载的成绩单是非正式版；需要正式版请联系教务。"
+      "unofficialNote": "只显示已发布的最终成绩。下载的成绩单是非正式版；需要正式版请联系教务。",
+      "verifyLink": "验真页",
+      "revoked": "已作废",
+      "revoke": "作废",
+      "revokeReason": "为什么作废这份文档？扫码的人会看到它已作废。"
     },
     "announcements": {
       "title": "公告",

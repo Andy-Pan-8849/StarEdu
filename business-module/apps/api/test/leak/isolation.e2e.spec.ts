@@ -70,6 +70,7 @@ describe("cross-tenant leak scan", () => {
     const course = await owner.course.create({ data: { tenantId, code: "SCAN101", name: "Scan course", credits: 3 } });
     const major = await owner.major.create({ data: { tenantId, code: "SCAN", name: "Scan major" } });
     await owner.majorVersion.create({ data: { tenantId, majorId: major.id, label: "Initial", effectiveYear: 2000 } });
+    const issue = await owner.transcriptIssue.create({ data: { tenantId, studentPersonId: person.id, docNumber: "TR-2026-000001", version: "formal", verifyToken: `scan${Math.random().toString(36).slice(2)}${Date.now()}` } });
     const section = await owner.section.create({ data: { tenantId, courseId: course.id, termId: term.id, campusId: campus.id, number: "01", name: "SCAN101-01", capacity: 10 } });
     const announcement = await owner.announcement.create({ data: { tenantId, title: "Scan notice", body: "x", scopeKind: "tenant" } });
     const dictType = await owner.dictType.create({ data: { tenantId, code: "scan_dict", name: "Scan dictionary" } });
@@ -109,6 +110,7 @@ describe("cross-tenant leak scan", () => {
         paramId: param.id,
         folderId: libFolder.id,
         libFileId: libFile.id,
+        issueId: issue.id,
         sid,
       },
       allIds: new Set([...allIds, extraCampus.id, extraCampusDept.id]),
@@ -265,7 +267,7 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|versionId|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId|aclId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const path = m.path.replace(/:(id|sid|personId|issueId)/, id).replace(/:(id|versionId|issueId|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId|aclId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
       const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400

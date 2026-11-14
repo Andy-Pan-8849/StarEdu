@@ -1376,6 +1376,15 @@ model TranscriptIssue {
   version         String
   generatedBy     String?  @map("generated_by") @db.Uuid
   generatedAt     DateTime @default(now()) @map("generated_at")
+  /// 验真令牌（二维码链接里的那段，随机不可猜）
+  verifyToken     String   @unique @map("verify_token")
+  /// 成绩单内容的 SHA-256；B18 之前生成的没有
+  contentHash     String?  @map("content_hash")
+  /// 生成时的要点（公开验真页显示）；B18 之前生成的没有
+  snapshot        Json?
+  revokedAt       DateTime? @map("revoked_at")
+  revokedBy       String?  @map("revoked_by") @db.Uuid
+  revokeReason    String?  @map("revoke_reason")
 
   @@unique([tenantId, docNumber])
   @@index([tenantId, studentPersonId])

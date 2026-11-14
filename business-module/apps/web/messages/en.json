@@ -633,7 +633,11 @@
       "myGrades": "My grades",
       "progress": "{e} of {r} credits earned",
       "downloadTranscript": "Download transcript (PDF)",
-      "unofficialNote": "Only published final grades are shown. The downloaded transcript is unofficial; ask the registrar for an official copy."
+      "unofficialNote": "Only published final grades are shown. The downloaded transcript is unofficial; ask the registrar for an official copy.",
+      "verifyLink": "Verification page",
+      "revoked": "Revoked",
+      "revoke": "Revoke",
+      "revokeReason": "Why is this document being revoked? Anyone who scans it will see it as revoked."
     },
     "announcements": {
       "title": "Announcements",
