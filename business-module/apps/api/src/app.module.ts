@@ -45,6 +45,9 @@ import { ObjectStoreService } from "./storage/object-store.service";
 import { CLASS_MEMBERSHIP } from "./data-scope/data-scope.service";
 import { EmergencyController } from "./hr/emergency.controller";
 import { HrAccess } from "./hr/hr-access.service";
+import { LibraryController, PortalLibraryController } from "./library/library.controller";
+import { LibraryAccess } from "./library/library-access.service";
+import { LibraryService } from "./library/library.service";
 import { PersonsController } from "./hr/persons.controller";
 import { StaffController } from "./hr/staff.controller";
 import { StaffService } from "./hr/staff.service";
@@ -99,6 +102,8 @@ export const CONTROLLERS = [
   InternalKbController,
   DiscussionController,
   PortalDiscussionController,
+  LibraryController,
+  PortalLibraryController,
   NotificationsController,
   BannersController,
   UnsubscribeController,
@@ -139,6 +144,8 @@ export const CONTROLLERS = [
     GradesService,
     InternalKeyGuard,
     DiscussionService,
+    LibraryAccess,
+    LibraryService,
     NotificationService,
     NotifyWorker,
     KafkaService,

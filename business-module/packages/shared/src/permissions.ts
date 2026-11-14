@@ -144,6 +144,23 @@ export const PERMS = {
   eduDiscussionList: "edu:discussion:list",
   /** 任课教师发帖、回复、置顶、标记已解决、删除 */
   eduDiscussionEdit: "edu:discussion:edit",
+  // 文档库：操作权限；文件夹上的访问级别另有 ACL（两者都满足才行）
+  docLibraryList: "doc:library:list",
+  docFolderAdd: "doc:folder:add",
+  /** 建顶层文件夹 */
+  docFolderRoot: "doc:folder:root",
+  docFolderEdit: "doc:folder:edit",
+  docFolderMove: "doc:folder:move",
+  docFolderRemove: "doc:folder:remove",
+  docFileUpload: "doc:file:upload",
+  docFileDownload: "doc:file:download",
+  /** 重命名、换新版本、复制、移动文件 */
+  docFileEdit: "doc:file:edit",
+  docFileDelete: "doc:file:delete",
+  docAclEdit: "doc:acl:edit",
+  /** 给自己授权访问某个文件夹（管理员默认看不到机密文件夹；这个动作一定写访问日志） */
+  docAclSelfGrant: "doc:acl:selfgrant",
+  docLogList: "doc:log:list",
   // 消息
   msgAnnouncementList: "msg:announcement:list",
   /** 发布公告：范围在自己的数据范围内（全公司、校区或班级） */
@@ -158,6 +175,8 @@ export const PERMS = {
   portalAssignmentSubmit: "portal:assignment:submit",
   portalDiscussionList: "portal:discussion:list",
   portalDiscussionPost: "portal:discussion:post",
+  portalLibraryList: "portal:library:list",
+  portalLibraryDownload: "portal:library:download",
   portalGradeList: "portal:grade:list",
   portalTranscriptDownload: "portal:transcript:download",
 } as const;
