@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B12.** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B13 (demo data).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -45,18 +45,18 @@ pnpm dev:password --code hq --username admin --password '<10+ characters, upper 
 pnpm dev:password --code riverside-franchise --username admin --password '<...>'
 ```
 
-**Accounts coming with later milestones.** They are created by `pnpm seed` and share one public demo password that will be written here (for local and trial use only).
+**Demo accounts (milestone B13).** `pnpm demo` (= `pnpm seed`, `pnpm import:sample`, `pnpm seed:demo`) loads the sample company into `hq` and creates these accounts. They share one public demo password, `Demo!Passw0rd2026` (local and trial use only; change it with the `DEMO_PASSWORD` environment variable before running). Each account is linked to the same person as in the AI module's sample data, so both systems describe the same company. Running it again changes nothing.
 
-| Account | Company | Role | Available from |
-|---|---|---|---|
-| `ling.mgr.bj`, `peng.mgr.sh` | hq | Campus lead (Beijing, Shanghai) | B5 |
-| `qing.hr.bj` | hq | HR manager | B5 |
-| `hui.acad.bj` | hq | Academic manager | B6 |
-| `fang.tch.bj`, `wei.acad.sh` | hq | Teacher | B6 |
-| `peng.stu.bj`, `kai.stu.bj` (on leave), `wei.stu.sh` | hq | Student | B6 |
-| `tao.admin.bj` | hq | System operator (system management only) | B4 |
-| `ning.adm.bj`, `ning.fin.bj`, `min.ragetl.bj` | hq | Staff with few permissions (used to show what the AI assistant may answer) | B5 |
-| `river.hr`, `river.acad`, `river.tch`, `river.stu` | riverside-franchise | HR manager, academic manager, teacher, student | B5-B6 |
+| Account | Person (sample id) | Role in the business module |
+|---|---|---|
+| `ling.mgr.bj`, `peng.mgr.sh` | E0001, E0018 (campus directors) | Campus lead |
+| `qing.hr.bj` | E0137 | HR manager |
+| `wei.acad.sh` | E0025 (instructor) | Teacher |
+| `wei.stu.sh` | S0018 | Student |
+| `tao.admin.bj` | E0140 (helpdesk engineer) | Tenant administrator |
+| `ning.adm.bj`, `ning.fin.bj`, `min.ragetl.bj` | E0014, E0138, E0141 | No role yet (admissions, finance and knowledge-base staff have no module here; they sign in and see only their own pages) |
+
+What `pnpm seed:demo` adds: a spring 2026 term (ended) with three courses (Java, Python, TypeScript), one section per program and campus (20 sections, each with a lead instructor from that campus), the sample's 12 assignments per program with all 198 submissions (raw score, lateness, penalty and final score exactly as in the sample), published final grades for the 52 students who did not withdraw, and a document library with 27 current documents from the AI sample (public, internal and confidential folders; confidential ones are visible to the HR manager only). With `BIZ_EVENT_BUS=kafka` it also queues one `library.file_changed` event per file so the AI knowledge base picks them up. The franchise tenant stays empty.
 
 ## 3. Walk-through by role
 
@@ -80,7 +80,7 @@ The administrator has every operation permission of the features enabled for the
 | **Dictionaries** and **Parameters**: the platform's are read-only; add your own | Works today |
 | **Operation log**: who changed what (passwords and tokens are masked, responses are never stored); clearing needs its own permission | Works today |
 
-### HR manager (`hr-manager` role; demo account `qing.hr.bj` arrives with the demo seed)
+### HR manager (`hr-manager` role; demo account `qing.hr.bj`)
 
 | Flow | Available |
 |---|---|
@@ -94,9 +94,9 @@ The administrator has every operation permission of the features enabled for the
 
 Try this as the tenant administrator too: the **Staff** list shows basic information only, **Students** is empty, and emergency contacts and sensitive fields are refused. That is the minimum-data design.
 
-To load the sample company into `hq`: `pnpm import:sample`.
+To load the sample company into `hq`: `pnpm import:sample` (or `pnpm demo` for everything).
 
-### Academic manager (`academic-manager` role; demo account `hui.acad.bj` arrives with the demo seed)
+### Academic manager (`academic-manager` role; no demo account yet; give the role to any account)
 
 | Flow | Available |
 |---|---|
@@ -123,7 +123,7 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **Grades** tab: set the weight of each assignment group (must total 100%), see the grade book (students by assignments; missing work counts as 0), enter scores for exams by hand, **calculate** and **publish** final grades, export CSV | Works today |
 | After the section ends the grades are locked; only the registrar can amend them (reason required, before and after are recorded) | Works today |
 
-### Student (portal at `/`; demo accounts arrive with the demo seed)
+### Student (portal at `/`; demo account `wei.stu.sh`)
 
 | Flow | Available |
 |---|---|
