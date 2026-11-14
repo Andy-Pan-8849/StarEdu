@@ -470,7 +470,8 @@
       "state_in_progress": "In progress",
       "state_not_taken": "Not taken",
       "tab_assignments": "Assignments",
-      "tab_grades": "Grades"
+      "tab_grades": "Grades",
+      "tab_discussion": "Discussion"
     },
     "assignments": {
       "tab": "Assignments",
@@ -592,6 +593,27 @@
       "recipients": "{n} recipients",
       "read": "read",
       "unread": "not read yet"
+    },
+    "discussion": {
+      "title": "Discussions",
+      "pickSection": "Pick a section",
+      "back": "Back",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "markResolved": "Mark as solved",
+      "reopen": "Reopen",
+      "resolved": "solved",
+      "delete": "Delete",
+      "confirmDelete": "Delete this post?",
+      "reply": "Reply",
+      "yourReply": "Your reply",
+      "newPost": "New discussion",
+      "titleField": "Title",
+      "bodyField": "Text",
+      "post": "Post",
+      "replies": "{n} replies",
+      "empty": "No discussions yet.",
+      "instructor": "instructor"
     }
   },
   "menu": {
@@ -638,7 +660,8 @@
     "portal:grade": "My grades",
     "msg": "Messages",
     "msg:announcement": "Announcements",
-    "platform:announcement": "Platform announcements"
+    "platform:announcement": "Platform announcements",
+    "portal:discussion": "Discussions"
   },
   "dict": {
     "type": {
@@ -696,6 +719,7 @@
     "cat_assignment": "Assignments",
     "cat_grade": "Grades",
     "cat_reminder": "Reminders",
-    "cat_announcement": "Announcements"
+    "cat_announcement": "Announcements",
+    "cat_discussion": "Discussions"
   }
 }

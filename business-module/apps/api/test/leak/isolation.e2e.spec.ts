@@ -33,7 +33,7 @@ const TABLES = [
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "section_instructor", "section_material", "student_major",
   "assignment_group", "assignment", "rubric_item", "assignment_extension", "submission", "submission_version", "submission_file", "submission_score",
   "grading_scale_item", "manual_grade", "final_grade", "grade_change", "transcript_issue",
-  "notification", "notification_preference", "announcement",
+  "notification", "notification_preference", "announcement", "discussion_post",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course",
 ];
 
@@ -258,7 +258,7 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
       const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400

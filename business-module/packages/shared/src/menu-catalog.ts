@@ -166,6 +166,8 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["gradebook", "Grade book", PERMS.eduGradeList],
     ["gradeEdit", "Edit grades", PERMS.eduGradeEdit],
     ["gradeAmend", "Amend locked grades", PERMS.eduGradeAmend],
+    ["discussion", "Discussion", PERMS.eduDiscussionList],
+    ["discussionEdit", "Edit discussion", PERMS.eduDiscussionEdit],
   ]),
   ...menuWithButtons("edu:scale", "edu", "Grading scale", "scale", 5, PERMS.eduScaleList, [["edit", "Edit", PERMS.eduScaleEdit]]),
   ...menuWithButtons("edu:transcript", "edu", "Transcripts", "transcript", 6, PERMS.eduTranscriptList, [["issue", "Issue formal transcript", PERMS.eduTranscriptIssue]]),
@@ -185,6 +187,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ]),
   ...menuWithButtons("portal:plan", "portal", "Degree plan", "plan", 2, PERMS.portalPlanView, []),
   ...menuWithButtons("portal:assignment", "portal", "My assignments", "assignment", 3, PERMS.portalAssignmentList, [["submit", "Submit", PERMS.portalAssignmentSubmit]]),
+  ...menuWithButtons("portal:discussion", "portal", "Discussions", "discussion", 5, PERMS.portalDiscussionList, [["post", "Post", PERMS.portalDiscussionPost]]),
   ...menuWithButtons("portal:grade", "portal", "My grades", "grade", 4, PERMS.portalGradeList, [["download", "Download transcript", PERMS.portalTranscriptDownload]]),
 
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },

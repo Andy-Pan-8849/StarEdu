@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B9.** Sign-in, the platform console, system management, people, teaching, assignments, grades and notifications work. The AI assistant and the discussion tab are not built yet; their menus show "This page is not available yet."
+Status: **milestone B9b.** Sign-in, the platform console, system management, people, teaching, assignments, grades, notifications and class discussion work. The AI assistant is not built yet; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -119,6 +119,7 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **Assignments** tab on a section: create an assignment (due date, rubric of items with points, optional late-work rule), organise them in groups, publish when ready | Works today |
 | **Submissions**: see every student of the section (those who have not submitted too), open a submission (all versions, download the files), **score each rubric item**, add feedback, **publish** one score or all that are fully scored | Works today |
 | **Extensions**: give one student 1-3 more days with a reason (the deadline moves for that student only; it is logged) | Works today |
+| **Discussion** tab: start a discussion, reply, **pin**, mark as **solved**, delete anyone's post (students can delete only their own) | Works today |
 | **Grades** tab: set the weight of each assignment group (must total 100%), see the grade book (students by assignments; missing work counts as 0), enter scores for exams by hand, **calculate** and **publish** final grades, export CSV | Works today |
 | After the section ends the grades are locked; only the registrar can amend them (reason required, before and after are recorded) | Works today |
 
@@ -133,6 +134,7 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **My assignments**: the published assignments of your sections with deadline (23:59 campus time), rubric and your status; **submit** text and files (up to 10 files, 20 MB each; files go straight to the object store), submit again before the deadline (the last one counts, earlier versions are kept) | Works today |
 | After the deadline you can still submit if the assignment accepts late work: 10% off up to 24 hours late, 20% up to 48, 30% up to 72, nothing after that (the teacher can change the table per assignment) | Works today |
 | Your score, the points per rubric item and the feedback appear **only after the teacher publishes** | Works today |
+| **Discussions** (menu): pick one of your sections, start a thread, reply, mark your own thread as solved, delete your own posts. Students on leave can read only | Works today |
 | **My grades**: published final grades by term, GPA by term and cumulative, credits earned; **download an unofficial transcript** (PDF, numbered, footer "for reference only"). Graduated or withdrawn students can still read their grades and download it | Works today |
 | **Notifications** (the bell in the top bar): new assignments, published scores and final grades, enrollment changes, announcements, and a reminder in the last 24 hours before a deadline. New ones appear at once. **Settings** in the bell: language, and per category whether you want it in the app and by e-mail. Every e-mail has an unsubscribe link (see them in Mailpit at http://localhost:8125) | Works today |
 | AI assistant | B10 |

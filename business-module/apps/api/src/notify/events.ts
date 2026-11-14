@@ -51,4 +51,20 @@ export const EVENT_HANDLERS: Record<string, EventHandler> = {
   },
 };
 
+/** 讨论通知：发帖通知任课教师；回复通知发帖人和任课教师；标记已解决通知发帖人（都不通知自己）。 */
+async function discussionRecipients(db: PlatformPrismaService, evt: OutboxRow, kind: "posted" | "replied" | "resolved"): Promise<HandlerResult> {
+  const p = evt.payload as P;
+  const thread = p.postId ? await db.discussionPost.findUnique({ where: { id: p.postId } }) : null;
+  if (!thread) return { items: [] };
+  const [section, teachers] = await Promise.all([sectionName(db, thread.sectionId), db.sectionInstructor.findMany({ where: { sectionId: thread.sectionId }, select: { personId: true } })]);
+  const actor = kind === "resolved" ? p.resolverPersonId : p.authorPersonId;
+  const author = actor ? ((await db.person.findUnique({ where: { id: actor }, select: { fullName: true } }))?.fullName ?? "") : "";
+  const to = kind === "posted" ? teachers.map((t) => t.personId) : kind === "replied" ? [thread.authorPersonId, ...teachers.map((t) => t.personId)] : [thread.authorPersonId];
+  const params = { section, title: thread.title ?? "", author };
+  return { items: [...new Set(to)].filter((id) => id !== actor).map((personId) => ({ personId, type: evt.type, params })) };
+}
+EVENT_HANDLERS["discussion.posted"] = (db, evt) => discussionRecipients(db, evt, "posted");
+EVENT_HANDLERS["discussion.replied"] = (db, evt) => discussionRecipients(db, evt, "replied");
+EVENT_HANDLERS["discussion.resolved"] = (db, evt) => discussionRecipients(db, evt, "resolved");
+
 export type { Recipient };

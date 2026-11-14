@@ -6,6 +6,7 @@ import { CoursesPage, MajorsPage, PortalEnrollPage, PortalPlanPage, SectionsPage
 import { PortalAssignmentsPage } from "./pages/assignment-pages";
 import { DashboardPage, GradingScalePage, PortalGradesPage, TranscriptsPage } from "./pages/grade-pages";
 import { AnnouncementsPage } from "./pages/announcement-pages";
+import { PortalDiscussionsPage } from "./pages/discussion-pages";
 import { StaffPage, StudentsPage } from "./pages/hr-pages";
 import { DataScopesPage, EntriesPage, MenusPage, RolesPage, UsersPage } from "./pages/access-pages";
 import { CampusesPage, DeptsPage, DictsPage, OperationLogPage, ParamsPage, PostsPage } from "./pages/system-pages";
@@ -20,6 +21,7 @@ export const PAGES: Record<string, React.ComponentType> = {
   "portal/plan/index": PortalPlanPage,
   "portal/assignment/index": PortalAssignmentsPage,
   "portal/grade/index": PortalGradesPage,
+  "portal/discussion/index": PortalDiscussionsPage,
   "msg/announcement/index": AnnouncementsPage,
   "edu/scale/index": GradingScalePage,
   "edu/transcript/index": TranscriptsPage,

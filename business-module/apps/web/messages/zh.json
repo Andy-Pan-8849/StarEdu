@@ -470,7 +470,8 @@
       "state_in_progress": "进行中",
       "state_not_taken": "未修",
       "tab_assignments": "作业",
-      "tab_grades": "成绩"
+      "tab_grades": "成绩",
+      "tab_discussion": "讨论"
     },
     "assignments": {
       "tab": "作业",
@@ -592,6 +593,27 @@
       "recipients": "{n} 位收件人",
       "read": "已读",
       "unread": "未读"
+    },
+    "discussion": {
+      "title": "讨论",
+      "pickSection": "选择班级",
+      "back": "返回",
+      "pin": "置顶",
+      "unpin": "取消置顶",
+      "markResolved": "标记为已解决",
+      "reopen": "重新打开",
+      "resolved": "已解决",
+      "delete": "删除",
+      "confirmDelete": "删除这条内容？",
+      "reply": "回复",
+      "yourReply": "你的回复",
+      "newPost": "发起讨论",
+      "titleField": "标题",
+      "bodyField": "内容",
+      "post": "发布",
+      "replies": "{n} 条回复",
+      "empty": "还没有讨论。",
+      "instructor": "老师"
     }
   },
   "menu": {
@@ -638,7 +660,8 @@
     "portal:grade": "我的成绩",
     "msg": "消息",
     "msg:announcement": "公告",
-    "platform:announcement": "平台公告"
+    "platform:announcement": "平台公告",
+    "portal:discussion": "讨论"
   },
   "dict": {
     "type": {
@@ -696,6 +719,7 @@
     "cat_assignment": "作业",
     "cat_grade": "成绩",
     "cat_reminder": "提醒",
-    "cat_announcement": "公告"
+    "cat_announcement": "公告",
+    "cat_discussion": "讨论"
   }
 }
