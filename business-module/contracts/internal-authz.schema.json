@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://staredu.example/contracts/internal-authz.schema.json",
+  "title": "Internal authorization answer",
+  "description": "What the business module's POST /api/internal/authz returns to the AI module for the caller identified by the bearer token. Rules live only in the business module; the AI module copies nothing but these answers.",
+  "type": "object",
+  "required": ["tenantId", "tenantCode", "accountId", "personId", "username", "name", "kind", "roles", "permissions", "scopes", "permVersion"],
+  "additionalProperties": false,
+  "properties": {
+    "tenantId": { "type": "string", "format": "uuid" },
+    "tenantCode": { "type": "string" },
+    "accountId": { "type": "string", "format": "uuid" },
+    "personId": { "type": ["string", "null"], "format": "uuid" },
+    "username": { "type": "string" },
+    "name": { "type": ["string", "null"] },
+    "kind": { "enum": ["staff", "student", "admin", "other"] },
+    "campusCode": { "type": ["string", "null"], "description": "Code of the campus of the person's primary department, when there is one." },
+    "roles": { "type": "array", "items": { "type": "string" } },
+    "permissions": { "type": "array", "items": { "type": "string" } },
+    "scopes": {
+      "type": "object",
+      "description": "Resolved data scope per permission code the AI views use. A permission that is missing or has an empty scope means no rows.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["all", "deptIds", "classIds", "selfPersonId"],
+        "additionalProperties": false,
+        "properties": {
+          "all": { "type": "boolean" },
+          "deptIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+          "classIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+          "selfPersonId": { "type": ["string", "null"], "format": "uuid" }
+        }
+      }
+    },
+    "permVersion": { "type": "integer", "minimum": 0 }
+  }
+}

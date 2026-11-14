@@ -175,6 +175,10 @@ def schema_prompt(identity: Identity) -> str:
     """生成给写 SQL 的模型看的数据说明：每个视图和列、校区编码表、提问者身份。
     参数：identity 提问者。返回：多行文字。
     """
+    if identity.business is not None:
+        from starit_core.dataaccess.business_schema import business_schema_prompt
+
+        return business_schema_prompt(identity)
     lines = ["Views (always write them as ai_sql.<name>):", ""]
     for view in VIEWS.values():
         lines.append(f"ai_sql.{view.name} - {view.description}")

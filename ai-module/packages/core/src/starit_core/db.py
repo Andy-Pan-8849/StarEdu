@@ -22,3 +22,10 @@ async def check_database(engine: AsyncEngine) -> bool:
     except Exception:
         return False
     return True
+
+
+def create_business_engine(settings: Settings) -> AsyncEngine:
+    """业务模式下读业务库的引擎：登录角色 ai_reader；
+    每次查询在事务里写入身份设置后切到 ai_sql_ro。
+    """
+    return create_async_engine(settings.business_database_url, pool_pre_ping=True)

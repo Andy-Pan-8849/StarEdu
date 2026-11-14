@@ -190,6 +190,9 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("portal:discussion", "portal", "Discussions", "discussion", 5, PERMS.portalDiscussionList, [["post", "Post", PERMS.portalDiscussionPost]]),
   ...menuWithButtons("portal:grade", "portal", "My grades", "grade", 4, PERMS.portalGradeList, [["download", "Download transcript", PERMS.portalTranscriptDownload]]),
 
+  // AI 助手：外链，管理后台和学生门户两个入口都分配（入口管理的多对多）；{code} 换成当前租户代码
+  { code: "ai", type: "link", name: "AI assistant", nameKey: "menu.ai", route: "http://{code}.localhost:3000/", icon: "bot", sort: 40, entries: ["admin", "portal"] },
+
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },
   ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [
     ["edit", "Edit", PERMS.hrPersonEdit],

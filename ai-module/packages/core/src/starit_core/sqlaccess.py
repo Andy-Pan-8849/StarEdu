@@ -48,6 +48,14 @@ async def run_as_identity(
         "app.employee_id": identity.employee_id or "",
         "app.student_id": identity.student_id or "",
     }
+    if identity.business is not None:
+        # 业务模式：租户、人员和"每个权限字符下的数据范围"（业务模块内部接口给的）；
+        # 业务库的视图据此过滤行
+        settings = {
+            "app.tenant_id": identity.business.tenant_id,
+            "app.person_id": identity.business.person_id or "",
+            "app.scopes": identity.business.scopes_json,
+        }
     for name, value in settings.items():
         await conn.execute(
             text("SELECT set_config(:name, :value, true)"), {"name": name, "value": value}

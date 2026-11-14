@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from starit_core.agent.runtime import AgentRuntime
 from starit_core.auth import AuthError, AuthUnavailableError, Identity, TokenVerifier
 from starit_core.cost import DailyBudget
+from starit_core.identity import ClaimsResolver, IdentityResolver
 from starit_core.ratelimit import RateLimiter
 from starit_core.storage import ObjectStorage
 
@@ -60,17 +61,27 @@ def get_verifier(request: Request) -> TokenVerifier:
     return verifier
 
 
-def get_identity(
+def get_resolver(
+    request: Request, verifier: TokenVerifier = Depends(get_verifier)
+) -> IdentityResolver:
+    """身份解析器：业务模式由启动时装配（令牌 + 业务模块）；否则沿用令牌声明。
+    独立模式仍然经过 get_verifier，所以测试里替换校验器的做法照旧有效。
+    """
+    business: IdentityResolver | None = getattr(request.app.state, "business_resolver", None)
+    return business if business is not None else ClaimsResolver(verifier)
+
+
+async def get_identity(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    verifier: TokenVerifier = Depends(get_verifier),
+    resolver: IdentityResolver = Depends(get_resolver),
 ) -> Identity:
     """从请求里取出并校验令牌，返回调用者身份。
-    失败：没带令牌或令牌无效 -> 401；身份服务取不到公钥 -> 503。
+    失败：没带令牌或令牌无效 -> 401；身份服务（Keycloak 公钥、业务模块）不可用 -> 503。
     """
     if credentials is None:
         raise ApiError(401, "unauthenticated", "Missing bearer token", _CHALLENGE)
     try:
-        return verifier.verify(credentials.credentials)
+        return await resolver.resolve(credentials.credentials)
     except AuthUnavailableError as exc:
         raise ApiError(503, "internal_error", "Identity service is unavailable") from exc
     except AuthError as exc:

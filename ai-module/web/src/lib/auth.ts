@@ -7,7 +7,7 @@
  */
 
 import { UserManager, WebStorageStateStore } from "oidc-client-ts";
-import { config } from "@/lib/config";
+import { oidcFor } from "@/lib/config";
 
 let manager: UserManager | null = null;
 
@@ -17,9 +17,10 @@ let manager: UserManager | null = null;
  */
 export function getManager(): UserManager {
   if (manager === null) {
+    const oidc = oidcFor(window.location.hostname);
     manager = new UserManager({
-      authority: config.oidcAuthority,
-      client_id: config.oidcClientId,
+      authority: oidc.authority,
+      client_id: oidc.clientId,
       redirect_uri: `${window.location.origin}/callback`,
       post_logout_redirect_uri: window.location.origin,
       response_type: "code",

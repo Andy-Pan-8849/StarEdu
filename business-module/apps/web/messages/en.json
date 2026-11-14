@@ -661,7 +661,8 @@
     "msg": "Messages",
     "msg:announcement": "Announcements",
     "platform:announcement": "Platform announcements",
-    "portal:discussion": "Discussions"
+    "portal:discussion": "Discussions",
+    "ai": "AI assistant"
   },
   "dict": {
     "type": {

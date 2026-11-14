@@ -282,8 +282,11 @@ class AgentNodes:
         settings: Settings,
         embedder: EmbeddingClient,
         retrieve_fn: RetrieveFn = retrieve,
+        business_engine: AsyncEngine | None = None,
     ) -> None:
         self._engine = engine
+        # 业务模式下，读业务数据的 SQL 在业务库的引擎上跑（身份里有 business 才用）
+        self._business_engine = business_engine
         self._settings = settings
         self._embedder = embedder
         self._retrieve = retrieve_fn
@@ -612,6 +615,9 @@ class AgentNodes:
         只有模型选了白名单里的工具、参数是字典、且工具客户端可用，才走工具；否则走 SQL。
         """
         ctx = _ctx(config)
+        if ctx.identity.business is not None:
+            # 业务模式：固定工具是针对样本数据写的（列和编号都不同），一律走 SQL 路径读业务库的视图
+            return {"plan_path": "sql", "sql_attempts": 0, "route": "run_sql"}
         try:
             result = await ctx.chat.complete(
                 [
@@ -740,8 +746,14 @@ class AgentNodes:
             return {"route": "end_no_permission", "end_reason": "restricted_data"}
         except SqlRejected as rejected:
             return failed(rejected.message)
+        engine = self._engine
+        if ctx.identity.business is not None:
+            if self._business_engine is None:
+                ctx.totals.failure_detail = "sql: the business database is not configured"
+                return give_up
+            engine = self._business_engine
         try:
-            async with self._engine.begin() as conn:
+            async with engine.begin() as conn:
                 rows = await run_as_identity(
                     conn,
                     ctx.identity,

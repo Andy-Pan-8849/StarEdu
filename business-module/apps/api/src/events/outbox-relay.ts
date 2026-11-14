@@ -23,6 +23,7 @@ export class OutboxRelay {
       async (tx) => {
         const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id::text FROM biz.outbox_event WHERE processed_at IS NULL AND failed_at IS NULL ORDER BY created_at LIMIT ${limit} FOR UPDATE SKIP LOCKED`;
         let sent = 0;
+        const codes = new Map<string, string>();
         for (const { id } of locked) {
           const row = await tx.outboxEvent.findUniqueOrThrow({ where: { id } });
           const problem = unsafePayload(row.payload);
@@ -31,7 +32,8 @@ export class OutboxRelay {
             continue;
           }
           try {
-            await this.kafka.publishEvent(topicFor(row.type), toEnvelope(row));
+            if (!codes.has(row.tenantId)) codes.set(row.tenantId, (await tx.tenant.findUnique({ where: { id: row.tenantId }, select: { code: true } }))?.code ?? "");
+            await this.kafka.publishEvent(topicFor(row.type), toEnvelope(row, codes.get(row.tenantId) || undefined));
             await tx.outboxEvent.update({ where: { id }, data: { processedAt: new Date(), lastError: null } });
             sent++;
           } catch (err) {

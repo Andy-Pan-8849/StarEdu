@@ -8,6 +8,8 @@ export interface EventEnvelope {
   type: string;
   version: 1;
   tenantId: string;
+  /** 租户代码：消费者（如 AI 模块）按它找到该租户的业务模块地址 */
+  tenantCode?: string;
   occurredAt: string;
   /** 分区键 */
   key: string;
@@ -31,8 +33,8 @@ export function aggregateOf(type: string, payload: unknown, fallback: string): s
   return fallback;
 }
 
-export function toEnvelope(row: OutboxLike): EventEnvelope {
-  return { id: row.id, type: row.type, version: 1, tenantId: row.tenantId, occurredAt: row.createdAt.toISOString(), key: `${row.tenantId}:${aggregateOf(row.type, row.payload, row.id)}`, payload: (row.payload ?? {}) as Record<string, unknown> };
+export function toEnvelope(row: OutboxLike, tenantCode?: string): EventEnvelope {
+  return { id: row.id, type: row.type, version: 1, tenantId: row.tenantId, ...(tenantCode ? { tenantCode } : {}), occurredAt: row.createdAt.toISOString(), key: `${row.tenantId}:${aggregateOf(row.type, row.payload, row.id)}`, payload: (row.payload ?? {}) as Record<string, unknown> };
 }
 
 /** 审计类事件走 audit.events，其余走 business.events。 */

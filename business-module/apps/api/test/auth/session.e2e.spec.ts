@@ -93,7 +93,7 @@ describe("sessions, force logout and entry qualification", () => {
       expect(res.status).toBe(201);
       expect(res.body.permissions).toEqual(expect.arrayContaining(["hr:person:list", "hr:person:edit"]));
       const top = res.body.menus.map((m: { code: string }) => m.code);
-      expect(top).toEqual(["hr"]); // hr-manager 只勾选了人事；没有勾选的"系统管理"不出现
+      expect(top).toEqual(["hr", "ai"]); // hr-manager 只勾选了人事和 AI 助手；没有勾选的"系统管理"不出现
       expect(res.body.menus[0].children.map((m: { code: string }) => m.code)).toEqual(["hr:person", "hr:staff", "hr:student"]);
       expect((await h.owner.account.findUniqueOrThrow({ where: { id: staff.accountId } })).status).toBe("active");
       expect((await h.call(token).get("/api/persons")).status).toBe(200); // 激活后立即生效
@@ -137,7 +137,7 @@ describe("sessions, force logout and entry qualification", () => {
       expect((await h.call(token).get("/api/persons")).status).toBe(403); // 账号还是"待激活"
       const session = await h.call(token).post("/api/auth/session", { entry: "admin" });
       expect(session.status).toBe(201);
-      expect(session.body.menus.map((m: { code: string }) => m.code).sort()).toEqual(["edu", "hr", "msg", "system"]);
+      expect(session.body.menus.map((m: { code: string }) => m.code).sort()).toEqual(["ai", "edu", "hr", "msg", "system"]);
     });
   });
 

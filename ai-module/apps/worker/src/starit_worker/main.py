@@ -9,10 +9,12 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
+from starit_core.business_knowledge import BusinessContentClient, BusinessKnowledgeSync
 from starit_core.config import get_settings
 from starit_core.cost import make_budget
 from starit_core.db import create_engine
 from starit_core.embeddings import embedding_client
+from starit_core.ingest.business_events import run_business_events
 from starit_core.ingest.worker import run_worker
 from starit_core.llm import chat_client
 from starit_core.logging import configure_logging
@@ -43,9 +45,24 @@ async def _run(once: bool) -> None:
         "worker started (embedding %s/%s, %d dimensions)",
         settings.embedding_provider, embedder.model, embedder.dimensions,
     )  # fmt: skip
+    content_client: BusinessContentClient | None = None
     try:
-        await run_worker(engine, storage, embedder, settings, once=once, chat=chat_client(settings))
+        worker = run_worker(
+            engine, storage, embedder, settings, once=once, chat=chat_client(settings)
+        )
+        if settings.kafka_brokers and not once:
+            # 业务模式：同时订阅业务事件，把课程大纲和课件清单同步进知识库
+            content_client = BusinessContentClient(
+                url_template=settings.business_api_url, internal_key=settings.business_internal_key
+            )
+            sync = BusinessKnowledgeSync(engine, storage, content_client)
+            logger.info("listening to business events (%s)", settings.kafka_brokers)
+            await asyncio.gather(worker, run_business_events(settings, sync))
+        else:
+            await worker
     finally:
+        if content_client is not None:
+            await content_client.aclose()
         await engine.dispose()
 
 

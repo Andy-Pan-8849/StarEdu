@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B9b.** Sign-in, the platform console, system management, people, teaching, assignments, grades, notifications and class discussion work. The AI assistant is not built yet; their menus show "This page is not available yet."
+Status: **milestone B10.** Sign-in, the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -137,7 +137,7 @@ To load the sample company into `hq`: `pnpm import:sample`.
 | **Discussions** (menu): pick one of your sections, start a thread, reply, mark your own thread as solved, delete your own posts. Students on leave can read only | Works today |
 | **My grades**: published final grades by term, GPA by term and cumulative, credits earned; **download an unofficial transcript** (PDF, numbered, footer "for reference only"). Graduated or withdrawn students can still read their grades and download it | Works today |
 | **Notifications** (the bell in the top bar): new assignments, published scores and final grades, enrollment changes, announcements, and a reminder in the last 24 hours before a deadline. New ones appear at once. **Settings** in the bell: language, and per category whether you want it in the app and by e-mail. Every e-mail has an unsubscribe link (see them in Mailpit at http://localhost:8125) | Works today |
-| AI assistant | B10 |
+| **AI assistant** (menu link, opens the assistant for your company): ask about your own courses, grades and, for teachers, the sections you teach; it never shows what your account may not see. See section 5 | Works today (needs the AI module in business mode) |
 
 ### Campus lead
 
@@ -184,18 +184,28 @@ await call("data-scope-sets");                                        // data sc
 
 Then tick menus with `PUT roles/<id>/menus {menuIds:[...]}`, choose data scopes with `PUT roles/<id>/data-scopes {setIds:[...]}`, create a person's account with `POST accounts {username, email}` and give them the role with `PUT accounts/<id>/roles {roleIds:[...]}`. The new person receives an invitation e-mail (see Mailpit) and sets a password.
 
-## 5. Optional: the Kafka event bus
+## 5. Optional: the AI assistant in business mode
+
+The AI module (`ai-module/`) normally runs on its own sample company. To let it answer from this module's data:
+
+1. In `business-module/.env` set `INTERNAL_API_KEY=<a secret>`, restart `pnpm dev:api`, and **create a new company** (`pnpm seed` creates the demo ones; a company opened earlier has no `ai` sign-in client, because the realm template of earlier milestones did not have it).
+2. In `ai-module/.env` set `STARIT_IDENTITY_MODE=business`, `STARIT_OIDC_TENANT_ISSUER_BASE=http://localhost:8180/realms`, `STARIT_BUSINESS_INTERNAL_KEY=<the same secret>` and `STARIT_CORS_ORIGINS=http://hq.localhost:3000` (see `ai-module/.env.example`), then `make migrate` and start the AI module.
+3. Sign in as a teacher or student of your company and click **AI assistant**. A student asking for "all students' grades" gets only their own; an account with no rows in scope gets "nothing found".
+
+Course syllabi and published material lists enter the knowledge base through the event bus (next section), per company.
+
+## 6. Optional: the Kafka event bus
 
 Nothing in the walk-through above needs Kafka. To see it work: `make biz-up-kafka`, set `BIZ_EVENT_BUS=kafka` in `.env`, restart `pnpm dev:api`, then do anything that sends a notification (for example enroll a student as the registrar). The event goes outbox table, Kafka topic `business.events`, a consumer group, and then the bell. Stop the broker with `make biz-down-kafka` and keep working: events wait in the table and arrive after you start it again. Messages that cannot be handled land in `business.events.dlq`. `make test-events` runs the tests against the real broker.
 
-## 6. What to notice when you evaluate
+## 7. What to notice when you evaluate
 
 - **Menus follow permissions.** Give an account a role with one menu ticked and sign in as that account: only that menu appears. Remove the role and the menu disappears on the next request.
 - **Data scope.** Two people with the same role but different departments see different people. "No data scope" means no rows, never "everything".
 - **Isolation.** Two companies share one system but not one row. The test suite proves this for every endpoint (`pnpm test:leak`).
 - **Sessions.** Force logout works at once, even though the sign-in token is still valid for a few minutes.
 
-## 7. Reset
+## 8. Reset
 
 ```bash
 make reset         # removes the local data of this module (not the AI module)

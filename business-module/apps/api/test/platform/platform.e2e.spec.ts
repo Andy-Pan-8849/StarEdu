@@ -151,7 +151,7 @@ describe("platform console", () => {
       await h.keycloak.request(`/realms/tenant-${code}/clients/${portal[0].id}`, { method: "PUT", body: JSON.stringify({ ...portal[0], directAccessGrantsEnabled: true }) });
       const tenantUserToken = await (await h.user("grant.user", { tenant: { tenantId: id, code } as never, roles: ["tenant-admin"], person: "staff" })).token();
       const menus = (await h.call(tenantUserToken, `${code}.localhost`).get("/api/me/menus?entry=admin")).body as Array<{ code: string }>;
-      expect(menus.map((m) => m.code)).toEqual(["edu", "msg", "system"]);
+      expect(menus.map((m) => m.code)).toEqual(["edu", "msg", "ai", "system"]);
       expect((await h.call(tenantUserToken, `${code}.localhost`).get("/api/persons")).status).toBe(403);
       // 平台入口的菜单不能授权给租户
       const platformMenu = await h.owner.menu.findFirstOrThrow({ where: { tenantId: null, code: "platform:tenant" } });

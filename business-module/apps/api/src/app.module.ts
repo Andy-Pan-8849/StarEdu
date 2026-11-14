@@ -25,6 +25,7 @@ import { SectionsController } from "./edu/sections.controller";
 import { EventConsumers } from "./events/event-consumers";
 import { KafkaService } from "./events/kafka.service";
 import { OutboxRelay } from "./events/outbox-relay";
+import { InternalAuthzController, InternalKbController, InternalKeyGuard } from "./internal/internal-authz.controller";
 import { AnnouncementsController } from "./notify/announcements.controller";
 import { BannersController, NotificationsController, UnsubscribeController } from "./notify/notifications.controller";
 import { NotificationService } from "./notify/notification.service";
@@ -94,6 +95,8 @@ export const CONTROLLERS = [
   SectionsController,
   AssignmentsController,
   GradesController,
+  InternalAuthzController,
+  InternalKbController,
   DiscussionController,
   PortalDiscussionController,
   NotificationsController,
@@ -134,6 +137,7 @@ export const CONTROLLERS = [
     OutboxService,
     ObjectStoreService,
     GradesService,
+    InternalKeyGuard,
     DiscussionService,
     NotificationService,
     NotifyWorker,

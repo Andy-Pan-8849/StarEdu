@@ -661,7 +661,8 @@
     "msg": "消息",
     "msg:announcement": "公告",
     "platform:announcement": "平台公告",
-    "portal:discussion": "讨论"
+    "portal:discussion": "讨论",
+    "ai": "AI 助手"
   },
   "dict": {
     "type": {

@@ -108,10 +108,10 @@ def _decode_cursor(cursor: str | None) -> int:
     return offset
 
 
-async def _existing(engine: AsyncEngine, document_id: UUID) -> dict[str, Any]:
-    """取文档元数据，不存在抛 404。"""
+async def _existing(engine: AsyncEngine, document_id: UUID, identity: Identity) -> dict[str, Any]:
+    """取文档元数据（只取调用者租户的），不存在抛 404。"""
     async with engine.connect() as conn:
-        found = await store.get_document(conn, document_id)
+        found = await store.get_document(conn, document_id, tenant_id=identity.tenant_id)
     if found is None:
         raise ApiError(404, "not_found", "Document not found")
     return found
@@ -159,7 +159,9 @@ async def upload(
         raise ApiError(422, "validation_error", "The file is larger than 20 MB")
     _check_file(extension, data)
     digest = hashlib.sha256(data).hexdigest()
-    key = f"documents/{doc_code}/{version}/{name}"
+    # 业务模式：对象键带租户前缀，两个租户上传同名文档不会互相覆盖
+    prefix = f"documents/{identity.tenant_id}" if identity.tenant_id else "documents"
+    key = f"{prefix}/{doc_code}/{version}/{name}"
 
     # 同一（编号, 版本）不能重复上传
     async with engine.connect() as probe:
@@ -189,6 +191,7 @@ async def upload(
                     object_key=key,
                     content_hash=digest,
                     supersedes_id=supersedes,
+                    tenant_id=identity.tenant_id,
                 ),
                 actor=identity,
             )
@@ -197,7 +200,7 @@ async def upload(
         await storage.delete(key)
         raise
     async with engine.connect() as conn:
-        created = await store.get_document(conn, document_id)
+        created = await store.get_document(conn, document_id, tenant_id=identity.tenant_id)
     assert created is not None
     return JSONResponse({"document": _meta(created), "job_id": str(job_id)}, status_code=202)
 
@@ -210,7 +213,7 @@ async def list_documents(
     q: str | None = Query(None, max_length=100),
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = None,
-    _: Identity = Depends(admin),
+    identity: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
     """文档列表（不含内容），可按领域、状态、入库状态、标题/编号关键字过滤，游标分页。"""
@@ -224,6 +227,7 @@ async def list_documents(
             q=q,
             limit=limit + 1,
             offset=offset,
+            tenant_id=identity.tenant_id,
         )
     more = len(rows) > limit
     return {
@@ -246,11 +250,11 @@ class DocumentPatch(BaseModel):
 @router.get("/{document_id}")
 async def get_document(
     document_id: UUID,
-    _: Identity = Depends(admin),
+    identity: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
     """某文档的元数据。"""
-    return _meta(await _existing(engine, document_id))
+    return _meta(await _existing(engine, document_id, identity))
 
 
 @router.patch("/{document_id}")
@@ -263,7 +267,7 @@ async def patch_document(
     """修改文档的元数据和权限。文档及其全部文本块在一个事务里一起改，并写审计。
     min_level 显式传 null 表示去掉职等要求（与“没传”区分开）。
     """
-    await _existing(engine, document_id)
+    await _existing(engine, document_id, identity)
     try:
         async with engine.begin() as conn:
             await store.update_document(
@@ -282,7 +286,7 @@ async def patch_document(
         raise ApiError(422, "validation_error", str(exc)) from exc
     except LookupError as exc:
         raise ApiError(404, "not_found", "Document not found") from exc
-    return _meta(await _existing(engine, document_id))
+    return _meta(await _existing(engine, document_id, identity))
 
 
 @router.delete("/{document_id}", status_code=204)
@@ -295,7 +299,7 @@ async def delete_document(
     """删除文档（数据库里的块、向量、任务随之级联删除）并尽力删除对象存储里的原文件；
     原文件删不掉只记日志。
     """
-    found = await _existing(engine, document_id)
+    found = await _existing(engine, document_id, identity)
     try:
         async with engine.begin() as conn:
             await store.delete_document(conn, document_id, actor=identity)
@@ -316,7 +320,7 @@ async def reindex(
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
     """重新排一个入库任务（比如换了嵌入模型），写审计。"""
-    await _existing(engine, document_id)
+    await _existing(engine, document_id, identity)
     async with engine.begin() as conn:
         job_id = await queue.enqueue(conn, document_id)
         await write_audit(conn, action="doc.reindex", actor=identity, doc_ids=[str(document_id)])
@@ -326,11 +330,11 @@ async def reindex(
 @router.get("/{document_id}/jobs")
 async def jobs(
     document_id: UUID,
-    _: Identity = Depends(admin),
+    identity: Identity = Depends(admin),
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict[str, Any]:
     """某文档的入库任务历史：状态、阶段、重试次数、错误。"""
-    await _existing(engine, document_id)
+    await _existing(engine, document_id, identity)
     async with engine.connect() as conn:
         rows = await store.list_jobs(conn, document_id)
     return {"items": [{k: _plain(v) for k, v in r.items()} for r in rows]}
@@ -355,7 +359,11 @@ async def chunks(
         found = await store.readable_chunks(
             conn, identity, document_id, around=around, window=window
         )
-        meta = await store.get_document(conn, document_id) if found else None
+        meta = (
+            await store.get_document(conn, document_id, tenant_id=identity.tenant_id)
+            if found
+            else None
+        )
     if not found or meta is None:  # missing and forbidden look the same
         raise ApiError(404, "not_found", "Document not found")
     return {
@@ -376,7 +384,11 @@ async def original_file(
     """下载/查看原文件（inline），仅限有权读该文档的人；其余统一 404。"""
     async with engine.connect() as conn:
         allowed = await store.can_read_document(conn, identity, document_id)
-        meta = await store.get_document(conn, document_id) if allowed else None
+        meta = (
+            await store.get_document(conn, document_id, tenant_id=identity.tenant_id)
+            if allowed
+            else None
+        )
     if meta is None or not meta.get("object_key"):
         raise ApiError(404, "not_found", "Document not found")
     try:

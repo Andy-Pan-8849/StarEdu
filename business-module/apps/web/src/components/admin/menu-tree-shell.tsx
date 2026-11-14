@@ -17,6 +17,11 @@ export interface ShellLabels {
   signOut: string;
 }
 
+/** 外链里的 {code} 换成当前租户代码（域名第一段）：AI 助手的地址随租户变。 */
+export function linkFor(route: string | null | undefined, hostname: string = typeof window === "undefined" ? "" : window.location.hostname): string {
+  return (route ?? "#").replace("{code}", hostname.split(".")[0] ?? "");
+}
+
 export function MenuTreeShell({
   menus,
   pages,
@@ -70,7 +75,7 @@ export function MenuTreeShell({
     if (node.type === "link") {
       return (
         <li key={node.id}>
-          <a className="block py-1.5 pr-3 text-sm text-muted hover:text-foreground" style={pad} href={node.route ?? "#"} target="_blank" rel="noopener noreferrer">
+          <a className="block py-1.5 pr-3 text-sm text-muted hover:text-foreground" style={pad} href={linkFor(node.route)} target="_blank" rel="noopener noreferrer">
             {label(node)} ↗
           </a>
         </li>
