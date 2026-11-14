@@ -16,6 +16,8 @@ export interface RealmParams {
   tenantId: string;
   /** 前端的来源地址，如 http://hq.localhost:3001（回调地址据此生成）。 */
   webOrigin: string;
+  /** AI 助手前端的来源地址，如 http://hq.localhost:3000；给了就多建一个 ai 客户端（租户域） */
+  aiOrigin?: string;
   smtp: { host: string; port: number; from: string; fromDisplayName: string; user?: string; password?: string; secure?: "none" | "ssl" | "starttls" };
   /** 仅本地冒烟测试：打开密码直连授权，让脚本不用浏览器就能换令牌。绝不用于正式开通。 */
   allowDirectGrant?: boolean;
@@ -86,12 +88,17 @@ function protocolMappers(params: RealmParams, cfg: RealmConfig): Mapper[] {
   ];
 }
 
+/** AI 模块的两个受众：问答 API 和数据 MCP 服务器；AI 客户端的令牌要同时带上。 */
+export const AI_AUDIENCES = ["starit-api", "starit-mcp"] as const;
+
 function client(
   params: RealmParams,
   cfg: RealmConfig,
   clientId: string,
   redirectPath: string,
   directGrant: boolean,
+  origin: string = params.webOrigin,
+  extraMappers: Mapper[] = [],
 ): Mapper {
   return {
     clientId,
@@ -103,12 +110,12 @@ function client(
     implicitFlowEnabled: false,
     directAccessGrantsEnabled: directGrant,
     serviceAccountsEnabled: false,
-    rootUrl: params.webOrigin,
-    redirectUris: [`${params.webOrigin}${redirectPath}`],
-    webOrigins: [params.webOrigin],
+    rootUrl: origin,
+    redirectUris: [`${origin}${redirectPath}`],
+    webOrigins: [origin],
     // 退出登录后允许回到的地址（与登录回调同一范围）
-    attributes: { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": `${params.webOrigin}${redirectPath}` },
-    protocolMappers: protocolMappers(params, cfg),
+    attributes: { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": `${origin}${redirectPath}` },
+    protocolMappers: [...protocolMappers(params, cfg), ...extraMappers],
   };
 }
 
@@ -122,6 +129,25 @@ export function buildRealm(params: RealmParams): Record<string, unknown> {
       : [
           client(params, cfg, "portal", "/*", direct),
           client(params, cfg, "admin", "/admin/*", direct),
+          // AI 助手：令牌身份仍是业务账号（同一个域、同一套登录），再带上 AI 模块的受众
+          ...(params.aiOrigin
+            ? [
+                client(
+                  params,
+                  cfg,
+                  "ai",
+                  "/*",
+                  direct,
+                  params.aiOrigin,
+                  AI_AUDIENCES.map((aud) => ({
+                    name: `audience-${aud}`,
+                    protocol: "openid-connect",
+                    protocolMapper: "oidc-audience-mapper",
+                    config: { "included.custom.audience": aud, "access.token.claim": "true", "id.token.claim": "false" },
+                  })),
+                ),
+              ]
+            : []),
         ];
   return {
     realm: realmName(params.kind, params.code),

@@ -27,6 +27,7 @@ starit-eval = { workspace = true }
 [dependency-groups]
 dev = [
     "httpx>=0.27",
+    "jsonschema>=4",
     "mypy>=1.11",
     "pre-commit>=3.8",
     "pytest>=8.3",
@@ -72,5 +73,5 @@ exclude = ["migrations/", "sample-data/", "web/"]
 
 [[tool.mypy.overrides]]
 # These libraries ship no type information.
-module = ["boto3", "botocore", "botocore.*", "pdfplumber", "pdfplumber.*"]
+module = ["boto3", "botocore", "botocore.*", "pdfplumber", "pdfplumber.*", "jsonschema", "jsonschema.*"]
 ignore_missing_imports = true

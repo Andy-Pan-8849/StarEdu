@@ -3,11 +3,12 @@
 //     没配置密钥就整个接口关闭（返回 503），不会"忘了配就对外开放"。
 //   - 回答里的数据范围就是业务模块自己的数据范围解析器的结果，AI 模块不再自己判断规则。
 //   - 按权限版本号缓存：回答带 ETag（权限版本 + 账号）；调用方带 If-None-Match 且没变就返回 304，不再重算和传输。
-import { Controller, ForbiddenException, Headers, HttpCode, Post, Res, ServiceUnavailableException, UseGuards, type CanActivate, type ExecutionContext, Injectable } from "@nestjs/common";
+import { Controller, ForbiddenException, Get, Headers, HttpCode, NotFoundException, Param, ParseUUIDPipe, Post, Res, ServiceUnavailableException, UseGuards, type CanActivate, type ExecutionContext, Injectable } from "@nestjs/common";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Response } from "express";
 import { PERMS } from "@staredu/shared";
 import { AnyAuthenticated } from "../auth/decorators";
+import { Public } from "../auth/public.decorator";
 import type { AuthContext } from "../auth/tenant-token.guard";
 import { Auth } from "../common/http";
 import { DataScopeService } from "../data-scope/data-scope.service";
@@ -83,6 +84,30 @@ export class InternalAuthzController {
       permissions: auth.authz.perms,
       scopes,
       permVersion: auth.authz.version,
+    };
+  }
+}
+
+/**
+ * 知识库入库用的内容接口：AI 模块收到"大纲或课件变了"的事件（只带课程 id）后，来取课程大纲和各班已发布的课件清单。
+ * 只认服务密钥（没有用户令牌——这是后台任务）；租户由主机名确定。课件只有标题和外链，没有文件，所以入库的是"清单"。
+ */
+@Controller("api/internal/kb")
+@Public()
+@UseGuards(InternalKeyGuard)
+export class InternalKbController {
+  constructor(private readonly tenantDb: TenantPrismaService) {}
+
+  @Get("courses/:courseId")
+  async course(@Param("courseId", ParseUUIDPipe) courseId: string) {
+    const db = this.tenantDb.db;
+    const course = await db.course.findFirst({ where: { id: courseId } });
+    if (!course) throw new NotFoundException();
+    const sections = await db.section.findMany({ where: { courseId, status: { in: ["open", "in_progress", "ended"] } }, include: { term: true }, orderBy: { name: "asc" } });
+    const materials = await db.sectionMaterial.findMany({ where: { sectionId: { in: sections.map((s) => s.id) }, published: true }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] });
+    return {
+      courseId: course.id, code: course.code, name: course.name, credits: Number(course.credits), status: course.status, syllabus: course.syllabus ?? "",
+      sections: sections.map((s) => ({ id: s.id, name: s.name, term: s.term.name, materials: materials.filter((m) => m.sectionId === s.id).map((m) => ({ title: m.title, category: m.category, url: m.url })) })),
     };
   }
 }

@@ -25,7 +25,7 @@ STATUSES = ("active", "superseded", "draft")
 # 文本块从文档复制的列（权限、状态、版本相关）
 _SYNCED = (
     "allowed_roles, allowed_users, campus_scope, min_level_rank, status, effective_date, "
-    "doc_code, version"
+    "doc_code, version, tenant_id"
 )
 
 
@@ -47,6 +47,8 @@ class NewDocument:
     object_key: str | None = None
     content_hash: str | None = None
     supersedes_id: UUID | None = None
+    # 业务模式：文档属于哪个租户；None = 独立模式的文档
+    tenant_id: str | None = None
 
 
 async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: Identity) -> UUID:
@@ -66,12 +68,12 @@ async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: I
                     INSERT INTO ai.documents
                         (doc_code, title, domain, version, status, effective_date, access_level,
                          allowed_roles, allowed_users, campus_scope, min_level_rank, object_key,
-                         format, content_hash, uploaded_by, supersedes_id)
+                         format, content_hash, uploaded_by, supersedes_id, tenant_id)
                     VALUES
                         (:doc_code, :title, :domain, :version, :status, :effective_date,
                          :access_level, :allowed_roles, :allowed_users, :campus_scope,
                          :min_level_rank, :object_key, :format, :content_hash, :uploaded_by,
-                         :supersedes_id)
+                         :supersedes_id, :tenant_id)
                     RETURNING id
                     """
                 ),
@@ -92,6 +94,7 @@ async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: I
                     "content_hash": doc.content_hash,
                     "uploaded_by": actor.user_id,
                     "supersedes_id": doc.supersedes_id,
+                    "tenant_id": doc.tenant_id,
                 },
             )
         ).scalar_one()
@@ -127,7 +130,7 @@ async def add_chunk(
                      {_SYNCED})
                 SELECT d.id, :chunk_index, :text, :heading_path, :page, :identifiers, :token_count,
                        d.allowed_roles, d.allowed_users, d.campus_scope, d.min_level_rank,
-                       d.status, d.effective_date, d.doc_code, d.version
+                       d.status, d.effective_date, d.doc_code, d.version, d.tenant_id
                 FROM ai.documents d WHERE d.id = :document_id
                 RETURNING id
                 """
@@ -155,7 +158,7 @@ async def _sync_chunks(conn: AsyncConnection, document_id: UUID) -> int:
             SET allowed_roles = d.allowed_roles, allowed_users = d.allowed_users,
                 campus_scope = d.campus_scope, min_level_rank = d.min_level_rank,
                 status = d.status, effective_date = d.effective_date,
-                doc_code = d.doc_code, version = d.version
+                doc_code = d.doc_code, version = d.version, tenant_id = d.tenant_id
             FROM ai.documents d
             WHERE d.id = c.document_id AND d.id = :document_id
             """
@@ -260,8 +263,8 @@ async def find_document(
         (
             await conn.execute(
                 text(
-                    "SELECT id, content_hash, ingest_status, status, access_level, object_key "
-                    "FROM ai.documents WHERE doc_code = :c AND version = :v"
+                    "SELECT id, content_hash, ingest_status, status, access_level, object_key, "
+                    "tenant_id FROM ai.documents WHERE doc_code = :c AND version = :v"
                 ),
                 {"c": doc_code, "v": version},
             )
@@ -306,7 +309,7 @@ async def set_content(
 _LISTED = (
     "id, doc_code, title, domain, version, status, effective_date, access_level, allowed_users, "
     "campus_scope, min_level_rank, format, ingest_status, content_hash, uploaded_by, "
-    "supersedes_id, created_at, updated_at"
+    "supersedes_id, created_at, updated_at, tenant_id"
 )
 
 
@@ -319,6 +322,7 @@ async def list_documents(
     q: str | None = None,
     limit: int = 20,
     offset: int = 0,
+    tenant_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """文档元数据列表（不含内容），最新的在前。
 
@@ -337,6 +341,7 @@ async def list_documents(
             "AND (CAST(:status AS text) IS NULL OR status = :status) "
             "AND (CAST(:ingest AS text) IS NULL OR ingest_status = :ingest) "
             "AND (CAST(:q AS text) IS NULL OR title ILIKE :q OR doc_code ILIKE :q) "
+            "AND tenant_id IS NOT DISTINCT FROM CAST(:tenant AS text) "
             "ORDER BY created_at DESC, id LIMIT :limit OFFSET :offset"
         ),
         {
@@ -344,6 +349,7 @@ async def list_documents(
             "status": status,
             "ingest": ingest_status,
             "q": pattern,
+            "tenant": tenant_id,
             "limit": limit,
             "offset": offset,
         },
@@ -351,13 +357,18 @@ async def list_documents(
     return [dict(r) for r in rows.mappings()]
 
 
-async def get_document(conn: AsyncConnection, document_id: UUID) -> dict[str, Any] | None:
-    """取单个文档的元数据（含对象键）；没有则 None。"""
+async def get_document(
+    conn: AsyncConnection, document_id: UUID, *, tenant_id: str | None = None
+) -> dict[str, Any] | None:
+    """取单个文档的元数据（含对象键）；没有则 None。只取调用者租户的文档（独立模式 = 无租户的）。"""
     row = (
         (
             await conn.execute(
-                text(f"SELECT {_LISTED}, object_key FROM ai.documents WHERE id = :id"),
-                {"id": document_id},
+                text(
+                    f"SELECT {_LISTED}, object_key FROM ai.documents WHERE id = :id "
+                    "AND tenant_id IS NOT DISTINCT FROM CAST(:tenant AS text)"
+                ),
+                {"id": document_id, "tenant": tenant_id},
             )
         )
         .mappings()

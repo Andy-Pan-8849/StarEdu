@@ -63,6 +63,7 @@ class AgentRuntime:
         retrieve_fn: RetrieveFn = retrieve,
         data_tools: Any = None,
         budget: DailyBudget | None = None,
+        business_engine: AsyncEngine | None = None,
     ) -> None:
         self._data_tools = data_tools
         self._budget = budget
@@ -70,7 +71,13 @@ class AgentRuntime:
         self._settings = settings
         self._chat = chat
         self._graph = build_graph(
-            AgentNodes(engine=engine, settings=settings, embedder=embedder, retrieve_fn=retrieve_fn)
+            AgentNodes(
+                engine=engine,
+                settings=settings,
+                embedder=embedder,
+                retrieve_fn=retrieve_fn,
+                business_engine=business_engine,
+            )
         )
 
     @property

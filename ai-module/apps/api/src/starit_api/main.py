@@ -25,8 +25,9 @@ from starit_core.config import Settings, get_settings
 from starit_core.cost import RedisDailyBudget, make_budget
 from starit_core.dataaccess.client import McpDataTools
 from starit_core.dataaccess.tools import DataTools, DataToolsClient
-from starit_core.db import check_database, create_engine
+from starit_core.db import check_database, create_business_engine, create_engine
 from starit_core.embeddings import embedding_client
+from starit_core.identity import build_identity_stack
 from starit_core.llm import chat_client
 from starit_core.logging import configure_logging, request_id_var
 from starit_core.ratelimit import RedisRateLimiter
@@ -63,6 +64,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         audience=settings.oidc_audience_api,
         key_resolver=jwks_key_resolver(settings.oidc_jwks_url),
     )
+    # 身份解析：独立模式沿用令牌声明；业务模式（IDENTITY_MODE=business）令牌 + 业务模块的内部接口
+    stack = build_identity_stack(settings, audience=settings.oidc_audience_api)
+    app.state.business_resolver = stack.resolver if stack.business else None
+    business_engine = create_business_engine(settings) if stack.business else None
     budget = make_budget(settings)
     app.state.budget = budget
     embedder = embedding_client(settings, budget)
@@ -73,6 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         chat=chat_client(settings),
         data_tools=data_tools(settings, engine, embedder),
         budget=budget,
+        business_engine=business_engine,
     )
     limiter = RedisRateLimiter(settings.redis_url)
     app.state.limiter = limiter
@@ -81,6 +87,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await limiter.close()
+        await stack.close()
+        if business_engine is not None:
+            await business_engine.dispose()
         if isinstance(budget, RedisDailyBudget):
             await budget.close()
         await engine.dispose()

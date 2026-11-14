@@ -39,6 +39,7 @@ export async function createRealm(admin: KeycloakAdmin, opts: RealmOptions): Pro
       displayName: opts.name,
       tenantId: opts.tenantId,
       webOrigin: opts.webOrigin,
+      aiOrigin: opts.kind === "tenant" ? aiOrigin(opts.code) : undefined,
       smtp: { ...opts.smtp, fromDisplayName: "StarEdu" },
       allowDirectGrant: opts.allowDirectGrant,
     }),
@@ -50,6 +51,12 @@ export async function createRealm(admin: KeycloakAdmin, opts: RealmOptions): Pro
 /** 租户网址模板，如 "http://{code}.localhost:3001"。 */
 export function tenantOrigin(code: string, env: NodeJS.ProcessEnv = process.env): string {
   const template = env.TENANT_ORIGIN_TEMPLATE ?? `http://{code}.localhost:${env.WEB_PORT ?? "3001"}`;
+  return template.replace("{code}", code);
+}
+
+/** AI 助手前端的网址模板，如 "http://{code}.localhost:3000"（AI_ORIGIN_TEMPLATE 可改）。 */
+export function aiOrigin(code: string, env: NodeJS.ProcessEnv = process.env): string {
+  const template = env.AI_ORIGIN_TEMPLATE ?? "http://{code}.localhost:3000";
   return template.replace("{code}", code);
 }
 

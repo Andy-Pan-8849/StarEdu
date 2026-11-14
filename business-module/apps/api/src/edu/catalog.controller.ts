@@ -13,7 +13,9 @@ import { withScope } from "../data-scope/scope-filter";
 import { assertVisible } from "../tenancy/owned";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { dayString } from "./edu-common";
+import { extendedEvents } from "../events/event-bus";
 import { EnrollmentService } from "./enrollment.service";
+import { OutboxService } from "./outbox.service";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => parseDay(v) !== null).transform((v) => parseDay(v) as Date);
 const termBase = z.object({
@@ -39,6 +41,7 @@ export class CatalogController {
     private readonly audit: AuditService,
     private readonly hr: HrAccess,
     private readonly enrollments: EnrollmentService,
+    private readonly outbox: OutboxService,
   ) {}
 
   private get db() {
@@ -147,6 +150,7 @@ export class CatalogController {
     try {
       const c = await this.db.course.create({ data: { tenantId: auth.tenantId, ...input, createdBy: auth.accountId } });
       await this.audit.record(auth.accountId, "course.create", "course", c.id, { code: c.code });
+      if (extendedEvents() && c.syllabus) await this.outbox.emit("course.syllabus_changed", { courseId: c.id });
       return { id: c.id, code: c.code };
     } catch (err) {
       if ((err as { code?: string }).code === "P2002") throw new ConflictException("Course code already exists");
@@ -167,6 +171,8 @@ export class CatalogController {
     if (input.deptId) await assertVisible(this.db.dept, [input.deptId], "department");
     try {
       const row = await this.db.course.update({ where: { id }, data: { ...input, updatedBy: auth.accountId } });
+      // 大纲、名称或状态变了：知识库要更新（kafka 模式；事件里只有课程 id）
+      if (extendedEvents() && (input.syllabus !== undefined || input.name !== undefined || input.status !== undefined)) await this.outbox.emit("course.syllabus_changed", { courseId: id });
       return { id: row.id, code: row.code, status: row.status };
     } catch (err) {
       if ((err as { code?: string }).code === "P2002") throw new ConflictException("Course code already exists");

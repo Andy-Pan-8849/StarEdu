@@ -70,6 +70,29 @@ describe("buildRealm", () => {
     expect(realm.clients[0].directAccessGrantsEnabled).toBe(true);
   });
 
+  it("adds an AI assistant client to a company realm: its own origin, PKCE, and the AI audiences besides the business one", () => {
+    const realm = buildRealm({ ...base, aiOrigin: "http://hq.localhost:3000" }) as { clients: Array<Record<string, any>> };
+    const ai = realm.clients.find((c) => c.clientId === "ai")!;
+    expect(ai).toBeTruthy();
+    expect(ai.redirectUris).toEqual(["http://hq.localhost:3000/*"]);
+    expect(ai.webOrigins).toEqual(["http://hq.localhost:3000"]);
+    expect(ai.publicClient).toBe(true);
+    expect(ai.attributes["pkce.code.challenge.method"]).toBe("S256");
+    const audiences = ai.protocolMappers.filter((m: any) => m.protocolMapper === "oidc-audience-mapper").map((m: any) => m.config["included.custom.audience"]);
+    expect(audiences.sort()).toEqual(["staredu-api", "starit-api", "starit-mcp"]);
+    // 业务账号 id 和租户 id 仍在令牌里
+    expect(ai.protocolMappers.map((m: any) => m.name)).toEqual(expect.arrayContaining(["tenant_id", "account_id"]));
+    // 其他客户端没有 AI 的受众
+    const portal = realm.clients.find((c) => c.clientId === "portal")!;
+    expect(portal.protocolMappers.map((m: any) => m.config["included.custom.audience"])).not.toContain("starit-api");
+  });
+
+  it("has no AI client unless an AI origin is given, and never on the platform realm", () => {
+    expect((buildRealm(base) as { clients: Array<Record<string, any>> }).clients.map((c) => c.clientId)).toEqual(["portal", "admin"]);
+    const platform = buildRealm({ ...base, kind: "platform", code: "platform", aiOrigin: "http://x" }) as { clients: Array<Record<string, any>> };
+    expect(platform.clients.map((c) => c.clientId)).toEqual(["platform"]);
+  });
+
   it("points SMTP at the configured host", () => {
     const realm = buildRealm(base) as Record<string, any>;
     expect(realm.smtpServer.host).toBe("mailpit");

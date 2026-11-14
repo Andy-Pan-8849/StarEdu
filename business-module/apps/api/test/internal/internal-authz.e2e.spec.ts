@@ -103,3 +103,64 @@ describe("internal authorization interface", () => {
     expect(iso()).toBeTruthy();
   });
 });
+
+describe("internal knowledge-base content interface", () => {
+  const h = new Harness();
+  let reg: string;
+  let courseId: string;
+  let sectionId: string;
+
+  beforeAll(async () => {
+    process.env.INTERNAL_API_KEY = KEY;
+    process.env.BIZ_EVENT_BUS = "kafka"; // 大纲和课件变化的事件只在 kafka 模式发
+    await h.start();
+    const campus = await h.owner.campus.findFirstOrThrow({ where: { tenantId: h.tenant.tenantId, type: "hq" } });
+    reg = await (await h.user("reg.kb", { roles: ["academic-manager"], person: "staff", deptIds: [campus.deptId] })).token();
+    const teacher = await h.user("teach.kb", { roles: ["teacher"], person: "staff", deptIds: [campus.deptId] });
+    const termId = (await h.call(reg).post("/api/terms", { code: "2026F", name: "2026 Fall", startDate: iso(-10), endDate: iso(80), enrollOpenDate: iso(-5), enrollCloseDate: iso(10), dropDeadline: iso(20) })).body.id;
+    await h.call(reg).post(`/api/terms/${termId}/status`, { status: "enrolling" });
+    courseId = (await h.call(reg).post("/api/courses", { code: "CS900", name: "Knowledge", credits: 3, syllabus: "Week 1: basics" })).body.id;
+    sectionId = (await h.call(reg).post("/api/sections", { courseId, termId, campusId: campus.id, number: "01", capacity: 5, schedule: [] })).body.id;
+    await h.call(reg).put(`/api/sections/${sectionId}/instructors`, { items: [{ personId: teacher.personId, role: "lead" }] });
+    await h.call(reg).post(`/api/sections/${sectionId}/status`, { status: "open" });
+    const t = h.call(await teacher.token());
+    await t.post(`/api/sections/${sectionId}/materials`, { title: "Slides week 1", url: "https://example.test/slides", published: true });
+    await t.post(`/api/sections/${sectionId}/materials`, { title: "Draft notes", url: "https://example.test/draft", published: false });
+  });
+  afterAll(async () => {
+    delete process.env.INTERNAL_API_KEY;
+    delete process.env.BIZ_EVENT_BUS;
+    await h.stop();
+  });
+
+  it("gives the syllabus and the published material list, only with the service key", async () => {
+    expect((await h.call(null).get(`/api/internal/kb/courses/${courseId}`)).status).toBe(403);
+    expect((await h.call(null).get(`/api/internal/kb/courses/${courseId}`).set("x-internal-key", "wrong")).status).toBe(403);
+    const res = await h.call(null).get(`/api/internal/kb/courses/${courseId}`).set("x-internal-key", KEY);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ code: "CS900", name: "Knowledge", syllabus: "Week 1: basics" });
+    expect(res.body.sections[0].materials).toEqual([{ title: "Slides week 1", category: "slides", url: "https://example.test/slides" }]); // 草稿不给
+    expect((await h.call(null).get("/api/internal/kb/courses/11111111-1111-4111-8111-111111111111").set("x-internal-key", KEY)).status).toBe(404);
+  });
+
+  it("another company's course id is not found on this company's address", async () => {
+    const other = await h.extraTenant();
+    const course = await h.owner.course.create({ data: { tenantId: other.tenantId, code: "OTHER1", name: "Other", credits: 1, syllabus: "secret" } });
+    const res = await h.call(null).get(`/api/internal/kb/courses/${course.id}`).set("x-internal-key", KEY);
+    expect(res.status).toBe(404);
+  });
+
+  it("changing the syllabus or the material list writes an event (only the ids, in kafka mode)", async () => {
+    await h.owner.outboxEvent.deleteMany({ where: { tenantId: h.tenant.tenantId } });
+    await h.call(reg).patch(`/api/courses/${courseId}`, { syllabus: "Week 1: basics. Week 2: more" });
+    const events = await h.owner.outboxEvent.findMany({ where: { tenantId: h.tenant.tenantId, type: "course.syllabus_changed" } });
+    expect(events.map((e) => e.payload)).toEqual([{ courseId }]);
+    const mat = (await h.call(reg).get(`/api/sections/${sectionId}/materials`)).body[0];
+    expect(mat).toBeTruthy();
+    process.env.BIZ_EVENT_BUS = "outbox";
+    await h.owner.outboxEvent.deleteMany({ where: { tenantId: h.tenant.tenantId } });
+    await h.call(reg).patch(`/api/courses/${courseId}`, { syllabus: "again" });
+    expect(await h.owner.outboxEvent.count({ where: { tenantId: h.tenant.tenantId, type: "course.syllabus_changed" } })).toBe(0); // 默认模式不发
+    process.env.BIZ_EVENT_BUS = "kafka";
+  });
+});

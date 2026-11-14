@@ -12,7 +12,9 @@ import { HrAccess, STUDENT_SCOPE } from "../hr/hr-access.service";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { assertVisible } from "../tenancy/owned";
 import { scheduleSchema, SECTION_SCOPE } from "./edu-common";
+import { extendedEvents } from "../events/event-bus";
 import { EnrollmentService } from "./enrollment.service";
+import { OutboxService } from "./outbox.service";
 
 const createSchema = z.object({
   courseId: z.string().uuid(),
@@ -35,6 +37,7 @@ export class SectionsController {
     private readonly hr: HrAccess,
     private readonly audit: AuditService,
     private readonly enrollments: EnrollmentService,
+    private readonly outbox: OutboxService,
   ) {}
 
   private get db() {
@@ -231,6 +234,11 @@ export class SectionsController {
     return (await this.isInstructor(auth, id)) || auth.authz.perms.includes(PERMS.eduEnrollmentAdd) ? all : all.filter((m) => m.published);
   }
 
+  /** 课件清单变了：知识库要更新（kafka 模式；事件里只有班级和课程 id）。 */
+  private async materialChanged(sectionId: string, courseId: string): Promise<void> {
+    if (extendedEvents()) await this.outbox.emit("material.changed", { sectionId, courseId });
+  }
+
   private async editableSection(auth: AuthContext, id: string) {
     const { row } = await this.scoped(auth, id, PERMS.eduSectionList);
     if (!(await this.isInstructor(auth, id))) throw new ForbiddenException("Only the section's instructors may change its materials");
@@ -242,25 +250,30 @@ export class SectionsController {
   @RequirePermissions(PERMS.eduMaterialEdit)
   async addMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     const input = parse(materialSchema, body);
-    await this.editableSection(auth, id);
-    return this.db.sectionMaterial.create({ data: { tenantId: auth.tenantId, sectionId: id, ...input, createdBy: auth.accountId } });
+    const section = await this.editableSection(auth, id);
+    const created = await this.db.sectionMaterial.create({ data: { tenantId: auth.tenantId, sectionId: id, ...input, createdBy: auth.accountId } });
+    await this.materialChanged(id, section.courseId);
+    return created;
   }
 
   @Patch(":id/materials/:materialId")
   @RequirePermissions(PERMS.eduMaterialEdit)
   async updateMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("materialId", ParseUUIDPipe) materialId: string, @Body() body: unknown) {
     const input = parse(materialSchema.partial().strict(), body);
-    await this.editableSection(auth, id);
+    const section = await this.editableSection(auth, id);
     if (!(await this.db.sectionMaterial.findFirst({ where: { id: materialId, sectionId: id } }))) throw new NotFoundException();
-    return this.db.sectionMaterial.update({ where: { id: materialId }, data: input });
+    const updated = await this.db.sectionMaterial.update({ where: { id: materialId }, data: input });
+    await this.materialChanged(id, section.courseId);
+    return updated;
   }
 
   @Delete(":id/materials/:materialId")
   @RequirePermissions(PERMS.eduMaterialEdit)
   async removeMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("materialId", ParseUUIDPipe) materialId: string) {
-    await this.editableSection(auth, id);
+    const section = await this.editableSection(auth, id);
     const { count } = await this.db.sectionMaterial.deleteMany({ where: { id: materialId, sectionId: id } });
     if (!count) throw new NotFoundException();
+    await this.materialChanged(id, section.courseId);
     return { id: materialId };
   }
 }

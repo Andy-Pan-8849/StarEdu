@@ -159,6 +159,27 @@ class Settings(BaseSettings):
     oidc_audience_api: str = "starit-api"
     oidc_audience_mcp: str = "starit-mcp"
 
+    # —— 业务模式（B10）：身份来自业务模块。standalone（默认）= 沿用令牌声明，现有行为不变。
+    identity_mode: str = "standalone"  # "standalone" or "business"
+    # 租户域的签发者：<基础地址>/<前缀><租户代码>；基础地址为空则不接受租户域
+    oidc_tenant_issuer_base: str = ""
+    oidc_tenant_jwks_base: str = ""  # 取公钥用的内部地址；空 = 和签发者基础地址相同
+    oidc_tenant_realm_prefix: str = "tenant-"
+    # 业务模块的地址，{code} 换成租户代码（业务模块按主机名识别租户）
+    business_api_url: str = "http://{code}.localhost:4000"
+    business_internal_key: str = Field(default="", repr=False)
+    # 业务库（只读，登录角色 ai_reader；视图和角色由业务模块的迁移建好）
+    business_database_url: str = Field(
+        default="postgresql+psycopg://ai_reader:starit-ai-biz@localhost:5433/starit_biz",
+        repr=False,
+    )
+    # 业务事件（Kafka）：非空才订阅 business.events，把课程大纲和课件清单同步进知识库
+    kafka_brokers: str = ""
+    kafka_topic_prefix: str = ""
+    kafka_group_prefix: str = "staredu"
+    # 业务模块的校区代码 -> AI 样本数据里的校区代码（如总部 HQ 对应样本里的 BJ），逗号分隔 HQ:BJ
+    business_campus_aliases: str = "HQ:BJ"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -101,6 +101,7 @@ chunks = table(
     column("effective_date", Date),
     column("doc_code", Text),
     column("version", Text),
+    column("tenant_id", Text),
     schema="ai",
 )
 documents = table(
@@ -143,4 +144,10 @@ def chunk_access_clause(identity: Identity) -> ColumnElement[bool]:
         chunks.c.min_level_rank.is_(None),
         literal(grade_of(identity.level)) >= chunks.c.min_level_rank,
     )
-    return and_(chunks.c.status.in_(RETRIEVABLE_STATUSES), granted, campus_ok, grade_ok)
+    # 4. 租户：业务模式的提问者只读自己租户的文档；独立模式的提问者只读没有租户的文档
+    tenant_ok = (
+        chunks.c.tenant_id.is_(None)
+        if identity.tenant_id is None
+        else chunks.c.tenant_id == identity.tenant_id
+    )
+    return and_(chunks.c.status.in_(RETRIEVABLE_STATUSES), tenant_ok, granted, campus_ok, grade_ok)

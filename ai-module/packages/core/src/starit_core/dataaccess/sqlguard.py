@@ -14,6 +14,7 @@ from sqlglot import exp
 from sqlglot.errors import SqlglotError
 
 from starit_core.auth import Identity
+from starit_core.dataaccess.business_schema import BUSINESS_VIEW_NAMES
 from starit_core.dataaccess.schema import CAMPUSES, VIEW_ROLES, can_use_view
 from starit_core.permissions import COMPANY_WIDE_ROLES
 
@@ -98,16 +99,18 @@ def validate_sql(sql: str, identity: Identity | None = None) -> ValidatedSql:
                 "forbidden_construct", f"{type(node).__name__} is not allowed; only reading."
             )
 
-    views = _check_tables(root)
+    business = identity is not None and identity.business is not None
+    views = _check_tables(root, BUSINESS_VIEW_NAMES if business else frozenset(VIEW_ROLES))
     _check_functions(root)
-    if identity is not None:
+    # 业务模式没有"早拒绝"：校区、角色这些规则在业务库的视图里（按业务模块给的数据范围），这里不重复
+    if identity is not None and not business:
         _check_access(views, root, identity)
     return ValidatedSql(
         sql=root.sql(dialect="postgres", comments=False), views=tuple(sorted(views))
     )
 
 
-def _check_tables(root: exp.Expression) -> set[str]:
+def _check_tables(root: exp.Expression, allowed: frozenset[str]) -> set[str]:
     """检查并收集用到的视图：必须写成 ai_sql.<名>（WITH 里定义的临时表除外），且在视图白名单里。"""
     ctes = {cte.alias.lower() for cte in root.find_all(exp.CTE)}
     views: set[str] = set()
@@ -122,11 +125,11 @@ def _check_tables(root: exp.Expression) -> set[str]:
                 "unqualified_table",
                 f"Write {name!r} as ai_sql.{name}; only the views in ai_sql can be read.",
             )
-        if table.catalog or schema != "ai_sql" or name not in VIEW_ROLES:
+        if table.catalog or schema != "ai_sql" or name not in allowed:
             raise SqlRejected(
                 "table_not_allowed",
                 f"{schema}.{name} cannot be read. The views are: "
-                + ", ".join(f"ai_sql.{v}" for v in sorted(VIEW_ROLES))
+                + ", ".join(f"ai_sql.{v}" for v in sorted(allowed))
                 + ".",
             )
         views.add(name)
