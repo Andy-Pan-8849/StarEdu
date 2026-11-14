@@ -4,6 +4,8 @@
 allowed_users、campus_scope、min_level_rank；`chunk_access_clause(identity)` 生成一个 WHERE 条件：
     (角色命中 或 指名用户)  且  (校区范围命中)  且  (职级够)  且  (状态可检索)
 所有检索查询都必须带这个条件，这里没有“不带身份就能查文本块”的入口。
+业务模式增加一条（B12）：来自业务模块文档库文件的块（folder_id 非空）只看"文件夹"——业务模块实时回答
+提问者能读哪些文件夹，块的 folder_id 在列表里才可读；其余块（folder_id 为空）仍按上面的规则。
 注意：Admin 和 RAGETLAdmin 只管系统/知识库，不在任何文档的角色表里，所以不能读受限内容。
 """
 
@@ -102,6 +104,7 @@ chunks = table(
     column("doc_code", Text),
     column("version", Text),
     column("tenant_id", Text),
+    column("folder_id", Text),
     schema="ai",
 )
 documents = table(
@@ -150,4 +153,19 @@ def chunk_access_clause(identity: Identity) -> ColumnElement[bool]:
         if identity.tenant_id is None
         else chunks.c.tenant_id == identity.tenant_id
     )
-    return and_(chunks.c.status.in_(RETRIEVABLE_STATUSES), tenant_ok, granted, campus_ok, grade_ok)
+    legacy = and_(granted, campus_ok, grade_ok)
+    if identity.business is None:
+        return and_(chunks.c.status.in_(RETRIEVABLE_STATUSES), tenant_ok, legacy)
+    # 5. 业务模式：来自文档库文件的块（folder_id 非空）只看文件夹：
+    #    业务模块实时回答"这个人能读哪些文件夹"
+    #    （操作权限 ∧ 文件夹授权，含继承、到期、机密、仅在线查看），这里不再看角色/校区/职等；
+    #    folder_id 为空的块（课程大纲、课件清单）走上面的过渡规则。
+    folders = sorted(identity.business.library_folders)
+    from_folder = (
+        chunks.c.folder_id == any_(literal(folders, ARRAY(Text))) if folders else literal(False)
+    )
+    return and_(
+        chunks.c.status.in_(RETRIEVABLE_STATUSES),
+        tenant_ok,
+        or_(and_(chunks.c.folder_id.is_(None), legacy), from_folder),
+    )

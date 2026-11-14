@@ -81,4 +81,13 @@ export class LibraryAccess {
     };
     return { folders, level: effective };
   }
+
+  /**
+   * AI 知识库能读的文件夹：用户有"查看"以上级别、且不是"仅在线查看"的文件夹（AI 的回答等于把内容复制出来，仅在线查看的不给）。
+   * 同一套规则（resolve），所以文档库里看得到什么、AI 能读什么，永远一致。
+   */
+  async aiReadableFolderIds(auth: AuthContext): Promise<string[]> {
+    const access = await this.resolve(auth);
+    return [...access.folders.values()].filter((f) => !f.previewOnly && access.level(f.id) !== "none").map((f) => f.id);
+  }
 }

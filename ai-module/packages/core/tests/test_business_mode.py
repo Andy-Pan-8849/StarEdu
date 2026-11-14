@@ -184,10 +184,17 @@ class FakeBusiness:
 
     def __init__(self, body: dict[str, Any] | None = None) -> None:
         self.body = body or answer()
-        self.requests: list[httpx.Request] = []
+        self.requests: list[httpx.Request] = []  # 权限接口的请求
+        self.library_requests: list[httpx.Request] = []  # 文档库可读文件夹的请求
+        self.folders: list[str] = []
         self.status = 200
 
     def handler(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/library-access"):
+            self.library_requests.append(request)
+            if self.status != 200:
+                return httpx.Response(self.status)
+            return httpx.Response(200, json={"folderIds": self.folders})
         self.requests.append(request)
         if self.status != 200:
             return httpx.Response(self.status)
@@ -274,6 +281,39 @@ class TestBusinessResolver:
         with pytest.raises(AuthError):
             await resolver(fake).resolve(token(f"{BASE}/tenant-hq", key=OTHER_KEY))
         assert fake.requests == []
+
+
+class TestLibraryFolders:
+    async def test_the_readable_folders_are_asked_every_time_and_not_cached(self) -> None:
+        fake = FakeBusiness()
+        r = resolver(fake)
+        raw = token(f"{BASE}/tenant-hq")
+        fake.folders = ["f-1", "f-2"]
+        first = await r.resolve(raw)
+        fake.folders = ["f-2"]  # 授权改了或到期了：下一次提问立即生效
+        second = await r.resolve(raw)
+        assert first.business is not None and second.business is not None
+        assert first.business.library_folders == {"f-1", "f-2"}
+        assert second.business.library_folders == {"f-2"}
+        assert len(fake.library_requests) == 2 and len(fake.requests) == 2
+        request = fake.library_requests[0]
+        assert str(request.url) == "http://hq.business.test:4000/api/internal/library-access"
+        assert request.headers["authorization"] == f"Bearer {raw}"
+        assert request.headers["x-internal-key"] == "s3cret"
+
+    async def test_an_unreadable_answer_is_unavailable(self) -> None:
+        def odd(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/library-access"):
+                return httpx.Response(200, json={"nope": 1})
+            return FakeBusiness().handler(request)
+
+        client = BusinessAuthzClient(
+            url_template="http://{code}.x:1",
+            internal_key="k",
+            client=httpx.AsyncClient(transport=httpx.MockTransport(odd)),
+        )
+        with pytest.raises(AuthUnavailableError):
+            await BusinessResolver(verifier(), client).resolve(token(f"{BASE}/tenant-hq"))
 
 
 class TestPermissionVersionCache:

@@ -8,6 +8,8 @@ import { AuditService } from "../audit/audit.service";
 import type { AuthContext } from "../auth/tenant-token.guard";
 import { Prisma } from "../generated/prisma";
 import { ObjectStoreService, assertTenantKey, safeKeyPart, tenantPrefix } from "../storage/object-store.service";
+import { OutboxService } from "../edu/outbox.service";
+import { extendedEvents } from "../events/event-bus";
 import { assertVisible } from "../tenancy/owned";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { atLeast, LibraryAccess, type Access, type FolderRow, type Level } from "./library-access.service";
@@ -50,10 +52,16 @@ export class LibraryService {
     private readonly access: LibraryAccess,
     private readonly store: ObjectStoreService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   private get db() {
     return this.tenantDb.db;
+  }
+
+  /** 文件有变化（新增、新版本、改名、删除、移动、复制）：通知 AI 知识库来同步（只带文件 id，内容由它回来取）。 */
+  private async changed(fileId: string): Promise<void> {
+    if (extendedEvents()) await this.outbox.emit("library.file_changed", { fileId });
   }
 
   // ------------------------------------------------------------ 日志
@@ -346,6 +354,7 @@ export class LibraryService {
         return id;
       });
       await this.log(auth, up.fileId ? "file.new_version" : "file.upload", { folder, fileId, detail: { name: up.name, size: up.size } });
+      await this.changed(fileId);
       return { id: fileId, name: up.name, version: up.fileId ? ((await this.db.docFile.findUnique({ where: { id: fileId } }))?.version ?? 1) : 1 };
     } catch (err) {
       if ((err as { code?: string }).code === "P2002" || /doc_file_name_key/.test(String((err as Error).message))) throw new ConflictException(`A file named "${up.name}" already exists in this folder`);
@@ -385,6 +394,7 @@ export class LibraryService {
       throw err;
     }
     await this.log(auth, "file.rename", { folder, fileId, detail: { from: file.name, to: clean } });
+    await this.changed(fileId);
     return { id: fileId, name: clean };
   }
 
@@ -393,6 +403,7 @@ export class LibraryService {
     if (!this.canTouch(level, file, auth)) throw new ForbiddenException("You can delete only the files you uploaded");
     await this.db.docFile.update({ where: { id: fileId }, data: { deletedAt: new Date() } });
     await this.log(auth, "file.delete", { folder, fileId, detail: { name: file.name } });
+    await this.changed(fileId);
     return { id: fileId };
   }
 
@@ -411,6 +422,7 @@ export class LibraryService {
       });
       await this.log(auth, "file.copy", { folder, fileId, detail: { to: target.id, copyId: copy.id } });
       await this.log(auth, "file.copy_in", { folder: target, fileId: copy.id, detail: { from: folder.id } });
+      await this.changed(copy.id);
       return { id: copy.id, folderId: target.id, name: copy.name };
     } catch (err) {
       await this.store.remove(key).catch(() => undefined);
@@ -437,6 +449,7 @@ export class LibraryService {
     }
     await this.log(auth, "file.move", { folder, fileId, detail: { to: target.id } });
     await this.log(auth, "file.move_in", { folder: target, fileId, detail: { from: folder.id } });
+    await this.changed(fileId);
     return { id: fileId, folderId: target.id };
   }
 
