@@ -121,6 +121,10 @@ jobs:
         run: docker compose --env-file .env.example -f deploy/compose/biz.yaml up -d --wait keycloak mailpit objectstore
       - name: Tests (unit, integration and cross-tenant leak scan; real Postgres, Redis, Keycloak)
         run: pnpm test
+      - name: Start Kafka (optional event bus)
+        run: docker compose --env-file .env.example -f deploy/compose/biz.yaml -f deploy/compose/kafka.yaml up -d --wait kafka
+      - name: Event bus tests (real Kafka)
+        run: pnpm test:events
       - name: Keycloak realm template smoke test
         run: pnpm smoke
       - name: Provision the two demo tenants (twice, to prove it can be repeated)
@@ -128,3 +132,6 @@ jobs:
       - name: Keycloak logs (on failure)
         if: failure()
         run: docker compose --env-file .env.example -f deploy/compose/biz.yaml logs keycloak --tail 100
+      - name: Kafka logs (on failure)
+        if: failure()
+        run: docker compose --env-file .env.example -f deploy/compose/biz.yaml -f deploy/compose/kafka.yaml logs kafka --tail 100

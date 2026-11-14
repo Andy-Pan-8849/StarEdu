@@ -1,0 +1,40 @@
+# 文件：deploy/compose/kafka.yaml
+# 作用：可选的 Kafka 事件总线（make biz-up-kafka）；单节点 KRaft，不需要 ZooKeeper。
+# 说明：
+#   - 和 biz.yaml 合在一起用（同一个 Compose 项目 starit-biz）：docker compose -f biz.yaml -f kafka.yaml up
+#   - 只在 BIZ_EVENT_BUS=kafka 时才用得上；默认（outbox）不需要它，lite 部署不启用。
+#   - 堆内存限制得很小（演示规模）；实测占用见 README。
+#   - 外部端口 9094 给本机的 NestJS 用（localhost:9094）；容器之间用 kafka:9092。
+
+services:
+  kafka:
+    image: apache/kafka:${KAFKA_IMAGE_TAG:-4.2.0}
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${BIZ_KAFKA_PORT:-9094}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms256m -Xmx512m}
+    ports:
+      - "${BIZ_KAFKA_PORT:-9094}:9094"
+    volumes:
+      - bizkafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 20s
+      retries: 20
+      start_period: 15s
+
+volumes:
+  bizkafkadata:

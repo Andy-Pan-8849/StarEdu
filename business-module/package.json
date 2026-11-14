@@ -22,7 +22,8 @@
     "dev:password": "tsx scripts/dev-set-password.ts",
     "test:leak": "pnpm --filter @staredu/api test -- test/leak",
     "bootstrap:platform": "tsx scripts/bootstrap-platform.ts",
-    "import:sample": "pnpm --filter @staredu/api build && node --env-file=.env apps/api/dist/cli/import-sample.js"
+    "import:sample": "pnpm --filter @staredu/api build && node --env-file=.env apps/api/dist/cli/import-sample.js",
+    "test:events": "pnpm --filter @staredu/api test:events"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

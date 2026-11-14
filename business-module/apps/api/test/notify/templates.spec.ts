@@ -23,6 +23,11 @@ describe("notification templates", () => {
     const token = signUnsubscribe("t", "a", "grade");
     expect(readUnsubscribe(token)).toEqual({ tenantId: "t", accountId: "a", category: "grade" });
     expect(readUnsubscribe(token + "x")).toBeNull();
+    // 改掉签名的任何一个字符（包括只影响末尾几个不参与解码的位的那种）都必须失败
+    for (const c of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") {
+      const changed = token.slice(0, -1) + c;
+      expect(readUnsubscribe(changed) !== null).toBe(changed === token);
+    }
     expect(readUnsubscribe(signUnsubscribe("t", "a", "not-a-category"))).toBeNull();
     expect(readUnsubscribe("")).toBeNull();
   });

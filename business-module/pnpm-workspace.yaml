@@ -9,3 +9,4 @@ onlyBuiltDependencies:
   - sharp
   - "@nestjs/core"
   - unrs-resolver
+  - "@confluentinc/kafka-javascript"
