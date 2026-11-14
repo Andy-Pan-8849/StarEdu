@@ -45,6 +45,7 @@ export function TenantsPage() {
   const [form, setForm] = React.useState({ code: "", name: "", type: "direct", adminEmail: "" });
   const [creating, setCreating] = React.useState(false);
   const [grantFor, setGrantFor] = React.useState<TenantRow | null>(null);
+  const [securityFor, setSecurityFor] = React.useState<TenantRow | null>(null);
 
   async function act(fn: () => Promise<unknown>, ok: string) {
     try {
@@ -81,6 +82,7 @@ export function TenantsPage() {
             <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => void act(() => status(r, "restore"), t("done"))}>{t("restore")}</PermButton>
           ) : null}
           <PermButton perm={PERMS.platformTenantGrant} size="sm" variant="outline" onClick={() => setGrantFor(r)}>{t("features")}</PermButton>
+          <PermButton perm={PERMS.platformTenantSecurity} size="sm" variant="outline" onClick={() => setSecurityFor(r)}>{t("security")}</PermButton>
           <PermButton perm={PERMS.platformTenantAdmin} size="sm" variant="outline" onClick={() => void act(() => bff(`tenants/${r.id}/admin/invite`, { method: "POST" }), t("inviteSent"))}>{t("resendInvite")}</PermButton>
           <PermButton perm={PERMS.platformTenantAdmin} size="sm" variant="outline" onClick={() => void act(() => bff(`tenants/${r.id}/admin/unlock`, { method: "POST" }), t("unlocked"))}>{t("unlock")}</PermButton>
         </div>
@@ -123,7 +125,95 @@ export function TenantsPage() {
       </Can>
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {grantFor ? <GrantsPanel tenant={grantFor} onClose={() => { setGrantFor(null); reload(); }} /> : null}
+      {securityFor ? <SecurityPanel key={securityFor.id} tenant={securityFor} onClose={() => setSecurityFor(null)} /> : null}
     </section>
+  );
+}
+
+interface SecurityData {
+  realm: string;
+  security: {
+    password: { length: number; upperCase: number; lowerCase: number; digits: number; specialChars: number; history: number };
+    lockout: { failureFactor: number; waitIncrementMinutes: number; maxWaitMinutes: number; permanent: boolean };
+    session: { idleMinutes: number; maxHours: number };
+    mfa: "off" | "all";
+  };
+  google: { configured: boolean; enabled: boolean; clientId: string | null; hasSecret: boolean; redirectUri: string };
+}
+
+/** 租户"登录与安全"：密码策略、登录失败锁定、会话时长、两步验证，和 Google 登录。 */
+function SecurityPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => void }) {
+  const t = useTranslations("pages.tenants");
+  const [data, setData] = React.useState<SecurityData | null>(null);
+  const [form, setForm] = React.useState<SecurityData["security"] | null>(null);
+  const [google, setGoogle] = React.useState({ clientId: "", clientSecret: "", enabled: true });
+  const [msg, setMsg] = React.useState<string | null>(null);
+  const load = React.useCallback(async () => {
+    const d = await bff<SecurityData>(`tenants/${tenant.id}/security`);
+    setData(d);
+    setForm(d.security);
+    setGoogle({ clientId: d.google.clientId ?? "", clientSecret: "", enabled: d.google.configured ? d.google.enabled : true });
+  }, [tenant.id]);
+  React.useEffect(() => { void load().catch((e) => setMsg((e as Error).message)); }, [load]);
+  if (!data || !form) return <p className="mt-3 text-sm text-muted">{msg ?? "…"}</p>;
+  async function run(fn: () => Promise<unknown>) {
+    try { await fn(); await load(); setMsg(t("saved")); } catch (e) { setMsg((e as Error).message); }
+  }
+  const field = (label: string, value: number, set: (n: number) => void, hint?: string) => (
+    <label className="flex flex-col gap-1 text-sm">
+      {label}
+      <input type="number" className="w-28 rounded-md border border-border bg-transparent px-2 py-1" value={value} onChange={(e) => set(Number(e.target.value))} />
+      {hint ? <span className="text-xs text-muted">{hint}</span> : null}
+    </label>
+  );
+  const pw = form.password;
+  const setPw = (k: keyof typeof pw, n: number) => setForm({ ...form, password: { ...pw, [k]: n } });
+  return (
+    <div className="mt-4 rounded-md border border-border p-3">
+      <h3 className="mb-2 font-medium">{t("securityOf", { name: tenant.name })}</h3>
+      <fieldset className="mb-3 flex flex-wrap gap-3"><legend className="mb-1 text-sm font-medium">{t("passwordRules")}</legend>
+        {field(t("pwLength"), pw.length, (n) => setPw("length", n))}
+        {field(t("pwUpper"), pw.upperCase, (n) => setPw("upperCase", n))}
+        {field(t("pwLower"), pw.lowerCase, (n) => setPw("lowerCase", n))}
+        {field(t("pwDigits"), pw.digits, (n) => setPw("digits", n))}
+        {field(t("pwSpecial"), pw.specialChars, (n) => setPw("specialChars", n))}
+        {field(t("pwHistory"), pw.history, (n) => setPw("history", n), t("pwHistoryHint"))}
+      </fieldset>
+      <fieldset className="mb-3 flex flex-wrap gap-3"><legend className="mb-1 text-sm font-medium">{t("lockoutRules")}</legend>
+        {field(t("failures"), form.lockout.failureFactor, (n) => setForm({ ...form, lockout: { ...form.lockout, failureFactor: n } }))}
+        {field(t("waitMinutes"), form.lockout.waitIncrementMinutes, (n) => setForm({ ...form, lockout: { ...form.lockout, waitIncrementMinutes: n } }))}
+        {field(t("maxWaitMinutes"), form.lockout.maxWaitMinutes, (n) => setForm({ ...form, lockout: { ...form.lockout, maxWaitMinutes: n } }))}
+      </fieldset>
+      <fieldset className="mb-3 flex flex-wrap gap-3"><legend className="mb-1 text-sm font-medium">{t("sessionRules")}</legend>
+        {field(t("idleMinutes"), form.session.idleMinutes, (n) => setForm({ ...form, session: { ...form.session, idleMinutes: n } }))}
+        {field(t("maxHours"), form.session.maxHours, (n) => setForm({ ...form, session: { ...form.session, maxHours: n } }))}
+      </fieldset>
+      <label className="mb-3 flex flex-col gap-1 text-sm">
+        {t("mfa")}
+        <select className="w-72 rounded-md border border-border bg-transparent px-2 py-1" value={form.mfa} onChange={(e) => setForm({ ...form, mfa: e.target.value as "off" | "all" })}>
+          <option value="off">{t("mfaOff")}</option>
+          <option value="all">{t("mfaAll")}</option>
+        </select>
+      </label>
+      <div className="mb-4 flex items-center gap-2 text-sm">
+        <PermButton perm={PERMS.platformTenantSecurity} size="sm" onClick={() => void run(() => bff(`tenants/${tenant.id}/security`, { method: "PUT", body: form }))}>{t("save")}</PermButton>
+      </div>
+      <fieldset className="border-t border-border pt-3"><legend className="mb-1 text-sm font-medium">{t("googleTitle")}</legend>
+        <p className="mb-2 text-xs text-muted">{t("googleHelp")}</p>
+        <p className="mb-2 text-sm">{t("redirectUri")}: <code className="select-all break-all">{data.google.redirectUri}</code></p>
+        <div className="flex flex-wrap items-end gap-3 text-sm">
+          <label className="flex flex-col gap-1">{t("googleClientId")}<input className="w-96 rounded-md border border-border bg-transparent px-2 py-1" value={google.clientId} onChange={(e) => setGoogle({ ...google, clientId: e.target.value })} /></label>
+          <label className="flex flex-col gap-1">{t("googleSecret")}<input type="password" autoComplete="off" placeholder={data.google.hasSecret ? t("secretKept") : ""} className="w-64 rounded-md border border-border bg-transparent px-2 py-1" value={google.clientSecret} onChange={(e) => setGoogle({ ...google, clientSecret: e.target.value })} /></label>
+          <label className="flex items-center gap-1"><input type="checkbox" checked={google.enabled} onChange={(e) => setGoogle({ ...google, enabled: e.target.checked })} />{t("googleEnabled")}</label>
+          <PermButton perm={PERMS.platformTenantSecurity} size="sm" onClick={() => void run(() => bff(`tenants/${tenant.id}/security/google`, { method: "PUT", body: { clientId: google.clientId, enabled: google.enabled, ...(google.clientSecret ? { clientSecret: google.clientSecret } : {}) } }))}>{t("save")}</PermButton>
+          {data.google.configured ? <PermButton perm={PERMS.platformTenantSecurity} size="sm" variant="outline" onClick={() => window.confirm(t("confirmRemoveGoogle")) && void run(() => bff(`tenants/${tenant.id}/security/google`, { method: "DELETE" }))}>{t("googleRemove")}</PermButton> : null}
+        </div>
+      </fieldset>
+      <div className="mt-3 flex items-center gap-2 text-sm">
+        <Button size="sm" variant="outline" onClick={onClose}>{t("close")}</Button>
+        {msg ? <span role="status" className="text-muted">{msg}</span> : null}
+      </div>
+    </div>
   );
 }
 

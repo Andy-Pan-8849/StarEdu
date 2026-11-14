@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B13 (demo data).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B14 (sign-in and security, Google sign-in).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -153,6 +153,7 @@ Signs in at **http://platform.localhost:3001** (create the first account with `p
 | **Open a company**: code, name, type, administrator e-mail; the administrator receives an invitation (Mailpit) | Works today |
 | **Notify** a planned suspension (e-mail to the administrator), **suspend** (the company's users are refused, data is kept), **restore** | Works today |
 | **Features**: switch features (menus) on or off for one company; its menus and permissions change at once | Works today |
+| **Sign-in & security** (button on the company row): password rules (length, character kinds, remembered passwords), lockout after failed sign-ins, idle and maximum session time, two-step verification (authenticator app) for everyone, and **Google sign-in** | Works today (milestone B14) |
 | **Administrator**: resend the invitation, send a password reset link, unlock after failed sign-ins, change the e-mail | Works today (API; resend and unlock are buttons) |
 | **Scheduled jobs**: enable a job, change its schedule, run it now, see the run log (new: **Send assignment deadline reminders**, enable it to get reminders) | Works today |
 | **Platform announcements**: a banner for every company during a time window | API today (`/api/platform/announcements`) |
@@ -212,3 +213,9 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Sign-in and security, and Google sign-in (platform operator, milestone B14)
+
+Open **Tenants**, press **Sign-in & security** on a company. Changes are written to that company's identity realm at once (they affect the next sign-in or password change) and are recorded in the platform audit log. Numbers are checked (for example the character kinds must fit in the length, idle time cannot exceed the longest session). Two-step verification set to "Required for everyone" makes everyone set up an authenticator app at their next sign-in.
+
+**Google sign-in** is optional and per company. The page shows the redirect address to register in the Google console; paste the client ID and secret (the secret is never shown again; leave it empty later to keep it). Rules: a person can sign in with Google only if an account with the same verified e-mail already exists in that company (it links automatically); if none exists, the sign-in is refused and nothing is created. Accounts with made-up e-mails (the demo accounts) keep using passwords. Removing the provider returns everyone to password sign-in.

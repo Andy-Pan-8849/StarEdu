@@ -193,6 +193,64 @@ export class KeycloakAdmin {
     if (res.status !== 204 && res.status !== 404) throw new KeycloakError(`unlock user failed: ${res.status}`, res.status);
   }
 
+  /** 整份写回域定义（调用方先 getRealm、改自己管的字段再写，其余字段原样保留）。 */
+  async updateRealm(realm: string, rep: Record<string, unknown>): Promise<void> {
+    const res = await this.request(`/realms/${realm}`, { method: "PUT", body: JSON.stringify(rep) });
+    if (res.status !== 204) throw new KeycloakError(`update realm failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  // ---- 认证流程 ----
+  async flowExists(realm: string, alias: string): Promise<boolean> {
+    const res = await this.request(`/realms/${realm}/authentication/flows`);
+    if (!res.ok) throw new KeycloakError(`list flows failed: ${res.status}`, res.status);
+    return ((await res.json()) as Array<{ alias: string }>).some((f) => f.alias === alias);
+  }
+
+  async createFlow(realm: string, alias: string, description: string): Promise<void> {
+    const res = await this.request(`/realms/${realm}/authentication/flows`, { method: "POST", body: JSON.stringify({ alias, description, providerId: "basic-flow", topLevel: true, builtIn: false }) });
+    if (res.status !== 201) throw new KeycloakError(`create flow failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  async executions(realm: string, flowAlias: string): Promise<FlowExecution[]> {
+    const res = await this.request(`/realms/${realm}/authentication/flows/${encodeURIComponent(flowAlias)}/executions`);
+    if (!res.ok) throw new KeycloakError(`list executions failed: ${res.status}`, res.status);
+    return (await res.json()) as FlowExecution[];
+  }
+
+  async addExecution(realm: string, flowAlias: string, provider: string): Promise<void> {
+    const res = await this.request(`/realms/${realm}/authentication/flows/${encodeURIComponent(flowAlias)}/executions/execution`, { method: "POST", body: JSON.stringify({ provider }) });
+    if (res.status !== 201) throw new KeycloakError(`add execution failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  async setRequirement(realm: string, flowAlias: string, execution: FlowExecution, requirement: string): Promise<void> {
+    if (execution.requirement === requirement) return;
+    const res = await this.request(`/realms/${realm}/authentication/flows/${encodeURIComponent(flowAlias)}/executions`, { method: "PUT", body: JSON.stringify({ ...execution, requirement }) });
+    if (res.status !== 202 && res.status !== 204) throw new KeycloakError(`set requirement failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  // ---- 身份提供商（社交登录）----
+  async getIdp(realm: string, alias: string): Promise<IdentityProviderRep | null> {
+    const res = await this.request(`/realms/${realm}/identity-provider/instances/${alias}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new KeycloakError(`get identity provider failed: ${res.status}`, res.status);
+    return (await res.json()) as IdentityProviderRep;
+  }
+
+  async createIdp(realm: string, rep: Record<string, unknown>): Promise<void> {
+    const res = await this.request(`/realms/${realm}/identity-provider/instances`, { method: "POST", body: JSON.stringify(rep) });
+    if (res.status !== 201) throw new KeycloakError(`create identity provider failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  async updateIdp(realm: string, alias: string, rep: Record<string, unknown>): Promise<void> {
+    const res = await this.request(`/realms/${realm}/identity-provider/instances/${alias}`, { method: "PUT", body: JSON.stringify(rep) });
+    if (res.status !== 204) throw new KeycloakError(`update identity provider failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
+  async deleteIdp(realm: string, alias: string): Promise<void> {
+    const res = await this.request(`/realms/${realm}/identity-provider/instances/${alias}`, { method: "DELETE" });
+    if (res.status !== 204 && res.status !== 404) throw new KeycloakError(`delete identity provider failed: ${res.status}`, res.status);
+  }
+
   /** 结束一个登录会话（强退时同时让刷新令牌失效）。会话已不存在也算成功。 */
   async deleteSession(realm: string, sessionId: string): Promise<void> {
     const res = await this.request(`/realms/${realm}/sessions/${sessionId}`, { method: "DELETE" });
@@ -217,4 +275,21 @@ export interface KeycloakSession {
   /** 毫秒时间戳 */
   start: number;
   lastAccess: number;
+}
+
+export interface FlowExecution {
+  id: string;
+  displayName?: string;
+  providerId?: string;
+  requirement: string;
+  level?: number;
+  index?: number;
+  [key: string]: unknown;
+}
+
+export interface IdentityProviderRep {
+  alias: string;
+  enabled?: boolean;
+  config?: Record<string, string>;
+  [key: string]: unknown;
 }
