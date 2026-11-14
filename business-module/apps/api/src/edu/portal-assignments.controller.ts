@@ -2,6 +2,7 @@
 //   - 在读（enrolled）可交；休学（on_leave）只读；毕业/退学/结业是成绩单模式，看不到班级内容。
 //   - 只有"已选"的班级才能交；班级结课后只读。得分发布后才可见，之前只看到"已提交/批改中"。
 //   - 截止以服务器收到的时间为准，按截止日 23:59（班级所属校区的时区），加上给我的延期。
+import { QuotaService } from "../quota/quota.service";
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -26,6 +27,7 @@ export class PortalAssignmentsController {
   constructor(
     private readonly tenantDb: TenantPrismaService,
     private readonly store: ObjectStoreService,
+    private readonly quota: QuotaService,
     private readonly outbox: OutboxService,
   ) {}
 
@@ -122,6 +124,7 @@ export class PortalAssignmentsController {
     const a = await this.visible(personId, id);
     await this.assertCanSubmit(auth, a, personId, status, new Date());
     const fileName = validateUpload(input);
+    await this.quota.assertCanStore(input.size);
     if ((await this.db.submissionFile.count({ where: { assignmentId: id, studentPersonId: personId, versionId: null } })) >= MAX_PENDING_UPLOADS) throw new ConflictException("Too many unfinished uploads; submit or wait");
     const key = `${tenantPrefix(auth.tenantId)}submissions/${id}/${personId}/${randomUUID()}/${safeKeyPart(fileName)}`;
     const file = await this.db.submissionFile.create({ data: { tenantId: auth.tenantId, assignmentId: id, studentPersonId: personId, storageKey: key, fileName, contentType: input.contentType, size: input.size } });

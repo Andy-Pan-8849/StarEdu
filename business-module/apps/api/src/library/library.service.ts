@@ -1,6 +1,7 @@
 // 文档库的业务规则：文件夹树、文件、授权、密级、访问日志。
 // 两层权限：接口先检查菜单按钮上的"操作权限"，这里再检查用户在该文件夹上的"访问级别"（见 LibraryAccess）。
 // 没有查看权限的文件夹对用户来说就不存在（404，不透露是否存在）。
+import { QuotaService } from "../quota/quota.service";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -51,6 +52,7 @@ export class LibraryService {
     private readonly tenantDb: TenantPrismaService,
     private readonly access: LibraryAccess,
     private readonly store: ObjectStoreService,
+    private readonly quota: QuotaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
   ) {}
@@ -315,6 +317,7 @@ export class LibraryService {
     if (!name || !ALLOWED_EXTENSIONS.has(extOf(name))) throw new BadRequestException(`This file type is not allowed (allowed: ${[...ALLOWED_EXTENSIONS].join(", ")})`);
     if (!Number.isInteger(input.size) || input.size <= 0) throw new BadRequestException("The file is empty");
     if (input.size > maxLibraryBytes()) throw new BadRequestException(`The file is larger than ${Math.floor(maxLibraryBytes() / 1024 / 1024)} MB`);
+    await this.quota.assertCanStore(input.size);
     let target: string | null = null;
     if (input.fileId) {
       const file = await this.db.docFile.findFirst({ where: { id: input.fileId, folderId, deletedAt: null } });

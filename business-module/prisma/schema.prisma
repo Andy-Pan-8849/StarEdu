@@ -170,6 +170,9 @@ model Tenant {
   contactPhone     String?      @map("contact_phone")
   remark           String?
   notifiedAt       DateTime?    @map("notified_at")
+  /// 配额：账号数、存储（MB）上限，空 = 不限（B15）
+  maxAccounts      Int?         @map("max_accounts")
+  maxStorageMb     Int?         @map("max_storage_mb")
   suspendedAt      DateTime?    @map("suspended_at")
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at")

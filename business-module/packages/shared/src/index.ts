@@ -4,3 +4,4 @@ export * from "./permissions";
 export * from "./menu-catalog";
 export * from "./role-templates";
 export * from "./tenant-security";
+export * from "./quota";
