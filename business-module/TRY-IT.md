@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B16 (curriculum versions).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B17 (batch enrollment).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -213,6 +213,10 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Batch enrollment (academic office, milestone B17)
+
+Open **Sections**, press **Batch enrollment**. Choose a term, a course and a major; optionally narrow by entry year and campus. **Preview** lists every selected student with the section they would go into (the open section of that course at the student's own campus with the most free seats) and what would stop them (not an enrolled student, already taking the course, no open section at the campus, and so on). Nothing is saved until **Run for real**. Over capacity, a missing prerequisite, a time conflict, being outside the enrollment window and a retake need to be ticked under "Confirm exceptions" with a reason, exactly as for a single registrar enrollment; each person gets their own enrollment record and audit entry, plus one summary entry for the batch. One person failing never stops the others, and running it again adds nobody twice. A batch holds at most 500 students.
 
 ### Curriculum versions (academic office, milestone B16)
 

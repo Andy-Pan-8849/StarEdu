@@ -25,6 +25,8 @@ export interface EnrollInput {
   /** 教务代选：确认过的情形 */
   confirm?: string[];
   reason?: string;
+  /** 只检查、不写入（批量选课的预览用）：规则和正式选课完全一样，到最后一步不创建 */
+  dryRun?: boolean;
 }
 
 export interface EnrollResult {
@@ -118,6 +120,7 @@ export class EnrollmentService {
         if (blocking.length) throw new ConflictException({ code: "RULE_VIOLATION", message: "The enrollment rules are not met", violations: blocking, detail });
       }
 
+      if (input.dryRun) return { enrollmentId: "", conflicts: registrar ? [] : conflicts, conflictCheckSkipped: skipped };
       const created = await tx.enrollment.create({
         data: { tenantId: tenant.tenantId, sectionId: section.id, studentPersonId: input.studentPersonId, method: input.method, reason: registrar ? (input.reason ?? null) : null, overrides: overrides as never, createdBy: input.actorAccountId },
       });
@@ -125,7 +128,7 @@ export class EnrollmentService {
       if (registrar) await tx.outboxEvent.create({ data: { tenantId: tenant.tenantId, type: "enrollment.registrar_added", payload: { enrollmentId: created.id, studentPersonId: input.studentPersonId, sectionId: section.id, overrides } } });
       return { enrollmentId: created.id, conflicts: registrar ? [] : conflicts, conflictCheckSkipped: skipped };
     }).then(async (result) => {
-      if (input.method === "registrar") await this.audit.record(input.actorAccountId, "enrollment.add", "section", input.sectionId, { studentPersonId: input.studentPersonId, overrides: input.confirm ?? [], reason: input.reason ?? null });
+      if (input.method === "registrar" && !input.dryRun) await this.audit.record(input.actorAccountId, "enrollment.add", "section", input.sectionId, { studentPersonId: input.studentPersonId, overrides: input.confirm ?? [], reason: input.reason ?? null });
       return result;
     });
   }

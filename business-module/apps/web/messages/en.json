@@ -516,7 +516,21 @@
       "versionRemove": "Remove this version",
       "versionConfirmRemove": "Remove this version? Students on it move to the previous version.",
       "versionHelp": "A version applies to students who entered from its year until the next version starts; earlier entry years use the first version.",
-      "electiveMin": "Minimum elective credits"
+      "electiveMin": "Minimum elective credits",
+      "batchEnroll": "Batch enrollment",
+      "batchHelp": "Pick a term, a course and a major (optionally an entry year and a campus). Each student is placed in an open section at their own campus with the most free seats. Preview first; nothing is saved until you run it. Over-capacity and other rule exceptions need to be ticked and a reason given, as with single enrollment.",
+      "major": "Major",
+      "entryYear": "Entry year",
+      "any": "Any",
+      "confirmRules": "Confirm exceptions",
+      "preview": "Preview",
+      "batchRun": "Run for real",
+      "batchConfirm": "Enroll these students ({n} will be enrolled)?",
+      "batchPreviewed": "Preview (nothing saved)",
+      "batchDone": "Done",
+      "batchSummary": "{selected} selected, {ok} ok, {needConfirmation} need confirmation, {blocked} blocked",
+      "batchWill": "will be enrolled",
+      "batchEnrolled": "enrolled"
     },
     "assignments": {
       "tab": "Assignments",

@@ -24,6 +24,7 @@ import { EnrollmentService } from "./edu/enrollment.service";
 import { OutboxService } from "./edu/outbox.service";
 import { PortalController } from "./edu/portal.controller";
 import { SectionsController } from "./edu/sections.controller";
+import { EnrollmentBatchController } from "./edu/enrollment-batch.controller";
 import { EventConsumers } from "./events/event-consumers";
 import { KafkaService } from "./events/kafka.service";
 import { OutboxRelay } from "./events/outbox-relay";
@@ -99,6 +100,7 @@ export const CONTROLLERS = [
   ImportController,
   CatalogController,
   SectionsController,
+  EnrollmentBatchController,
   AssignmentsController,
   GradesController,
   InternalAuthzController,
