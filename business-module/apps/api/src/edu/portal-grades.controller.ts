@@ -1,6 +1,7 @@
 // 学生门户：我的成绩、学分进度和成绩单下载。
 //   毕业、结业、退学的学生是"成绩单模式"：仍能看自己的成绩、下载非正式版成绩单（不能选课、提交）。
 //   只有发布过的最终成绩可见；非正式版页脚写"仅供参考"，每份有编号。
+import { resolveVersion } from "@staredu/shared";
 import { Controller, ForbiddenException, Get, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { PERMS } from "@staredu/shared";
@@ -29,7 +30,8 @@ export class PortalGradesController {
   async grades(@Auth() auth: AuthContext) {
     const transcript = await this.transcripts.build(await this.me(auth));
     const major = await this.tenantDb.db.studentMajor.findFirst({ where: { personId: transcript.student.personId, kind: "primary", active: true } });
-    const required = major ? Number((await this.tenantDb.db.major.findUnique({ where: { id: major.majorId } }))?.totalCredits ?? 0) : null;
+    const version = major ? resolveVersion(await this.tenantDb.db.majorVersion.findMany({ where: { majorId: major.majorId } }), major.entryYear) : null;
+    const required = major ? Number(version?.totalCredits ?? 0) : null;
     return { ...transcript, progress: { creditsEarned: transcript.cumulative.creditsEarned, creditsRequired: required, trend: transcript.terms.map((t) => ({ term: t.name, gpa: t.gpa })) } };
   }
 

@@ -159,7 +159,8 @@ function CourseDetailPanel({ id, all, onClose }: { id: string; all: CourseRow[];
 
 // ---------------------------------------------------------------- 专业
 interface MajorRow { id: string; code: string; name: string; degreeType: string | null; totalCredits: number; status: boolean }
-interface MajorDetail { id: string; name: string; courses: Array<{ courseId: string; code: string; name: string; credits: number; category: string; suggestedTerm: number | null }> }
+interface MajorVersionRow { id: string; label: string; effectiveYear: number; entryYearFrom: number | null; entryYearTo: number | null; courseCount: number | null }
+interface MajorDetail { id: string; name: string; versionId: string; totalCredits: number; electiveMinCredits: number; versions: MajorVersionRow[]; courses: Array<{ courseId: string; code: string; name: string; credits: number; category: string; suggestedTerm: number | null }> }
 
 export function MajorsPage() {
   const t = useTranslations("pages.edu");
@@ -172,16 +173,21 @@ export function MajorsPage() {
   const [open, setOpen] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<MajorDetail | null>(null);
   const [items, setItems] = React.useState<Record<string, { category: string; suggestedTerm: string }>>({});
+  const [versionId, setVersionId] = React.useState<string | null>(null);
+  const [newYear, setNewYear] = React.useState("");
+  const [newLabel, setNewLabel] = React.useState("");
+  const [credits, setCredits] = React.useState({ total: "", elective: "" });
+  const [reloadKey, setReloadKey] = React.useState(0);
   React.useEffect(() => {
     if (!open) return;
-    void bff<MajorDetail>(`majors/${open}`).then((d) => { setDetail(d); setItems(Object.fromEntries(d.courses.map((x) => [x.courseId, { category: x.category, suggestedTerm: x.suggestedTerm ? String(x.suggestedTerm) : "" }]))); });
-  }, [open]);
+    void bff<MajorDetail>(`majors/${open}${versionId ? `?version=${versionId}` : ""}`).then((d) => { setCredits({ total: String(d.totalCredits), elective: String(d.electiveMinCredits) }); setDetail(d); setItems(Object.fromEntries(d.courses.map((x) => [x.courseId, { category: x.category, suggestedTerm: x.suggestedTerm ? String(x.suggestedTerm) : "" }]))); });
+  }, [open, versionId, reloadKey]);
   const columns: Column<MajorRow>[] = [
     { key: "code", header: t("code"), cell: (r) => r.code },
     { key: "name", header: t("name"), cell: (r) => r.name },
     { key: "degree", header: t("degreeType"), cell: (r) => r.degreeType ?? "" },
     { key: "credits", header: t("totalCredits"), cell: (r) => r.totalCredits },
-    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("curriculum")}</Button> },
+    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => { setVersionId(null); setOpen(r.id); }}>{t("curriculum")}</Button> },
   ];
   return (
     <section>
@@ -197,6 +203,23 @@ export function MajorsPage() {
       {open && detail ? (
         <div className="mt-4 rounded-md border border-border p-3 text-sm">
           <h3 className="mb-2 font-medium">{t("curriculumOf", { name: detail.name })}</h3>
+          <div className="mb-3 flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">{t("version")}
+              <select className="rounded-md border border-border bg-transparent px-2 py-1" value={detail.versionId} onChange={(e) => setVersionId(e.target.value)}>
+                {detail.versions.map((v) => <option key={v.id} value={v.id}>{v.label} ({v.entryYearFrom ?? "…"}–{v.entryYearTo ?? "…"}, {v.courseCount})</option>)}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">{t("versionYear")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={newYear} onChange={(e) => setNewYear(e.target.value)} /></label>
+            <label className="flex flex-col gap-1">{t("versionLabel")}<input className="w-32 rounded-md border border-border bg-transparent px-2 py-1" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} /></label>
+            <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => void run(async () => { const r = await bff<{ id: string }>(`majors/${open}/versions`, { method: "POST", body: { effectiveYear: Number(newYear), ...(newLabel ? { label: newLabel } : {}), copyFromVersionId: detail.versionId } }); setNewYear(""); setNewLabel(""); setVersionId(r.id); setReloadKey((k) => k + 1); }, c("saved"))}>{t("versionAdd")}</PermButton>
+            {detail.versions.length > 1 ? <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => window.confirm(t("versionConfirmRemove")) && void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "DELETE" }); setVersionId(null); setReloadKey((k) => k + 1); }, c("done"))}>{t("versionRemove")}</PermButton> : null}
+          </div>
+          <p className="mb-2 text-xs text-muted">{t("versionHelp")}</p>
+          <div className="mb-3 flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">{t("totalCredits")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={credits.total} onChange={(e) => setCredits({ ...credits, total: e.target.value })} /></label>
+            <label className="flex flex-col gap-1">{t("electiveMin")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={credits.elective} onChange={(e) => setCredits({ ...credits, elective: e.target.value })} /></label>
+            <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "PATCH", body: { totalCredits: Number(credits.total), electiveMinCredits: Number(credits.elective) } }); setReloadKey((k) => k + 1); }, c("saved"))}>{c("save")}</PermButton>
+          </div>
           <table className="mb-2 text-left"><tbody>
             {courses.rows.map((x) => (
               <tr key={x.id}>
@@ -209,8 +232,8 @@ export function MajorsPage() {
               </tr>
             ))}
           </tbody></table>
-          <PermButton perm={PERMS.eduMajorEdit} size="sm" onClick={() => void run(() => bff(`majors/${open}/courses`, { method: "PUT", body: { items: Object.entries(items).map(([courseId, v]) => ({ courseId, category: v.category, suggestedTerm: v.suggestedTerm ? Number(v.suggestedTerm) : null })) } }), c("saved"))}>{c("save")}</PermButton>
-          <Button size="sm" variant="outline" className="ml-2" onClick={() => { setOpen(null); setDetail(null); }}>{c("close")}</Button>
+          <PermButton perm={PERMS.eduMajorEdit} size="sm" onClick={() => void run(() => bff(`majors/${open}/courses?version=${detail.versionId}`, { method: "PUT", body: { items: Object.entries(items).map(([courseId, v]) => ({ courseId, category: v.category, suggestedTerm: v.suggestedTerm ? Number(v.suggestedTerm) : null })) } }), c("saved"))}>{c("save")}</PermButton>
+          <Button size="sm" variant="outline" className="ml-2" onClick={() => { setOpen(null); setDetail(null); setVersionId(null); }}>{c("close")}</Button>
         </div>
       ) : null}
     </section>

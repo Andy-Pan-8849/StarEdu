@@ -133,9 +133,13 @@ export async function seedDemo(opts: DemoOptions): Promise<DemoResult> {
       () => owner.major.findFirst({ where: { tenantId, code: def.course } }),
       () => owner.major.create({ data: { tenantId, code: def.course, name: def.name, degreeType: "certificate", totalCredits: 3 } }),
     );
+    const version = await findOrCreate(
+      () => owner.majorVersion.findFirst({ where: { majorId: major.id } }),
+      () => owner.majorVersion.create({ data: { tenantId, majorId: major.id, label: "Initial", effectiveYear: 2000, totalCredits: 3 } }),
+    );
     await findOrCreate(
-      () => owner.majorCourse.findFirst({ where: { majorId: major.id, courseId: course.id } }),
-      () => owner.majorCourse.create({ data: { tenantId, majorId: major.id, courseId: course.id, category: "required", suggestedTerm: 1 } }),
+      () => owner.majorCourse.findFirst({ where: { versionId: version.id, courseId: course.id } }),
+      () => owner.majorCourse.create({ data: { tenantId, majorId: major.id, versionId: version.id, courseId: course.id, category: "required", suggestedTerm: 1 } }),
     );
   }
   const majorByProgram = new Map<string, string>();
@@ -211,7 +215,7 @@ export async function seedDemo(opts: DemoOptions): Promise<DemoResult> {
     const withdrawn = s.status === "withdrawn";
     await findOrCreate(
       () => owner.studentMajor.findFirst({ where: { personId, majorId: majorByProgram.get(s.program) as string } }),
-      () => owner.studentMajor.create({ data: { tenantId, personId, majorId: majorByProgram.get(s.program) as string, kind: "primary", declaredOn: new Date("2026-02-15") } }),
+      () => owner.studentMajor.create({ data: { tenantId, personId, majorId: majorByProgram.get(s.program) as string, kind: "primary", entryYear: 2026, declaredOn: new Date("2026-02-15") } }),
     );
     let enrollment = await owner.enrollment.findFirst({ where: { sectionId: sec.id, studentPersonId: personId } });
     if (!enrollment) {

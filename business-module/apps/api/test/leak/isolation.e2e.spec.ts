@@ -30,12 +30,12 @@ interface Side {
 const TABLES = [
   "role", "menu", "data_scope_set", "data_scope_set_node", "account", "account_role", "person", "person_dept",
   "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log", "dict_type", "dict_item", "sys_param",
-  "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "section_instructor", "section_material", "student_major",
+  "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "major_version", "section_instructor", "section_material", "student_major",
   "assignment_group", "assignment", "rubric_item", "assignment_extension", "submission", "submission_version", "submission_file", "submission_score",
   "grading_scale_item", "manual_grade", "final_grade", "grade_change", "transcript_issue",
   "notification", "notification_preference", "announcement", "discussion_post",
   "doc_folder", "doc_acl", "doc_file", "doc_file_version", "doc_upload", "doc_access_log",
-  "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course",
+  "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "major_version",
 ];
 
 describe("cross-tenant leak scan", () => {
@@ -69,6 +69,7 @@ describe("cross-tenant leak scan", () => {
     const term = await owner.term.create({ data: { tenantId, code: "T1", name: "Term one", startDate: new Date("2026-09-01"), endDate: new Date("2026-12-20") } });
     const course = await owner.course.create({ data: { tenantId, code: "SCAN101", name: "Scan course", credits: 3 } });
     const major = await owner.major.create({ data: { tenantId, code: "SCAN", name: "Scan major" } });
+    await owner.majorVersion.create({ data: { tenantId, majorId: major.id, label: "Initial", effectiveYear: 2000 } });
     const section = await owner.section.create({ data: { tenantId, courseId: course.id, termId: term.id, campusId: campus.id, number: "01", name: "SCAN101-01", capacity: 10 } });
     const announcement = await owner.announcement.create({ data: { tenantId, title: "Scan notice", body: "x", scopeKind: "tenant" } });
     const dictType = await owner.dictType.create({ data: { tenantId, code: "scan_dict", name: "Scan dictionary" } });
@@ -264,7 +265,7 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId|aclId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|versionId|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId|aclId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
       const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400

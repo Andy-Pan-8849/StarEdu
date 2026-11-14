@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B15 (usage and quota).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B16 (curriculum versions).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -213,6 +213,10 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Curriculum versions (academic office, milestone B16)
+
+Open **Majors**, press **Curriculum**. A major has one or more versions; a version applies to students who entered from its first year until the next version starts (the first version also covers earlier years). Pick a version to edit its courses and credit requirements. **Add version** copies the one you are looking at, so you only change what differs. A student's entry year is set when the major is declared (default: this year; the declare call accepts `entryYear`) and decides which version the student sees in "My plan" and for the credits required. Removing a version moves its students to the previous one; the last version cannot be removed.
 
 ### Usage and quota (platform operator, milestone B15)
 

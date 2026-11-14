@@ -1,8 +1,9 @@
 // 教学目录：学期、课程、专业（含课程设置、学生申报专业）。这些是教务维护的"目录"，不是个人数据，
 // 所以只按权限字符控制；班级、选课才按数据范围。
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
+import type { Prisma } from "../generated/prisma";
 import { z } from "zod";
-import { PERMS } from "@staredu/shared";
+import { PERMS, resolveVersion, versionRanges } from "@staredu/shared";
 import { AuditService } from "../audit/audit.service";
 import { RequirePermissions } from "../auth/decorators";
 import type { AuthContext } from "../auth/tenant-token.guard";
@@ -137,7 +138,7 @@ export class CatalogController {
     return {
       id: c.id, code: c.code, name: c.name, credits: Number(c.credits), syllabus: c.syllabus, status: c.status, deptId: c.deptId,
       prerequisites: prereq.map((p) => ({ id: p.prerequisiteId, code: p.prerequisite.code, name: p.prerequisite.name })),
-      majors: majors.map((m) => ({ id: m.majorId, code: m.major.code, name: m.major.name, category: m.category })), // 只读，在专业的课程设置里维护
+      majors: [...new Map(majors.map((m) => [m.majorId, m])).values()].map((m) => ({ id: m.majorId, code: m.major.code, name: m.major.name, category: m.category })), // 只读，在专业的课程设置里维护
       sections, // 历史开班，只读；有了历史班级后编号和学分只读
     };
   }
@@ -216,13 +217,45 @@ export class CatalogController {
     return rows.map((m) => ({ id: m.id, code: m.code, name: m.name, degreeType: m.degreeType, totalCredits: Number(m.totalCredits), electiveMinCredits: Number(m.electiveMinCredits), status: m.status }));
   }
 
+  /** 专业的版本，按生效年份升序。 */
+  private async versionsOf(majorId: string) {
+    return this.db.majorVersion.findMany({ where: { majorId }, orderBy: { effectiveYear: "asc" } });
+  }
+
+  /** 取要操作的版本：指定了就用指定的（必须属于这个专业），没指定用最新版本。 */
+  private async targetVersion(majorId: string, versionId?: string) {
+    const versions = await this.versionsOf(majorId);
+    const v = versionId ? versions.find((x) => x.id === versionId) : versions[versions.length - 1];
+    if (!v) throw new NotFoundException();
+    return v;
+  }
+
+  /** 专业上的学分字段始终镜像最新版本（旧的列表和页面继续可用）。 */
+  private async syncMajorFromLatest(tx: Prisma.TransactionClient, majorId: string) {
+    const latest = await tx.majorVersion.findFirst({ where: { majorId }, orderBy: { effectiveYear: "desc" } });
+    if (latest) await tx.major.update({ where: { id: majorId }, data: { totalCredits: latest.totalCredits, electiveMinCredits: latest.electiveMinCredits } });
+  }
+
+  private versionView(v: { id: string; label: string; effectiveYear: number; totalCredits: unknown; electiveMinCredits: unknown }, range?: { from: number | null; to: number | null }, courseCount?: number) {
+    return { id: v.id, label: v.label, effectiveYear: v.effectiveYear, totalCredits: Number(v.totalCredits), electiveMinCredits: Number(v.electiveMinCredits), entryYearFrom: range?.from ?? null, entryYearTo: range?.to ?? null, courseCount: courseCount ?? null };
+  }
+
   @Get("majors/:id")
   @RequirePermissions(PERMS.eduMajorList)
-  async major(@Param("id", ParseUUIDPipe) id: string) {
+  async major(@Param("id", ParseUUIDPipe) id: string, @Query() query: { version?: string }) {
     const m = await this.db.major.findUnique({ where: { id } });
     if (!m) throw new NotFoundException();
-    const items = await this.db.majorCourse.findMany({ where: { majorId: id }, include: { course: true }, orderBy: [{ category: "asc" }, { suggestedTerm: "asc" }] });
-    return { id: m.id, code: m.code, name: m.name, degreeType: m.degreeType, deptId: m.deptId, totalCredits: Number(m.totalCredits), electiveMinCredits: Number(m.electiveMinCredits), description: m.description, status: m.status, courses: items.map((i) => ({ courseId: i.courseId, code: i.course.code, name: i.course.name, credits: Number(i.course.credits), category: i.category, suggestedTerm: i.suggestedTerm, note: i.note })) };
+    const versions = await this.versionsOf(id);
+    const chosen = await this.targetVersion(id, query.version);
+    const counts = await this.db.majorCourse.groupBy({ by: ["versionId"], where: { majorId: id }, _count: { _all: true } });
+    const ranges = new Map(versionRanges(versions).map((r) => [r.id, r]));
+    const items = await this.db.majorCourse.findMany({ where: { versionId: chosen.id }, include: { course: true }, orderBy: [{ category: "asc" }, { suggestedTerm: "asc" }] });
+    return {
+      id: m.id, code: m.code, name: m.name, degreeType: m.degreeType, deptId: m.deptId, totalCredits: Number(chosen.totalCredits), electiveMinCredits: Number(chosen.electiveMinCredits), description: m.description, status: m.status,
+      versionId: chosen.id,
+      versions: versions.map((v) => this.versionView(v, ranges.get(v.id), counts.find((c) => c.versionId === v.id)?._count._all ?? 0)),
+      courses: items.map((i) => ({ courseId: i.courseId, code: i.course.code, name: i.course.name, credits: Number(i.course.credits), category: i.category, suggestedTerm: i.suggestedTerm, note: i.note })),
+    };
   }
 
   @Post("majors")
@@ -231,7 +264,11 @@ export class CatalogController {
     const input = parse(z.object({ code: z.string().regex(/^[A-Za-z0-9_-]{2,30}$/), name: z.string().trim().min(1).max(200), degreeType: z.string().max(50).nullable().optional(), deptId: z.string().uuid().nullable().optional(), totalCredits: z.number().min(0).max(999).optional(), electiveMinCredits: z.number().min(0).max(999).optional(), description: z.string().max(5000).nullable().optional() }), body);
     if (input.deptId) await assertVisible(this.db.dept, [input.deptId], "department");
     try {
-      const m = await this.db.major.create({ data: { tenantId: auth.tenantId, ...input, createdBy: auth.accountId } });
+      const m = await this.tenantDb.transaction(async (tx) => {
+        const major = await tx.major.create({ data: { tenantId: auth.tenantId, ...input, createdBy: auth.accountId } });
+        await tx.majorVersion.create({ data: { tenantId: auth.tenantId, majorId: major.id, label: "Initial", effectiveYear: 2000, totalCredits: input.totalCredits ?? 0, electiveMinCredits: input.electiveMinCredits ?? 0, createdBy: auth.accountId } });
+        return major;
+      });
       return { id: m.id, code: m.code };
     } catch (err) {
       if ((err as { code?: string }).code === "P2002") throw new ConflictException("Major code already exists");
@@ -245,25 +282,82 @@ export class CatalogController {
     const input = parse(z.object({ name: z.string().trim().min(1).max(200).optional(), degreeType: z.string().max(50).nullable().optional(), deptId: z.string().uuid().nullable().optional(), totalCredits: z.number().min(0).max(999).optional(), electiveMinCredits: z.number().min(0).max(999).optional(), description: z.string().max(5000).nullable().optional(), status: z.boolean().optional() }).strict(), body);
     if (!(await this.db.major.findUnique({ where: { id } }))) throw new NotFoundException();
     if (input.deptId) await assertVisible(this.db.dept, [input.deptId], "department");
-    const m = await this.db.major.update({ where: { id }, data: { ...input, updatedBy: auth.accountId } });
+    const m = await this.tenantDb.transaction(async (tx) => {
+      const row = await tx.major.update({ where: { id }, data: { ...input, updatedBy: auth.accountId } });
+      if (input.totalCredits !== undefined || input.electiveMinCredits !== undefined) {
+        const latest = await tx.majorVersion.findFirst({ where: { majorId: id }, orderBy: { effectiveYear: "desc" } });
+        if (latest) await tx.majorVersion.update({ where: { id: latest.id }, data: { ...(input.totalCredits !== undefined ? { totalCredits: input.totalCredits } : {}), ...(input.electiveMinCredits !== undefined ? { electiveMinCredits: input.electiveMinCredits } : {}) } });
+      }
+      return row;
+    });
     return { id: m.id, status: m.status };
   }
 
   /** 课程设置：整体替换。类别（必修/选修/通识）是专业和课程这条关系的属性。 */
   @Put("majors/:id/courses")
   @RequirePermissions(PERMS.eduMajorEdit)
-  async setMajorCourses(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
+  async setMajorCourses(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown, @Query() query: { version?: string }) {
     const { items } = parse(z.object({ items: z.array(z.object({ courseId: z.string().uuid(), category: z.enum(["required", "elective", "general"]), suggestedTerm: z.number().int().min(1).max(20).nullable().optional(), note: z.string().max(500).nullable().optional() })).max(300) }), body);
     if (!(await this.db.major.findUnique({ where: { id } }))) throw new NotFoundException();
+    const version = await this.targetVersion(id, query.version);
     const ids = items.map((i) => i.courseId);
     if (new Set(ids).size !== ids.length) throw new BadRequestException("A course can appear only once in a major");
     await assertVisible(this.db.course, ids, "course");
     await this.tenantDb.transaction(async (tx) => {
-      await tx.majorCourse.deleteMany({ where: { majorId: id } });
-      if (items.length) await tx.majorCourse.createMany({ data: items.map((i) => ({ tenantId: auth.tenantId, majorId: id, courseId: i.courseId, category: i.category, suggestedTerm: i.suggestedTerm ?? null, note: i.note ?? null })) });
+      await tx.majorCourse.deleteMany({ where: { versionId: version.id } });
+      if (items.length) await tx.majorCourse.createMany({ data: items.map((i) => ({ tenantId: auth.tenantId, majorId: id, versionId: version.id, courseId: i.courseId, category: i.category, suggestedTerm: i.suggestedTerm ?? null, note: i.note ?? null })) });
     });
-    await this.audit.record(auth.accountId, "major.courses", "major", id, { count: items.length });
-    return { id, count: items.length };
+    await this.audit.record(auth.accountId, "major.courses", "major", id, { count: items.length, versionId: version.id });
+    return { id, versionId: version.id, count: items.length };
+  }
+
+  /** 新增培养方案版本：从某个入学年份起生效。默认复制最新版本的课程设置和学分要求，之后可以单独改。 */
+  @Post("majors/:id/versions")
+  @RequirePermissions(PERMS.eduMajorEdit)
+  async createVersion(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const input = parse(z.object({ label: z.string().trim().min(1).max(60).optional(), effectiveYear: z.number().int().min(1900).max(2200), copyFromVersionId: z.string().uuid().optional() }).strict(), body);
+    if (!(await this.db.major.findUnique({ where: { id } }))) throw new NotFoundException();
+    const source = await this.targetVersion(id, input.copyFromVersionId);
+    if ((await this.versionsOf(id)).some((v) => v.effectiveYear === input.effectiveYear)) throw new ConflictException("A version already starts in that year");
+    const created = await this.tenantDb.transaction(async (tx) => {
+      const v = await tx.majorVersion.create({ data: { tenantId: auth.tenantId, majorId: id, label: input.label ?? String(input.effectiveYear), effectiveYear: input.effectiveYear, totalCredits: source.totalCredits, electiveMinCredits: source.electiveMinCredits, createdBy: auth.accountId } });
+      const items = await tx.majorCourse.findMany({ where: { versionId: source.id } });
+      if (items.length) await tx.majorCourse.createMany({ data: items.map((i) => ({ tenantId: auth.tenantId, majorId: id, versionId: v.id, courseId: i.courseId, category: i.category, suggestedTerm: i.suggestedTerm, note: i.note })) });
+      await this.syncMajorFromLatest(tx, id);
+      return { v, copied: items.length };
+    });
+    await this.audit.record(auth.accountId, "major.version.create", "major", id, { versionId: created.v.id, effectiveYear: input.effectiveYear, copiedFrom: source.id, copied: created.copied });
+    return { id: created.v.id, copied: created.copied };
+  }
+
+  @Patch("majors/:id/versions/:versionId")
+  @RequirePermissions(PERMS.eduMajorEdit)
+  async updateVersion(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("versionId", ParseUUIDPipe) versionId: string, @Body() body: unknown) {
+    const input = parse(z.object({ label: z.string().trim().min(1).max(60).optional(), totalCredits: z.number().min(0).max(999).optional(), electiveMinCredits: z.number().min(0).max(999).optional() }).strict(), body);
+    const v = await this.targetVersion(id, versionId);
+    await this.tenantDb.transaction(async (tx) => {
+      await tx.majorVersion.update({ where: { id: v.id }, data: input });
+      await this.syncMajorFromLatest(tx, id);
+    });
+    await this.audit.record(auth.accountId, "major.version.update", "major", id, { versionId, ...input });
+    return { id: v.id };
+  }
+
+  /** 删除版本：至少保留一个；用到它的学生自动落到前一个版本（没有前一个就落到后一个）。 */
+  @Delete("majors/:id/versions/:versionId")
+  @RequirePermissions(PERMS.eduMajorEdit)
+  async removeVersion(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("versionId", ParseUUIDPipe) versionId: string) {
+    const versions = await this.versionsOf(id);
+    const v = versions.find((x) => x.id === versionId);
+    if (!v) throw new NotFoundException();
+    if (versions.length === 1) throw new ConflictException("A major must keep at least one version");
+    await this.tenantDb.transaction(async (tx) => {
+      await tx.majorCourse.deleteMany({ where: { versionId } });
+      await tx.majorVersion.delete({ where: { id: versionId } });
+      await this.syncMajorFromLatest(tx, id);
+    });
+    await this.audit.record(auth.accountId, "major.version.remove", "major", id, { versionId, effectiveYear: v.effectiveYear });
+    return { id: versionId };
   }
 
   /** 在读学生（已申报该专业的），只读。按学员的数据范围过滤。 */
@@ -273,15 +367,19 @@ export class CatalogController {
     const scope = await this.hr.scope(auth, PERMS.hrStudentList);
     const rows = await this.db.person.findMany({ where: withScope({ student: { isNot: null }, majors: undefined } as never, scope, STUDENT_SCOPE) });
     const declared = await this.db.studentMajor.findMany({ where: { majorId: id, active: true } });
-    const ids = new Set(declared.map((d) => d.personId));
-    return rows.filter((r) => ids.has(r.id)).map((r) => ({ id: r.id, fullName: r.fullName }));
+    const byPerson = new Map(declared.map((d) => [d.personId, d]));
+    const versions = await this.versionsOf(id);
+    return rows.filter((r) => byPerson.has(r.id)).map((r) => {
+      const d = byPerson.get(r.id)!;
+      return { id: r.id, fullName: r.fullName, entryYear: d.entryYear, versionLabel: resolveVersion(versions, d.entryYear)?.label ?? null };
+    });
   }
 
   /** 学生申报专业（教务操作）。学生要在操作者的学员数据范围内。 */
   @Put("majors/:id/students/:personId")
   @RequirePermissions(PERMS.eduMajorEdit)
   async declare(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("personId", ParseUUIDPipe) personId: string, @Body() body: unknown) {
-    const { kind } = parse(z.object({ kind: z.enum(["primary", "minor"]).default("primary") }), body ?? {});
+    const { kind, entryYear } = parse(z.object({ kind: z.enum(["primary", "minor"]).default("primary"), entryYear: z.number().int().min(1900).max(2200).optional() }), body ?? {});
     if (!(await this.db.major.findUnique({ where: { id } }))) throw new NotFoundException();
     const scope = await this.hr.scope(auth, PERMS.hrStudentList);
     const student = await this.db.person.findFirst({ where: withScope({ id: personId, student: { isNot: null } }, scope, STUDENT_SCOPE) });
@@ -289,10 +387,10 @@ export class CatalogController {
     await this.tenantDb.transaction(async (tx) => {
       if (kind === "primary") await tx.studentMajor.updateMany({ where: { personId, kind: "primary", active: true }, data: { active: false } });
       const existing = await tx.studentMajor.findFirst({ where: { personId, majorId: id } });
-      if (existing) await tx.studentMajor.update({ where: { id: existing.id }, data: { kind, active: true } });
-      else await tx.studentMajor.create({ data: { tenantId: auth.tenantId, personId, majorId: id, kind } });
+      if (existing) await tx.studentMajor.update({ where: { id: existing.id }, data: { kind, active: true, ...(entryYear ? { entryYear } : {}) } });
+      else await tx.studentMajor.create({ data: { tenantId: auth.tenantId, personId, majorId: id, kind, entryYear: entryYear ?? new Date().getUTCFullYear() } });
     });
-    await this.audit.record(auth.accountId, "student.declareMajor", "person", personId, { majorId: id, kind });
+    await this.audit.record(auth.accountId, "student.declareMajor", "person", personId, { majorId: id, kind, entryYear: entryYear ?? null });
     return { personId, majorId: id, kind };
   }
 
