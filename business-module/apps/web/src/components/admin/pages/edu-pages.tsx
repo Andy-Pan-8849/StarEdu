@@ -258,6 +258,7 @@ export function SectionsPage() {
   const campuses = useList<{ id: string; name: string; status: string }>("campuses");
   const { run, message } = useAct(sections.reload);
   const [form, setForm] = React.useState(false);
+  const [batchOpen, setBatchOpen] = React.useState(false);
   const [open, setOpen] = React.useState<string | null>(null);
   const columns: Column<SectionRow>[] = [
     { key: "name", header: t("name"), cell: (r) => r.name },
@@ -284,6 +285,8 @@ export function SectionsPage() {
       <Err error={sections.error} />
       {message}
       <Can perm={PERMS.eduSectionAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduEnrollmentAdd}>{!batchOpen ? <Button size="sm" variant="outline" className="mb-3 ml-2" onClick={() => setBatchOpen(true)}>{t("batchEnroll")}</Button> : null}</Can>
+      {batchOpen ? <BatchEnrollPanel onClose={() => { setBatchOpen(false); sections.reload(); }} /> : null}
       {form ? (
         <FormPanel title={c("add")} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           fields={[
@@ -298,6 +301,76 @@ export function SectionsPage() {
       <DataTable columns={columns} rows={sections.rows} rowKey={(r) => r.id} loading={sections.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {open ? <SectionPanel id={open} onClose={() => { setOpen(null); sections.reload(); }} /> : null}
     </section>
+  );
+}
+
+interface BatchRow { studentId: string; fullName: string | null; studentNo: string | null; sectionName: string | null; ok: boolean; code?: string; violations?: string[]; message?: string }
+interface BatchResult { dryRun: boolean; summary: { selected: number; ok: number; needConfirmation: number; blocked: number }; rows: BatchRow[] }
+
+/** 批量安排选课：按专业、入学年份、校区选出学生，先预览，再执行（规则和教务代选相同，超员等要确认并填原因）。 */
+function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
+  const t = useTranslations("pages.edu");
+  const c = useTranslations("crud");
+  const terms = useList<TermRow>("terms");
+  const courses = useList<CourseRow>("courses");
+  const majors = useList<MajorRow>("majors");
+  const campuses = useList<{ id: string; name: string; status: string }>("campuses");
+  const [f, setF] = React.useState({ termId: "", courseId: "", majorId: "", entryYear: "", campusId: "", reason: "" });
+  const [confirm, setConfirm] = React.useState<string[]>([]);
+  const [result, setResult] = React.useState<BatchResult | null>(null);
+  const [msg, setMsg] = React.useState<string | null>(null);
+  const body = (dryRun: boolean) => ({ termId: f.termId, courseId: f.courseId, majorId: f.majorId, ...(f.entryYear ? { entryYear: Number(f.entryYear) } : {}), ...(f.campusId ? { campusId: f.campusId } : {}), ...(confirm.length ? { confirm } : {}), ...(f.reason ? { reason: f.reason } : {}), dryRun });
+  async function go(dryRun: boolean) {
+    try { setMsg(null); setResult(await bff<BatchResult>("enrollment-batches", { method: "POST", body: body(dryRun) })); } catch (e) { setMsg((e as Error).message); }
+  }
+  const ready = f.termId && f.courseId && f.majorId;
+  const sel = (label: string, key: keyof typeof f, opts: Array<{ value: string; label: string }>, optional = false) => (
+    <label className="flex flex-col gap-1 text-sm">{label}
+      <select className="rounded-md border border-border bg-transparent px-2 py-1" value={f[key]} onChange={(e) => { setF({ ...f, [key]: e.target.value }); setResult(null); }}>
+        <option value="">{optional ? t("any") : "—"}</option>
+        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </label>
+  );
+  return (
+    <div className="mb-4 rounded-md border border-border p-3 text-sm">
+      <h3 className="mb-2 font-medium">{t("batchEnroll")}</h3>
+      <p className="mb-2 text-xs text-muted">{t("batchHelp")}</p>
+      <div className="mb-3 flex flex-wrap items-end gap-3">
+        {sel(t("term"), "termId", terms.rows.filter((x) => x.status !== "ended").map((x) => ({ value: x.id, label: x.name })))}
+        {sel(t("course"), "courseId", courses.rows.filter((x) => x.status).map((x) => ({ value: x.id, label: `${x.code} · ${x.name}` })))}
+        {sel(t("major"), "majorId", majors.rows.filter((x) => x.status).map((x) => ({ value: x.id, label: `${x.code} · ${x.name}` })))}
+        <label className="flex flex-col gap-1">{t("entryYear")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={f.entryYear} onChange={(e) => { setF({ ...f, entryYear: e.target.value }); setResult(null); }} /></label>
+        {sel(t("campus"), "campusId", campuses.rows.filter((x) => x.status === "normal").map((x) => ({ value: x.id, label: x.name })), true)}
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <span>{t("confirmRules")}:</span>
+        {["capacity", "prerequisite", "conflict", "window", "retake"].map((k) => (
+          <label key={k} className="flex items-center gap-1"><input type="checkbox" checked={confirm.includes(k)} onChange={(e) => setConfirm((s) => (e.target.checked ? [...s, k] : s.filter((x) => x !== k)))} />{t(`viol_${k}`)}</label>
+        ))}
+        <input aria-label={t("reason")} placeholder={t("reason")} className="w-64 rounded-md border border-border bg-transparent px-2 py-1" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} />
+      </div>
+      <div className="mb-3 flex items-center gap-2">
+        <Button size="sm" variant="outline" disabled={!ready} onClick={() => void go(true)}>{t("preview")}</Button>
+        <PermButton perm={PERMS.eduEnrollmentAdd} size="sm" disabled={!ready || !result?.dryRun || result.summary.ok + result.summary.needConfirmation === 0} onClick={() => window.confirm(t("batchConfirm", { n: result?.summary.ok ?? 0 })) && void go(false)}>{t("batchRun")}</PermButton>
+        <Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button>
+        {msg ? <span role="alert" className="text-red-600">{msg}</span> : null}
+      </div>
+      {result ? (
+        <div>
+          <p className="mb-2" role="status">{result.dryRun ? t("batchPreviewed") : t("batchDone")}: {t("batchSummary", { ...result.summary })}</p>
+          <table className="text-left"><tbody>
+            {result.rows.map((r) => (
+              <tr key={r.studentId}>
+                <td className="pr-3">{r.fullName} {r.studentNo ? `(${r.studentNo})` : ""}</td>
+                <td className="pr-3">{r.sectionName ?? ""}</td>
+                <td className={r.ok ? "" : "text-amber-600"}>{r.ok ? (result.dryRun ? t("batchWill") : t("batchEnrolled")) : `${r.code ?? ""}${r.violations?.length ? ` (${r.violations.map((v) => t(`viol_${v}`)).join(", ")})` : ""}`}</td>
+              </tr>
+            ))}
+          </tbody></table>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
