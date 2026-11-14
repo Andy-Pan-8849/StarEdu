@@ -303,6 +303,7 @@ export const OTHER_ROUTES: Record<string, string> = {
   "POST /api/portal/sections/:id/discussions/:postId/resolve": "student portal: members of the section only; other ids are 404 (discussion.e2e.spec.ts)",
   "DELETE /api/portal/sections/:id/discussions/:postId": "student portal: members of the section only; other ids are 404 (discussion.e2e.spec.ts)",
   "POST /api/internal/authz": "answers about the caller's own account only (identity comes from the token); needs the service key (internal-authz.e2e.spec.ts)",
+  "POST /api/internal/library-access": "answers about the caller's own account only (identity comes from the token); needs the service key (library-ai.e2e.spec.ts)",
   "POST /api/campuses": "creates a campus and its root department in the caller's tenant from plain fields",
   "POST /api/posts": "creates a post from plain fields",
   "POST /api/dict-types": "creates a dictionary in the caller's tenant from plain fields",

@@ -25,7 +25,7 @@ STATUSES = ("active", "superseded", "draft")
 # 文本块从文档复制的列（权限、状态、版本相关）
 _SYNCED = (
     "allowed_roles, allowed_users, campus_scope, min_level_rank, status, effective_date, "
-    "doc_code, version, tenant_id"
+    "doc_code, version, tenant_id, folder_id"
 )
 
 
@@ -49,6 +49,9 @@ class NewDocument:
     supersedes_id: UUID | None = None
     # 业务模式：文档属于哪个租户；None = 独立模式的文档
     tenant_id: str | None = None
+    # 业务模式：来自文档库文件时的文件夹 id 和密级；谁能读由文件夹授权决定（见 permissions.py）
+    folder_id: str | None = None
+    classification: str | None = None
 
 
 async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: Identity) -> UUID:
@@ -59,7 +62,12 @@ async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: I
     """
     if doc.status not in STATUSES:
         raise ValueError(f"unknown status: {doc.status!r}")
-    allowed_roles = expand_access_level(doc.access_level)
+    if doc.folder_id is not None:
+        if doc.tenant_id is None:
+            raise ValueError("a library document belongs to a tenant")
+        allowed_roles: list[str] = []  # 文档库来源：角色列表为空，只能经文件夹授权读到
+    else:
+        allowed_roles = expand_access_level(doc.access_level)
     async with conn.begin_nested():
         document_id = (
             await conn.execute(
@@ -68,12 +76,13 @@ async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: I
                     INSERT INTO ai.documents
                         (doc_code, title, domain, version, status, effective_date, access_level,
                          allowed_roles, allowed_users, campus_scope, min_level_rank, object_key,
-                         format, content_hash, uploaded_by, supersedes_id, tenant_id)
+                         format, content_hash, uploaded_by, supersedes_id, tenant_id, folder_id,
+                         classification)
                     VALUES
                         (:doc_code, :title, :domain, :version, :status, :effective_date,
                          :access_level, :allowed_roles, :allowed_users, :campus_scope,
                          :min_level_rank, :object_key, :format, :content_hash, :uploaded_by,
-                         :supersedes_id, :tenant_id)
+                         :supersedes_id, :tenant_id, :folder_id, :classification)
                     RETURNING id
                     """
                 ),
@@ -95,6 +104,8 @@ async def register_document(conn: AsyncConnection, doc: NewDocument, *, actor: I
                     "uploaded_by": actor.user_id,
                     "supersedes_id": doc.supersedes_id,
                     "tenant_id": doc.tenant_id,
+                    "folder_id": doc.folder_id,
+                    "classification": doc.classification,
                 },
             )
         ).scalar_one()
@@ -130,7 +141,7 @@ async def add_chunk(
                      {_SYNCED})
                 SELECT d.id, :chunk_index, :text, :heading_path, :page, :identifiers, :token_count,
                        d.allowed_roles, d.allowed_users, d.campus_scope, d.min_level_rank,
-                       d.status, d.effective_date, d.doc_code, d.version, d.tenant_id
+                       d.status, d.effective_date, d.doc_code, d.version, d.tenant_id, d.folder_id
                 FROM ai.documents d WHERE d.id = :document_id
                 RETURNING id
                 """
@@ -158,7 +169,8 @@ async def _sync_chunks(conn: AsyncConnection, document_id: UUID) -> int:
             SET allowed_roles = d.allowed_roles, allowed_users = d.allowed_users,
                 campus_scope = d.campus_scope, min_level_rank = d.min_level_rank,
                 status = d.status, effective_date = d.effective_date,
-                doc_code = d.doc_code, version = d.version, tenant_id = d.tenant_id
+                doc_code = d.doc_code, version = d.version, tenant_id = d.tenant_id,
+                folder_id = d.folder_id
             FROM ai.documents d
             WHERE d.id = c.document_id AND d.id = :document_id
             """
@@ -197,6 +209,26 @@ async def update_access(
     elif clear_min_level:
         sets["min_level_rank"] = None
     return await _change_document(conn, document_id, sets, actor, "doc.update_access")
+
+
+async def update_library_meta(
+    conn: AsyncConnection,
+    document_id: UUID,
+    *,
+    actor: Identity,
+    folder_id: str,
+    classification: str,
+    title: str,
+    file_format: str,
+) -> int:
+    """文档库文件换了文件夹、密级、名字或格式：改文档并同步到所有块（folder_id 随块走）。"""
+    sets: dict[str, object] = {
+        "folder_id": folder_id,
+        "classification": classification,
+        "title": title,
+        "format": file_format,
+    }
+    return await _change_document(conn, document_id, sets, actor, "doc.update_library_meta")
 
 
 async def set_status(
@@ -264,7 +296,8 @@ async def find_document(
             await conn.execute(
                 text(
                     "SELECT id, content_hash, ingest_status, status, access_level, object_key, "
-                    "tenant_id FROM ai.documents WHERE doc_code = :c AND version = :v"
+                    "tenant_id, folder_id, title, format FROM ai.documents "
+                    "WHERE doc_code = :c AND version = :v"
                 ),
                 {"c": doc_code, "v": version},
             )

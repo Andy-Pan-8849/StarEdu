@@ -41,6 +41,8 @@ class BusinessAccess:
     permissions: frozenset[str]
     scopes_json: str
     perm_version: int
+    # 能读的文档库文件夹 id（业务模块实时回答；不进权限缓存，授权一改、到期一到下次提问就生效）
+    library_folders: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)

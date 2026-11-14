@@ -6,7 +6,8 @@
     角色、权限和按权限字符划分的数据范围，向业务模块的内部接口问。
     规则只在业务模块里实现一份，权限一改立即生效；按权限版本号缓存（ETag），没变就不重新传输。
 业务模式下 Identity.roles 是从业务身份映射来的知识库角色（student / staff / manager / hr / Admin），
-只用于现有的文档权限判断；知识库权限与文档库对齐是 B12 的事，在此之前是过渡映射。
+只用于"不来自文档库"的文档（课程大纲、课件清单）的过渡判断；来自文档库文件的文档（B12）由业务模块按文件夹授权
+实时回答（library-access 接口，每次提问都问一次，不缓存），和文档库里"看得到什么"是同一套规则。
 """
 
 import json
@@ -108,6 +109,27 @@ class BusinessAuthzClient:
             raise AuthUnavailableError("business module sent an unreadable answer") from exc
         return body, response.headers.get("etag")
 
+    async def library_folders(self, tenant_code: str, token: str) -> frozenset[str]:
+        """这个用户在文档库里能读（且允许 AI 读）的文件夹 id；每次现问，授权一改立即生效。"""
+        url = (
+            self._template.replace("{code}", tenant_code).rstrip("/")
+            + "/api/internal/library-access"
+        )
+        headers = {"Authorization": f"Bearer {token}", "X-Internal-Key": self._key}
+        try:
+            response = await self._client.post(url, headers=headers)
+        except httpx.HTTPError as exc:
+            raise AuthUnavailableError(f"business module unreachable: {exc}") from exc
+        if response.status_code in (401, 403, 404):
+            raise AuthError(f"the business module refused the identity ({response.status_code})")
+        if response.status_code != 200:
+            raise AuthUnavailableError(f"business module answered {response.status_code}")
+        try:
+            ids = response.json()["folderIds"]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise AuthUnavailableError("business module sent an unreadable answer") from exc
+        return frozenset(str(i) for i in ids)
+
     async def aclose(self) -> None:
         await self._client.aclose()
 
@@ -149,9 +171,15 @@ class BusinessResolver:
         if len(self._cache) >= self._size:
             self._cache.pop(next(iter(self._cache)))
         self._cache[key] = (new_etag, body, time.monotonic())
-        return self._identity(claims, body)
+        folders = await self._client.library_folders(code, token)
+        return self._identity(claims, body, folders)
 
-    def _identity(self, claims: Mapping[str, Any], body: Mapping[str, Any]) -> Identity:
+    def _identity(
+        self,
+        claims: Mapping[str, Any],
+        body: Mapping[str, Any],
+        folders: frozenset[str] = frozenset(),
+    ) -> Identity:
         kind = str(body.get("kind", "other"))
         permissions = frozenset(str(p) for p in body.get("permissions", []))
         role_codes = frozenset(str(r) for r in body.get("roles", []))
@@ -166,6 +194,7 @@ class BusinessResolver:
             permissions=permissions,
             scopes_json=json.dumps(body.get("scopes", {}), separators=(",", ":"), sort_keys=True),
             perm_version=int(body.get("permVersion", 0)),
+            library_folders=folders,
         )
         return Identity(
             user_id=str(claims["sub"]),

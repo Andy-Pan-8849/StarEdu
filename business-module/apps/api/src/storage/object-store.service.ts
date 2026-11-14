@@ -121,6 +121,13 @@ export class ObjectStoreService {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 
+  /** 服务端读出整个对象（知识库入库用；文件大小在上传时已限制）。 */
+  async get(key: string): Promise<Buffer> {
+    await this.ensureBucket();
+    const r = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    return Buffer.from(await r.Body!.transformToByteArray());
+  }
+
   /** 服务端直接写入（演示数据和测试用）。 */
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
     await this.ensureBucket();

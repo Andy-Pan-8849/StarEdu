@@ -11,6 +11,8 @@ import { AnyAuthenticated } from "../auth/decorators";
 import { Public } from "../auth/public.decorator";
 import type { AuthContext } from "../auth/tenant-token.guard";
 import { Auth } from "../common/http";
+import { LibraryAccess } from "../library/library-access.service";
+import { ObjectStoreService, assertTenantKey } from "../storage/object-store.service";
 import { DataScopeService } from "../data-scope/data-scope.service";
 import { currentScope } from "../tenancy/request-scope";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
@@ -39,7 +41,21 @@ export class InternalAuthzController {
   constructor(
     private readonly tenantDb: TenantPrismaService,
     private readonly scopes: DataScopeService,
+    private readonly library: LibraryAccess,
   ) {}
+
+  /**
+   * AI 知识库问"这个用户能读哪些文件夹"。规则就是文档库自己的规则（操作权限 ∧ 文件夹授权，含继承、到期、机密、仅在线查看），
+   * 每次现算、不缓存：授权一改、到期一到，AI 下一次检索就看不到。用户没有任何"文档库/资料库"查看权限就是空列表。
+   */
+  @Post("library-access")
+  @HttpCode(200)
+  @AnyAuthenticated()
+  @UseGuards(InternalKeyGuard)
+  async libraryAccess(@Auth() auth: AuthContext) {
+    const mayRead = auth.authz.perms.includes(PERMS.docLibraryList) || auth.authz.perms.includes(PERMS.portalLibraryList);
+    return { folderIds: mayRead ? await this.library.aiReadableFolderIds(auth) : [] };
+  }
 
   @Post("authz")
   @HttpCode(200)
@@ -96,7 +112,27 @@ export class InternalAuthzController {
 @Public()
 @UseGuards(InternalKeyGuard)
 export class InternalKbController {
-  constructor(private readonly tenantDb: TenantPrismaService) {}
+  constructor(private readonly tenantDb: TenantPrismaService, private readonly store: ObjectStoreService) {}
+
+  /** 文档库文件的元数据（删除了也会返回，带 deleted，让 AI 把对应知识库文档转成草稿）。 */
+  @Get("files/:fileId")
+  async file(@Param("fileId", ParseUUIDPipe) fileId: string) {
+    const db = this.tenantDb.db;
+    const f = await db.docFile.findFirst({ where: { id: fileId } });
+    if (!f) throw new NotFoundException();
+    const folder = await db.docFolder.findFirst({ where: { id: f.folderId } });
+    return { fileId: f.id, folderId: f.folderId, name: f.name, contentType: f.contentType, size: f.size, version: f.version, deleted: f.deletedAt !== null, classification: folder?.classification ?? "internal" };
+  }
+
+  /** 文件内容（当前版本）。 */
+  @Get("files/:fileId/content")
+  async fileContent(@Param("fileId", ParseUUIDPipe) fileId: string, @Res() res: Response) {
+    const f = await this.tenantDb.db.docFile.findFirst({ where: { id: fileId, deletedAt: null } });
+    if (!f) throw new NotFoundException();
+    assertTenantKey(f.tenantId, f.storageKey);
+    res.setHeader("content-type", "application/octet-stream");
+    res.send(await this.store.get(f.storageKey));
+  }
 
   @Get("courses/:courseId")
   async course(@Param("courseId", ParseUUIDPipe) courseId: string) {
