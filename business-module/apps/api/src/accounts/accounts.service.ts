@@ -2,6 +2,7 @@
 //   创建顺序：业务库写一条"待激活"账号 → 在该租户的 Keycloak 域建用户 → 回写 Keycloak 用户 id → 发邀请邮件。
 //   中途失败账号留在"待激活、没有 Keycloak 用户"，对账能发现并补建。
 //   改邮箱、停用/启用从这里推送给 Keycloak；定时对账发现两边不一致（以业务库为准）。
+import { QuotaService } from "../quota/quota.service";
 import { randomInt } from "node:crypto";
 import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { realmName } from "@staredu/shared";
@@ -44,6 +45,7 @@ export class AccountsService {
     private readonly keycloak: KeycloakService,
     private readonly authz: AuthzService,
     private readonly audit: AuditService,
+    private readonly quota: QuotaService,
   ) {}
 
   async create(actor: Authz, input: CreateAccountInput) {
@@ -62,6 +64,7 @@ export class AccountsService {
       roleIds.push(studentRole.id);
     }
 
+    await this.quota.assertCanAddAccounts();
     let account;
     try {
       account = await this.tenantDb.transaction(async (tx) => {

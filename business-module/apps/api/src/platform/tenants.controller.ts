@@ -5,6 +5,7 @@ import { PERMS } from "@staredu/shared";
 import { RequirePermissions } from "../auth/decorators";
 import { parse } from "../common/http";
 import { PAuth, PlatformRoute, type PlatformAuthContext } from "./platform.decorators";
+import { TenantUsageService } from "./tenant-usage.service";
 import { TenantSecurityService } from "./tenant-security.service";
 import { TenantsService } from "./tenants.service";
 
@@ -44,6 +45,7 @@ const securitySchema = z
   })
   .strict();
 const googleSchema = z.object({ clientId: z.string().trim().min(10).max(300), clientSecret: z.string().trim().min(5).max(300).optional(), enabled: z.boolean() }).strict();
+const quotaSchema = z.object({ maxAccounts: int.nullable(), maxStorageMb: int.nullable() }).strict();
 const grantsSchema = z.object({ menuIds: z.array(z.string().uuid()).max(3000) });
 
 @PlatformRoute()
@@ -52,6 +54,7 @@ export class TenantsController {
   constructor(
     private readonly tenants: TenantsService,
     private readonly security: TenantSecurityService,
+    private readonly usage: TenantUsageService,
   ) {}
 
   @Get()
@@ -64,6 +67,12 @@ export class TenantsController {
   @RequirePermissions(PERMS.platformTenantAdd)
   create(@PAuth() auth: PlatformAuthContext, @Body() body: unknown) {
     return this.tenants.create(auth.accountId, parse(createSchema, body));
+  }
+
+  @Get("usage")
+  @RequirePermissions(PERMS.platformTenantQuota)
+  listUsage() {
+    return this.usage.list();
   }
 
   @Get(":id")
@@ -128,6 +137,18 @@ export class TenantsController {
   }
 
   // ---- 登录与安全
+  @Get(":id/usage")
+  @RequirePermissions(PERMS.platformTenantQuota)
+  getUsage(@Param("id", ParseUUIDPipe) id: string) {
+    return this.usage.get(id);
+  }
+
+  @Put(":id/quota")
+  @RequirePermissions(PERMS.platformTenantQuota)
+  setQuota(@PAuth() auth: PlatformAuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.usage.setLimits(auth.accountId, id, parse(quotaSchema, body));
+  }
+
   @Get(":id/security")
   @RequirePermissions(PERMS.platformTenantSecurity)
   getSecurity(@Param("id", ParseUUIDPipe) id: string) {

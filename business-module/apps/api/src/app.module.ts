@@ -1,3 +1,5 @@
+import { TenantUsageService } from "./platform/tenant-usage.service";
+import { QuotaService } from "./quota/quota.service";
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { AccountsController } from "./accounts/accounts.controller";
@@ -161,6 +163,8 @@ export const CONTROLLERS = [
     PlatformAuditService,
     TenantsService,
     TenantSecurityService,
+    QuotaService,
+    TenantUsageService,
     JobsService,
     { provide: APP_GUARD, useClass: TenantTokenGuard },
     { provide: APP_INTERCEPTOR, useClass: OperationLogInterceptor },

@@ -129,7 +129,15 @@
       "secretKept": "(keep the current secret)",
       "googleEnabled": "Enabled",
       "googleRemove": "Remove Google sign-in",
-      "confirmRemoveGoogle": "Remove Google sign-in? People will have to use their password."
+      "confirmRemoveGoogle": "Remove Google sign-in? People will have to use their password.",
+      "quota": "Usage & quota",
+      "quotaOf": "Usage and quota of {name}",
+      "accountsUsed": "Accounts: {used} ({active} active)",
+      "storageUsed": "Storage: {mb} MB ({library} library files, {submissions} submission files)",
+      "maxAccounts": "Account limit",
+      "maxStorageMb": "Storage limit (MB)",
+      "noLimit": "No limit",
+      "quotaHelp": "Leave a limit empty for no limit. When a limit is reached, new accounts and uploads are refused; existing data is never deleted. Service accounts do not count."
     },
     "jobs": {
       "title": "Scheduled jobs",

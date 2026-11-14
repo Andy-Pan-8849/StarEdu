@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B14 (sign-in and security, Google sign-in).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B15 (usage and quota).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -213,6 +213,10 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Usage and quota (platform operator, milestone B15)
+
+Open **Tenants**, press **Usage & quota** on a company. You see the number of accounts (service accounts do not count) and the storage in use (document library files plus submitted assignment files), and you can set an account limit and a storage limit in MB; leave a box empty for no limit. When a limit is reached, creating an account is refused (409) and asking to upload a file is refused (413) with a message that names the limit; people can still sign in, read and download, and nothing is deleted. Lowering a limit below current use keeps the existing data and refuses only new additions. Changes are in the platform audit log. Not measured yet: AI assistant calls (they are counted in the AI module, not here).
 
 ### Sign-in and security, and Google sign-in (platform operator, milestone B14)
 

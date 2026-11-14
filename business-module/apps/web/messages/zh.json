@@ -129,7 +129,15 @@
       "secretKept": "（保持当前密钥）",
       "googleEnabled": "启用",
       "googleRemove": "移除 Google 登录",
-      "confirmRemoveGoogle": "移除 Google 登录？大家将只能用密码登录。"
+      "confirmRemoveGoogle": "移除 Google 登录？大家将只能用密码登录。",
+      "quota": "使用情况与配额",
+      "quotaOf": "{name} 的使用情况与配额",
+      "accountsUsed": "账号：{used}（其中启用 {active}）",
+      "storageUsed": "存储：{mb} MB（文档库 {library} 个文件，作业提交 {submissions} 个文件）",
+      "maxAccounts": "账号数上限",
+      "maxStorageMb": "存储上限（MB）",
+      "noLimit": "不限",
+      "quotaHelp": "上限留空 = 不限。达到上限后，新增账号和上传会被拒绝；已有数据不会被删除。服务账号不占名额。"
     },
     "jobs": {
       "title": "定时任务",

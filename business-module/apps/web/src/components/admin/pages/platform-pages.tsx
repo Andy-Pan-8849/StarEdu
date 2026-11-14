@@ -46,6 +46,7 @@ export function TenantsPage() {
   const [creating, setCreating] = React.useState(false);
   const [grantFor, setGrantFor] = React.useState<TenantRow | null>(null);
   const [securityFor, setSecurityFor] = React.useState<TenantRow | null>(null);
+  const [quotaFor, setQuotaFor] = React.useState<TenantRow | null>(null);
 
   async function act(fn: () => Promise<unknown>, ok: string) {
     try {
@@ -83,6 +84,7 @@ export function TenantsPage() {
           ) : null}
           <PermButton perm={PERMS.platformTenantGrant} size="sm" variant="outline" onClick={() => setGrantFor(r)}>{t("features")}</PermButton>
           <PermButton perm={PERMS.platformTenantSecurity} size="sm" variant="outline" onClick={() => setSecurityFor(r)}>{t("security")}</PermButton>
+          <PermButton perm={PERMS.platformTenantQuota} size="sm" variant="outline" onClick={() => setQuotaFor(r)}>{t("quota")}</PermButton>
           <PermButton perm={PERMS.platformTenantAdmin} size="sm" variant="outline" onClick={() => void act(() => bff(`tenants/${r.id}/admin/invite`, { method: "POST" }), t("inviteSent"))}>{t("resendInvite")}</PermButton>
           <PermButton perm={PERMS.platformTenantAdmin} size="sm" variant="outline" onClick={() => void act(() => bff(`tenants/${r.id}/admin/unlock`, { method: "POST" }), t("unlocked"))}>{t("unlock")}</PermButton>
         </div>
@@ -126,6 +128,7 @@ export function TenantsPage() {
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {grantFor ? <GrantsPanel tenant={grantFor} onClose={() => { setGrantFor(null); reload(); }} /> : null}
       {securityFor ? <SecurityPanel key={securityFor.id} tenant={securityFor} onClose={() => setSecurityFor(null)} /> : null}
+      {quotaFor ? <QuotaPanel key={quotaFor.id} tenant={quotaFor} onClose={() => setQuotaFor(null)} /> : null}
     </section>
   );
 }
@@ -375,5 +378,71 @@ export function PlatformAuditPage() {
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: rows.length === 20, onPageChange: setPage }} />
     </section>
+  );
+}
+
+interface Meter { used: number; limit: number | null; percent: number | null; full: boolean; over: boolean }
+interface UsageData {
+  limits: { maxAccounts: number | null; maxStorageMb: number | null };
+  usage: { accounts: number; activeAccounts: number; libraryFiles: number; submissionFiles: number; storageMb: number };
+  accountsMeter: Meter;
+  storageMeter: Meter;
+}
+
+/** 租户"使用情况与配额"：账号数、存储用量，和平台设的上限（留空 = 不限）。 */
+function QuotaPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => void }) {
+  const t = useTranslations("pages.tenants");
+  const [data, setData] = React.useState<UsageData | null>(null);
+  const [accounts, setAccounts] = React.useState("");
+  const [storage, setStorage] = React.useState("");
+  const [msg, setMsg] = React.useState<string | null>(null);
+  const load = React.useCallback(async () => {
+    const d = await bff<UsageData>(`tenants/${tenant.id}/usage`);
+    setData(d);
+    setAccounts(d.limits.maxAccounts === null ? "" : String(d.limits.maxAccounts));
+    setStorage(d.limits.maxStorageMb === null ? "" : String(d.limits.maxStorageMb));
+  }, [tenant.id]);
+  React.useEffect(() => { void load().catch((e) => setMsg((e as Error).message)); }, [load]);
+  if (!data) return <p className="mt-3 text-sm text-muted">{msg ?? "…"}</p>;
+  const num = (v: string) => (v.trim() === "" ? null : Number(v));
+  async function save() {
+    try {
+      await bff(`tenants/${tenant.id}/quota`, { method: "PUT", body: { maxAccounts: num(accounts), maxStorageMb: num(storage) } });
+      await load();
+      setMsg(t("saved"));
+    } catch (e) { setMsg((e as Error).message); }
+  }
+  const bar = (m: Meter) => (
+    <div className="h-2 w-48 rounded bg-border" role="img" aria-label={m.percent === null ? t("noLimit") : `${m.percent}%`}>
+      <div className={`h-2 rounded ${m.over ? "bg-red-500" : m.full ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${Math.min(100, m.percent ?? 0)}%` }} />
+    </div>
+  );
+  const u = data.usage;
+  return (
+    <div className="mt-4 rounded-md border border-border p-3">
+      <h3 className="mb-2 font-medium">{t("quotaOf", { name: tenant.name })}</h3>
+      <div className="mb-3 grid gap-3 text-sm sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <span className="font-medium">{t("accountsUsed", { used: u.accounts, active: u.activeAccounts })}</span>
+          {bar(data.accountsMeter)}
+          <label className="flex flex-col gap-1">{t("maxAccounts")}
+            <input type="number" min={1} className="w-32 rounded-md border border-border bg-transparent px-2 py-1" value={accounts} placeholder={t("noLimit")} onChange={(e) => setAccounts(e.target.value)} />
+          </label>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="font-medium">{t("storageUsed", { mb: u.storageMb, library: u.libraryFiles, submissions: u.submissionFiles })}</span>
+          {bar(data.storageMeter)}
+          <label className="flex flex-col gap-1">{t("maxStorageMb")}
+            <input type="number" min={1} className="w-32 rounded-md border border-border bg-transparent px-2 py-1" value={storage} placeholder={t("noLimit")} onChange={(e) => setStorage(e.target.value)} />
+          </label>
+        </div>
+      </div>
+      <p className="mb-2 text-xs text-muted">{t("quotaHelp")}</p>
+      <div className="flex items-center gap-2 text-sm">
+        <PermButton perm={PERMS.platformTenantQuota} size="sm" onClick={() => void save()}>{t("save")}</PermButton>
+        <Button size="sm" variant="outline" onClick={onClose}>{t("close")}</Button>
+        {msg ? <span role="status" className="text-muted">{msg}</span> : null}
+      </div>
+    </div>
   );
 }
