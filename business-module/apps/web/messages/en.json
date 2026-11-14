@@ -508,7 +508,15 @@
       "state_not_taken": "Not taken",
       "tab_assignments": "Assignments",
       "tab_grades": "Grades",
-      "tab_discussion": "Discussion"
+      "tab_discussion": "Discussion",
+      "version": "Curriculum version",
+      "versionYear": "New version: first entry year",
+      "versionLabel": "Name (optional)",
+      "versionAdd": "Add version (copies this one)",
+      "versionRemove": "Remove this version",
+      "versionConfirmRemove": "Remove this version? Students on it move to the previous version.",
+      "versionHelp": "A version applies to students who entered from its year until the next version starts; earlier entry years use the first version.",
+      "electiveMin": "Minimum elective credits"
     },
     "assignments": {
       "tab": "Assignments",

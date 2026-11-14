@@ -915,9 +915,30 @@ model Major {
   tenant  Tenant        @relation(fields: [tenantId], references: [id])
   courses MajorCourse[]
   students StudentMajor[]
+  versions MajorVersion[]
 
   @@unique([tenantId, code])
   @@map("major")
+}
+
+/// 培养方案版本：从某个入学年份起生效；学生按入学年份落在哪个版本就用哪个版本的课程设置和学分要求
+model MajorVersion {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  majorId            String   @map("major_id") @db.Uuid
+  label              String
+  effectiveYear      Int      @map("effective_year")
+  totalCredits       Decimal  @default(0) @map("total_credits") @db.Decimal(6, 1)
+  electiveMinCredits Decimal  @default(0) @map("elective_min_credits") @db.Decimal(6, 1)
+  createdAt          DateTime @default(now()) @map("created_at")
+  createdBy          String?  @map("created_by") @db.Uuid
+
+  major   Major         @relation(fields: [majorId], references: [id])
+  courses MajorCourse[]
+
+  @@unique([majorId, effectiveYear])
+  @@index([tenantId, majorId])
+  @@map("major_version")
 }
 
 /// 课程：目录条目，不属于任何学期。有历史班级后编号和学分只读。
@@ -964,16 +985,18 @@ model MajorCourse {
   id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId      String  @map("tenant_id") @db.Uuid
   majorId       String  @map("major_id") @db.Uuid
+  versionId     String  @map("version_id") @db.Uuid
   courseId      String  @map("course_id") @db.Uuid
   /// required / elective / general
   category      String
   suggestedTerm Int?    @map("suggested_term")
   note          String?
 
-  major  Major  @relation(fields: [majorId], references: [id])
-  course Course @relation(fields: [courseId], references: [id])
+  major   Major        @relation(fields: [majorId], references: [id])
+  version MajorVersion @relation(fields: [versionId], references: [id])
+  course  Course       @relation(fields: [courseId], references: [id])
 
-  @@unique([majorId, courseId])
+  @@unique([versionId, courseId])
   @@map("major_course")
 }
 
@@ -985,6 +1008,8 @@ model StudentMajor {
   majorId    String   @map("major_id") @db.Uuid
   /// primary / minor
   kind       String   @default("primary")
+  /// 入学年份：决定适用哪个培养方案版本（默认取申报当年）
+  entryYear  Int      @map("entry_year")
   declaredOn DateTime @default(dbgenerated("CURRENT_DATE")) @map("declared_on") @db.Date
   active     Boolean  @default(true)
 

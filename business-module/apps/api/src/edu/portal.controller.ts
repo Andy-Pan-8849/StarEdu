@@ -1,5 +1,6 @@
 // 学生门户的教学接口：选课、退课、我的选课、培养方案、班级课件。
 // 一切以"我"为准（令牌里的账号 → 人员）；学生看不到别人的任何选课。权限字符来自门户入口下的菜单，学生角色自动拥有。
+import { resolveVersion } from "@staredu/shared";
 import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import { PERMS } from "@staredu/shared";
@@ -34,8 +35,10 @@ export class PortalController {
     const declared = await this.db.studentMajor.findFirst({ where: { personId, kind: "primary", active: true } });
     if (!declared) return null;
     const major = await this.db.major.findUnique({ where: { id: declared.majorId } });
-    const items = await this.db.majorCourse.findMany({ where: { majorId: declared.majorId } });
-    return { major, items: new Map(items.map((i) => [i.courseId, i])) };
+    // 按入学年份落在哪个培养方案版本，就用哪个版本的课程设置和学分要求
+    const version = resolveVersion(await this.db.majorVersion.findMany({ where: { majorId: declared.majorId } }), declared.entryYear);
+    const items = version ? await this.db.majorCourse.findMany({ where: { versionId: version.id } }) : [];
+    return { major, version, items: new Map(items.map((i) => [i.courseId, i])) };
   }
 
   @Get("sections")
@@ -111,7 +114,7 @@ export class PortalController {
       const cfg = major.items.get(c.id);
       return { courseId: c.id, code: c.code, name: c.name, credits: Number(c.credits), category: cfg?.category, suggestedTerm: cfg?.suggestedTerm ?? null, state };
     });
-    return { declaredMajor: { id: major.major.id, name: major.major.name }, courses: items, credits: { earned, required: Number(major.major.totalCredits) } };
+    return { declaredMajor: { id: major.major.id, name: major.major.name }, courses: items, credits: { earned, required: Number(major.version?.totalCredits ?? major.major.totalCredits) }, version: major.version ? { id: major.version.id, label: major.version.label, effectiveYear: major.version.effectiveYear } : null };
   }
 
   /** 班级课件：选课的学生可看已发布的（已作废/退课的失去访问；结课后保留只读）。 */

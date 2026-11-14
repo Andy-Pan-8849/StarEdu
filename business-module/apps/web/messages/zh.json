@@ -508,7 +508,15 @@
       "state_not_taken": "未修",
       "tab_assignments": "作业",
       "tab_grades": "成绩",
-      "tab_discussion": "讨论"
+      "tab_discussion": "讨论",
+      "version": "培养方案版本",
+      "versionYear": "新版本从哪年入学起生效",
+      "versionLabel": "名称（可不填）",
+      "versionAdd": "新增版本（复制当前版本）",
+      "versionRemove": "删除此版本",
+      "versionConfirmRemove": "删除这个版本？用它的学生会改用前一个版本。",
+      "versionHelp": "一个版本适用于从它的生效年份起入学、到下一个版本生效前的学生；早于第一个版本的入学年份按第一个版本。",
+      "electiveMin": "选修最低学分"
     },
     "assignments": {
       "tab": "作业",
