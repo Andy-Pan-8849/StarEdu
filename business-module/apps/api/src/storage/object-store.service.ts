@@ -2,7 +2,7 @@
 // 上传：服务端发预签名地址，浏览器直接传给对象存储（文件不经过 NestJS）；提交时服务端用 HEAD 确认对象存在且大小一致。
 // 键一律以 tenant/<租户 id>/ 开头，并在取用前核对前缀：一个租户的键换不出另一个租户的文件。
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const UPLOAD_URL_TTL_SECONDS = 600;
@@ -92,6 +92,18 @@ export class ObjectStoreService {
   async presignDownload(key: string, fileName: string): Promise<string> {
     await this.ensureBucket();
     return getSignedUrl(this.signer, new GetObjectCommand({ Bucket: this.bucket, Key: key, ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}` }), { expiresIn: DOWNLOAD_URL_TTL_SECONDS });
+  }
+
+  /** 在线预览：用 inline 展示（不是附件），并指定内容类型；地址很快过期。 */
+  async presignView(key: string, fileName: string, contentType: string): Promise<string> {
+    await this.ensureBucket();
+    return getSignedUrl(this.signer, new GetObjectCommand({ Bucket: this.bucket, Key: key, ResponseContentType: contentType, ResponseContentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(fileName)}` }), { expiresIn: 120 });
+  }
+
+  /** 服务端复制一个对象（不经过浏览器）。 */
+  async copy(sourceKey: string, targetKey: string): Promise<void> {
+    await this.ensureBucket();
+    await this.client.send(new CopyObjectCommand({ Bucket: this.bucket, Key: targetKey, CopySource: `${this.bucket}/${sourceKey.split("/").map(encodeURIComponent).join("/")}` }));
   }
 
   /** 对象存在就返回大小，不存在返回 null。 */

@@ -1445,3 +1445,117 @@ model DiscussionPost {
   @@index([parentId])
   @@map("discussion_post")
 }
+
+/// 文档库文件夹（树）。ancestors 含自己，由触发器维护；"子树" = ancestors @> ARRAY[文件夹id]
+model DocFolder {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  parentId       String?  @map("parent_id") @db.Uuid
+  ancestors      String[] @default([])
+  name           String
+  /// 所属部门：只用来生成默认授权
+  ownerDeptId    String?  @map("owner_dept_id") @db.Uuid
+  /// public / internal / confidential
+  classification String   @default("internal")
+  /// 为真：这个文件夹的有效授权 = 自己的授权 + 上级的有效授权；机密文件夹建立时断开
+  inheritAcl     Boolean  @default(true) @map("inherit_acl")
+  /// 仅在线预览（不能下载）；只对机密文件夹有意义
+  previewOnly    Boolean  @default(false) @map("preview_only")
+  /// 记录访问日志；机密文件夹必记，内部文件夹可选
+  logAccess      Boolean  @default(false) @map("log_access")
+  createdBy      String?  @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([tenantId, parentId])
+  @@index([ancestors], type: Gin)
+  @@map("doc_folder")
+}
+
+/// 文件夹访问授权：没有"拒绝"，多条取最高级别
+model DocAcl {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  folderId      String    @map("folder_id") @db.Uuid
+  /// everyone（含学生）/ all_staff（全体员工）/ dept / role / user
+  principalType String    @map("principal_type")
+  principalId   String?   @map("principal_id") @db.Uuid
+  includeSub    Boolean   @default(false) @map("include_sub")
+  /// view（查看/下载）/ edit（编辑/上传）/ manage（管理）
+  level         String
+  /// default（建文件夹时按规则生成）/ manual
+  source        String    @default("manual")
+  expiresAt     DateTime? @map("expires_at")
+  grantedBy     String?   @map("granted_by") @db.Uuid
+  grantedAt     DateTime  @default(now()) @map("granted_at")
+
+  @@index([tenantId, folderId])
+  @@map("doc_acl")
+}
+
+/// 文件：当前版本的信息在这一行，历史版本在 doc_file_version
+model DocFile {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  folderId    String    @map("folder_id") @db.Uuid
+  name        String
+  storageKey  String    @map("storage_key")
+  size        Int
+  contentType String    @map("content_type")
+  version     Int       @default(1)
+  uploadedBy  String?   @map("uploaded_by") @db.Uuid
+  uploadedAt  DateTime  @default(now()) @map("uploaded_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@index([tenantId, folderId])
+  @@map("doc_file")
+}
+
+model DocFileVersion {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  fileId      String   @map("file_id") @db.Uuid
+  version     Int
+  storageKey  String   @unique @map("storage_key")
+  size        Int
+  contentType String   @map("content_type")
+  uploadedBy  String?  @map("uploaded_by") @db.Uuid
+  uploadedAt  DateTime @default(now()) @map("uploaded_at")
+
+  @@unique([fileId, version])
+  @@map("doc_file_version")
+}
+
+/// 已登记、等浏览器直传的上传（预签名地址发出去了，还没确认）
+model DocUpload {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  folderId    String   @map("folder_id") @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  /// 不为空 = 给这个文件上传新版本
+  fileId      String?  @map("file_id") @db.Uuid
+  storageKey  String   @unique @map("storage_key")
+  name        String
+  size        Int
+  contentType String   @map("content_type")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("doc_upload")
+}
+
+/// 访问日志：谁、何时、对哪个文件/文件夹、做了什么
+model DocAccessLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  accountId String?  @map("account_id") @db.Uuid
+  action    String
+  folderId  String?  @map("folder_id") @db.Uuid
+  fileId    String?  @map("file_id") @db.Uuid
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, folderId, createdAt])
+  @@map("doc_access_log")
+}

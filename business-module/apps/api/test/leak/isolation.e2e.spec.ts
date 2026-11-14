@@ -34,6 +34,7 @@ const TABLES = [
   "assignment_group", "assignment", "rubric_item", "assignment_extension", "submission", "submission_version", "submission_file", "submission_score",
   "grading_scale_item", "manual_grade", "final_grade", "grade_change", "transcript_issue",
   "notification", "notification_preference", "announcement", "discussion_post",
+  "doc_folder", "doc_acl", "doc_file", "doc_file_version", "doc_upload", "doc_access_log",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course",
 ];
 
@@ -72,6 +73,9 @@ describe("cross-tenant leak scan", () => {
     const announcement = await owner.announcement.create({ data: { tenantId, title: "Scan notice", body: "x", scopeKind: "tenant" } });
     const dictType = await owner.dictType.create({ data: { tenantId, code: "scan_dict", name: "Scan dictionary" } });
     const dictItem = await owner.dictItem.create({ data: { tenantId, typeId: dictType.id, value: "one", label: "One" } });
+    const libFolder = await owner.docFolder.create({ data: { tenantId, name: "Scan library", classification: "internal" } });
+    await owner.docAcl.create({ data: { tenantId, folderId: libFolder.id, principalType: "user", principalId: user.accountId, level: "manage", source: "manual" } });
+    const libFile = await owner.docFile.create({ data: { tenantId, folderId: libFolder.id, name: "scan.txt", storageKey: `tenant/${tenantId}/library/${libFolder.id}/x/scan.txt`, size: 1, contentType: "text/plain" } });
     const param = await owner.sysParam.create({ data: { tenantId, key: "scan.param", value: "1", name: "Scan parameter" } });
 
     const token = await user.token();
@@ -79,7 +83,7 @@ describe("cross-tenant leak scan", () => {
     const everyId = async (table: string) =>
       (await owner.$queryRawUnsafe<Array<{ id: string }>>(`SELECT id::text FROM biz.${table} WHERE tenant_id = '${tenantId}'`)).map((r) => r.id);
     const allIds = new Set<string>([tenantId, sid]);
-    for (const t of ["role", "menu", "data_scope_set", "account", "person", "dept", "campus", "post", "dict_type", "dict_item", "sys_param", "term", "major", "course", "section"]) (await everyId(t)).forEach((i) => allIds.add(i));
+    for (const t of ["role", "menu", "data_scope_set", "account", "person", "dept", "campus", "post", "dict_type", "dict_item", "sys_param", "term", "major", "course", "section", "doc_folder", "doc_file"]) (await everyId(t)).forEach((i) => allIds.add(i));
     return {
       tenant,
       host: `${tenant.code}.localhost`,
@@ -102,6 +106,8 @@ describe("cross-tenant leak scan", () => {
         dictTypeId: dictType.id,
         dictItemId: dictItem.id,
         paramId: param.id,
+        folderId: libFolder.id,
+        libFileId: libFile.id,
         sid,
       },
       allIds: new Set([...allIds, extraCampus.id, extraCampusDept.id]),
@@ -258,7 +264,7 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const path = m.path.replace(/:(id|sid|personId)/, id).replace(/:(id|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId|aclId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
       const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400

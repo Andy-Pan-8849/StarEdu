@@ -137,6 +137,22 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("platform:log", "platform", "Audit log", "log", 8, PERMS.platformLogList, []),
   ...menuWithButtons("platform:announcement", "platform", "Platform announcements", "announcement", 9, PERMS.platformAnnouncementList, [["edit", "Edit", PERMS.platformAnnouncementEdit]]),
 
+  // 文档库：全员使用的文件库（不属于系统管理），排在人事之后；文件夹树是数据，不是菜单
+  { code: "doc", type: "directory", name: "Library", nameKey: "menu.doc", route: "doc", icon: "folder", sort: 15, entries: ["admin"] },
+  ...menuWithButtons("doc:library", "doc", "Document library", "library", 1, PERMS.docLibraryList, [
+    ["folderAdd", "New folder", PERMS.docFolderAdd],
+    ["folderRoot", "New top-level folder", PERMS.docFolderRoot],
+    ["folderEdit", "Edit folder", PERMS.docFolderEdit],
+    ["folderMove", "Move folder", PERMS.docFolderMove],
+    ["folderRemove", "Delete folder", PERMS.docFolderRemove],
+    ["upload", "Upload", PERMS.docFileUpload],
+    ["download", "Download", PERMS.docFileDownload],
+    ["fileEdit", "Edit, copy and move files", PERMS.docFileEdit],
+    ["fileDelete", "Delete files", PERMS.docFileDelete],
+    ["aclEdit", "Folder access", PERMS.docAclEdit],
+    ["selfGrant", "Grant myself access", PERMS.docAclSelfGrant],
+    ["log", "Access log", PERMS.docLogList],
+  ]),
   { code: "edu", type: "directory", name: "Teaching", nameKey: "menu.edu", route: "edu", icon: "book", sort: 20, entries: ["admin"] },
   ...menuWithButtons("edu:term", "edu", "Terms", "term", 1, PERMS.eduTermList, [
     ["add", "Add", PERMS.eduTermAdd],
@@ -188,6 +204,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("portal:plan", "portal", "Degree plan", "plan", 2, PERMS.portalPlanView, []),
   ...menuWithButtons("portal:assignment", "portal", "My assignments", "assignment", 3, PERMS.portalAssignmentList, [["submit", "Submit", PERMS.portalAssignmentSubmit]]),
   ...menuWithButtons("portal:discussion", "portal", "Discussions", "discussion", 5, PERMS.portalDiscussionList, [["post", "Post", PERMS.portalDiscussionPost]]),
+  ...menuWithButtons("portal:library", "portal", "Library", "library", 6, PERMS.portalLibraryList, [["download", "Download", PERMS.portalLibraryDownload]]),
   ...menuWithButtons("portal:grade", "portal", "My grades", "grade", 4, PERMS.portalGradeList, [["download", "Download transcript", PERMS.portalTranscriptDownload]]),
 
   // AI 助手：外链，管理后台和学生门户两个入口都分配（入口管理的多对多）；{code} 换成当前租户代码

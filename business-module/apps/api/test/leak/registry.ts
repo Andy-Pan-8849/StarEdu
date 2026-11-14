@@ -28,6 +28,8 @@ export type Fixture =
   | "dictTypeId"
   | "dictItemId"
   | "paramId"
+  | "folderId"
+  | "libFileId"
   | "sid";
 
 export interface LeakEntry {
@@ -42,6 +44,8 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/me", kind: "self" },
   { method: "GET", path: "/api/me/menus?entry=admin", kind: "other" },
   { method: "GET", path: "/api/campuses", kind: "list" },
+  { method: "GET", path: "/api/library/folders", kind: "list" },
+  { method: "GET", path: "/api/library/folders/:id", kind: "detail", fixture: "folderId" },
   { method: "GET", path: "/api/campuses/:id", kind: "detail", fixture: "campusId" },
   { method: "GET", path: "/api/campuses/:id/closure-check", kind: "detail", fixture: "campusId" },
   { method: "GET", path: "/api/dict-types", kind: "other" },
@@ -202,6 +206,29 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "POST", path: "/api/sections/:id/discussions/:postId/pin", fixture: "sectionId", target: "foreign", body: { pinned: true }, note: "pin another tenant's post" },
   { method: "POST", path: "/api/sections/:id/discussions/:postId/resolve", fixture: "sectionId", target: "foreign", body: { resolved: true }, note: "resolve another tenant's post" },
   { method: "DELETE", path: "/api/sections/:id/discussions/:postId", fixture: "sectionId", target: "foreign", note: "delete another tenant's post" },
+  { method: "PATCH", path: "/api/library/folders/:id", fixture: "folderId", target: "foreign", body: { name: "x" }, note: "change another tenant's folder" },
+  { method: "POST", path: "/api/library/folders/:id/move", fixture: "folderId", target: "foreign", body: { targetId: null, confirm: true }, note: "move another tenant's folder" },
+  { method: "DELETE", path: "/api/library/folders/:id", fixture: "folderId", target: "foreign", note: "delete another tenant's folder" },
+  { method: "GET", path: "/api/library/folders/:id/acl", fixture: "folderId", target: "foreign", note: "read another tenant's folder grants" },
+  { method: "POST", path: "/api/library/folders/:id/acl", fixture: "folderId", target: "foreign", body: { principalType: "everyone", level: "view" }, note: "grant access on another tenant's folder" },
+  { method: "DELETE", path: "/api/library/folders/:id/acl/:aclId", fixture: "folderId", target: "foreign", note: "remove a grant of another tenant's folder" },
+  { method: "POST", path: "/api/library/folders/:id/self-grant", fixture: "folderId", target: "foreign", body: { reason: "leak scan test" }, note: "self-grant on another tenant's folder" },
+  { method: "GET", path: "/api/library/folders/:id/log", fixture: "folderId", target: "foreign", note: "read another tenant's access log" },
+  { method: "GET", path: "/api/library/folders/:id/files", fixture: "folderId", target: "foreign", note: "list another tenant's files" },
+  { method: "POST", path: "/api/library/folders/:id/uploads", fixture: "folderId", target: "foreign", body: { name: "x.txt", size: 1, contentType: "text/plain" }, note: "upload into another tenant's folder" },
+  { method: "POST", path: "/api/library/folders/:id/uploads/confirm", fixture: "folderId", target: "foreign", body: { uploadId: "11111111-1111-4111-8111-111111111111" }, note: "confirm an upload in another tenant's folder" },
+  { method: "GET", path: "/api/library/files/:id/download", fixture: "libFileId", target: "foreign", note: "download another tenant's file" },
+  { method: "GET", path: "/api/library/files/:id/preview", fixture: "libFileId", target: "foreign", note: "preview another tenant's file" },
+  { method: "GET", path: "/api/library/files/:id/versions", fixture: "libFileId", target: "foreign", note: "list another tenant's file versions" },
+  { method: "PATCH", path: "/api/library/files/:id", fixture: "libFileId", target: "foreign", body: { name: "x.txt" }, note: "rename another tenant's file" },
+  { method: "DELETE", path: "/api/library/files/:id", fixture: "libFileId", target: "foreign", note: "delete another tenant's file" },
+  { method: "POST", path: "/api/library/files/:id/copy", fixture: "libFileId", target: "foreign", body: { targetId: "{{A.folderId}}" }, note: "copy another tenant's file" },
+  { method: "POST", path: "/api/library/files/:id/move", fixture: "libFileId", target: "foreign", body: { targetId: "{{A.folderId}}" }, note: "move another tenant's file" },
+  { method: "POST", path: "/api/library/files/:id/copy", fixture: "libFileId", target: "own", expectStatus: 404, body: { targetId: "{{B.folderId}}" }, note: "copy own file into another tenant's folder" },
+  { method: "POST", path: "/api/library/files/:id/move", fixture: "libFileId", target: "own", expectStatus: 404, body: { targetId: "{{B.folderId}}" }, note: "move own file into another tenant's folder" },
+  { method: "POST", path: "/api/library/folders", target: "own", expectStatus: 404, body: { name: "leak", parentId: "{{B.folderId}}" }, note: "folder under another tenant's folder" },
+  { method: "POST", path: "/api/library/folders", target: "own", body: { name: "leak2", ownerDeptId: "{{B.deptId}}" }, note: "folder owned by another tenant's department" },
+  { method: "POST", path: "/api/library/folders/:id/move", fixture: "folderId", target: "own", expectStatus: 404, body: { targetId: "{{B.folderId}}", confirm: true }, note: "move own folder under another tenant's folder" },
   { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{B.courseId}}", termId: "{{A.termId}}", campusId: "{{A.campusId}}", number: "01", capacity: 5 }, note: "section of another tenant's course" },
   { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{A.courseId}}", termId: "{{B.termId}}", campusId: "{{A.campusId}}", number: "02", capacity: 5 }, note: "section in another tenant's term" },
   { method: "POST", path: "/api/sections", target: "own", body: { courseId: "{{A.courseId}}", termId: "{{A.termId}}", campusId: "{{B.campusId}}", number: "03", capacity: 5 }, note: "section on another tenant's campus" },
@@ -227,6 +254,11 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
 
 /** 不接收别人的 id、只作用于调用者自己租户的写接口。 */
 export const OTHER_ROUTES: Record<string, string> = {
+  "GET /api/library/principals": "candidate list from the caller's own tenant only (no ids in the request)",
+  "GET /api/portal/library/folders": "portal read-only: same service and the same folder-level check as the admin routes, which are scanned above; student visibility tested in library.e2e.spec.ts",
+  "GET /api/portal/library/folders/:id/files": "portal read-only: same service as the scanned admin route",
+  "GET /api/portal/library/files/:id/download": "portal read-only: same service as the scanned admin route",
+  "GET /api/portal/library/files/:id/preview": "portal read-only: same service as the scanned admin route",
   "POST /api/auth/session": "registers the caller's own session; body has only an entry code",
   "POST /api/roles": "creates a role in the caller's tenant from name/code only",
   "POST /api/menus": "tested above with a foreign parent id; otherwise creates in the caller's tenant",
