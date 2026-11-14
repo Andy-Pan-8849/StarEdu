@@ -184,14 +184,18 @@ await call("data-scope-sets");                                        // data sc
 
 Then tick menus with `PUT roles/<id>/menus {menuIds:[...]}`, choose data scopes with `PUT roles/<id>/data-scopes {setIds:[...]}`, create a person's account with `POST accounts {username, email}` and give them the role with `PUT accounts/<id>/roles {roleIds:[...]}`. The new person receives an invitation e-mail (see Mailpit) and sets a password.
 
-## 5. What to notice when you evaluate
+## 5. Optional: the Kafka event bus
+
+Nothing in the walk-through above needs Kafka. To see it work: `make biz-up-kafka`, set `BIZ_EVENT_BUS=kafka` in `.env`, restart `pnpm dev:api`, then do anything that sends a notification (for example enroll a student as the registrar). The event goes outbox table, Kafka topic `business.events`, a consumer group, and then the bell. Stop the broker with `make biz-down-kafka` and keep working: events wait in the table and arrive after you start it again. Messages that cannot be handled land in `business.events.dlq`. `make test-events` runs the tests against the real broker.
+
+## 6. What to notice when you evaluate
 
 - **Menus follow permissions.** Give an account a role with one menu ticked and sign in as that account: only that menu appears. Remove the role and the menu disappears on the next request.
 - **Data scope.** Two people with the same role but different departments see different people. "No data scope" means no rows, never "everything".
 - **Isolation.** Two companies share one system but not one row. The test suite proves this for every endpoint (`pnpm test:leak`).
 - **Sessions.** Force logout works at once, even though the sign-in token is still valid for a few minutes.
 
-## 6. Reset
+## 7. Reset
 
 ```bash
 make reset         # removes the local data of this module (not the AI module)

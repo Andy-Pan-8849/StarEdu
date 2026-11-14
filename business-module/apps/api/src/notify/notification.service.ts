@@ -27,8 +27,9 @@ export function signUnsubscribe(tenantId: string, accountId: string, category: s
 export function readUnsubscribe(token: string): { tenantId: string; accountId: string; category: Category } | null {
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
-  const expected = createHmac("sha256", secret()).update(payload).digest();
-  const given = Buffer.from(sig, "base64url");
+  // 比较规范的文本形式，不是解码后的字节：base64url 的末位有几位不参与解码，改末位字符可能解出同样的字节
+  const expected = Buffer.from(createHmac("sha256", secret()).update(payload).digest("base64url"));
+  const given = Buffer.from(sig);
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
     const v = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { t: string; a: string; c: string };

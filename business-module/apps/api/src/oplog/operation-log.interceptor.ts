@@ -2,6 +2,8 @@
 // 返回内容不记。写日志失败不能影响业务请求。
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
 import { Observable, tap } from "rxjs";
+import { OutboxService } from "../edu/outbox.service";
+import { extendedEvents } from "../events/event-bus";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { sanitizeParams } from "./sanitize";
 
@@ -9,7 +11,10 @@ const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 @Injectable()
 export class OperationLogInterceptor implements NestInterceptor {
-  constructor(private readonly tenantDb: TenantPrismaService) {}
+  constructor(
+    private readonly tenantDb: TenantPrismaService,
+    private readonly outbox: OutboxService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest();
@@ -33,6 +38,8 @@ export class OperationLogInterceptor implements NestInterceptor {
             error: error?.slice(0, 500) ?? null,
           } as never,
         })
+        // kafka 模式：操作记录也作为事件发出去（方法、路径、状态；不带请求参数）
+        .then(() => (extendedEvents() ? this.outbox.emit("audit.operation", { accountId: req.auth.accountId, method: req.method, path: String(req.originalUrl ?? route).split("?")[0].slice(0, 300), status }) : undefined))
         .catch(() => undefined);
     };
     return next.handle().pipe(

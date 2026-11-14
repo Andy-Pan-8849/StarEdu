@@ -12,6 +12,7 @@ import { todayUtc } from "../hr/effective";
 import { requireTenant } from "../tenancy/request-scope";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { schedulesOverlap, type ScheduleItem } from "./edu-common";
+import { extendedEvents } from "../events/event-bus";
 import { OutboxService } from "./outbox.service";
 
 export type Violation = "capacity" | "prerequisite" | "window" | "retake" | "conflict";
@@ -120,6 +121,7 @@ export class EnrollmentService {
       const created = await tx.enrollment.create({
         data: { tenantId: tenant.tenantId, sectionId: section.id, studentPersonId: input.studentPersonId, method: input.method, reason: registrar ? (input.reason ?? null) : null, overrides: overrides as never, createdBy: input.actorAccountId },
       });
+      if (extendedEvents()) await tx.outboxEvent.create({ data: { tenantId: tenant.tenantId, type: "enrollment.enrolled", payload: { enrollmentId: created.id, studentPersonId: input.studentPersonId, sectionId: section.id, method: input.method } } });
       if (registrar) await tx.outboxEvent.create({ data: { tenantId: tenant.tenantId, type: "enrollment.registrar_added", payload: { enrollmentId: created.id, studentPersonId: input.studentPersonId, sectionId: section.id, overrides } } });
       return { enrollmentId: created.id, conflicts: registrar ? [] : conflicts, conflictCheckSkipped: skipped };
     }).then(async (result) => {
@@ -143,6 +145,7 @@ export class EnrollmentService {
       const deadline = e.section.term.dropDeadline;
       const status = !deadline || todayUtc() <= deadline ? "voided" : "withdrawn";
       await tx.enrollment.update({ where: { id: e.id }, data: { status, droppedAt: new Date() } });
+      if (extendedEvents()) await tx.outboxEvent.create({ data: { tenantId: tenant.tenantId, type: "enrollment.dropped", payload: { enrollmentId: e.id, studentPersonId: e.studentPersonId, sectionId: e.sectionId, status, by: opts.byRegistrar ? "registrar" : "student" } } });
       if (opts.byRegistrar) await tx.outboxEvent.create({ data: { tenantId: tenant.tenantId, type: "enrollment.registrar_removed", payload: { enrollmentId: e.id, studentPersonId: e.studentPersonId, sectionId: e.sectionId, status } } });
       return { id: e.id, status, sectionId: e.sectionId };
     });

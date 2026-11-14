@@ -6,6 +6,8 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { MailService } from "../mail/mail.service";
 import { PlatformPrismaService } from "../platform/platform-prisma.service";
+import { busMode } from "../events/event-bus";
+import { OutboxRelay } from "../events/outbox-relay";
 import { EVENT_HANDLERS } from "./events";
 import { NotificationService, signUnsubscribe } from "./notification.service";
 import { EMAIL_FOOTER, pickLocale, render } from "./templates";
@@ -22,6 +24,7 @@ export class NotifyWorker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly db: PlatformPrismaService,
     private readonly notify: NotificationService,
     private readonly mail: MailService,
+    private readonly relay: OutboxRelay,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -35,18 +38,29 @@ export class NotifyWorker implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** 一轮：先处理事件，再发邮件。同一实例里不重叠。 */
+  /** 一轮：出站箱模式下直接处理事件；kafka 模式下把事件转发到 Kafka（处理由消费组做）。然后发邮件。同一实例里不重叠。 */
   async tick(): Promise<{ events: number; emails: number }> {
     if (this.running) return { events: 0, emails: 0 };
     this.running = true;
     try {
-      return { events: await this.processOutbox(), emails: await this.sendEmails() };
+      const events = busMode() === "kafka" ? await this.relay.tick() : await this.processOutbox();
+      return { events, emails: await this.sendEmails() };
     } catch (err) {
       this.log.warn(`worker tick failed: ${err instanceof Error ? err.message : err}`);
       return { events: 0, emails: 0 };
     } finally {
       this.running = false;
     }
+  }
+
+  /** 一个事件 → 通知。出站箱模式和 Kafka 消费者共用；按（账号，事件 id）去重，重复处理没有副作用。 */
+  async handleEvent(evt: { id: string; tenantId: string; type: string; payload: unknown }): Promise<void> {
+    const handler = EVENT_HANDLERS[evt.type];
+    if (!handler) return;
+    const { items } = await handler(this.db, evt);
+    const accounts = await this.notify.accountsOfPersons(evt.tenantId, [...new Set(items.map((i) => i.personId))]);
+    const recipients = items.flatMap((i) => (accounts.has(i.personId) ? [{ accountId: accounts.get(i.personId) as string, type: i.type, params: i.params }] : []));
+    await this.notify.deliver(evt.tenantId, null, recipients, evt.id);
   }
 
   async processOutbox(limit = 50): Promise<number> {
@@ -56,13 +70,7 @@ export class NotifyWorker implements OnApplicationBootstrap, OnModuleDestroy {
         for (const { id } of locked) {
           const evt = await tx.outboxEvent.findUniqueOrThrow({ where: { id } });
           try {
-            const handler = EVENT_HANDLERS[evt.type];
-            if (handler) {
-              const { items } = await handler(this.db, evt);
-              const accounts = await this.notify.accountsOfPersons(evt.tenantId, [...new Set(items.map((i) => i.personId))]);
-              const recipients = items.flatMap((i) => (accounts.has(i.personId) ? [{ accountId: accounts.get(i.personId) as string, type: i.type, params: i.params }] : []));
-              await this.notify.deliver(evt.tenantId, null, recipients, evt.id);
-            }
+            await this.handleEvent(evt);
             await tx.outboxEvent.update({ where: { id }, data: { processedAt: new Date() } });
           } catch (err) {
             const attempts = evt.attempts + 1;
