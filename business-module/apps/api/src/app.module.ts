@@ -61,6 +61,7 @@ import { PlatformAuditService } from "./platform/platform-audit.service";
 import { PlatformAuthzService } from "./platform/platform-authz.service";
 import { PlatformPrismaService } from "./platform/platform-prisma.service";
 import { TenantsController } from "./platform/tenants.controller";
+import { TenantSecurityService } from "./platform/tenant-security.service";
 import { TenantsService } from "./platform/tenants.service";
 import { MeController } from "./me/me.controller";
 import { CampusesController } from "./org/campuses.controller";
@@ -159,6 +160,7 @@ export const CONTROLLERS = [
     PlatformAuthzService,
     PlatformAuditService,
     TenantsService,
+    TenantSecurityService,
     JobsService,
     { provide: APP_GUARD, useClass: TenantTokenGuard },
     { provide: APP_INTERCEPTOR, useClass: OperationLogInterceptor },

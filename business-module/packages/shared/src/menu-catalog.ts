@@ -115,6 +115,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["status", "Status", PERMS.platformTenantStatus],
     ["grant", "Features", PERMS.platformTenantGrant],
     ["admin", "Administrator", PERMS.platformTenantAdmin],
+    ["security", "Sign-in and security", PERMS.platformTenantSecurity],
   ]),
   ...menuWithButtons("platform:account", "platform", "Platform accounts", "account", 2, PERMS.platformAccountList, [
     ["add", "Add", PERMS.platformAccountAdd],

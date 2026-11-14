@@ -1,10 +1,11 @@
 // 平台入口的租户管理接口（路径前缀 /api/platform，只在主机名 platform.* 上可用）。
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put } from "@nestjs/common";
 import { z } from "zod";
 import { PERMS } from "@staredu/shared";
 import { RequirePermissions } from "../auth/decorators";
 import { parse } from "../common/http";
 import { PAuth, PlatformRoute, type PlatformAuthContext } from "./platform.decorators";
+import { TenantSecurityService } from "./tenant-security.service";
 import { TenantsService } from "./tenants.service";
 
 const createSchema = z.object({
@@ -33,12 +34,25 @@ const statusSchema = z.object({
   plannedSuspendAt: z.coerce.date().nullable().optional(),
   noticeText: z.string().trim().min(1).max(2000).nullable().optional(),
 });
+const int = z.number().int();
+const securitySchema = z
+  .object({
+    password: z.object({ length: int, upperCase: int, lowerCase: int, digits: int, specialChars: int, history: int }).strict(),
+    lockout: z.object({ failureFactor: int, waitIncrementMinutes: int, maxWaitMinutes: int, permanent: z.boolean() }).strict(),
+    session: z.object({ idleMinutes: int, maxHours: int }).strict(),
+    mfa: z.enum(["off", "all"]),
+  })
+  .strict();
+const googleSchema = z.object({ clientId: z.string().trim().min(10).max(300), clientSecret: z.string().trim().min(5).max(300).optional(), enabled: z.boolean() }).strict();
 const grantsSchema = z.object({ menuIds: z.array(z.string().uuid()).max(3000) });
 
 @PlatformRoute()
 @Controller("api/platform/tenants")
 export class TenantsController {
-  constructor(private readonly tenants: TenantsService) {}
+  constructor(
+    private readonly tenants: TenantsService,
+    private readonly security: TenantSecurityService,
+  ) {}
 
   @Get()
   @RequirePermissions(PERMS.platformTenantList)
@@ -111,5 +125,30 @@ export class TenantsController {
   @RequirePermissions(PERMS.platformTenantAdmin)
   adminEmail(@PAuth() auth: PlatformAuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     return this.tenants.changeAdminEmail(auth.accountId, id, parse(z.object({ email: z.string().email().max(200) }), body).email);
+  }
+
+  // ---- 登录与安全
+  @Get(":id/security")
+  @RequirePermissions(PERMS.platformTenantSecurity)
+  getSecurity(@Param("id", ParseUUIDPipe) id: string) {
+    return this.security.get(id);
+  }
+
+  @Put(":id/security")
+  @RequirePermissions(PERMS.platformTenantSecurity)
+  setSecurity(@PAuth() auth: PlatformAuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.security.update(auth.accountId, id, parse(securitySchema, body));
+  }
+
+  @Put(":id/security/google")
+  @RequirePermissions(PERMS.platformTenantSecurity)
+  setGoogle(@PAuth() auth: PlatformAuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.security.setGoogle(auth.accountId, id, parse(googleSchema, body));
+  }
+
+  @Delete(":id/security/google")
+  @RequirePermissions(PERMS.platformTenantSecurity)
+  removeGoogle(@PAuth() auth: PlatformAuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    return this.security.removeGoogle(auth.accountId, id);
   }
 }

@@ -58,6 +58,7 @@ export const PERMS = {
   platformTenantStatus: "platform:tenant:status",
   platformTenantGrant: "platform:tenant:grant",
   platformTenantAdmin: "platform:tenant:admin",
+  platformTenantSecurity: "platform:tenant:security",
   platformAccountList: "platform:account:list",
   platformAccountAdd: "platform:account:add",
   platformAccountEdit: "platform:account:edit",
