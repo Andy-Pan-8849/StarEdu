@@ -63,6 +63,7 @@ export const TENANT_MODELS: Record<string, ModelRule> = {
   Notification: { nullable: false, softDelete: false },
   NotificationPreference: { nullable: false, softDelete: false },
   Announcement: { nullable: false, softDelete: false },
+  DiscussionPost: { nullable: false, softDelete: false },
 };
 
 export class TenantScopeError extends Error {}

@@ -1426,3 +1426,22 @@ model PlatformAnnouncement {
   @@index([startsAt, endsAt])
   @@map("platform_announcement")
 }
+
+/// 班级讨论：帖子（有标题）和回复（parentId 指向帖子）。删除是软删除；回复不能再有回复
+model DiscussionPost {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  sectionId      String    @map("section_id") @db.Uuid
+  parentId       String?   @map("parent_id") @db.Uuid
+  authorPersonId String    @map("author_person_id") @db.Uuid
+  title          String?
+  body           String
+  pinned         Boolean   @default(false)
+  resolved       Boolean   @default(false)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  @@index([sectionId, createdAt])
+  @@index([parentId])
+  @@map("discussion_post")
+}

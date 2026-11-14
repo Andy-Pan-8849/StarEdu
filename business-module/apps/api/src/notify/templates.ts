@@ -1,6 +1,6 @@
 // 通知文字模板：中英文两套。站内消息存的是"类型 + 参数"，读取时按收件人的语言渲染；邮件发送时同样渲染。
 export type Locale = "en" | "zh";
-export const CATEGORIES = ["enrollment", "assignment", "grade", "reminder", "announcement"] as const;
+export const CATEGORIES = ["enrollment", "assignment", "grade", "reminder", "announcement", "discussion"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 interface Template {
@@ -39,6 +39,21 @@ export const TEMPLATES: Record<string, Template> = {
     category: "grade",
     en: { title: "Final grade published: {section}", body: "Your final grade for {section} is now available." },
     zh: { title: "最终成绩已发布：{section}", body: "你在 {section} 的最终成绩已发布。" },
+  },
+  "discussion.posted": {
+    category: "discussion",
+    en: { title: "New discussion in {section}: {title}", body: "{author} started a discussion." },
+    zh: { title: "{section} 有新讨论：{title}", body: "{author} 发起了讨论。" },
+  },
+  "discussion.replied": {
+    category: "discussion",
+    en: { title: "New reply in {section}: {title}", body: "{author} replied." },
+    zh: { title: "{section} 的讨论有新回复：{title}", body: "{author} 回复了。" },
+  },
+  "discussion.resolved": {
+    category: "discussion",
+    en: { title: "Marked as solved: {title}", body: "Your discussion in {section} was marked as solved." },
+    zh: { title: "讨论已标记为已解决：{title}", body: "你在 {section} 发起的讨论已标记为已解决。" },
   },
   "reminder.deadline": {
     category: "reminder",

@@ -140,6 +140,10 @@ export const PERMS = {
   /** 生成正式版成绩单（带编号，写日志） */
   eduTranscriptIssue: "edu:transcript:issue",
   eduDashboardView: "edu:dashboard:view",
+  /** 班级讨论：任课教师和教务能看 */
+  eduDiscussionList: "edu:discussion:list",
+  /** 任课教师发帖、回复、置顶、标记已解决、删除 */
+  eduDiscussionEdit: "edu:discussion:edit",
   // 消息
   msgAnnouncementList: "msg:announcement:list",
   /** 发布公告：范围在自己的数据范围内（全公司、校区或班级） */
@@ -152,6 +156,8 @@ export const PERMS = {
   portalPlanView: "portal:plan:view",
   portalAssignmentList: "portal:assignment:list",
   portalAssignmentSubmit: "portal:assignment:submit",
+  portalDiscussionList: "portal:discussion:list",
+  portalDiscussionPost: "portal:discussion:post",
   portalGradeList: "portal:grade:list",
   portalTranscriptDownload: "portal:transcript:download",
 } as const;

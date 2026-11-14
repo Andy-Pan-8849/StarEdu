@@ -8,6 +8,7 @@ import { bff } from "@/lib/bff";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton, usePermissions } from "../permissions";
 import { AssignmentsPanel } from "./assignment-pages";
+import { DiscussionPanel } from "./discussion-pages";
 import { GradesPanel } from "./grade-pages";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
@@ -281,7 +282,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const t = useTranslations("pages.edu");
   const c = useTranslations("crud");
   const tt = useTable();
-  const [tab, setTab] = React.useState<"roster" | "instructors" | "materials" | "assignments" | "grades">("roster");
+  const [tab, setTab] = React.useState<"roster" | "instructors" | "materials" | "assignments" | "grades" | "discussion">("roster");
   const perms = usePermissions();
   const [s, setS] = React.useState<SectionRow | null>(null);
   const roster = useList<RosterRow>(`sections/${id}/roster`);
@@ -318,7 +319,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
     <div className="mt-4 rounded-md border border-border p-3 text-sm">
       <h3 className="mb-2 font-medium">{s.name} — {s.seated}/{s.capacity}</h3>
       <div role="tablist" className="mb-3 flex gap-2">
-        {(["roster", "instructors", "materials", "assignments", "grades"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList))).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "font-medium underline" : "text-muted"} onClick={() => setTab(k)}>{t(`tab_${k}`)}</button>)}
+        {(["roster", "instructors", "materials", "assignments", "grades", "discussion"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList)) && (k !== "discussion" || perms.has(PERMS.eduDiscussionList))).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "font-medium underline" : "text-muted"} onClick={() => setTab(k)}>{t(`tab_${k}`)}</button>)}
       </div>
       {message}
       {tab === "roster" ? (
@@ -362,6 +363,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
       ) : null}
       {tab === "assignments" ? <AssignmentsPanel sectionId={id} /> : null}
       {tab === "grades" ? <GradesPanel sectionId={id} /> : null}
+      {tab === "discussion" ? <DiscussionPanel sectionId={id} /> : null}
       <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
     </div>
   );
