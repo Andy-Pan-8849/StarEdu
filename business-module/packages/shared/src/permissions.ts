@@ -76,6 +76,8 @@ export const PERMS = {
   platformJobEdit: "platform:job:edit",
   platformJobRun: "platform:job:run",
   platformLogList: "platform:log:list",
+  platformAnnouncementList: "platform:announcement:list",
+  platformAnnouncementEdit: "platform:announcement:edit",
   // 人事
   hrPersonList: "hr:person:list",
   hrPersonEdit: "hr:person:edit",
@@ -138,6 +140,11 @@ export const PERMS = {
   /** 生成正式版成绩单（带编号，写日志） */
   eduTranscriptIssue: "edu:transcript:issue",
   eduDashboardView: "edu:dashboard:view",
+  // 消息
+  msgAnnouncementList: "msg:announcement:list",
+  /** 发布公告：范围在自己的数据范围内（全公司、校区或班级） */
+  msgAnnouncementAdd: "msg:announcement:add",
+  msgAnnouncementRemove: "msg:announcement:remove",
   // 学生门户
   portalEnrollList: "portal:enroll:list",
   portalEnrollAdd: "portal:enroll:add",

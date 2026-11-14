@@ -574,6 +574,24 @@
       "progress": "{e} of {r} credits earned",
       "downloadTranscript": "Download transcript (PDF)",
       "unofficialNote": "Only published final grades are shown. The downloaded transcript is unofficial; ask the registrar for an official copy."
+    },
+    "announcements": {
+      "title": "Announcements",
+      "new": "New announcement",
+      "titleField": "Title",
+      "bodyField": "Text",
+      "audience": "Audience",
+      "aud_tenant": "Whole company",
+      "aud_campus": "One campus",
+      "aud_section": "One section",
+      "pick": "Pick one",
+      "publish": "Publish",
+      "readers": "Readers",
+      "withdraw": "Withdraw",
+      "withdrawn": "withdrawn",
+      "recipients": "{n} recipients",
+      "read": "read",
+      "unread": "not read yet"
     }
   },
   "menu": {
@@ -617,7 +635,10 @@
     "edu:scale": "Grading scale",
     "edu:transcript": "Transcripts",
     "edu:dashboard": "Dashboard",
-    "portal:grade": "My grades"
+    "portal:grade": "My grades",
+    "msg": "Messages",
+    "msg:announcement": "Announcements",
+    "platform:announcement": "Platform announcements"
   },
   "dict": {
     "type": {
@@ -659,5 +680,22 @@
     "status": "Status",
     "enabled": "Enabled",
     "disabled": "Disabled"
+  },
+  "notifications": {
+    "bell": "Notifications",
+    "title": "Notifications",
+    "markAll": "Mark all read",
+    "settings": "Settings",
+    "empty": "Nothing yet.",
+    "language": "Language",
+    "auto": "Automatic",
+    "category": "Category",
+    "inApp": "In app",
+    "email": "E-mail",
+    "cat_enrollment": "Enrollment",
+    "cat_assignment": "Assignments",
+    "cat_grade": "Grades",
+    "cat_reminder": "Reminders",
+    "cat_announcement": "Announcements"
   }
 }

@@ -16,7 +16,7 @@ export interface RealmOptions {
   tenantId: string;
   /** 前端来源，如 http://hq.localhost:3001 */
   webOrigin: string;
-  smtp: { host: string; port: number; from: string };
+  smtp: { host: string; port: number; from: string; user?: string; password?: string; secure?: "none" | "ssl" | "starttls" };
   recreate?: boolean;
   /** 仅测试：打开密码直连授权，让脚本不用浏览器就能换令牌。 */
   allowDirectGrant?: boolean;
@@ -53,11 +53,18 @@ export function tenantOrigin(code: string, env: NodeJS.ProcessEnv = process.env)
   return template.replace("{code}", code);
 }
 
+export function smtpSecure(env: NodeJS.ProcessEnv = process.env): "none" | "ssl" | "starttls" {
+  return env.SMTP_SECURE === "ssl" || env.SMTP_SECURE === "starttls" ? env.SMTP_SECURE : "none";
+}
+
 export function smtpFromEnv(env: NodeJS.ProcessEnv = process.env): RealmOptions["smtp"] {
   return {
     // Keycloak 在容器里，经 Compose 网络访问 Mailpit；改成真实 SMTP 只改环境变量
     host: env.KEYCLOAK_SMTP_HOST ?? "mailpit",
     port: Number(env.KEYCLOAK_SMTP_PORT ?? 1025),
     from: env.SMTP_FROM ?? "no-reply@staredu.test",
+    // 登录用户名、密码、加密方式和业务邮件共用同一组变量（SMTP_USER / SMTP_PASSWORD / SMTP_SECURE）
+    ...(env.SMTP_USER ? { user: env.SMTP_USER, password: env.SMTP_PASSWORD ?? "" } : {}),
+    secure: smtpSecure(env),
   };
 }

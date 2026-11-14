@@ -24,12 +24,18 @@ export function MenuTreeShell({
   userName,
   signOutAction,
   labels,
+  headerExtra,
+  topExtra,
 }: {
   menus: readonly MenuNode[];
   pages: Record<string, React.ComponentType>;
   label: (node: MenuNode) => string;
   userName: string;
   signOutAction: string;
+  /** 顶栏里用户名旁边的内容（消息铃铛） */
+  headerExtra?: React.ReactNode;
+  /** 顶栏上方的内容（平台横幅） */
+  topExtra?: React.ReactNode;
   labels: ShellLabels;
 }) {
   const [tabs, setTabs] = React.useState<TabsState>(() => {
@@ -90,7 +96,9 @@ export function MenuTreeShell({
         {menus.length === 0 ? <p className="px-3 text-sm text-muted">{labels.noMenus}</p> : <ul>{menus.map((m) => renderNode(m, 0))}</ul>}
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
+        {topExtra}
         <header className="flex items-center justify-end gap-3 border-b border-border px-4 py-2 text-sm text-muted">
+          {headerExtra}
           <span>
             {labels.signedInAs} <strong className="text-foreground">{userName}</strong>
           </span>

@@ -33,6 +33,7 @@ const TABLES = [
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "section_instructor", "section_material", "student_major",
   "assignment_group", "assignment", "rubric_item", "assignment_extension", "submission", "submission_version", "submission_file", "submission_score",
   "grading_scale_item", "manual_grade", "final_grade", "grade_change", "transcript_issue",
+  "notification", "notification_preference", "announcement",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course",
 ];
 
@@ -68,6 +69,7 @@ describe("cross-tenant leak scan", () => {
     const course = await owner.course.create({ data: { tenantId, code: "SCAN101", name: "Scan course", credits: 3 } });
     const major = await owner.major.create({ data: { tenantId, code: "SCAN", name: "Scan major" } });
     const section = await owner.section.create({ data: { tenantId, courseId: course.id, termId: term.id, campusId: campus.id, number: "01", name: "SCAN101-01", capacity: 10 } });
+    const announcement = await owner.announcement.create({ data: { tenantId, title: "Scan notice", body: "x", scopeKind: "tenant" } });
     const dictType = await owner.dictType.create({ data: { tenantId, code: "scan_dict", name: "Scan dictionary" } });
     const dictItem = await owner.dictItem.create({ data: { tenantId, typeId: dictType.id, value: "one", label: "One" } });
     const param = await owner.sysParam.create({ data: { tenantId, key: "scan.param", value: "1", name: "Scan parameter" } });
@@ -96,6 +98,7 @@ describe("cross-tenant leak scan", () => {
         courseId: course.id,
         majorId: major.id,
         sectionId: section.id,
+        announcementId: announcement.id,
         dictTypeId: dictType.id,
         dictItemId: dictItem.id,
         paramId: param.id,

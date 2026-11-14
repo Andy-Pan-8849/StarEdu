@@ -574,6 +574,24 @@
       "progress": "已获 {e} / 要求 {r} 学分",
       "downloadTranscript": "下载成绩单（PDF）",
       "unofficialNote": "只显示已发布的最终成绩。下载的成绩单是非正式版；需要正式版请联系教务。"
+    },
+    "announcements": {
+      "title": "公告",
+      "new": "发布公告",
+      "titleField": "标题",
+      "bodyField": "内容",
+      "audience": "对象",
+      "aud_tenant": "全公司",
+      "aud_campus": "一个校区",
+      "aud_section": "一个班级",
+      "pick": "请选择",
+      "publish": "发布",
+      "readers": "阅读名单",
+      "withdraw": "撤回",
+      "withdrawn": "已撤回",
+      "recipients": "{n} 位收件人",
+      "read": "已读",
+      "unread": "未读"
     }
   },
   "menu": {
@@ -617,7 +635,10 @@
     "edu:scale": "成绩等级表",
     "edu:transcript": "成绩单",
     "edu:dashboard": "仪表板",
-    "portal:grade": "我的成绩"
+    "portal:grade": "我的成绩",
+    "msg": "消息",
+    "msg:announcement": "公告",
+    "platform:announcement": "平台公告"
   },
   "dict": {
     "type": {
@@ -659,5 +680,22 @@
     "status": "状态",
     "enabled": "启用",
     "disabled": "停用"
+  },
+  "notifications": {
+    "bell": "通知",
+    "title": "通知",
+    "markAll": "全部已读",
+    "settings": "设置",
+    "empty": "暂无通知。",
+    "language": "语言",
+    "auto": "自动",
+    "category": "类别",
+    "inApp": "站内",
+    "email": "邮件",
+    "cat_enrollment": "选课",
+    "cat_assignment": "作业",
+    "cat_grade": "成绩",
+    "cat_reminder": "提醒",
+    "cat_announcement": "公告"
   }
 }

@@ -65,9 +65,9 @@ describe("RBAC", () => {
         expect((await h.call(daveToken).get("/api/persons")).status).toBe(403);
         expect((await admin().get("/api/persons")).status).toBe(403); // 租户管理员也一样
         const tree = (await admin().get("/api/roles/menu-tree")).body as Array<{ code: string }>;
-        expect(tree.map((n) => n.code)).toEqual(["edu", "system"]); // 角色勾选树里没有了人事（教学仍在）
+        expect(tree.map((n) => n.code)).toEqual(["edu", "msg", "system"]); // 角色勾选树里没有了人事（教学仍在）
         expect((await admin().put(`/api/roles/${roleId}/menus`, { menuIds: ids("hr") })).status).toBe(400); // 也不能再勾
-        expect((await admin().get("/api/me/menus?entry=admin")).body.map((n: { code: string }) => n.code)).toEqual(["edu", "system"]);
+        expect((await admin().get("/api/me/menus?entry=admin")).body.map((n: { code: string }) => n.code)).toEqual(["edu", "msg", "system"]);
         // 菜单管理的列表也不再列出未开通的平台菜单（B3 发现并修复：之前会列出）
         expect(((await admin().get("/api/menus")).body as Array<{ code: string | null }>).some((m) => m.code === "hr" || m.code?.startsWith("hr:"))).toBe(false);
       } finally {

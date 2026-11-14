@@ -19,7 +19,8 @@ function join(...parts: string[]): string {
 export function listRoutes(controllers: Array<new (...args: never[]) => unknown>): RouteInfo[] {
   const out: RouteInfo[] = [];
   for (const controller of controllers) {
-    const base: string = Reflect.getMetadata(PATH_METADATA, controller) ?? "";
+    const meta: string | string[] = Reflect.getMetadata(PATH_METADATA, controller) ?? "";
+    const bases = Array.isArray(meta) ? meta : [meta]; // 一个控制器可以挂在几个前缀下
     const classPlatform = Reflect.getMetadata(PLATFORM_ROUTE, controller) === true;
     const classPublic = Reflect.getMetadata(IS_PUBLIC, controller) === true;
     for (const name of Object.getOwnPropertyNames(controller.prototype)) {
@@ -29,12 +30,14 @@ export function listRoutes(controllers: Array<new (...args: never[]) => unknown>
       const method = Reflect.getMetadata(METHOD_METADATA, handler);
       if (method === undefined) continue;
       const path: string = Reflect.getMetadata(PATH_METADATA, handler) ?? "";
-      out.push({
-        method: RequestMethod[method],
-        path: join(base, path),
-        isPlatform: classPlatform || Reflect.getMetadata(PLATFORM_ROUTE, handler) === true,
-        isPublic: classPublic || Reflect.getMetadata(IS_PUBLIC, handler) === true,
-      });
+      for (const base of bases) {
+        out.push({
+          method: RequestMethod[method],
+          path: join(base, path),
+          isPlatform: classPlatform || Reflect.getMetadata(PLATFORM_ROUTE, handler) === true,
+          isPublic: classPublic || Reflect.getMetadata(IS_PUBLIC, handler) === true,
+        });
+      }
     }
   }
   return out;

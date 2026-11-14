@@ -135,6 +135,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["run", "Run now", PERMS.platformJobRun],
   ]),
   ...menuWithButtons("platform:log", "platform", "Audit log", "log", 8, PERMS.platformLogList, []),
+  ...menuWithButtons("platform:announcement", "platform", "Platform announcements", "announcement", 9, PERMS.platformAnnouncementList, [["edit", "Edit", PERMS.platformAnnouncementEdit]]),
 
   { code: "edu", type: "directory", name: "Teaching", nameKey: "menu.edu", route: "edu", icon: "book", sort: 20, entries: ["admin"] },
   ...menuWithButtons("edu:term", "edu", "Terms", "term", 1, PERMS.eduTermList, [
@@ -169,6 +170,12 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("edu:scale", "edu", "Grading scale", "scale", 5, PERMS.eduScaleList, [["edit", "Edit", PERMS.eduScaleEdit]]),
   ...menuWithButtons("edu:transcript", "edu", "Transcripts", "transcript", 6, PERMS.eduTranscriptList, [["issue", "Issue formal transcript", PERMS.eduTranscriptIssue]]),
   ...menuWithButtons("edu:dashboard", "edu", "Dashboard", "dashboard", 7, PERMS.eduDashboardView, []),
+
+  { code: "msg", type: "directory", name: "Messages", nameKey: "menu.msg", route: "msg", icon: "bell", sort: 30, entries: ["admin"] },
+  ...menuWithButtons("msg:announcement", "msg", "Announcements", "announcement", 1, PERMS.msgAnnouncementList, [
+    ["add", "Publish", PERMS.msgAnnouncementAdd],
+    ["remove", "Withdraw", PERMS.msgAnnouncementRemove],
+  ]),
 
   // 学生门户：学生角色的权限就是这个入口下全部菜单和按钮的权限
   { code: "portal", type: "directory", name: "My studies", nameKey: "menu.portal", route: "studies", icon: "graduation", sort: 10, entries: ["portal"] },

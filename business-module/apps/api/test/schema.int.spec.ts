@@ -3,7 +3,7 @@ import { appClient, ownerClient } from "./helpers/fixtures";
 
 // 没有 tenant_id 的表：租户表本身、固定入口、迁移历史
 // 平台表：只给平台专用连接用，应用账号 biz_app 没有任何权限（下面有测试）
-const PLATFORM_TABLES = ["platform_account", "platform_role", "platform_account_role", "platform_role_menu", "platform_audit_log", "scheduled_job", "job_run"];
+const PLATFORM_TABLES = ["platform_account", "platform_role", "platform_account_role", "platform_role_menu", "platform_audit_log", "scheduled_job", "job_run", "platform_announcement"];
 const NO_TENANT_COLUMN = new Set(["tenant", "entry", "_prisma_migrations", ...PLATFORM_TABLES]);
 
 describe("schema invariants", () => {

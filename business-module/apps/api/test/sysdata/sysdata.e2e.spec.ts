@@ -131,7 +131,7 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       const fresh = await h.owner.operationLog.create({ data: { tenantId: h.tenant.tenantId, method: "POST", path: "/api/fresh", status: 200, durationMs: 1, params: { body: { a: 1 } } } });
       const { JOBS } = await import("../../src/platform/jobs/job-registry");
       const job = JOBS.find((j) => j.code === "logs.purge-params")!;
-      await job.run({ db: h.owner as never, accounts: null as never, staff: null as never });
+      await job.run({ db: h.owner as never, accounts: null as never, staff: null as never, notify: null as never });
       expect((await h.owner.operationLog.findUniqueOrThrow({ where: { id: old.id } })).params).toBeNull();
       expect((await h.owner.operationLog.findUniqueOrThrow({ where: { id: old.id } })).path).toBe("/api/old");
       expect((await h.owner.operationLog.findUniqueOrThrow({ where: { id: fresh.id } })).params).not.toBeNull();

@@ -10,14 +10,17 @@ export class MailService {
     this.transporter ??= createTransport({
       host: process.env.SMTP_HOST ?? "localhost",
       port: Number(process.env.SMTP_PORT ?? 1125),
-      secure: false,
-      ignoreTLS: true,
+      // 本地 Mailpit：不加密、不登录；真实 SMTP 设 SMTP_SECURE（ssl / starttls）、SMTP_USER、SMTP_PASSWORD，Keycloak 的域模板读同一组变量
+      secure: process.env.SMTP_SECURE === "ssl",
+      ignoreTLS: !process.env.SMTP_SECURE || process.env.SMTP_SECURE === "none",
+      requireTLS: process.env.SMTP_SECURE === "starttls",
+      ...(process.env.SMTP_USER ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD ?? "" } } : {}),
       connectionTimeout: 5000,
     });
     return this.transporter;
   }
 
-  async send(to: string, subject: string, text: string): Promise<void> {
-    await this.transport.sendMail({ from: process.env.SMTP_FROM ?? "no-reply@staredu.test", to, subject, text });
+  async send(to: string, subject: string, text: string, headers?: Record<string, string>): Promise<void> {
+    await this.transport.sendMail({ from: process.env.SMTP_FROM ?? "no-reply@staredu.test", to, subject, text, ...(headers ? { headers } : {}) });
   }
 }

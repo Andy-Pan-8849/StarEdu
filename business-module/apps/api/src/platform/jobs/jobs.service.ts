@@ -3,6 +3,7 @@ import { ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnMo
 import { Cron } from "croner";
 import { AccountsService } from "../../accounts/accounts.service";
 import { StaffService } from "../../hr/staff.service";
+import { NotificationService } from "../../notify/notification.service";
 import { RedisService } from "../../redis/redis.service";
 import { PlatformPrismaService } from "../platform-prisma.service";
 import { JOBS, jobByCode } from "./job-registry";
@@ -28,6 +29,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     private readonly redis: RedisService,
     private readonly accounts: AccountsService,
     private readonly staff: StaffService,
+    private readonly notify: NotificationService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -93,7 +95,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     let status = "success";
     let message: string;
     try {
-      message = await def.run({ db: this.db, accounts: this.accounts, staff: this.staff });
+      message = await def.run({ db: this.db, accounts: this.accounts, staff: this.staff, notify: this.notify });
     } catch (err) {
       status = "failed";
       message = err instanceof Error ? err.message : String(err);

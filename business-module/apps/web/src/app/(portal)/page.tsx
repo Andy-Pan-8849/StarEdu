@@ -21,5 +21,5 @@ export default async function PortalHome() {
   if (me.status === 401 || menus.status === 401) redirect("/auth/login?return=/");
   if (me.status !== 200 || menus.status !== 200) throw new Error(`Could not load the menu (${me.status}/${menus.status})`);
   const account = JSON.parse(me.body.toString("utf8")) as { username: string; permissions: string[] };
-  return <AdminShell menus={JSON.parse(menus.body.toString("utf8"))} permissions={account.permissions} userName={account.username} signOutAction="/auth/logout" />;
+  return <AdminShell menus={JSON.parse(menus.body.toString("utf8"))} permissions={account.permissions} userName={account.username} wsPort={new URL(config.apiUrl).port} signOutAction="/auth/logout" />;
 }

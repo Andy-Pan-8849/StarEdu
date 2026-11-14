@@ -22,6 +22,12 @@ import { EnrollmentService } from "./edu/enrollment.service";
 import { OutboxService } from "./edu/outbox.service";
 import { PortalController } from "./edu/portal.controller";
 import { SectionsController } from "./edu/sections.controller";
+import { AnnouncementsController } from "./notify/announcements.controller";
+import { BannersController, NotificationsController, UnsubscribeController } from "./notify/notifications.controller";
+import { NotificationService } from "./notify/notification.service";
+import { NotifyWorker } from "./notify/notify-worker";
+import { PlatformAnnouncementsController } from "./notify/platform-announcements.controller";
+import { RealtimeService } from "./notify/realtime.service";
 import { GradesController } from "./edu/grades.controller";
 import { GradeAdminController } from "./edu/grade-admin.controller";
 import { PortalGradesController } from "./edu/portal-grades.controller";
@@ -83,6 +89,11 @@ export const CONTROLLERS = [
   SectionsController,
   AssignmentsController,
   GradesController,
+  NotificationsController,
+  BannersController,
+  UnsubscribeController,
+  AnnouncementsController,
+  PlatformAnnouncementsController,
   GradeAdminController,
   PortalGradesController,
   PortalAssignmentsController,
@@ -116,6 +127,9 @@ export const CONTROLLERS = [
     OutboxService,
     ObjectStoreService,
     GradesService,
+    NotificationService,
+    NotifyWorker,
+    RealtimeService,
     TranscriptService,
     { provide: CLASS_MEMBERSHIP, useClass: ClassMembershipService },
     MailService,
