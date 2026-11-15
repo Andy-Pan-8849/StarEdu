@@ -25,6 +25,7 @@
     "import:sample": "pnpm --filter @staredu/api build && node --env-file=.env apps/api/dist/cli/import-sample.js",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "demo": "pnpm seed && pnpm import:sample && pnpm seed:demo",
+    "gen:module": "tsx scripts/gen-module.ts",
     "test:events": "pnpm --filter @staredu/api test:events"
   },
   "devDependencies": {
