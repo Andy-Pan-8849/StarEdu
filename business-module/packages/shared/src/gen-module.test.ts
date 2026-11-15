@@ -2,7 +2,8 @@
 // 不用等到有人真的运行生成器。
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { applyPatches, buildPlan, namesOf, parseFields } from "../../../scripts/lib/gen-module";
+import { describe, expect, it } from "vitest";
+import { applyPatches, buildPlan, namesOf, parseFields } from "./gen-module";
 
 const root = resolve(__dirname, "../../..");
 const opts = { name: "warehouse-item", group: "edu", fields: parseFields("title:string!,qty:int,due:date,done:bool,notes:text"), label: "Warehouse items", labelZh: "仓库物品", stamp: "20270101000000" };

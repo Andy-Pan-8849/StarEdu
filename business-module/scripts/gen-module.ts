@@ -2,7 +2,7 @@
 // 字段类型：string text int bool date；类型后加 ! 表示必填。生成后：pnpm migrate && pnpm prisma:generate，再跑测试。
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { applyPatches, buildPlan, namesOf, parseFields } from "./lib/gen-module";
+import { applyPatches, buildPlan, namesOf, parseFields } from "../packages/shared/src/gen-module";
 
 const root = resolve(__dirname, "..");
 const args = new Map<string, string>();
