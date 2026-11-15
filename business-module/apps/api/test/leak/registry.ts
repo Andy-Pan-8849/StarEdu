@@ -30,6 +30,7 @@ export type Fixture =
   | "paramId"
   | "folderId"
   | "libFileId"
+  | "issueId"
   | "sid";
 
 export interface LeakEntry {
@@ -197,6 +198,7 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "GET", path: "/api/sections/:id/grade-changes", fixture: "sectionId", target: "foreign", note: "read another tenant's grade changes" },
   { method: "GET", path: "/api/dashboard/sections/:id", fixture: "sectionId", target: "foreign", note: "analyse another tenant's section" },
   { method: "GET", path: "/api/transcripts/:personId", fixture: "personId", target: "foreign", note: "read another tenant's transcript" },
+  { method: "POST", path: "/api/transcripts/issues/:issueId/revoke", fixture: "issueId", target: "foreign", body: { reason: "hacked" }, note: "revoke another tenant's transcript" },
   { method: "POST", path: "/api/transcripts/:personId/formal", fixture: "personId", target: "foreign", note: "issue another tenant's transcript" },
   { method: "GET", path: "/api/announcements/:id/readers", fixture: "announcementId", target: "foreign", note: "read another tenant's announcement readers" },
   { method: "DELETE", path: "/api/announcements/:id", fixture: "announcementId", target: "foreign", note: "withdraw another tenant's announcement" },

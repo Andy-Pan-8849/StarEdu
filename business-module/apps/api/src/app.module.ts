@@ -23,6 +23,7 @@ import { ClassMembershipService } from "./edu/class-membership.service";
 import { EnrollmentService } from "./edu/enrollment.service";
 import { OutboxService } from "./edu/outbox.service";
 import { PortalController } from "./edu/portal.controller";
+import { TranscriptVerifyController } from "./edu/transcript-verify.controller";
 import { SectionsController } from "./edu/sections.controller";
 import { EnrollmentBatchController } from "./edu/enrollment-batch.controller";
 import { EventConsumers } from "./events/event-consumers";
@@ -100,6 +101,7 @@ export const CONTROLLERS = [
   ImportController,
   CatalogController,
   SectionsController,
+  TranscriptVerifyController,
   EnrollmentBatchController,
   AssignmentsController,
   GradesController,

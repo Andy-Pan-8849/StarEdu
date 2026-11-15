@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B17 (batch enrollment).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B18 (transcript verification).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -213,6 +213,10 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Transcript verification (academic office and anyone holding a transcript, milestone B18)
+
+Every transcript PDF (student download = unofficial, academic office = official) now has a watermark on every page ("UNOFFICIAL COPY", or "OFFICIAL" with the document number), a QR code and a short **fingerprint** (the first 16 characters of a SHA-256 of the transcript content). Scanning the QR code opens `<institution address>/verify/<token>` with no sign-in: it says whether the document was issued by the institution, official or unofficial, the issue date, the student's name, a mostly hidden student number, major, campus, cumulative GPA and credits as they were **when the document was issued**, and the fingerprint to compare with the printed one. The page never shows course-by-course results. In **Transcripts** (admin), each issued copy lists its verification page and a **Revoke** button (asks for a reason, cannot be undone); a revoked document shows "revoked" on the verification page at once. Copies issued before this milestone can be confirmed to exist but have no details. The address in the QR code comes from `TENANT_ORIGIN_TEMPLATE` (default `http://{code}.localhost:3001`), so set it to the public address in a real deployment. Lookups are limited to 30 per minute per address.
 
 ### Batch enrollment (academic office, milestone B17)
 

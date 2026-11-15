@@ -10,6 +10,7 @@ import { Auth, parse } from "../common/http";
 import { withScope } from "../data-scope/scope-filter";
 import { Prisma } from "../generated/prisma";
 import { HrAccess, STUDENT_SCOPE } from "../hr/hr-access.service";
+import { requireTenant } from "../tenancy/request-scope";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { SECTION_SCOPE } from "./edu-common";
 import { DEFAULT_SCALE, scaleProblems } from "./grade-calc";
@@ -77,7 +78,20 @@ export class GradeAdminController {
   async transcript(@Auth() auth: AuthContext, @Param("personId", ParseUUIDPipe) studentId: string) {
     await this.student(auth, studentId, PERMS.eduTranscriptList);
     const issues = await this.db.transcriptIssue.findMany({ where: { studentPersonId: studentId }, orderBy: { generatedAt: "desc" }, take: 50 });
-    return { transcript: await this.transcripts.build(studentId), issues: issues.map((i) => ({ id: i.id, docNumber: i.docNumber, version: i.version, generatedAt: i.generatedAt, generatedBy: i.generatedBy })) };
+    return { transcript: await this.transcripts.build(studentId), issues: issues.map((i) => ({ id: i.id, docNumber: i.docNumber, version: i.version, generatedAt: i.generatedAt, generatedBy: i.generatedBy, verifyUrl: this.transcripts.verifyUrl(requireTenant("list issues").code, i.verifyToken), verifiable: !!i.contentHash, revokedAt: i.revokedAt, revokeReason: i.revokeReason })) };
+  }
+
+  /** 作废一份已生成的成绩单（比如发现生成错了、学生信息有误）：验真页立刻显示"已作废"。不能撤销作废。 */
+  @Post("transcripts/issues/:issueId/revoke")
+  @RequirePermissions(PERMS.eduTranscriptIssue)
+  async revoke(@Auth() auth: AuthContext, @Param("issueId", ParseUUIDPipe) issueId: string, @Body() body: unknown) {
+    const { reason } = parse(z.object({ reason: z.string().trim().min(1).max(500) }).strict(), body);
+    const issue = await this.db.transcriptIssue.findUnique({ where: { id: issueId } });
+    if (!issue) throw new NotFoundException();
+    await this.student(auth, issue.studentPersonId, PERMS.eduTranscriptIssue);
+    const r = await this.transcripts.revoke(issueId, auth.accountId, reason);
+    await this.audit.record(auth.accountId, "transcript.revoke", "person", issue.studentPersonId, { docNumber: issue.docNumber, reason });
+    return { id: r.id, docNumber: r.docNumber, revokedAt: r.revokedAt };
   }
 
   /** 生成正式版成绩单（PDF，带唯一编号，写生成记录和审计日志）。毕业、退学的学生也可以由教务生成。 */
@@ -86,9 +100,10 @@ export class GradeAdminController {
   async formal(@Auth() auth: AuthContext, @Param("personId", ParseUUIDPipe) studentId: string, @Res() res: Response) {
     await this.student(auth, studentId, PERMS.eduTranscriptIssue);
     const t = await this.transcripts.build(studentId);
-    const issue = await this.transcripts.issue(studentId, "formal", auth.accountId);
     const tenant = await this.db.tenant.findUnique({ where: { id: auth.tenantId } });
-    const pdf = await this.transcripts.pdf(t, { version: "formal", docNumber: issue.docNumber, generatedAt: issue.generatedAt, institution: tenant?.name ?? "Institution" });
+    const institution = tenant?.name ?? "Institution";
+    const issue = await this.transcripts.issue(studentId, "formal", auth.accountId, t, institution);
+    const pdf = await this.transcripts.pdf(t, { version: "formal", docNumber: issue.docNumber, generatedAt: issue.generatedAt, institution, verify: { url: issue.verifyUrl, fingerprint: issue.fingerprint } });
     await this.audit.record(auth.accountId, "transcript.issue_formal", "person", studentId, { docNumber: issue.docNumber });
     res.setHeader("content-type", "application/pdf");
     res.setHeader("content-disposition", `attachment; filename="${issue.docNumber}.pdf"`);

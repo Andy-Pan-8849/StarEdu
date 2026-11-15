@@ -144,7 +144,7 @@ export function GradingScalePage() {
 }
 
 // ---------------------------------------------------------------- 成绩单（教务）
-interface TranscriptView { transcript: { student: { fullName: string; studentNo: string | null }; terms: Array<{ termId: string; name: string; gpa: number | null; rows: Array<{ enrollmentId: string; courseCode: string; courseName: string; state: string; grade: string | null; total: number | null; replaced: boolean }> }>; cumulative: { gpa: number | null; creditsAttempted: number; creditsEarned: number } }; issues: Array<{ id: string; docNumber: string; version: string; generatedAt: string }> }
+interface TranscriptView { transcript: { student: { fullName: string; studentNo: string | null }; terms: Array<{ termId: string; name: string; gpa: number | null; rows: Array<{ enrollmentId: string; courseCode: string; courseName: string; state: string; grade: string | null; total: number | null; replaced: boolean }> }>; cumulative: { gpa: number | null; creditsAttempted: number; creditsEarned: number } }; issues: Array<{ id: string; docNumber: string; version: string; generatedAt: string; verifyUrl: string; verifiable: boolean; revokedAt: string | null; revokeReason: string | null }> }
 
 export function TranscriptsPage() {
   const t = useTranslations("pages.grades");
@@ -171,7 +171,15 @@ export function TranscriptsPage() {
           ))}
           <p className="mb-2">{t("cumulative")}: GPA {view.transcript.cumulative.gpa ?? "-"} · {t("credits", { a: view.transcript.cumulative.creditsAttempted, e: view.transcript.cumulative.creditsEarned })}</p>
           <PermButton perm={PERMS.eduTranscriptIssue} size="sm" onClick={() => void downloadPdf(`transcripts/${current}/formal`, "POST").then(() => open(current!)).catch((e: Error) => setMsg(e.message))}>{t("issueFormal")}</PermButton>
-          <ul className="mt-2 text-muted">{view.issues.map((i) => <li key={i.id}>{i.docNumber} · {t(`v_${i.version}`)} · {new Date(i.generatedAt).toLocaleString()}</li>)}</ul>
+          <ul className="mt-2 text-muted">{view.issues.map((i) => (
+            <li key={i.id}>
+              {i.docNumber} · {t(`v_${i.version}`)} · {new Date(i.generatedAt).toLocaleString()} ·{" "}
+              <a className="underline" href={i.verifyUrl} target="_blank" rel="noreferrer">{t("verifyLink")}</a>
+              {i.revokedAt ? <span className="ml-2 text-red-600">{t("revoked")}{i.revokeReason ? `: ${i.revokeReason}` : ""}</span> : (
+                <PermButton perm={PERMS.eduTranscriptIssue} size="sm" variant="outline" className="ml-2" onClick={() => { const reason = window.prompt(t("revokeReason")); if (reason && reason.trim()) void bff(`transcripts/issues/${i.id}/revoke`, { method: "POST", body: { reason: reason.trim() } }).then(() => open(current!)).catch((e: Error) => setMsg(e.message)); }}>{t("revoke")}</PermButton>
+              )}
+            </li>
+          ))}</ul>
         </div>
       ) : null}
     </section>
