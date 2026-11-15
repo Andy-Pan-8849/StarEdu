@@ -1,6 +1,6 @@
 // 通知文字模板：中英文两套。站内消息存的是"类型 + 参数"，读取时按收件人的语言渲染；邮件发送时同样渲染。
 export type Locale = "en" | "zh";
-export const CATEGORIES = ["enrollment", "assignment", "grade", "reminder", "announcement", "discussion"] as const;
+export const CATEGORIES = ["enrollment", "assignment", "grade", "reminder", "announcement", "discussion", "request"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 interface Template {
@@ -39,6 +39,36 @@ export const TEMPLATES: Record<string, Template> = {
     category: "grade",
     en: { title: "Final grade published: {section}", body: "Your final grade for {section} is now available." },
     zh: { title: "最终成绩已发布：{section}", body: "你在 {section} 的最终成绩已发布。" },
+  },
+  "request.appeal_submitted": {
+    category: "request",
+    en: { title: "Grade appeal in {section}", body: "{student} appealed the final grade for {section}." },
+    zh: { title: "{section} 有新的成绩复评申请", body: "{student} 对 {section} 的最终成绩提出了复评。" },
+  },
+  "request.extension_submitted": {
+    category: "request",
+    en: { title: "Extension request in {section}", body: "{student} asked for {days} more day(s) on {title}." },
+    zh: { title: "{section} 有新的延期申请", body: "{student} 申请《{title}》延期 {days} 天。" },
+  },
+  "request.appeal_approved": {
+    category: "request",
+    en: { title: "Your grade appeal was approved: {section}", body: "The grade for {section} was changed. Note: {note}" },
+    zh: { title: "你的成绩复评已通过：{section}", body: "{section} 的成绩已更正。说明：{note}" },
+  },
+  "request.appeal_rejected": {
+    category: "request",
+    en: { title: "Your grade appeal was rejected: {section}", body: "The grade for {section} stays. Note: {note}" },
+    zh: { title: "你的成绩复评未通过：{section}", body: "{section} 的成绩维持不变。说明：{note}" },
+  },
+  "request.extension_approved": {
+    category: "request",
+    en: { title: "Your extension was approved: {title}", body: "{section}: you now have {days} extra day(s) on {title}. Note: {note}" },
+    zh: { title: "你的延期申请已通过：{title}", body: "{section}：《{title}》延期 {days} 天。说明：{note}" },
+  },
+  "request.extension_rejected": {
+    category: "request",
+    en: { title: "Your extension was rejected: {title}", body: "{section}: the deadline for {title} stays. Note: {note}" },
+    zh: { title: "你的延期申请未通过：{title}", body: "{section}：《{title}》的截止时间不变。说明：{note}" },
   },
   "discussion.posted": {
     category: "discussion",

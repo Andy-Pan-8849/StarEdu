@@ -42,6 +42,7 @@ export const TENANT_MODELS: Record<string, ModelRule> = {
   CoursePrerequisite: { nullable: false, softDelete: false },
   MajorCourse: { nullable: false, softDelete: false },
   MajorVersion: { nullable: false, softDelete: false },
+  StudentRequest: { nullable: false, softDelete: false },
   StudentMajor: { nullable: false, softDelete: false },
   Section: { nullable: false, softDelete: false },
   SectionInstructor: { nullable: false, softDelete: false },

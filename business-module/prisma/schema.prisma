@@ -1366,6 +1366,33 @@ model GradeChange {
   @@map("grade_change")
 }
 
+/// 学生申请：成绩复评（针对已发布的最终成绩）或作业延期；教师/教务审批，留痕并通知
+model StudentRequest {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  /// grade_appeal / extension
+  kind            String
+  sectionId       String    @map("section_id") @db.Uuid
+  studentPersonId String    @map("student_person_id") @db.Uuid
+  enrollmentId    String?   @map("enrollment_id") @db.Uuid
+  assignmentId    String?   @map("assignment_id") @db.Uuid
+  /// 延期申请的天数（1–3）
+  days            Int?
+  reason          String
+  /// pending / approved / rejected / withdrawn
+  status          String    @default("pending")
+  decisionNote    String?   @map("decision_note")
+  decidedBy       String?   @map("decided_by") @db.Uuid
+  decidedAt       DateTime? @map("decided_at")
+  /// 批准后的结果：复评 {before, after}；延期 {days}
+  result          Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, sectionId, status])
+  @@index([tenantId, studentPersonId])
+  @@map("student_request")
+}
+
 /// 成绩单生成记录：每份有唯一文档编号
 model TranscriptIssue {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
