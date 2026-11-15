@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B19 (student requests).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B20 (module generator).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -213,6 +213,17 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Module generator (developers, milestone B20)
+
+For a plain "list of records inside one company" (a catalog, a register, a checklist) you do not have to wire eleven places by hand:
+
+```bash
+pnpm gen:module --name warehouse-item --group edu --fields "title:string!,qty:int,due:date,done:bool,notes:text" --label "Warehouse items" --label-zh "仓库物品"
+pnpm migrate && pnpm prisma:generate && pnpm --filter @staredu/shared build
+```
+
+Field types: `string`, `text`, `int`, `bool`, `date` (`!` after the type = required). `--group` is an existing menu directory (`edu`, `hr`, `msg`, `doc`, `system`); `--plural` overrides the default `<name>s`; `--dry-run` lists the files without writing. It creates the table (with row-level security) and its migration, the API controller (list, get, create, edit, delete; four permissions; audit entries), the menu with its buttons, the admin page, English and Chinese labels, an end-to-end test, and the cross-tenant leak-scan entries; it also registers the controller and the model. All edits are computed first, and if any anchor in an existing file is missing, nothing is written. The built-in administrator sees the new menu at once; give it to other roles in **Roles** or in `role-templates.ts`. The output is a starting point: rules between records, status flows, imports and exports are written by hand on top of it.
 
 ### Student requests (students and instructors / academic office, milestone B19)
 
