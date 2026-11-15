@@ -608,12 +608,14 @@
       "due": "截止 {at}",
       "currentGrade": "当前成绩：{grade}（{total}）",
       "changed": "成绩已更正：{a} → {b}",
+      "newTotalLabel": "新的总评",
+      "noteLabel": "说明",
       "approve": "批准",
       "reject": "驳回",
-      "approveNote": "给学生的说明（改成绩至少 5 个字）：",
-      "rejectNote": "驳回的理由（学生可见）：",
-      "newTotal": "新的总评（当前：{current}）：",
-      "approveDays": "批准几天（1-3）？",
+      "approveNote": "给学生的说明（改成绩至少 5 个字）",
+      "rejectNote": "驳回的理由（学生可见）",
+      "newTotal": "新的总评（当前：{current}）",
+      "approveDays": "批准天数",
       "decided": "已处理，并通知了学生。"
     },
     "grades": {
@@ -669,6 +671,7 @@
       "verifyLink": "验真页",
       "revoked": "已作废",
       "revoke": "作废",
+      "cancel": "取消",
       "revokeReason": "为什么作废这份文档？扫码的人会看到它已作废。"
     },
     "announcements": {

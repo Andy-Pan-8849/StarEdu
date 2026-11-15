@@ -48,6 +48,9 @@ export function MenuTreeShell({
     return first ? openTab(emptyTabs, { id: first.id, title: label(first) }) : emptyTabs;
   });
   const [collapsed, setCollapsed] = React.useState<ReadonlySet<string>>(new Set());
+  // 外链里的 {code} 要用浏览器里的域名；服务端渲染时不知道，所以挂载之后才换（否则服务端和浏览器渲染出的地址不同，React 报水合不一致）
+  const [host, setHost] = React.useState<string | null>(null);
+  React.useEffect(() => setHost(window.location.hostname), []);
 
   const active = tabs.activeId ? findMenu(menus, tabs.activeId) : undefined;
   const Page = active?.component ? pages[active.component] : undefined;
@@ -75,7 +78,7 @@ export function MenuTreeShell({
     if (node.type === "link") {
       return (
         <li key={node.id}>
-          <a className="block py-1.5 pr-3 text-sm text-muted hover:text-foreground" style={pad} href={linkFor(node.route)} target="_blank" rel="noopener noreferrer">
+          <a className="block py-1.5 pr-3 text-sm text-muted hover:text-foreground" style={pad} href={host === null ? "#" : linkFor(node.route, host)} target="_blank" rel="noopener noreferrer">
             {label(node)} ↗
           </a>
         </li>

@@ -36,10 +36,11 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
     userAgent: req.headers.get("user-agent") ?? undefined,
   }).catch(() => null);
   if (!response) return NextResponse.json({ message: "Service unavailable" }, { status: 502 });
-  return new NextResponse(new Uint8Array(response.body), {
-    status: response.status,
-    headers: { "content-type": String(response.headers["content-type"] ?? "application/json") },
-  });
+  const headers: Record<string, string> = { "content-type": String(response.headers["content-type"] ?? "application/json") };
+  // 下载文件的名字（成绩单 PDF 的编号）要带给浏览器，否则一律叫默认名
+  const disposition = response.headers["content-disposition"];
+  if (typeof disposition === "string") headers["content-disposition"] = disposition;
+  return new NextResponse(new Uint8Array(response.body), { status: response.status, headers });
 }
 
 export const GET = forward;

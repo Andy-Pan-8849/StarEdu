@@ -86,21 +86,25 @@ export function RequestsPage() {
   const list = useList<StaffRequest>(`requests?status=${status}`);
   const { message, run } = useAct(list.reload);
 
-  const decide = (r: StaffRequest, decision: "approve" | "reject") => {
-    const note = window.prompt(t(decision === "approve" ? "approveNote" : "rejectNote"));
-    if (!note || !note.trim()) return;
-    const body: Record<string, unknown> = { decision, note: note.trim() };
-    if (decision === "approve" && r.kind === "grade_appeal") {
-      const total = window.prompt(t("newTotal", { current: r.currentGrade?.total ?? "-" }));
-      if (total === null || total.trim() === "" || Number.isNaN(Number(total))) return;
-      body.total = Number(total);
-    }
-    if (decision === "approve" && r.kind === "extension") {
-      const d = window.prompt(t("approveDays"), String(r.days ?? 1));
-      if (d === null || !/^[1-3]$/.test(d.trim())) return;
-      body.days = Number(d);
-    }
-    void run(() => bff(`requests/${r.id}/decide`, { method: "POST", body }), t("decided"));
+  const c = useTranslations("crud");
+  const [deciding, setDeciding] = React.useState<{ id: string; decision: "approve" | "reject" } | null>(null);
+  const [note, setNote] = React.useState("");
+  const [total, setTotal] = React.useState("");
+  const [days, setDays] = React.useState("1");
+  const open = (r: StaffRequest, decision: "approve" | "reject") => { setDeciding({ id: r.id, decision }); setNote(""); setTotal(""); setDays(String(r.days ?? 1)); };
+
+  const send = async (r: StaffRequest) => {
+    if (!deciding) return;
+    const body: Record<string, unknown> = { decision: deciding.decision, note: note.trim() };
+    if (deciding.decision === "approve" && r.kind === "grade_appeal") body.total = Number(total);
+    if (deciding.decision === "approve" && r.kind === "extension") body.days = Number(days);
+    if (await run(() => bff(`requests/${r.id}/decide`, { method: "POST", body }), t("decided"))) setDeciding(null);
+  };
+  const ready = (r: StaffRequest) => {
+    if (!deciding) return false;
+    const min = deciding.decision === "approve" && r.kind === "grade_appeal" ? 5 : 3;
+    if (note.trim().length < min) return false;
+    return !(deciding.decision === "approve" && r.kind === "grade_appeal" && (total.trim() === "" || Number.isNaN(Number(total)) || Number(total) < 0 || Number(total) > 100));
   };
 
   return (
@@ -120,10 +124,26 @@ export function RequestsPage() {
               <div>{r.reason}</div>
               {r.decisionNote ? <div className="text-muted">{t("note")}: {r.decisionNote}</div> : null}
               {r.result?.before ? <div className="text-muted">{t("changed", { a: r.result.before.total, b: r.result.after?.total ?? "-" })}</div> : null}
-              {r.status === "pending" ? (
+              {r.status === "pending" && deciding?.id !== r.id ? (
                 <div className="mt-1 flex gap-2">
-                  <PermButton perm={PERMS.eduRequestDecide} size="sm" onClick={() => decide(r, "approve")}>{t("approve")}</PermButton>
-                  <PermButton perm={PERMS.eduRequestDecide} size="sm" variant="outline" onClick={() => decide(r, "reject")}>{t("reject")}</PermButton>
+                  <PermButton perm={PERMS.eduRequestDecide} size="sm" onClick={() => open(r, "approve")}>{t("approve")}</PermButton>
+                  <PermButton perm={PERMS.eduRequestDecide} size="sm" variant="outline" onClick={() => open(r, "reject")}>{t("reject")}</PermButton>
+                </div>
+              ) : null}
+              {deciding?.id === r.id ? (
+                <div className="mt-2 flex flex-col gap-2 rounded-md border border-border p-2">
+                  <div className="font-medium">{t(deciding.decision === "approve" ? "approve" : "reject")}</div>
+                  {deciding.decision === "approve" && r.kind === "grade_appeal" ? <input aria-label={t("newTotalLabel")} placeholder={t("newTotal", { current: r.currentGrade?.total ?? "-" })} inputMode="decimal" className="rounded-md border border-border bg-transparent px-2 py-1" value={total} onChange={(e) => setTotal(e.target.value)} /> : null}
+                  {deciding.decision === "approve" && r.kind === "extension" ? (
+                    <label className="flex items-center gap-2">{t("approveDays")}
+                      <select className="rounded-md border border-border bg-transparent px-2 py-1" value={days} onChange={(e) => setDays(e.target.value)}>{[1, 2, 3].map((d) => <option key={d} value={d}>{d}</option>)}</select>
+                    </label>
+                  ) : null}
+                  <textarea aria-label={t("noteLabel")} placeholder={t(deciding.decision === "approve" ? "approveNote" : "rejectNote")} rows={2} className="rounded-md border border-border bg-transparent px-2 py-1" value={note} onChange={(e) => setNote(e.target.value)} />
+                  <div className="flex gap-2">
+                    <PermButton perm={PERMS.eduRequestDecide} size="sm" disabled={!ready(r)} onClick={() => void send(r)}>{c("save")}</PermButton>
+                    <PermButton perm={PERMS.eduRequestDecide} size="sm" variant="outline" onClick={() => setDeciding(null)}>{c("cancel")}</PermButton>
+                  </div>
                 </div>
               ) : null}
             </li>
