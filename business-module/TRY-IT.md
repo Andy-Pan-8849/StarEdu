@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B18 (transcript verification).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B19 (student requests).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -213,6 +213,10 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Student requests (students and instructors / academic office, milestone B19)
+
+Students open **My requests** in the portal, choose either a published final grade (appeal; open for 14 days after publication, at most 2 per course, reason of at least 10 characters) or an assignment whose deadline has not passed (extension of 1–3 days, not shorter than one already granted, not once the work is being graded) and submit; one pending request per grade or assignment, and the student can **Withdraw** it until it is handled. The section's instructors get a notification. Instructors and the academic office open **Student requests** (within their own data scope): **Approve** or **Reject** with a note the student sees. Approving an extension sets it exactly like the manual one (the days can be changed, late flags are recomputed). Approving a grade appeal needs the "amend locked grades" permission (the academic office), a new total and a note; it goes through the normal amendment (before/after kept in the grade change record). Instructors can see appeals and reject them but cannot change the grade. A handled request cannot be handled again; every step is in the audit log and the student is notified of the decision.
 
 ### Transcript verification (academic office and anyone holding a transcript, milestone B18)
 

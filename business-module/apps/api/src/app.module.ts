@@ -40,6 +40,8 @@ import { DiscussionController, PortalDiscussionController } from "./edu/discussi
 import { DiscussionService } from "./edu/discussion.service";
 import { GradesController } from "./edu/grades.controller";
 import { GradeAdminController } from "./edu/grade-admin.controller";
+import { PortalRequestsController } from "./edu/portal-requests.controller";
+import { RequestsController } from "./edu/requests.controller";
 import { PortalGradesController } from "./edu/portal-grades.controller";
 import { GradesService } from "./edu/grades.service";
 import { TranscriptService } from "./edu/transcript.service";
@@ -118,6 +120,8 @@ export const CONTROLLERS = [
   PlatformAnnouncementsController,
   GradeAdminController,
   PortalGradesController,
+  PortalRequestsController,
+  RequestsController,
   PortalAssignmentsController,
   PortalController,
   DictController,

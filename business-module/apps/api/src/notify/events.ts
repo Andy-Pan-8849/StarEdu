@@ -52,6 +52,31 @@ export const EVENT_HANDLERS: Record<string, EventHandler> = {
   },
 };
 
+/** 学生申请：提交通知任课教师；处理结果通知学生（说明文字原样带上）。 */
+EVENT_HANDLERS["request.submitted"] = async (db, evt) => {
+  const p = evt.payload as P;
+  const r = p.requestId ? await db.studentRequest.findFirst({ where: { id: p.requestId, tenantId: evt.tenantId } }) : null;
+  if (!r) return { items: [] };
+  const [section, teachers, student, a] = await Promise.all([
+    sectionName(db, evt.tenantId, r.sectionId),
+    db.sectionInstructor.findMany({ where: { sectionId: r.sectionId, tenantId: evt.tenantId }, select: { personId: true } }),
+    db.person.findFirst({ where: { id: r.studentPersonId, tenantId: evt.tenantId }, select: { fullName: true } }),
+    r.assignmentId ? db.assignment.findFirst({ where: { id: r.assignmentId, tenantId: evt.tenantId }, select: { title: true } }) : null,
+  ]);
+  const type = r.kind === "extension" ? "request.extension_submitted" : "request.appeal_submitted";
+  const params = { section, student: student?.fullName ?? "", title: a?.title ?? "", days: String(r.days ?? "") };
+  return { items: teachers.map((t) => ({ personId: t.personId, type, params })) };
+};
+EVENT_HANDLERS["request.decided"] = async (db, evt) => {
+  const p = evt.payload as P;
+  const r = p.requestId ? await db.studentRequest.findFirst({ where: { id: p.requestId, tenantId: evt.tenantId } }) : null;
+  if (!r || (r.status !== "approved" && r.status !== "rejected")) return { items: [] };
+  const a = r.assignmentId ? await db.assignment.findFirst({ where: { id: r.assignmentId, tenantId: evt.tenantId }, select: { title: true } }) : null;
+  const days = (r.result as { days?: number } | null)?.days ?? r.days;
+  const type = `request.${r.kind === "extension" ? "extension" : "appeal"}_${r.status}`;
+  return { items: [{ personId: r.studentPersonId, type, params: { section: await sectionName(db, evt.tenantId, r.sectionId), title: a?.title ?? "", days: String(days ?? ""), note: r.decisionNote ?? "" } }] };
+};
+
 /** 讨论通知：发帖通知任课教师；回复通知发帖人和任课教师；标记已解决通知发帖人（都不通知自己）。 */
 async function discussionRecipients(db: PlatformPrismaService, evt: OutboxRow, kind: "posted" | "replied" | "resolved"): Promise<HandlerResult> {
   const p = evt.payload as P;

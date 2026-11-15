@@ -31,7 +31,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     menuCodes: [
       "edu", "edu:term", "edu:term:add", "edu:term:edit", "edu:major", "edu:major:add", "edu:major:edit", "edu:course", "edu:course:add", "edu:course:edit",
       "edu:section", "edu:section:add", "edu:section:edit", "edu:section:status", "edu:section:roster", "edu:section:enroll", "edu:section:unenroll", "edu:section:materials",
-      "edu:section:assignments", "edu:section:submissions", "edu:section:extension", "edu:section:gradebook", "edu:section:gradeAmend", "edu:section:discussion", "ai",
+      "edu:section:assignments", "edu:section:submissions", "edu:section:extension", "edu:section:gradebook", "edu:section:gradeAmend", "edu:section:discussion", "edu:request", "edu:request:decide", "ai",
       "doc", "doc:library", "doc:library:folderAdd", "doc:library:folderEdit", "doc:library:folderMove", "doc:library:folderRemove", "doc:library:upload", "doc:library:download", "doc:library:fileEdit", "doc:library:fileDelete", "doc:library:aclEdit", "doc:library:log",
       "edu:scale", "edu:scale:edit", "edu:transcript", "edu:transcript:issue", "edu:dashboard",
       "msg", "msg:announcement", "msg:announcement:add", "msg:announcement:remove",
@@ -41,7 +41,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
   { code: "campus-lead", name: "Campus lead", sort: 30, scopes: ["own_dept_tree"], menuCodes: ["doc", "doc:library", "doc:library:folderAdd", "doc:library:folderEdit", "doc:library:upload", "doc:library:download", "doc:library:fileEdit", "doc:library:fileDelete", "doc:library:aclEdit", "doc:library:log", "ai", "hr", "hr:person", "hr:staff", "hr:student", "edu", "edu:dashboard", "msg", "msg:announcement", "msg:announcement:add", "msg:announcement:remove"] },
   { code: "teacher", name: "Teacher", sort: 40, scopes: ["self", "own_classes"], menuCodes: [
       "edu", "edu:term", "edu:course", "edu:section", "edu:section:roster", "edu:section:materials",
-      "edu:section:assignments", "edu:section:assignmentEdit", "edu:section:submissions", "edu:section:grade", "edu:section:extension", "edu:section:gradebook", "edu:section:gradeEdit", "edu:section:discussion", "edu:section:discussionEdit", "edu:dashboard", "ai",
+      "edu:section:assignments", "edu:section:assignmentEdit", "edu:section:submissions", "edu:section:grade", "edu:section:extension", "edu:section:gradebook", "edu:section:gradeEdit", "edu:section:discussion", "edu:section:discussionEdit", "edu:request", "edu:request:decide", "edu:dashboard", "ai",
       "doc", "doc:library", "doc:library:upload", "doc:library:download", "doc:library:fileEdit",
       "msg", "msg:announcement", "msg:announcement:add", "msg:announcement:remove",
     ],

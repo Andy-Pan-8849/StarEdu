@@ -187,6 +187,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["discussion", "Discussion", PERMS.eduDiscussionList],
     ["discussionEdit", "Edit discussion", PERMS.eduDiscussionEdit],
   ]),
+  ...menuWithButtons("edu:request", "edu", "Student requests", "request", 8, PERMS.eduRequestList, [["decide", "Decide", PERMS.eduRequestDecide]]),
   ...menuWithButtons("edu:scale", "edu", "Grading scale", "scale", 5, PERMS.eduScaleList, [["edit", "Edit", PERMS.eduScaleEdit]]),
   ...menuWithButtons("edu:transcript", "edu", "Transcripts", "transcript", 6, PERMS.eduTranscriptList, [["issue", "Issue formal transcript", PERMS.eduTranscriptIssue]]),
   ...menuWithButtons("edu:dashboard", "edu", "Dashboard", "dashboard", 7, PERMS.eduDashboardView, []),
@@ -207,6 +208,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("portal:assignment", "portal", "My assignments", "assignment", 3, PERMS.portalAssignmentList, [["submit", "Submit", PERMS.portalAssignmentSubmit]]),
   ...menuWithButtons("portal:discussion", "portal", "Discussions", "discussion", 5, PERMS.portalDiscussionList, [["post", "Post", PERMS.portalDiscussionPost]]),
   ...menuWithButtons("portal:library", "portal", "Library", "library", 6, PERMS.portalLibraryList, [["download", "Download", PERMS.portalLibraryDownload]]),
+  ...menuWithButtons("portal:request", "portal", "My requests", "request", 7, PERMS.portalRequestList, [["submit", "Submit", PERMS.portalRequestSubmit]]),
   ...menuWithButtons("portal:grade", "portal", "My grades", "grade", 4, PERMS.portalGradeList, [["download", "Download transcript", PERMS.portalTranscriptDownload]]),
 
   // AI 助手：外链，管理后台和学生门户两个入口都分配（入口管理的多对多）；{code} 换成当前租户代码

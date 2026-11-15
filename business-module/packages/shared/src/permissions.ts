@@ -136,6 +136,10 @@ export const PERMS = {
   eduGradeEdit: "edu:grade:edit",
   /** 结课后改成绩：教务，要填原因，记改前改后 */
   eduGradeAmend: "edu:grade:amend",
+  /** 看学生的申请（复评、延期）：任课教师和教务（在范围内） */
+  eduRequestList: "edu:request:list",
+  /** 处理学生申请：延期由任课教师或教务批；复评改分需要同时有"结课后改成绩" */
+  eduRequestDecide: "edu:request:decide",
   eduScaleList: "edu:scale:list",
   eduScaleEdit: "edu:scale:edit",
   eduTranscriptList: "edu:transcript:list",
@@ -179,6 +183,8 @@ export const PERMS = {
   portalDiscussionPost: "portal:discussion:post",
   portalLibraryList: "portal:library:list",
   portalLibraryDownload: "portal:library:download",
+  portalRequestList: "portal:request:list",
+  portalRequestSubmit: "portal:request:submit",
   portalGradeList: "portal:grade:list",
   portalTranscriptDownload: "portal:transcript:download",
 } as const;

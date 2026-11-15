@@ -134,6 +134,7 @@ export async function removeTestTenant(owner: PrismaClient, keycloak: KeycloakAd
       owner.$executeRaw`DELETE FROM biz.student_major WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.major_course WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.major_version WHERE tenant_id = ${id}::uuid`,
+      owner.$executeRaw`DELETE FROM biz.student_request WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.course_prerequisite WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.course WHERE tenant_id = ${id}::uuid`,
       owner.$executeRaw`DELETE FROM biz.major WHERE tenant_id = ${id}::uuid`,

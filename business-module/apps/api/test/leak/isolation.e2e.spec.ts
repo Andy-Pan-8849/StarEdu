@@ -1,4 +1,5 @@
 // 跨租户泄露扫描（端到端：真实 Postgres + 真实 Keycloak 令牌 + 完整的 Nest 应用）。
+import { randomUUID } from "node:crypto";
 import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
@@ -32,7 +33,7 @@ const TABLES = [
   "role_menu", "role_data_scope", "entry_menu", "tenant_menu_grant", "dept", "campus", "post", "audit_log", "dict_type", "dict_item", "sys_param",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "major_version", "section_instructor", "section_material", "student_major",
   "assignment_group", "assignment", "rubric_item", "assignment_extension", "submission", "submission_version", "submission_file", "submission_score",
-  "grading_scale_item", "manual_grade", "final_grade", "grade_change", "transcript_issue",
+  "grading_scale_item", "manual_grade", "final_grade", "grade_change", "transcript_issue", "student_request",
   "notification", "notification_preference", "announcement", "discussion_post",
   "doc_folder", "doc_acl", "doc_file", "doc_file_version", "doc_upload", "doc_access_log",
   "term", "major", "course", "section", "enrollment", "course_prerequisite", "major_course", "major_version",
@@ -72,6 +73,7 @@ describe("cross-tenant leak scan", () => {
     await owner.majorVersion.create({ data: { tenantId, majorId: major.id, label: "Initial", effectiveYear: 2000 } });
     const issue = await owner.transcriptIssue.create({ data: { tenantId, studentPersonId: person.id, docNumber: "TR-2026-000001", version: "formal", verifyToken: `scan${Math.random().toString(36).slice(2)}${Date.now()}` } });
     const section = await owner.section.create({ data: { tenantId, courseId: course.id, termId: term.id, campusId: campus.id, number: "01", name: "SCAN101-01", capacity: 10 } });
+    const studentReq = await owner.studentRequest.create({ data: { tenantId, kind: "grade_appeal", sectionId: section.id, studentPersonId: person.id, enrollmentId: randomUUID(), reason: "scan appeal reason" } });
     const announcement = await owner.announcement.create({ data: { tenantId, title: "Scan notice", body: "x", scopeKind: "tenant" } });
     const dictType = await owner.dictType.create({ data: { tenantId, code: "scan_dict", name: "Scan dictionary" } });
     const dictItem = await owner.dictItem.create({ data: { tenantId, typeId: dictType.id, value: "one", label: "One" } });
@@ -111,6 +113,7 @@ describe("cross-tenant leak scan", () => {
         folderId: libFolder.id,
         libFileId: libFile.id,
         issueId: issue.id,
+        requestId: studentReq.id,
         sid,
       },
       allIds: new Set([...allIds, extraCampus.id, extraCampusDept.id]),
@@ -267,7 +270,7 @@ describe("cross-tenant leak scan", () => {
       const beforeA = await fingerprint(a);
       const beforeB = await fingerprint(b);
       const id = m.fixture ? (m.target === "foreign" ? b : a).ids[m.fixture] : "";
-      const path = m.path.replace(/:(id|sid|personId|issueId)/, id).replace(/:(id|versionId|issueId|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId|aclId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
+      const path = m.path.replace(/:(id|sid|personId|issueId|requestId)/, id).replace(/:(id|versionId|issueId|assignmentId|enrollmentId|materialId|personId|subId|studentId|groupId|fileId|postId|aclId)/g, "11111111-1111-4111-8111-111111111111").replace(":code", "admin");
       const verb = m.method.toLowerCase() as "get" | "post" | "put" | "patch" | "delete";
       const res = await request(app.getHttpServer())[verb](path).set("Host", a.host).set("Authorization", `Bearer ${a.token}`).send((m.body === undefined ? undefined : fill(m.body)) as object);
       // 别人的行：404（不透露存在与否）；自己的行带着别人的关联 id：400

@@ -31,6 +31,7 @@ export type Fixture =
   | "folderId"
   | "libFileId"
   | "issueId"
+  | "requestId"
   | "sid";
 
 export interface LeakEntry {
@@ -45,6 +46,7 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/me", kind: "self" },
   { method: "GET", path: "/api/me/menus?entry=admin", kind: "other" },
   { method: "GET", path: "/api/campuses", kind: "list" },
+  { method: "GET", path: "/api/requests", kind: "other" },
   { method: "GET", path: "/api/library/folders", kind: "list" },
   { method: "GET", path: "/api/library/folders/:id", kind: "detail", fixture: "folderId" },
   { method: "GET", path: "/api/campuses/:id", kind: "detail", fixture: "campusId" },
@@ -198,6 +200,7 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "GET", path: "/api/sections/:id/grade-changes", fixture: "sectionId", target: "foreign", note: "read another tenant's grade changes" },
   { method: "GET", path: "/api/dashboard/sections/:id", fixture: "sectionId", target: "foreign", note: "analyse another tenant's section" },
   { method: "GET", path: "/api/transcripts/:personId", fixture: "personId", target: "foreign", note: "read another tenant's transcript" },
+  { method: "POST", path: "/api/requests/:id/decide", fixture: "requestId", target: "foreign", body: { decision: "reject", note: "hacked" }, note: "decide another tenant's student request" },
   { method: "POST", path: "/api/transcripts/issues/:issueId/revoke", fixture: "issueId", target: "foreign", body: { reason: "hacked" }, note: "revoke another tenant's transcript" },
   { method: "POST", path: "/api/transcripts/:personId/formal", fixture: "personId", target: "foreign", note: "issue another tenant's transcript" },
   { method: "GET", path: "/api/announcements/:id/readers", fixture: "announcementId", target: "foreign", note: "read another tenant's announcement readers" },
@@ -289,6 +292,10 @@ export const OTHER_ROUTES: Record<string, string> = {
   "PUT /api/grading-scale": "replaces the caller's own tenant's scale from plain fields",
   "POST /api/grading-scale/reset": "resets the caller's own tenant's scale",
   "GET /api/dashboard/overview": "aggregates only inside the caller's data scope; scope-limited totals are tested in grades.e2e.spec.ts",
+  "GET /api/portal/requests": "student portal: the caller's own requests only (student-requests.e2e.spec.ts)",
+  "GET /api/portal/requests/options": "student portal: only the caller's own enrollments and assignments (student-requests.e2e.spec.ts)",
+  "POST /api/portal/requests": "student portal: the enrollment/assignment must belong to the caller's own record, else 404 (student-requests.e2e.spec.ts)",
+  "POST /api/portal/requests/:id/withdraw": "student portal: only the caller's own pending requests; others are 404 (student-requests.e2e.spec.ts)",
   "GET /api/portal/grades": "student portal: the caller's own grades only (grades.e2e.spec.ts)",
   "GET /api/portal/transcript.pdf": "student portal: the caller's own transcript only; the number is allocated per tenant (grades.e2e.spec.ts)",
   "GET /api/notifications": "the caller's own messages only (notify.e2e.spec.ts)",
