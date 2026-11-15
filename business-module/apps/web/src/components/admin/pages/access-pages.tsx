@@ -21,7 +21,7 @@ const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" cl
 
 // ---------------------------------------------------------------- 用户（账号）
 interface AccountRow { id: string; username: string; email: string | null; status: string; isBuiltinAdmin: boolean; personId: string | null; roleIds: string[] }
-interface RoleRow { id: string; code: string; name: string; kind: string }
+interface RoleRow { id: string; code: string; name: string; kind: string; templateMissingCount?: number }
 interface PersonRow { id: string; fullName: string; type: string }
 
 export function UsersPage() {
@@ -122,6 +122,8 @@ export function RolesPage() {
   const { run, message } = useAct(roles.reload);
   const [form, setForm] = React.useState<{ row?: RoleRow } | null>(null);
   const [editing, setEditing] = React.useState<RoleRow | null>(null);
+  const [upgrade, setUpgrade] = React.useState<{ role: RoleRow; missing: Array<{ menuId: string; name: string; type: string }> } | null>(null);
+  const openUpgrade = (role: RoleRow) => void bff<{ missing: Array<{ menuId: string; name: string; type: string }> }>(`roles/${role.id}/template-diff`).then((d) => setUpgrade({ role, missing: d.missing })).catch(() => setUpgrade(null));
   const columns: Column<RoleRow>[] = [
     { key: "name", header: t("name"), cell: (r) => r.name },
     { key: "code", header: t("code"), cell: (r) => <code>{r.code}</code> },
@@ -134,6 +136,7 @@ export function RolesPage() {
           <PermButton perm={PERMS.roleEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
           <PermButton perm={PERMS.roleAuthorize} size="sm" variant="outline" onClick={() => setEditing(r)}>{t("permissions")}</PermButton>
           <PermButton perm={PERMS.roleRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          {r.templateMissingCount ? <PermButton perm={PERMS.roleAuthorize} size="sm" onClick={() => openUpgrade(r)}>{t("templateUpdate", { n: r.templateMissingCount })}</PermButton> : null}
         </div>
       )),
     },
@@ -151,6 +154,17 @@ export function RolesPage() {
           onSubmit={async (p) => { if (await run(() => (form.row ? bff(`roles/${form.row.id}`, { method: "PATCH", body: { name: p.name } }) : bff("roles", { method: "POST", body: p })), c("saved"))) setForm(null); }} />
       ) : null}
       <DataTable columns={columns} rows={roles.rows} rowKey={(r) => r.id} loading={roles.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
+      {upgrade ? (
+        <div className="mt-4 rounded-md border border-border p-3 text-sm">
+          <h3 className="mb-2 font-medium">{t("templateTitle", { name: upgrade.role.name })}</h3>
+          <ul className="mb-2 list-disc pl-5">{upgrade.missing.map((m) => <li key={m.menuId}>{m.name}</li>)}</ul>
+          <p className="mb-2 text-muted">{t("templateNote")}</p>
+          <div className="flex gap-2">
+            <PermButton perm={PERMS.roleAuthorize} size="sm" onClick={() => void run(() => bff(`roles/${upgrade.role.id}/template-upgrade`, { method: "POST" }), t("templateDone")).then(() => setUpgrade(null))}>{t("templateApply")}</PermButton>
+            <Button size="sm" variant="outline" onClick={() => setUpgrade(null)}>{c("cancel")}</Button>
+          </div>
+        </div>
+      ) : null}
       {editing ? <RolePermissions role={editing} label={(n) => (n.nameKey && tm.has(n.nameKey) ? tm(n.nameKey) : n.name)} onClose={() => setEditing(null)} /> : null}
     </section>
   );
