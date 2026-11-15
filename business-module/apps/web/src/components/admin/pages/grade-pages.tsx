@@ -152,6 +152,8 @@ export function TranscriptsPage() {
   const [view, setView] = React.useState<TranscriptView | null>(null);
   const [msg, setMsg] = React.useState<string | null>(null);
   const [current, setCurrent] = React.useState<string | null>(null);
+  const [revoking, setRevoking] = React.useState<string | null>(null);
+  const [revokeReason, setRevokeReason] = React.useState("");
   const open = React.useCallback((id: string) => { setCurrent(id); void bff<TranscriptView>(`transcripts/${id}`).then(setView).catch((e: Error) => setMsg(e.message)); }, []);
   return (
     <section className="text-sm">
@@ -176,7 +178,15 @@ export function TranscriptsPage() {
               {i.docNumber} · {t(`v_${i.version}`)} · {new Date(i.generatedAt).toLocaleString()} ·{" "}
               <a className="underline" href={i.verifyUrl} target="_blank" rel="noreferrer">{t("verifyLink")}</a>
               {i.revokedAt ? <span className="ml-2 text-red-600">{t("revoked")}{i.revokeReason ? `: ${i.revokeReason}` : ""}</span> : (
-                <PermButton perm={PERMS.eduTranscriptIssue} size="sm" variant="outline" className="ml-2" onClick={() => { const reason = window.prompt(t("revokeReason")); if (reason && reason.trim()) void bff(`transcripts/issues/${i.id}/revoke`, { method: "POST", body: { reason: reason.trim() } }).then(() => open(current!)).catch((e: Error) => setMsg(e.message)); }}>{t("revoke")}</PermButton>
+                revoking === i.id ? (
+                  <span className="ml-2 inline-flex items-center gap-1">
+                    <input aria-label={t("revokeReason")} placeholder={t("revokeReason")} className={`${input} w-80`} value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} />
+                    <PermButton perm={PERMS.eduTranscriptIssue} size="sm" disabled={!revokeReason.trim()} onClick={() => void bff(`transcripts/issues/${i.id}/revoke`, { method: "POST", body: { reason: revokeReason.trim() } }).then(() => { setRevoking(null); open(current!); }).catch((e: Error) => setMsg(e.message))}>{t("revoke")}</PermButton>
+                    <PermButton perm={PERMS.eduTranscriptIssue} size="sm" variant="outline" onClick={() => setRevoking(null)}>{t("cancel")}</PermButton>
+                  </span>
+                ) : (
+                  <PermButton perm={PERMS.eduTranscriptIssue} size="sm" variant="outline" className="ml-2" onClick={() => { setRevoking(i.id); setRevokeReason(""); }}>{t("revoke")}</PermButton>
+                )
               )}
             </li>
           ))}</ul>
