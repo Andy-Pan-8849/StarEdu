@@ -58,6 +58,12 @@ describe("trial protection rules", () => {
     ]) expect(isTrialBlocked("platform", m, p)).toBe(false);
   });
 
+  it("cannot be bypassed by case, repeated slashes or percent-encoding", () => {
+    for (const p of ["/API/Accounts", "/api//accounts", "/api/%61ccounts", "/Api/ACCOUNTS/"]) expect(isTrialBlocked("tenant", "POST", p)).toBe(true);
+    expect(isTrialBlocked("platform", "POST", "/API/PLATFORM/Tenants")).toBe(true);
+    expect(isTrialBlocked("tenant", "POST", "/api/%zz")).toBe(false);
+  });
+
   it("platform rules do not apply to tenants and the reverse", () => {
     expect(isTrialBlocked("tenant", "POST", "/api/platform/tenants")).toBe(false);
     expect(isTrialBlocked("platform", "POST", "/api/accounts")).toBe(false);

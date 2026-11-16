@@ -42,8 +42,20 @@ export function trialProtectEnabled(env: NodeJS.ProcessEnv = process.env): boole
   return env.TRIAL_PROTECT === "1";
 }
 
+// 路由器不区分大小写、会合并重复斜杠、会解开百分号编码：规则匹配前先把路径整理成同一个样子，否则 /API/Accounts 之类的写法能绕过
+function normalizePath(path: string): string {
+  let p = path;
+  try {
+    p = decodeURIComponent(p);
+  } catch {
+    // 无法解码的路径保持原样，下面照样按小写匹配
+  }
+  p = p.toLowerCase().replace(/\/{2,}/g, "/");
+  return p.length > 1 ? p.replace(/\/+$/, "") : p;
+}
+
 export function isTrialBlocked(kind: "tenant" | "platform", method: string, path: string): boolean {
-  const p = path.length > 1 ? path.replace(/\/+$/, "") : path;
+  const p = normalizePath(path);
   const m = method.toUpperCase();
   const rules = kind === "tenant" ? TENANT_RULES : PLATFORM_RULES;
   return rules.some((r) => r.methods.includes(m) && r.path.test(p));
