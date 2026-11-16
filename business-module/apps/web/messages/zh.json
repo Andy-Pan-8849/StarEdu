@@ -788,6 +788,64 @@
       "time": "时间",
       "user": "用户",
       "action": "操作"
+    },
+    "platformAccounts": {
+      "title": "平台账号",
+      "username": "用户名",
+      "email": "邮箱",
+      "builtin": "内置",
+      "roles": "角色",
+      "status_active": "正常",
+      "status_pending": "待激活",
+      "status_disabled": "已停用",
+      "assignRoles": "分配角色",
+      "rolesOf": "{name} 的角色",
+      "enable": "启用",
+      "disable": "停用",
+      "created": "账号已创建；身份服务可用时会发出邀请邮件。"
+    },
+    "platformRoles": {
+      "title": "平台角色",
+      "name": "名称",
+      "code": "编码",
+      "kind": "类型",
+      "custom": "自定义",
+      "builtin": "内置",
+      "sort": "排序",
+      "permissions": "权限",
+      "permissionsOf": "{name} 的权限"
+    },
+    "platformMenus": {
+      "title": "菜单",
+      "hint": "平台只能显示、隐藏、启用或停用菜单；名称、路由和权限标识由代码里的目录定义。",
+      "name": "名称",
+      "code": "编码",
+      "type": "类型",
+      "entries": "所属入口",
+      "visible": "显示",
+      "enabled": "启用",
+      "show": "显示",
+      "hide": "隐藏",
+      "enable": "启用",
+      "disable": "停用"
+    },
+    "platformEntries": {
+      "title": "入口分配",
+      "hint": "选择每个入口（管理端、门户、平台）提供哪些顶级菜单。",
+      "none": "没有菜单",
+      "assign": "分配"
+    },
+    "platformAnnouncements": {
+      "title": "平台公告",
+      "titleField": "标题",
+      "bodyField": "内容",
+      "severity": "级别",
+      "sev_info": "通知",
+      "sev_warning": "警告",
+      "startsAt": "开始时间",
+      "endsAt": "结束时间",
+      "period": "展示时间",
+      "publish": "发布"
     }
   },
   "menu": {

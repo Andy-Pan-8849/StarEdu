@@ -3,8 +3,8 @@ import { MENU_CATALOG } from "@staredu/shared";
 import { describe, expect, it } from "vitest";
 import { PAGES } from "../src/components/admin/page-registry";
 
-// 已知还没有页面的平台控制台菜单（接口都有，页面没做）。做完一个就从这里删掉一个；新增的菜单没有页面则测试失败。
-const KNOWN_MISSING = ["platform:account", "platform:announcement", "platform:entry", "platform:menu", "platform:role"];
+// 已知还没有页面的菜单。新增的菜单没有页面则测试失败；真有暂缓的，在这里登记并写明原因。
+const KNOWN_MISSING: string[] = [];
 
 describe("page registry", () => {
   it("has a page for every menu in the catalog, except the known gaps", () => {

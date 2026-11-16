@@ -12,6 +12,7 @@ import { LibraryPage, PortalLibraryPage } from "./pages/library-pages";
 import { PeoplePage, StaffPage, StudentsPage } from "./pages/hr-pages";
 import { DataScopesPage, EntriesPage, MenusPage, RolesPage, UsersPage } from "./pages/access-pages";
 import { CampusesPage, DeptsPage, DictsPage, OperationLogPage, ParamsPage, PostsPage } from "./pages/system-pages";
+import { PlatformAccountsPage, PlatformAnnouncementsPage, PlatformEntriesPage, PlatformMenusPage, PlatformRolesPage } from "./pages/platform-console-pages";
 import { AuditLogPage, LoginLogPage, OnlineUsersPage } from "./pages/log-pages";
 
 export const PAGES: Record<string, React.ComponentType> = {
@@ -50,6 +51,11 @@ export const PAGES: Record<string, React.ComponentType> = {
   "system/loginLog/index": LoginLogPage,
   "system/auditLog/index": AuditLogPage,
   "platform/tenant/index": TenantsPage,
+  "platform/account/index": PlatformAccountsPage,
+  "platform/role/index": PlatformRolesPage,
+  "platform/menu/index": PlatformMenusPage,
+  "platform/entry/index": PlatformEntriesPage,
+  "platform/announcement/index": PlatformAnnouncementsPage,
   "platform/job/index": JobsPage,
   "platform/monitor/index": MonitorPage,
   "platform/log/index": PlatformAuditPage,

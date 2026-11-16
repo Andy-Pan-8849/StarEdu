@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 export interface Field {
   name: string;
   label: string;
-  type?: "text" | "number" | "email" | "select" | "checkbox" | "textarea";
+  type?: "text" | "number" | "email" | "datetime-local" | "select" | "checkbox" | "textarea";
   options?: Array<{ value: string; label: string }>;
   required?: boolean;
   readOnly?: boolean;

@@ -788,6 +788,64 @@
       "time": "Time",
       "user": "User",
       "action": "Action"
+    },
+    "platformAccounts": {
+      "title": "Platform accounts",
+      "username": "Username",
+      "email": "E-mail",
+      "builtin": "built-in",
+      "roles": "Roles",
+      "status_active": "Active",
+      "status_pending": "Pending",
+      "status_disabled": "Disabled",
+      "assignRoles": "Assign roles",
+      "rolesOf": "Roles of {name}",
+      "enable": "Enable",
+      "disable": "Disable",
+      "created": "Account created. An invitation e-mail was sent if the identity service is reachable."
+    },
+    "platformRoles": {
+      "title": "Platform roles",
+      "name": "Name",
+      "code": "Code",
+      "kind": "Type",
+      "custom": "Custom",
+      "builtin": "Built-in",
+      "sort": "Sort",
+      "permissions": "Permissions",
+      "permissionsOf": "Permissions of {name}"
+    },
+    "platformMenus": {
+      "title": "Menus",
+      "hint": "The platform can only show, hide, enable or disable menus. Names, routes and permission codes come from the code catalog.",
+      "name": "Name",
+      "code": "Code",
+      "type": "Type",
+      "entries": "Entries",
+      "visible": "Visible",
+      "enabled": "Enabled",
+      "show": "Show",
+      "hide": "Hide",
+      "enable": "Enable",
+      "disable": "Disable"
+    },
+    "platformEntries": {
+      "title": "Entry assignment",
+      "hint": "Choose which top-level menus each entry (admin, portal, platform) offers.",
+      "none": "No menus",
+      "assign": "Assign"
+    },
+    "platformAnnouncements": {
+      "title": "Platform announcements",
+      "titleField": "Title",
+      "bodyField": "Text",
+      "severity": "Severity",
+      "sev_info": "Info",
+      "sev_warning": "Warning",
+      "startsAt": "Starts",
+      "endsAt": "Ends",
+      "period": "Shown",
+      "publish": "Publish"
     }
   },
   "menu": {
