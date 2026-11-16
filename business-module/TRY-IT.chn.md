@@ -10,7 +10,7 @@
 |---|---|
 | Node.js **20.19 及以上**和 **pnpm 10** | `node -v`、`pnpm -v` |
 | 带 Compose 的 **Docker** | 给 Postgres、Redis、对象存储、Keycloak 和 Mailpit 留几个 GB 的空闲内存。AI 模块有自己独立的 Compose 项目和不同的端口，两边可以同时运行。 |
-| macOS、Linux，或带 WSL 的 Windows | `pnpm dev:*` 命令用的是 POSIX shell。 |
+| macOS、Linux 或 Windows | Windows 用 Docker Desktop 即可；遇到问题可以改用 WSL。 |
 | 一个现代浏览器 | `*.localhost` 要能解析到本机（Chrome、Edge、Firefox 都可以；否则把 `hq.localhost`、`riverside-franchise.localhost`、`platform.localhost` 加到 `/etc/hosts`）。 |
 | 空闲端口 | Postgres 5433、Redis 6380、对象存储 9100/9101、Keycloak 8180、Mailpit 1125 和 8125、接口 4000、网页 3001。 |
 

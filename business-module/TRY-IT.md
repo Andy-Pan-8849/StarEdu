@@ -10,7 +10,7 @@ This guide gets the business module running on your own machine, loads a realist
 |---|---|
 | Node.js **20.19 or newer** and **pnpm 10** | `node -v`, `pnpm -v` |
 | **Docker** with Compose | A few GB of free memory for Postgres, Redis, object storage, Keycloak and Mailpit. The AI module has its own Compose project with different ports, so both can run together. |
-| macOS, Linux or Windows with WSL | The `pnpm dev:*` commands use a POSIX shell. |
+| macOS, Linux or Windows | Windows works with Docker Desktop; if something misbehaves, try WSL. |
 | A modern browser | `*.localhost` names must resolve to your machine (Chrome, Edge and Firefox do this; otherwise add `hq.localhost`, `riverside-franchise.localhost` and `platform.localhost` to `/etc/hosts`). |
 | Free ports | Postgres 5433, Redis 6380, object store 9100/9101, Keycloak 8180, Mailpit 1125 and 8125, API 4000, web 3001. |
 
