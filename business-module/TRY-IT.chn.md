@@ -148,12 +148,13 @@ make reset          # 删除本模块的全部本地数据（不含 AI 模块）
 | 现象 | 处理 |
 |---|---|
 | `*.localhost` 打不开 | 把三个名字加到 `/etc/hosts`，指向 `127.0.0.1`。 |
-| 登录页上没有演示账号 | Keycloak 是在挂载主题之前启动的：再运行一次 `make up`，然后 `pnpm seed:demo`。 |
+| 登录页上没有演示账号 | Keycloak 容器看不到主题目录（启动时主题还不存在，或目录被替换过，比如切换过 git 分支）。重建容器：`docker compose --env-file .env -f deploy/compose/biz.yaml up -d --force-recreate keycloak`，然后刷新页面。如果是登录域本身没有设置主题，再运行 `pnpm seed:demo`。（只运行 `make up` 不会重建已在运行的容器。）|
 | 菜单能看到，页面却提示 "Missing permission"（从旧版本升级后） | 运行 `pnpm seed`：它会补上缺的菜单并刷新权限缓存。你早先复制的角色，用 **Roles > Update from template**。 |
 | 在管理后台登录后显示 "No access" | 这个账号没有管理后台权限（学生和部分演示员工账号只用门户）。换 `demo.admin`。 |
 | 租户管理员的列表里 "Nothing here" | 按设计，管理员没有业务数据范围；用 `demo.admin` 或 `demo.registrar`。 |
 | 截止日期看起来很旧 | `pnpm demo:reset`。 |
 | 端口被占用 | AI 模块用的是另外的端口（3000、5432、6379、8080）。检查第 1 节里的端口有没有被别的程序占用。 |
+| AWS SDK 打印 `NodeVersionSupportWarning`（比如运行 `pnpm demo` 时） | 目前无害。你用的是 Node 20；AWS SDK for JavaScript 从 2027 年 1 月起要求 Node 22，请在那之前升级到 Node 22。 |
 | 接口启动报 "Invalid environment" | 用 `pnpm dev:api` 启动（它会加载 `.env`），并确认 `.env` 存在。 |
 
 ## 7. 可选的扩展

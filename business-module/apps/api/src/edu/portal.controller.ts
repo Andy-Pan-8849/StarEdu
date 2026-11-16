@@ -59,7 +59,7 @@ export class PortalController {
       const seated = await this.db.enrollment.count({ where: { sectionId: s.id, status: "enrolled" } });
       const missing = prereqs.filter((p) => p.courseId === s.courseId && !passedCourses.has(p.prerequisiteId)).map((p) => p.prerequisite.code);
       const clashes = mine
-        .filter((e) => e.status === "enrolled" && e.section.termId === s.termId)
+        .filter((e) => e.status === "enrolled" && e.section.termId === s.termId && e.sectionId !== s.id) // 自己已选的这个班不算和自己冲突
         .filter((e) => schedulesOverlap(s.schedule as unknown as ScheduleItem[], e.section.schedule as unknown as ScheduleItem[]))
         .map((e) => e.section.name);
       rows.push({

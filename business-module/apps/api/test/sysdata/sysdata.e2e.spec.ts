@@ -71,18 +71,24 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
 
   describe("operation log", () => {
     const logs = async () => (await admin().get("/api/operation-logs?size=100")).body as Array<{ method: string; path: string; status: number; username: string; params: { body?: Record<string, unknown> } | null; error: string | null; ip: string | null }>;
-    const waitFor = async (pred: () => Promise<boolean>) => {
-      for (let i = 0; i < 20; i += 1) {
-        if (await pred()) return;
+    // 操作日志是请求结束后异步写入的：测试必须等到"自己要看的那一行"出现，而不是"任何一行"（前面的用例也写过 400），
+    // 超时要报错，不能默默放过去。
+    type Row = Awaited<ReturnType<typeof logs>>[number];
+    const rowWhere = async (pred: (l: Row) => boolean, what: string): Promise<Row> => {
+      for (let i = 0; i < 100; i += 1) {
+        const found = (await logs()).find(pred);
+        if (found) return found;
         await new Promise((r) => setTimeout(r, 100));
       }
+      throw new Error(`operation log row not written within 10 s: ${what}`);
     };
 
     it("records who did what with sanitized parameters, never the response, for writes only", async () => {
       await admin().post("/api/posts", { code: "logged-post", name: "Logged" });
       await admin().get("/api/posts"); // 读不记
       await admin().post("/api/params", { key: "log.test.password", value: "secret-value-123", name: "Secret one", remark: "r" });
-      await waitFor(async () => (await logs()).some((l) => l.path === "/api/posts"));
+      await rowWhere((l) => l.path === "/api/posts" && l.method === "POST", "POST /api/posts");
+      await rowWhere((l) => l.path === "/api/params" && l.method === "POST", "POST /api/params");
       const rows = await logs();
       expect(rows.every((l) => l.method !== "GET")).toBe(true);
       const post = rows.find((l) => l.path === "/api/posts" && l.method === "POST")!;
@@ -94,15 +100,13 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
 
     it("masks passwords and tokens in the stored parameters", async () => {
       await admin().post("/api/accounts", { username: "log.user", email: "log.user@example.test", sendInvite: false, password: "Hunter2!Hunter2", token: "abc" } as never).catch(() => undefined);
-      await waitFor(async () => (await logs()).some((l) => l.path === "/api/accounts"));
-      const row = (await logs()).find((l) => l.path === "/api/accounts" && l.method === "POST")!;
+      const row = await rowWhere((l) => l.path === "/api/accounts" && l.method === "POST", "POST /api/accounts");
       expect(row.params?.body).toMatchObject({ password: "***", token: "***", username: "log.user" });
     });
 
     it("failed requests are recorded with their status and message", async () => {
       await admin().post("/api/posts", { code: "Bad Code", name: "x" });
-      await waitFor(async () => (await logs()).some((l) => l.status === 400));
-      const bad = (await logs()).find((l) => l.status === 400 && l.path === "/api/posts")!;
+      const bad = await rowWhere((l) => l.status === 400 && l.path === "/api/posts", "POST /api/posts with status 400");
       expect(bad.error).toBeTruthy();
     });
 

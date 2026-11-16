@@ -148,12 +148,13 @@ make reset          # remove all local data of this module (not the AI module); 
 | Symptom | What to do |
 |---|---|
 | `*.localhost` does not open | Add the three names to `/etc/hosts` pointing at `127.0.0.1`. |
-| The login page shows no demo accounts | Keycloak was started before the theme was mounted: run `make up` again, then `pnpm seed:demo`. |
+| The login page shows no demo accounts | The Keycloak container does not see the theme folder (started before the theme existed, or the folder was replaced, for example after switching git branches). Recreate it: `docker compose --env-file .env -f deploy/compose/biz.yaml up -d --force-recreate keycloak`, then reload the page. If the realm itself has no theme, run `pnpm seed:demo`. (`make up` alone does not recreate a running container.) |
 | A menu shows but the page says "Missing permission" (after upgrading from an older version) | Run `pnpm seed`: it adds missing menus and refreshes cached permissions. For roles you copied earlier, use **Roles > Update from template**. |
 | "No access" after signing in at the admin console | The account has no admin permissions (students and some demo staff accounts only use the portal). Use `demo.admin`. |
 | "Nothing here" in lists for a tenant administrator | By design the administrator has no business data scope; use `demo.admin` or `demo.registrar`. |
 | Deadlines look old | `pnpm demo:reset`. |
 | Port already in use | The AI module uses different ports (3000, 5432, 6379, 8080). Check that nothing else uses the ports in section 1. |
+| A `NodeVersionSupportWarning` from the AWS SDK appears (for example during `pnpm demo`) | Harmless today. You are on Node 20; the AWS SDK for JavaScript will require Node 22 from January 2027, so plan to move to Node 22 before then. |
 | API refuses to start with "Invalid environment" | Run it with `pnpm dev:api` (it loads `.env`) and make sure `.env` exists. |
 
 ## 7. Optional extras

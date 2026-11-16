@@ -9,7 +9,7 @@ import { PortalRequestsPage, RequestsPage } from "./pages/request-pages";
 import { AnnouncementsPage } from "./pages/announcement-pages";
 import { PortalDiscussionsPage } from "./pages/discussion-pages";
 import { LibraryPage, PortalLibraryPage } from "./pages/library-pages";
-import { StaffPage, StudentsPage } from "./pages/hr-pages";
+import { PeoplePage, StaffPage, StudentsPage } from "./pages/hr-pages";
 import { DataScopesPage, EntriesPage, MenusPage, RolesPage, UsersPage } from "./pages/access-pages";
 import { CampusesPage, DeptsPage, DictsPage, OperationLogPage, ParamsPage, PostsPage } from "./pages/system-pages";
 import { AuditLogPage, LoginLogPage, OnlineUsersPage } from "./pages/log-pages";
@@ -32,6 +32,7 @@ export const PAGES: Record<string, React.ComponentType> = {
   "edu/scale/index": GradingScalePage,
   "edu/transcript/index": TranscriptsPage,
   "edu/dashboard/index": DashboardPage,
+  "hr/person/index": PeoplePage,
   "hr/staff/index": StaffPage,
   "hr/student/index": StudentsPage,
   "system/user/index": UsersPage,

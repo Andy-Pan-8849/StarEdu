@@ -402,7 +402,17 @@
       "guardian": "Guardian",
       "emergencyNote": "Sensitive information. Viewing and changing it is logged.",
       "changeStatus": "Change status",
-      "statusPrompt": "New status ({options}):"
+      "statusPrompt": "New status ({options}):",
+      "peopleTitle": "People",
+      "peopleHint": "Everyone in the company, staff and students. Sensitive information is shown only to people who may see it.",
+      "personType": "Type",
+      "allTypes": "All",
+      "person_staff": "Staff",
+      "person_student": "Student",
+      "birthDate": "Birth date",
+      "gender": "Gender",
+      "address": "Address",
+      "noSensitive": "Sensitive information is not shown to your account."
     },
     "edu": {
       "termsTitle": "Terms",
