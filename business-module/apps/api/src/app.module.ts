@@ -81,6 +81,7 @@ import { RolesController } from "./rbac/roles.controller";
 import { RedisService } from "./redis/redis.service";
 import { TenantPrismaService } from "./tenancy/tenant-prisma.service";
 import { TenantResolverMiddleware } from "./tenancy/tenant-resolver.middleware";
+import { TrialProtectMiddleware } from "./demo/trial-protect.middleware";
 
 /** 全部控制器；泄露扫描的"路由都已登记"测试用同一份列表。 */
 export const CONTROLLERS = [
@@ -181,6 +182,6 @@ export const CONTROLLERS = [
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // 健康检查不属于任何租户，其余所有路由先按主机名确定租户
-    consumer.apply(TenantResolverMiddleware).exclude("healthz").forRoutes("*");
+    consumer.apply(TenantResolverMiddleware, TrialProtectMiddleware).exclude("healthz").forRoutes("*");
   }
 }

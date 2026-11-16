@@ -1,0 +1,3 @@
+# Rebuild the demo data every day at 03:00 (server time). Adjust the project path.
+# The command loads .env itself; logs go to a file you can read the next morning.
+0 3 * * * cd /srv/staredu/business-module && /usr/bin/env pnpm demo:reset >> /var/log/staredu-demo-reset.log 2>&1

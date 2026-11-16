@@ -180,6 +180,10 @@ await call("roles/menu-tree");    // menus and buttons you can tick
 
 API documentation is at <http://localhost:4000/api-docs> (development only; it has no sign-in, so do not expose it).
 
+### Hosting a public trial
+
+To put the demo on a server for others to try, turn on the trial protection and schedule the daily reset. Visitors can still create, edit and delete almost everything; only account creation, sign-in changes and the platform's company administration are turned off, and the data is rebuilt every day. Settings, proxy rules and the cron or timer files are in [`deploy/trial/`](deploy/trial/README.md).
+
 ### Scaffold your own resource
 `pnpm gen:module --name warehouse-item --group edu --fields "title:string!,qty:int,due:date,done:bool,notes:text" --label "Warehouse items" --label-zh "仓库物品"`, then `pnpm migrate && pnpm prisma:generate && pnpm --filter @staredu/shared build`. It creates the table (with row-level security), API, permissions, menu, page, tests and leak-scan entries; `--dry-run` lists the files without writing.
 

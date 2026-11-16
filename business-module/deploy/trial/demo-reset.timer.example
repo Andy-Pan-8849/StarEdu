@@ -1,0 +1,11 @@
+# /etc/systemd/system/staredu-demo-reset.timer
+# Enable with: systemctl enable --now staredu-demo-reset.timer
+[Unit]
+Description=Daily StarEdu demo reset
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

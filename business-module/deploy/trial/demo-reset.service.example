@@ -1,0 +1,9 @@
+# /etc/systemd/system/staredu-demo-reset.service
+[Unit]
+Description=Rebuild the StarEdu demo data
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/staredu/business-module
+Environment=ALLOW_DEMO_SEED=1
+ExecStart=/usr/bin/env pnpm demo:reset
