@@ -60,7 +60,7 @@ make env            # creates .env; set OPENAI_API_KEY in it
 make sync && make up && make seed
 ```
 
-Open <http://localhost:3000> and sign in as `wei.stu.sh` with the password `demo-pass-123` (a local demo account). See [`ai-module/README.md`](ai-module/README.md) for the details (in Chinese).
+Open <http://localhost:3000> and sign in as `wei.stu.sh` with the password `demo-pass-123` (a local demo account). See [`ai-module/README.md`](ai-module/README.md) for the details.
 
 ## Architecture
 
@@ -83,7 +83,7 @@ StarEdu/
 ├── TRY-IT.md              how to run and try each module, or both (TRY-IT.chn.md in Chinese)
 ├── LICENSE                MIT
 ├── ai-module/             the AI module: everything you run
-│   ├── README.md          detailed guide, in Chinese: start, try, test, directory layout
+│   ├── README.md          detailed guide: start, try, test, directory layout (README.chn.md in Chinese)
 │   ├── Makefile           the commands you use every day (make up, make seed, make eval ...)
 │   ├── pyproject.toml     uv workspace root; shared ruff, mypy and pytest settings
 │   ├── alembic.ini        database migration tool settings

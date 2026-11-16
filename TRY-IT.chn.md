@@ -6,7 +6,7 @@ StarEdu 有两部分，都能在你自己的机器上运行，可以一起跑，
 
 | 部分 | 你能看到什么 | 需要 | 详细指南 |
 |---|---|---|---|
-| **AI 模块** | 企业知识助手：在聊天页提问，得到带引用的回答，结果按提问者的身份过滤。 | Docker Compose、uv、make、OpenAI 密钥 | [`ai-module/README.md`](ai-module/README.md) |
+| **AI 模块** | 企业知识助手：在聊天页提问，得到带引用的回答，结果按提问者的身份过滤。 | Docker Compose、uv、make、OpenAI 密钥 | [`ai-module/README.chn.md`](ai-module/README.chn.md) |
 | **业务模块** | 面向培训公司的多租户后台：人员、教学、作业、成绩、成绩单、通知、文档。自带演示公司和账号。 | Docker Compose、Node.js 20.19+、pnpm 10，**不需要任何密钥** | [`business-module/TRY-IT.chn.md`](business-module/TRY-IT.chn.md) |
 | **两个一起** | 助手直接用后台的数据回答问题，用公司自己的登录。 | 上面两个都要 | 下面的路线 C |
 
@@ -48,7 +48,7 @@ make sync && make up && make seed
 - 问 `What does ERR-PORTAL-429 mean?`：得到带引用的回答，引用可以点开看原文。
 - 退出后用 `qing.hr.bj`（HR）登录，问 `What is the base salary band for a Senior Instructor at a Tier 1 campus?`：HR 得到薪资带。用 `wei.stu.sh` 问同一个问题，学员得到固定的"找不到"话术，不会暗示存在受限文档。
 
-八个演示账号，每个账号三个正常问题和两个受限问题，见 [`ai-module/README.md`](ai-module/README.md)。停止用 `make down`；`make clean` 连数据一起删。
+八个演示账号，每个账号三个正常问题和两个受限问题，见 [`ai-module/README.chn.md`](ai-module/README.chn.md)。停止用 `make down`；`make clean` 连数据一起删。
 
 ## 路线 B：业务模块
 

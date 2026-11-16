@@ -6,7 +6,7 @@ StarEdu has two parts you can run on your own machine, together or one at a time
 
 | Part | What you get | Needs | Detailed guide |
 |---|---|---|---|
-| **AI module** | A knowledge assistant: ask questions in a chat page and get answers with citations, filtered by who is asking. | Docker Compose, uv, make, an OpenAI API key | [`ai-module/README.md`](ai-module/README.md) (Chinese) |
+| **AI module** | A knowledge assistant: ask questions in a chat page and get answers with citations, filtered by who is asking. | Docker Compose, uv, make, an OpenAI API key | [`ai-module/README.md`](ai-module/README.md) |
 | **Business module** | A multi-tenant back office for a training company: people, teaching, assignments, grades, transcripts, notifications, documents. Demo companies and accounts included. | Docker Compose, Node.js 20.19+, pnpm 10. **No API key.** | [`business-module/TRY-IT.md`](business-module/TRY-IT.md) |
 | **Both together** | The assistant answers from the back office's data, signed in with the company's own login. | Both of the above | Path C below |
 
@@ -48,7 +48,7 @@ Open <http://localhost:3000> and sign in as `wei.stu.sh`, password `demo-pass-12
 - Ask `What does ERR-PORTAL-429 mean?`: you get an answer with a citation you can open.
 - Sign out, sign in as `qing.hr.bj` (HR) and ask `What is the base salary band for a Senior Instructor at a Tier 1 campus?`: HR gets the band. Ask the same question as `wei.stu.sh` and the student gets the fixed "could not find" reply, without a hint that a restricted document exists.
 
-All eight demo accounts, with three normal and two restricted questions for each, are in [`ai-module/README.md`](ai-module/README.md) (Chinese). Stop with `make down`; `make clean` also deletes the data.
+All eight demo accounts, with three normal and two restricted questions for each, are in [`ai-module/README.md`](ai-module/README.md). Stop with `make down`; `make clean` also deletes the data.
 
 ## Path B: the business module
 

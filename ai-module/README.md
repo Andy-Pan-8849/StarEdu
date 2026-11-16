@@ -1,251 +1,253 @@
 <p align="center">
-  <img src="../assets/logo/logo.svg" alt="StarIT Education 标志：灯塔把光射向一弧星星" width="140">
+  <img src="../assets/logo/logo.svg" alt="StarIT Education logo: a lighthouse sending its beams toward an arc of stars" width="140">
 </p>
 
-# AI 模块
+# AI module
 
-公司 StarIT Education 的企业知识助手。里程碑 M2–M9 已完成（tag `ai-m2` … `ai-m9`、`v0.1.0`），全部可在本机用 Docker Compose 跑起来。
+[中文](README.chn.md) · [Try the whole project](../TRY-IT.md)
 
-## 一、已有功能
+The enterprise knowledge assistant of the company StarIT Education. Milestones M2 to M9 are done (tags `ai-m2` ... `ai-m9`, `v0.1.0`), and everything runs on your own machine with Docker Compose.
 
-1. **知识库**：28 份示例文档（md/txt/docx/pdf）由后台 worker 解析、切块、向量化，存入 PostgreSQL + pgvector；重复运行只处理有变化的文档。
-2. **检索**：关键词 + 向量，用 RRF 融合，再用模型重排；**权限过滤在数据库查询内、排序之前**。
-3. **助手（LangGraph）**：理解问题 → 必要时只反问一次 → 拒绝越界/写操作 → 带 `[n]` 引用作答 → 对照原文校验（失败重试一次）。
-4. **数据问答**：数据类问题走只读 SQL 视图和 MCP 工具，视图按提问者身份过滤行；引用里会显示用了哪些视图、多少行。
-5. **不泄露**：“没找到”和“没权限”用相同的固定话术，不透露受限文档是否存在。
-6. **流式输出**：请求头带 `Accept: text/event-stream` 时返回 SSE；先流出，校验不通过则用 `message.retract` 撤回并给出更正后的回答。
-7. **权限**：Keycloak 登录，8 种演示角色；文档和数据行按角色/校区/职级过滤；每次运行写入只增不改的审计日志。
-8. **模型**：全部经 LiteLLM 网关；备用链 `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`。
-9. **限制**：每用户 20 条/分钟、每 IP 60 条/分钟、全栈每日 **0.5 美元**（UTC 日）；超出时聊天返回 429，worker 暂停取任务。
-10. **网页**：Next.js 聊天（引用可点开看原文）、会话列表；`RAGETLAdmin` 角色有 Documents 管理页（上传、状态、权限、删除）。
-11. **可观测（可选）**：OpenTelemetry 链路、Prometheus、Grafana 看板、Langfuse。
-12. **评测**：114 道文档题、41 道数据题、权限泄露扫描、检索/切块实验。最近一次答案评测 **107/114**（M8 基线 99/114）；20% 人工抽查与判官一致 21/23。
+## 1. What it does
 
-### 助手怎么分流（有没有 Router Agent？）
+1. **Knowledge base.** 28 sample documents (md, txt, docx, pdf) are parsed, chunked and embedded by a background worker and stored in PostgreSQL with pgvector. Running it again only processes documents that changed.
+2. **Search.** Keyword and vector search, fused with reciprocal rank fusion (RRF), then reranked by a model. **Permission filtering happens inside the database query, before ranking.**
+3. **The assistant (LangGraph).** Understand the question, ask one clarifying question only if needed, refuse out-of-scope and write requests, answer with `[n]` citations, check the answer against the sources (retry once if it fails).
+4. **Data questions.** Questions about numbers go through read-only SQL views and MCP tools. The views filter rows by who is asking, and the citation shows which views and how many rows were used.
+5. **No leaks.** "Not found" and "not allowed" get the same fixed reply, so the answer never reveals whether a restricted document exists.
+6. **Streaming.** With `Accept: text/event-stream` the API returns Server-Sent Events. The answer streams first; if verification fails, `message.retract` withdraws it and a corrected answer follows.
+7. **Permissions.** Keycloak sign-in, eight demo roles; documents and data rows are filtered by role, campus and level; every run writes to an append-only audit log.
+8. **Models.** Every call goes through the LiteLLM gateway; fallback chain `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`.
+9. **Limits.** 20 messages per minute per user, 60 per minute per IP, and **US$0.50 per day** for the whole stack (UTC day). Over a limit, chat returns 429 and the worker pauses taking jobs.
+10. **Web.** A Next.js chat page (click a citation to read the source) and a conversation list; the `RAGETLAdmin` role has a Documents page (upload, status, permissions, delete).
+11. **Observability (optional).** OpenTelemetry traces, Prometheus, Grafana dashboards, Langfuse.
+12. **Evaluation.** 114 document questions, 41 data questions, a permission leak sweep, and retrieval and chunking experiments. Latest answer run: **107/114** (the M8 baseline was 99/114); a human review of a 20% sample agreed with the model judge on 21 of 23 items.
 
-没有单独的 Router Agent。助手是**一张固定的 LangGraph 图**，“分流”只是图里的一个步骤。下面两件事是各自独立的，容易混在一起：
+### How a question is routed (is there a router agent?)
 
-| 问题 | 由什么决定 | 在哪里发生 |
+There is no separate router agent. The assistant is **one fixed LangGraph graph**, and routing is a single step inside it. Two questions are answered independently, and they are easy to mix up:
+
+| Question | Decided by | Where it happens |
 |---|---|---|
-| **这个问题走哪条路？** | **问题的类型** | `understand` 步骤：一次模型调用，判断意图 |
-| **这个人能看到什么？** | **登录的账号** | 数据库查询和数据工具内部，**不经过模型** |
+| **Which path does this question take?** | The **type of the question** | The `understand` step: one model call that classifies the intent |
+| **What may this person see?** | The **signed-in account** | Inside the database query and the data tools, **never in the model** |
 
 ```mermaid
 flowchart LR
-    Q["问题 + 登录身份（JWT）"] --> U["understand：判断问题类型"]
-    U -->|doc_qa 文档问答| D["检索文档 → 评估命中 → 带引用作答 → 校验"]
-    U -->|data_query 数据问答| A["MCP 数据工具或只读 SQL → 依据查询结果作答"]
-    U -->|chitchat 闲聊| C["简短回复"]
-    U -->|"action 写操作 / out_of_scope 越界"| R["拒绝并给出原因码"]
-    U -->|"问题含糊"| K["只反问一次"]
+    Q["Question + signed-in identity (JWT)"] --> U["understand: classify the question"]
+    U -->|doc_qa| D["search documents, check hits, answer with citations, verify"]
+    U -->|data_query| A["MCP data tools or read-only SQL, answer from rows"]
+    U -->|chitchat| C["short reply"]
+    U -->|"action / out_of_scope"| R["refuse with a reason code"]
+    U -->|"unclear"| K["ask one clarifying question"]
 ```
 
-- **问题类型决定走哪条路。** 同一个账号先问制度、再问数字，会走两个不同的分支。模型看不到提问者的身份，也不允许自己判断身份。
-- **账号只决定“能看到什么”。** 身份来自登录令牌（JWT），一次运行开始后只读。文档权限在检索 SQL 里、排序之前过滤；数据问答跑在按提问者过滤行的视图上，MCP 工具会把用户的令牌原样转发。
-- **所以同一个问题，不同账号走同一条路，看到的结果不同。** 例如用 `qing.hr.bj`（HR）和 `wei.stu.sh`（学员）分别问 `What is the base salary band for a Senior Instructor at a Tier 1 campus?`：HR 得到薪资带并带引用，学员得到固定的“找不到”话术。“没找到”和“没权限”说的是同一句话，不会透露受限文档是否存在。
+- **The question type chooses the path.** The same account asking about a policy and then about a number goes down two different branches. The model never sees the asker's identity and is not allowed to decide on one.
+- **The account decides only what is visible.** Identity comes from the signed token (JWT) and is read-only once a run starts. Document permissions are applied inside the search SQL before ranking; data questions run on views that filter rows by the asker, and the MCP tools forward the user's token as it is.
+- **So the same question from two accounts takes the same path and returns different results.** Ask `What is the base salary band for a Senior Instructor at a Tier 1 campus?` as `qing.hr.bj` (HR) and as `wei.stu.sh` (a student): HR gets the band with a citation, the student gets the fixed "could not find" reply. A missing document and a forbidden one read the same.
 
-`understand` 就相当于 Router Agent 的角色，只是它不是独立的 Agent，而是图里的一个节点，由问题类型来选择分支。
+`understand` plays the part of a router agent, but it is a node in the graph, not an agent of its own.
 
-**为什么是一张图，而不是多个 Agent：** 外层流程（检索、权限过滤、校验、收尾）是固定的代码，模型只用在几个明确的步骤里。这样每次运行可预期、可测试、评测成本低。数据路径里的 SQL 部分是有次数上限的小循环（设计文档里叫 SQL Agent 子图）。Analytics Agent、Web Search Agent 在 [第二阶段计划](../docs/design/09-phase2-plan.md) 里是候选项，**还没有做**。
+**Why one graph rather than several agents:** the outer flow (search, permission filter, verification, wrap-up) is fixed code, and the model is used only in a few named steps. That keeps runs predictable, testable and cheap to evaluate. The SQL part of the data path is a bounded sub-loop (called the SQL agent subgraph in the design documents). Analytics and web-search agents are candidates in the [phase 2 plan](../docs/design/09-phase2-plan.md) and are **not built**.
 
-代码位置：路由表在 [`graph.py`](packages/core/src/starit_core/agent/graph.py)，`understand` 在 [`nodes.py`](packages/core/src/starit_core/agent/nodes.py)，它的提示词在 `packages/core/src/starit_core/agent/prompts/`。设计说明见 [`docs/design/04-agent-flow.md`](../docs/design/04-agent-flow.md)。
+Code: the routing table is in [`graph.py`](packages/core/src/starit_core/agent/graph.py), `understand` is in [`nodes.py`](packages/core/src/starit_core/agent/nodes.py), and its prompt is in `packages/core/src/starit_core/agent/prompts/`. See [`docs/design/04-agent-flow.md`](../docs/design/04-agent-flow.md) for the design (in Chinese).
 
-## 二、启动（首次约 15 分钟）
+## 2. Start it (about 15 minutes the first time)
 
-**系统需求**：Docker Compose（建议 ≥ 8 GB 内存、≥ 20 GB 磁盘）、[uv](https://docs.astral.sh/uv/)、`make`、`git`、OpenAI 密钥。
+**Requirements:** Docker Compose (8 GB of memory or more and 20 GB of disk are recommended), [uv](https://docs.astral.sh/uv/), `make`, `git`, an OpenAI API key.
 
-1. **从 GitHub 下载代码到项目目录**：
+1. **Get the code:**
 
    ```bash
    git clone https://github.com/Andy-Pan-8849/StarEdu.git
    cd StarEdu/ai-module
    ```
 
-   以下所有命令都在 `StarEdu/ai-module` 目录里运行。
+   Every command below runs in `StarEdu/ai-module`.
 
-2. **配置环境**：
+2. **Configure the environment:**
 
    ```bash
    make env
    ```
 
-   它把 `.env.example` 复制成 `.env`。用编辑器打开 `.env`，填写 `OPENAI_API_KEY=你的密钥`。`ANTHROPIC_API_KEY` 只用于备用链最后一级，可以不填。端口被占用时，也在这个文件里改（如 `STARIT_WEB_PORT`）。
+   This copies `.env.example` to `.env`. Open `.env` in an editor and set `OPENAI_API_KEY=your key`. `ANTHROPIC_API_KEY` is only used by the last step of the fallback chain and can stay empty. If a port is taken, change it in this file too (for example `STARIT_WEB_PORT`).
 
-3. **准备 Docker**：安装并打开 Docker Desktop（Linux 用 Docker Engine），确认可用，并在 Docker Desktop 的设置里给它 ≥ 8 GB 内存：
+3. **Prepare Docker:** install and open Docker Desktop (Docker Engine on Linux), and give it at least 8 GB of memory in its settings. Check it works:
 
    ```bash
    docker compose version
    docker info
    ```
 
-   这两条都能正常输出（`docker info` 不报“Cannot connect”），才能继续。
+   Both must print normally (`docker info` must not say "Cannot connect") before you go on.
 
-4. **安装 Python 依赖**：
+4. **Install the Python dependencies:**
 
    ```bash
    make sync
    ```
 
-5. **构建并启动全部服务**：
+5. **Build and start all services:**
 
    ```bash
    make up
    ```
 
-   首次需要下载并构建镜像，约 10 分钟；等到命令结束、所有容器显示 healthy。
+   The first run downloads and builds images, about 10 minutes. Wait until the command ends and every container is healthy.
 
-6. **写入示例数据**：
+6. **Load the sample data:**
 
    ```bash
    make seed
    ```
 
-   导入业务表、28 份文档的知识库（来自预制转储，不需要模型密钥）和原始文件。
+   This imports the business tables, the knowledge base of 28 documents (from a prebuilt dump, so no model key is needed) and the original files.
 
-7. **检查是否起来了**：
+7. **Check that it is up:**
 
    ```bash
    curl localhost:8000/healthz
    ```
 
-   应返回 `{"status":"ok","checks":{"database":"ok"}}`。
+   It should return `{"status":"ok","checks":{"database":"ok"}}`.
 
-8. **（可选）启动监控**：`make up-obs` 额外启动 Grafana 等；`make up-langfuse` 再加 Langfuse（很重，约 5 GB 内存）。已经用 `make up` 启动过也可以直接再运行它们。
+8. **(Optional) Start monitoring:** `make up-obs` also starts Grafana and friends; `make up-langfuse` adds Langfuse (heavy, about 5 GB of memory). You can run them after `make up` too.
 
-9. **停止**：`make down` 停止服务并保留数据；`make clean` 连数据一起删。
+9. **Stop:** `make down` stops the services and keeps the data; `make clean` deletes the data as well.
 
-10. **访问地址和账号**：
+10. **Addresses and accounts:**
 
-    | 地址 | 内容 | 账号 / 密码 |
+    | Address | What | Account / password |
     |---|---|---|
-    | http://localhost:3000 | 聊天网页（从这里开始） | 见下面“三、怎么试用”，密码都是 `demo-pass-123` |
-    | http://localhost:8000/docs | API 文档 | 需要 token：`make -s token ACCOUNT=wei.stu.sh` |
-    | http://localhost:8080 | Keycloak 后台 | admin / admin |
-    | http://localhost:4100 | LiteLLM 网关 | 密钥 `sk-starit-local-dev`（仅本地） |
-    | http://localhost:3300 | Grafana（`make up-obs` 后） | admin / admin |
-    | http://localhost:3100 | Langfuse（`make up-langfuse` 后） | admin@starit.example / starit-local |
+    | http://localhost:3000 | Chat web page (start here) | see section 3; every password is `demo-pass-123` |
+    | http://localhost:8000/docs | API documentation | needs a token: `make -s token ACCOUNT=wei.stu.sh` |
+    | http://localhost:8080 | Keycloak admin | admin / admin |
+    | http://localhost:4100 | LiteLLM gateway | key `sk-starit-local-dev` (local only) |
+    | http://localhost:3300 | Grafana (after `make up-obs`) | admin / admin |
+    | http://localhost:3100 | Langfuse (after `make up-langfuse`) | admin@starit.example / starit-local |
 
-## 三、怎么试用
+## 3. Try it
 
-用 http://localhost:3000 登录。每个问题用一个新会话更清楚。
+Sign in at http://localhost:3000. Starting a new conversation for each question keeps things clear.
 
-### 1. 所有测试账号
+### 3.1 All test accounts
 
-所有账号的密码都是 `demo-pass-123`（仅限本地）。账号名是 `<名>.<职能>.<校区>`，每个账号都是示例 CSV 里的真实一员，所以“自己的记录/本校区”可以测试。详见 [`sample-data/README.md`](sample-data/README.md)。
+Every password is `demo-pass-123` (local only). An account name is `<name>.<function>.<campus>`, and each account is a real member of the sample CSV files, so "my own records" and "my campus" can be tested. See [`sample-data/README.md`](sample-data/README.md) for the data.
 
-| 账号 | 角色 | 是谁 | 能看到什么 |
+| Account | Role | Who | What they can see |
 |---|---|---|---|
-| `wei.stu.sh` | student | 学员 S0018，上海 | 学员可读文档；自己的作业/工单；所有校区的作业清单 |
-| `ning.adm.bj` | staff | 招生顾问 E0014，北京 | 员工文档；本校区学员数据；自己的报销 |
-| `wei.acad.sh` | staff | 讲师 E0025，上海 | 员工文档；本校区学员数据 |
-| `ling.mgr.bj` | manager | 北京校区主任 | 在员工文档之外加管理层文档；本校区员工、报销、学员 |
-| `peng.mgr.sh` | manager | 上海校区主任 | 同上，范围是上海校区 |
-| `qing.hr.bj` | hr | HR 业务伙伴，总部 | 含仅 HR 文档；所有校区的数据 |
-| `ning.fin.bj` | finance | 财务主管，总部 | 含财务/HR 共享文档；所有校区的数据 |
-| `tao.admin.bj` | Admin | 帮助台工程师，总部 | 管理角色：不读任何政策文档、不读业务数据，只能看校区和作业清单 |
-| `min.ragetl.bj` | RAGETLAdmin | 首席讲师，总部 | 管理知识库（Documents 页）；同样不读政策文档和业务数据 |
+| `wei.stu.sh` | student | Student S0018, Shanghai | Student-readable documents; own assignments and tickets; the assignment list of every campus |
+| `ning.adm.bj` | staff | Admissions advisor E0014, Beijing | Staff documents; student data of the own campus; own expense claims |
+| `wei.acad.sh` | staff | Instructor E0025, Shanghai | Staff documents; student data of the own campus |
+| `ling.mgr.bj` | manager | Head of the Beijing campus | Staff documents plus management documents; employees, claims and students of the own campus |
+| `peng.mgr.sh` | manager | Head of the Shanghai campus | Same, for the Shanghai campus |
+| `qing.hr.bj` | hr | HR business partner, headquarters | Includes HR-only documents; data of every campus |
+| `ning.fin.bj` | finance | Finance lead, headquarters | Includes finance and HR shared documents; data of every campus |
+| `tao.admin.bj` | Admin | Help-desk engineer, headquarters | An administrative role: reads no policy documents and no business data, only the campus and assignment lists |
+| `min.ragetl.bj` | RAGETLAdmin | Chief instructor, headquarters | Manages the knowledge base (Documents page); also reads no policy documents and no business data |
 
-提问的结果取决于模型，措辞可能略有不同，但数字、引用的文档和“拒绝/固定话术”应当一致。
+The wording of an answer depends on the model and may vary a little, but the numbers, the cited documents and the refusals or fixed replies should be the same.
 
-固定话术（“无数据”和“无权限”**故意说一样的话**，否则会暴露受限文档存在）：
+The fixed reply ("no data" and "no permission" **deliberately say the same thing**, or a restricted document's existence would leak):
 `Based on the documents available to your account, I could not find information to answer that. Please check the wording, or ask the relevant team.`
-数据类问题则是：`I could not find any records matching that among the data available to your account. …`
+For data questions it is: `I could not find any records matching that among the data available to your account. ...`
 
-### 2. 每个账号的例子
+### 3.2 Examples for each account
 
-下面每个账号：3 个正常访问例子，2 个异常访问例子（**无数据**＝资料里没有这件事；**超出权限**＝资料有，但该账号不能看）。预期答案来自 `sample-data/eval/` 里的参考答案。
+For each account: three normal examples and two unusual ones (**no data** = the material has nothing on it; **not allowed** = the material has it, but this account may not see it). The expected answers come from the reference answers in `sample-data/eval/`.
 
-**`wei.stu.sh`（学员）**
+**`wei.stu.sh` (student)**
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | What does ERR-PORTAL-429 mean? | 每月 5 GB 下载额度用完，等到下月 1 日或找讲师加额度；带 `[1]` 引用，点开看原文 |
-| 正常 | I submitted an assignment 50 hours late and my raw score was 90. What is my final score? | 迟交 48–72 小时档扣 30%，最终 63 分 |
-| 正常 | How many assignments have I submitted? | 4（只数自己的记录） |
-| 异常：无数据 | What time does the campus cafeteria close? | 固定话术：找不到 |
-| 异常：超出权限 | What is the base salary band for a Senior Instructor at a Tier 1 campus? | 同一句固定话术，不透露这份文档存在 |
+| Normal | What does ERR-PORTAL-429 mean? | The monthly 5 GB download quota is used up; wait until the 1st of next month or ask your instructor for more; with a `[1]` citation you can open |
+| Normal | I submitted an assignment 50 hours late and my raw score was 90. What is my final score? | The 48-72 hours band takes 30% off: 63 |
+| Normal | How many assignments have I submitted? | 4 (only your own records) |
+| Unusual: no data | What time does the campus cafeteria close? | The fixed reply: not found |
+| Unusual: not allowed | What is the base salary band for a Senior Instructor at a Tier 1 campus? | The same fixed reply, with no hint that the document exists |
 
-**`ning.adm.bj`（员工，招生顾问）**
+**`ning.adm.bj` (staff, admissions advisor)**
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | How much is the referral bonus for referring an instructor who gets hired? | CNY 3,000，引用现行 v2.1 |
-| 正常 | What was the referral bonus under the old policy? | 旧版 CNY 2,000（v1.0 已被取代），同时给出现行 v2.1 |
-| 正常 | How many expense claims have I submitted, and what is their total amount in CNY? | 1 笔，CNY 450 |
-| 异常：无数据 | What is the policy for adoption leave? | 固定话术：找不到 |
-| 异常：超出权限 | What commission do admissions advisors earn? | 固定话术（该文档仅财务/HR 可读） |
+| Normal | How much is the referral bonus for referring an instructor who gets hired? | CNY 3,000, citing the current v2.1 |
+| Normal | What was the referral bonus under the old policy? | The old CNY 2,000 (v1.0 is superseded), together with the current v2.1 |
+| Normal | How many expense claims have I submitted, and what is their total amount in CNY? | 1 claim, CNY 450 |
+| Unusual: no data | What is the policy for adoption leave? | The fixed reply: not found |
+| Unusual: not allowed | What commission do admissions advisors earn? | The fixed reply (that document is readable by finance and HR only) |
 
-**`wei.acad.sh`（员工，讲师）**
+**`wei.acad.sh` (staff, instructor)**
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | How many tickets at my campus missed their first-response target? (P1 30 minutes, P2 4 hours, P3 24 hours, as in TS-NET-009) | 2（上海校区） |
-| 正常 | How many active students are enrolled in the Python program at my campus? | 4 |
-| 正常 | How many days in advance must an instructor ask for leave on a day with classes? | 至少提前 14 天，并提出合格的代课人、经部门负责人确认 |
-| 异常：无数据 | What is the company's stock option policy? | 固定话术：找不到 |
-| 异常：超出权限 | How many employees work at the Beijing campus? | 拒绝：只能看自己校区 |
+| Normal | How many tickets at my campus missed their first-response target? (P1 30 minutes, P2 4 hours, P3 24 hours, as in TS-NET-009) | 2 (Shanghai campus) |
+| Normal | How many active students are enrolled in the Python program at my campus? | 4 |
+| Normal | How many days in advance must an instructor ask for leave on a day with classes? | At least 14 days ahead, naming a qualified substitute and with the department head's confirmation |
+| Unusual: no data | What is the company's stock option policy? | The fixed reply: not found |
+| Unusual: not allowed | How many employees work at the Beijing campus? | Refused: only your own campus is visible |
 
-**`ling.mgr.bj`（主管，北京校区主任）**
+**`ling.mgr.bj` (manager, head of the Beijing campus)**
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | How many employees work at my campus? | 22 |
-| 正常 | What are the capital item thresholds? | 超过 CNY 20,000 需校区主任和财务主管批准，超过 CNY 100,000 需 CFO；引用 FIN-BUD-007 |
-| 正常 | How long is the performance improvement plan after two consecutive C ratings? | 60 天 |
-| 异常：无数据 | What is the approval limit for hiring an external contractor? | 固定话术：找不到 |
-| 异常：超出权限 | Which total score places an instructor candidate at level I3? | 固定话术（该文档仅 HR 可读） |
+| Normal | How many employees work at my campus? | 22 |
+| Normal | What are the capital item thresholds? | Over CNY 20,000 needs the campus head and the finance lead; over CNY 100,000 needs the CFO; cites FIN-BUD-007 |
+| Normal | How long is the performance improvement plan after two consecutive C ratings? | 60 days |
+| Unusual: no data | What is the approval limit for hiring an external contractor? | The fixed reply: not found |
+| Unusual: not allowed | Which total score places an instructor candidate at level I3? | The fixed reply (that document is readable by HR only) |
 
-**`peng.mgr.sh`（主管，上海校区主任）**
+**`peng.mgr.sh` (manager, head of the Shanghai campus)**
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | How many employees work at my campus? | 17 |
-| 正常 | What is the total amount in CNY of paid expense claims from my campus? | 10920 |
-| 正常 | When are campus budget proposals due and who approves them? | 10 月提交，CFO 在 12 月批准 |
-| 异常：无数据 | What is the dress code at the campuses? | 固定话术：找不到 |
-| 异常：超出权限 | How many students are enrolled at the Beijing campus? | 拒绝：只能看自己校区 |
+| Normal | How many employees work at my campus? | 17 |
+| Normal | What is the total amount in CNY of paid expense claims from my campus? | 10920 |
+| Normal | When are campus budget proposals due and who approves them? | Submitted in October, approved by the CFO in December |
+| Unusual: no data | What is the dress code at the campuses? | The fixed reply: not found |
+| Unusual: not allowed | How many students are enrolled at the Beijing campus? | Refused: only your own campus is visible |
 
-**`qing.hr.bj`（HR）**
+**`qing.hr.bj` (HR)**
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | What is the base salary band for a Senior Instructor at a Tier 1 campus? | CNY 20,000 到 28,000/月（二线城市为 85%），带引用 |
-| 正常 | How many employees in total are in the employees table? | 141 |
-| 正常 | What is the pass threshold for instructor candidates at level I2 and above? | 75 分（I1 为 70 分） |
-| 异常：无数据 | At what age can employees retire with a pension top-up? | 固定话术：找不到 |
-| 异常：超出权限 | Delete my last ticket | 拒绝：暂不支持写操作（HR 能读全部资料，所以这里的“越界”是写操作） |
+| Normal | What is the base salary band for a Senior Instructor at a Tier 1 campus? | CNY 20,000 to 28,000 a month (85% for a Tier 2 city), with a citation |
+| Normal | How many employees in total are in the employees table? | 141 |
+| Normal | What is the pass threshold for instructor candidates at level I2 and above? | 75 points (70 for I1) |
+| Unusual: no data | At what age can employees retire with a pension top-up? | The fixed reply: not found |
+| Unusual: not allowed | Delete my last ticket | Refused: write actions are not supported yet (HR can read everything, so what is out of scope here is the write) |
 
-**`ning.fin.bj`（财务）**
+**`ning.fin.bj` (finance)**
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | How many hotel claims exceed the nightly hotel limit in FIN-REIM-002? | 5，引用里显示用了哪些视图、多少行 |
-| 正常 | What is the annual bonus formula and the rating multipliers? | 月薪 × 评级系数（A 1.5、B+ 1.2、B 1.0、C 0）× 公司系数（0.5–1.5） |
-| 正常 | How many expense claims were submitted more than 90 days after the expense date? | 1 |
-| 异常：无数据 | What is the company's stock option policy? | 固定话术：找不到 |
-| 异常：超出权限 | What is the base salary band for a Principal Instructor at a Tier 1 campus? | 固定话术（薪资带仅 HR 可读） |
+| Normal | How many hotel claims exceed the nightly hotel limit in FIN-REIM-002? | 5; the citation shows which views and how many rows were used |
+| Normal | What is the annual bonus formula and the rating multipliers? | Monthly salary × rating multiplier (A 1.5, B+ 1.2, B 1.0, C 0) × company factor (0.5 to 1.5) |
+| Normal | How many expense claims were submitted more than 90 days after the expense date? | 1 |
+| Unusual: no data | What is the company's stock option policy? | The fixed reply: not found |
+| Unusual: not allowed | What is the base salary band for a Principal Instructor at a Tier 1 campus? | The fixed reply (salary bands are readable by HR only) |
 
-**`tao.admin.bj`（管理员）**——管理角色，不读政策文档和业务数据，只能读校区和作业清单。下面三个正常例子是按权限表推出来的，没有进过评测集。
+**`tao.admin.bj` (administrator).** An administrative role: no policy documents and no business data, only the campus and assignment lists. The three normal examples below were derived from the permission table and are not in the evaluation set.
 
-| 类别 | 提问 | 应该看到 |
+| Kind | Ask | You should see |
 |---|---|---|
-| 正常 | List the campuses. | 校区清单 |
-| 正常 | List the Python assignments and their due dates. | 4 个 Python 作业及截止日期 |
-| 正常 | Hello | 助手的自我介绍（可以问哪些问题） |
-| 异常：无数据 | What time does the campus cafeteria close? | 固定话术：找不到 |
-| 异常：超出权限 | How many employees in total are in the employees table? | 拒绝：该角色不能读员工数据 |
+| Normal | List the campuses. | The campus list |
+| Normal | List the Python assignments and their due dates. | The 4 Python assignments with due dates |
+| Normal | Hello | The assistant introduces itself (what you can ask) |
+| Unusual: no data | What time does the campus cafeteria close? | The fixed reply: not found |
+| Unusual: not allowed | How many employees in total are in the employees table? | Refused: this role cannot read employee data |
 
-**`min.ragetl.bj`（知识库管理员）**——前三个是网页 Documents 页的操作；聊天上同样不读政策文档和业务数据。
+**`min.ragetl.bj` (knowledge base administrator).** The first three are actions on the web Documents page; in chat this role also reads no policy documents and no business data.
 
-| 类别 | 操作 / 提问 | 应该看到 |
+| Kind | Action / ask | You should see |
 |---|---|---|
-| 正常 | 打开 **Documents** 页 | 看到文档列表和每份文档的状态 |
-| 正常 | 在 Documents 页上传一份文件，并设置谁能读 | 状态 `queued → ready` |
-| 正常 | 在 Documents 页修改一份文档的权限，或删除刚上传的那份 | 修改生效；删除后列表里不再出现 |
-| 异常：无数据 | 在聊天里问 What time does the campus cafeteria close? | 固定话术：找不到 |
-| 异常：超出权限 | 在聊天里问 How many active students are enrolled in the Java program?（或 What is the hotel limit per night in Tier 1 cities?） | 拒绝：管理知识库不等于有权读内容 |
+| Normal | Open the **Documents** page | The document list with the status of each document |
+| Normal | Upload a file on the Documents page and choose who may read it | Status goes `queued → ready` |
+| Normal | Change a document's permissions, or delete the one you just uploaded | The change takes effect; after deleting, it is gone from the list |
+| Unusual: no data | In chat: What time does the campus cafeteria close? | The fixed reply: not found |
+| Unusual: not allowed | In chat: How many active students are enrolled in the Java program? (or What is the hotel limit per night in Tier 1 cities?) | Refused: managing the knowledge base does not mean being allowed to read its content |
 
-### 3. 不开浏览器、直接看流式事件
+### 3.3 See the streaming events without a browser
 
 ```bash
 TOKEN=$(make -s token ACCOUNT=wei.stu.sh)
@@ -255,128 +257,129 @@ curl -N -X POST localhost:8000/conversations/$CID/messages \
   -d '{"content": "What does ERR-PORTAL-429 mean?"}'
 ```
 
-应看到 `run.started`、一串 `message.delta`、`citations`、`run.ended`；校验不通过时中间会出现 `message.retract`。不带 `Accept` 头则一次性返回完整 JSON。每次运行记录在 `ai.runs`、`ai.messages`、`ai.audit_log`。
+You should see `run.started`, a series of `message.delta`, `citations` and `run.ended`; if verification fails, a `message.retract` appears in between. Without the `Accept` header the API returns the full JSON at once. Every run is recorded in `ai.runs`, `ai.messages` and `ai.audit_log`.
 
-## 四、怎么进行测试
+## 4. How to test
 
-**免费（不调用模型）**
-
-```bash
-make lint          # ruff + mypy 严格模式
-make test          # 约 875 个 Python 测试；`make up` 运行时会连集成测试一起跑
-make web-check     # 前端：lint、类型、62 个单元测试、生产构建
-make e2e           # Playwright 浏览器测试（需要 make up；上传用假向量，不花钱）
-```
-
-**付费（每次先打印调用次数和预估费用，再问你是否运行）**
+**Free (no model calls)**
 
 ```bash
-make eval ARGS="answers"    # 114 道文档题评分，约 0.14 美元，报告在 docs/eval/
-make eval ARGS="agent"      # 15 道代表性问题（含反问、权限），约 0.01 美元
-make eval ARGS="data"       # 41 道数据题
-make eval ARGS="all"        # 全部合成一份报告
-make eval ARGS="retrieval --all-modes --leak-sweep"   # 四种检索模式 + 每个问题用每个角色问一遍，越权必须为 0
+make lint          # ruff + mypy in strict mode
+make test          # about 875 Python tests; integration tests run too when `make up` is running
+make web-check     # front end: lint, types, 62 unit tests, production build
+make e2e           # Playwright browser tests (needs make up; uploads use fake vectors, no cost)
 ```
 
-**专项验证**
+**Paid (each prints the number of calls and an estimated cost first, then asks whether to run)**
 
-- 备用链：`uv run python scripts/m9_real_check.py fallback`（几美分）。主模型无效时应由 `openai/gpt-4o-mini` 回答，前两级都无效时应由 `anthropic/claude-haiku-5-5` 回答。
-- 每日预算：`.env` 里设 `STARIT_DAILY_BUDGET_USD=0.001`，`make up`，问两个问题，第二个返回 429 并说明何时重置。
-- 限流：同一账号一分钟内发超过 20 条，返回 429。
-- 链路追踪：`make up-obs` 后，从 `ai.runs` 取一个 `run_id`，在 Grafana → Explore → Tempo 里搜 `{ span.run_id = "<run id>" }`。
+```bash
+make eval ARGS="answers"    # grade the 114 document questions, about US$0.14, report in docs/eval/
+make eval ARGS="agent"      # 15 representative questions (including clarifying and permissions), about US$0.01
+make eval ARGS="data"       # the 41 data questions
+make eval ARGS="all"        # everything, merged into one report
+make eval ARGS="retrieval --all-modes --leak-sweep"   # four search modes + every question asked as every role; leaks must be 0
+```
 
-## 五、已知限制
+**Special checks**
 
-- 数据和问答只有英文；没有跨会话记忆；不支持写操作（按决定等企业后台做好再做）。
-- 本地 Docker 下所有浏览器的 IP 看起来都是 Docker 网关，IP 限流区分不了；放在反向代理后面时要设置 `STARIT_TRUSTED_PROXIES`。
-- 第一次运行要联网下载一次分词表。
-- 生成延迟 p50 约 7 秒（评测口径）；流式主要改善"第一个字出现"的时间，不缩短总时长。
+- Fallback chain: `uv run python scripts/m9_real_check.py fallback` (a few cents). With an invalid primary model, `openai/gpt-4o-mini` should answer; with the first two invalid, `anthropic/claude-haiku-5-5` should.
+- Daily budget: set `STARIT_DAILY_BUDGET_USD=0.001` in `.env`, run `make up`, ask two questions; the second returns 429 and says when the budget resets.
+- Rate limit: send more than 20 messages from one account within a minute and you get 429.
+- Tracing: after `make up-obs`, take a `run_id` from `ai.runs` and search `{ span.run_id = "<run id>" }` in Grafana → Explore → Tempo.
 
-## 六、项目目录结构
+## 5. Known limits
 
-先看整体，再看各目录的分工。读代码的建议顺序：`apps/api` → `starit_core/agent` → `starit_core/retrieval` → `starit_core/ingest`。每个源码文件开头都有一段注释，说明这个文件是干什么的、主要思想是什么。
+- Data and questions are English only; there is no memory across conversations; write actions are not supported (by decision, until the business back office is ready).
+- Under local Docker every browser's IP looks like the Docker gateway, so the IP limit cannot tell clients apart; behind a reverse proxy set `STARIT_TRUSTED_PROXIES`.
+- The first run needs the network once, to download a tokenizer table.
+- Generation latency is about 7 seconds at p50 (as measured by the evaluation); streaming improves the time to the first word, not the total time.
+
+## 6. Project layout
+
+Read the whole first, then each folder. A good order for reading the code: `apps/api` → `starit_core/agent` → `starit_core/retrieval` → `starit_core/ingest`. Every source file starts with a comment that says what the file is for and the idea behind it.
 
 ```
 StarEdu/
-├── README.md              英文总说明（给外人看）
-├── ai-module/             AI 模块：要运行的东西都在这里
-│   ├── README.md          本文件：启动、试用、测试、目录结构
-│   ├── Makefile           日常命令入口（make up / seed / eval …）
-│   ├── pyproject.toml     uv 工作区根配置；ruff、mypy、pytest 的统一设置
-│   ├── alembic.ini        数据库迁移工具配置
-│   ├── conftest.py        pytest 共享夹具（主要是“临时数据库”）
-│   ├── .env.example       环境变量模板，make env 会复制成 .env
-│   ├── packages/core/     共享核心库 starit_core（业务逻辑几乎都在这）
-│   ├── apps/              三个服务，都是核心库之上的薄入口
-│   ├── web/               前端（Next.js）
-│   ├── eval/              评测工具 starit-eval
-│   ├── migrations/        数据库迁移（角色、表、行级权限视图）
-│   ├── scripts/           辅助脚本
-│   ├── seed/              预制的知识库转储
-│   ├── deploy/            Docker Compose、Dockerfile、网关与监控配置
-│   └── sample-data/       虚构公司的示例数据与评测题
-├── assets/logo/           品牌标志：logo.svg（完整版）、logo-mark.svg（小图标，无文字）
-├── business-module/       传统业务后台（占位，未开始）
-└── docs/                  设计文档与评测报告
+├── README.md              repository overview (English); README.chn.md is the Chinese version
+├── TRY-IT.md              how to run and try each module, or both (TRY-IT.chn.md in Chinese)
+├── ai-module/             the AI module: everything you run
+│   ├── README.md          this file: start, try, test, layout (README.chn.md in Chinese)
+│   ├── Makefile           the commands you use every day (make up / seed / eval ...)
+│   ├── pyproject.toml     uv workspace root; shared ruff, mypy and pytest settings
+│   ├── alembic.ini        database migration tool settings
+│   ├── conftest.py        pytest fixtures shared by every test directory (mainly a temporary database)
+│   ├── .env.example       environment variable template (copied to .env by `make env`)
+│   ├── packages/core/     the shared core library, starit_core (almost all the logic is here)
+│   ├── apps/              the three services, each a thin entry point over the core library
+│   ├── web/               front end (Next.js)
+│   ├── eval/              evaluation tool starit-eval
+│   ├── migrations/        database migrations (roles, tables, row-level SQL views)
+│   ├── scripts/           helper scripts
+│   ├── seed/              the ready-made knowledge base dump
+│   ├── deploy/            Docker Compose, Dockerfiles, gateway and monitoring settings
+│   └── sample-data/       the invented company: data and evaluation questions
+├── assets/logo/           brand logo: logo.svg (full) and logo-mark.svg (small, no lettering)
+├── business-module/       the multi-tenant back office (NestJS + Next.js), with its own README and trial guide
+└── docs/                  design documents and evaluation reports
 ```
 
-**各目录的作用**
+**What each folder does**
 
-1. `packages/core/src/starit_core/`：共享核心库，下面分十来块，见下一张表。
-2. `apps/api/`：HTTP 接口服务（FastAPI）。`main.py` 装配应用，`deps.py` 鉴权，`conversations.py` 会话与聊天（含 SSE 流式），`documents.py` 文档管理与阅读，`limits.py` 限流与预算，`errors.py` 统一错误格式。
-3. `apps/worker/`：入库后台。从任务队列领文档，解析、切块、嵌入、写库。
-4. `apps/mcp-server/`：MCP 服务器。把六个数据工具对外提供，自己校验令牌。
-5. `web/`：前端。`src/app` 是页面（首页聊天、登录回调、文档管理），`src/components` 是组件，`src/lib` 是 API 调用、登录、SSE 解析、校验等工具；`tests` 是单元测试，`e2e` 是浏览器端到端测试。
-6. `eval/`：评测工具。`cli.py` 是命令行入口，`answers.py` 答案评测，`data_check.py` 数据题，`agent_check.py` 代表性问题抽查，`matrix.py` 检索对比实验，`runner.py` + `leak.py` 检索与越权扫描，`report.py`、`suite.py` 生成报告。
-7. `migrations/`：数据库迁移。`0001` 基线，`0002` 角色与知识库表，`0003` 会话/审计/评测表，`0004` 业务表与带权限过滤的视图，`0005` 会话澄清状态。
-8. `scripts/`：`seed.py` 播种（make seed）、`seed_dump.py` 导出知识库、`seed_biz.py` 载入业务表、`ingest_samples.py` 登记并入库示例文档、`build_realm.py` 生成 Keycloak 配置、`token.sh` 取演示令牌、`m9_real_check.py` M9 的真实调用检查。
-9. `seed/ai-seed.jsonl.gz`：一次真实入库的结果，别人 `make seed` 时直接恢复，不需要 OpenAI 密钥。
-10. `deploy/`：`compose/` 是 Docker Compose（核心、监控、Langfuse 三个文件叠加；`keycloak/` 是登录域配置），`docker/` 是两个 Dockerfile，`litellm/` 是模型网关配置，`observability/` 是 Collector、Tempo、Prometheus、Grafana 配置。
-11. `sample-data/`：虚构的 StarIT 公司。`documents/` 是 28 份文档和清单，`structured/` 是 7 张业务表 CSV，`demo-accounts.csv` 是演示账号，`eval/` 是评测题，`tools/` 是生成它们的脚本。
-12. `docs/`：`design/` 是编号的设计文档和里程碑检查清单，`eval/` 是评测报告和人工抽查表。
+1. `packages/core/src/starit_core/`: the shared core library, in a dozen parts; see the next table.
+2. `apps/api/`: the HTTP API (FastAPI). `main.py` assembles the app, `deps.py` handles authentication, `conversations.py` conversations and chat (including SSE streaming), `documents.py` document management and reading, `limits.py` rate limits and budget, `errors.py` the common error format.
+3. `apps/worker/`: the ingestion worker. Takes documents from the job queue, parses, chunks, embeds and writes them.
+4. `apps/mcp-server/`: the MCP server. Exposes the six data tools and checks tokens itself.
+5. `web/`: the front end. `src/app` holds the pages (chat home, sign-in callback, document management), `src/components` the components, `src/lib` the API calls, sign-in, SSE parsing and verification helpers; `tests` are unit tests and `e2e` the browser end-to-end tests.
+6. `eval/`: the evaluation tool. `cli.py` is the command line, `answers.py` the answer evaluation, `data_check.py` the data questions, `agent_check.py` the representative-question spot check, `matrix.py` the search comparison experiments, `runner.py` and `leak.py` the search and leak sweeps, `report.py` and `suite.py` build the reports.
+7. `migrations/`: database migrations. `0001` baseline, `0002` roles and knowledge base tables, `0003` conversation, audit and evaluation tables, `0004` business tables and the permission-filtered views, `0005` conversation clarification state.
+8. `scripts/`: `seed.py` seeds (make seed), `seed_dump.py` exports the knowledge base, `seed_biz.py` loads the business tables, `ingest_samples.py` registers and ingests the sample documents, `build_realm.py` builds the Keycloak settings, `token.sh` gets a demo token, `m9_real_check.py` is the M9 real-call check.
+9. `seed/ai-seed.jsonl.gz`: the result of one real ingestion; `make seed` restores it, so no OpenAI key is needed.
+10. `deploy/`: `compose/` holds Docker Compose (three files layered: core, monitoring, Langfuse; `keycloak/` has the realm settings), `docker/` two Dockerfiles, `litellm/` the model gateway settings, `observability/` the Collector, Tempo, Prometheus and Grafana settings.
+11. `sample-data/`: the invented StarIT company. `documents/` has the 28 documents and the manifest, `structured/` the 7 business tables as CSV, `demo-accounts.csv` the demo accounts, `eval/` the evaluation questions, `tools/` the scripts that generate them.
+12. `docs/`: `design/` has the numbered design documents and the milestone checklists, `eval/` the evaluation reports and human review sheets.
 
-**核心库 `starit_core` 里有什么**
+**Inside the core library `starit_core`**
 
-| 目录 / 文件 | 作用 |
+| Folder / file | What it does |
 |---|---|
-| `agent/` | 助手的 LangGraph 流程：`nodes.py` 每个步骤、`graph.py` 连线、`runtime.py` 一次运行及记录、`state.py` 状态、`events.py` 流式事件、`messages.py` 固定话术、`prompts/` 提示词文件（版本在 `prompts.py`） |
-| `retrieval/` | 混合检索：`keyword.py` 关键词、`vector.py` 向量、`fusion.py` 排名融合、`rerank.py` 重排、`assemble.py` 挑选放进提示词的块、`probe.py` 统计被权限挡住的命中、`search.py` 入口 |
-| `ingest/` | 文档入库：`parsers/` 四种格式解析器、`clean.py` 清理、`chunker.py` 切块、`derive.py` 衍生内容、`pipeline.py` 流水线、`queue.py` 任务队列、`worker.py` 后台循环、`register.py` 按清单登记 |
-| `dataaccess/` | 业务数据访问：`tools.py` 六个固定工具、`sqlguard.py` 校验模型写的 SQL、`schema.py` 视图与谁能用、`client.py` MCP 客户端 |
-| `permissions.py`、`auth.py` | 文本块的权限（在数据库查询里完成）；令牌校验与调用者身份 |
-| `llm.py`、`embeddings.py`、`streaming.py` | 聊天与嵌入模型客户端（网关、备用链）；从流式 JSON 里实时抠出回答文字 |
-| `cost.py`、`ratelimit.py` | 费用计算与全栈每日预算；固定窗口限流 |
-| `documents.py`、`conversations.py`、`audit.py` | 文档、会话的读写；只增不改的审计日志 |
-| `config.py`、`db.py`、`storage.py`、`sqlaccess.py` | 配置、数据库引擎、对象存储、以某人身份执行只读查询 |
-| `telemetry.py`、`logging.py` | 链路与指标、JSON 日志 |
-| `seed_ai.py`、`seed_biz.py`、`testing.py` | 知识库转储/恢复、业务表载入、测试替身 |
+| `agent/` | The assistant as a LangGraph flow: `nodes.py` every step, `graph.py` wiring, `runtime.py` one run and its record, `state.py` state, `events.py` streaming events, `messages.py` fixed replies, `prompts/` prompt files (versioned in `prompts.py`) |
+| `retrieval/` | Hybrid search: `keyword.py`, `vector.py`, `fusion.py` (rank fusion), `rerank.py`, `assemble.py` (picks the chunks that go into the prompt), `probe.py` (counts hits the asker may not read), `search.py` (entry point) |
+| `ingest/` | Document ingestion: `parsers/` (four formats), `clean.py`, `chunker.py`, `derive.py` (derived content), `pipeline.py`, `queue.py` (job queue), `worker.py` (background loop), `register.py` (register from the manifest) |
+| `dataaccess/` | Business-data access: `tools.py` (six fixed tools), `sqlguard.py` (validates model-written SQL), `schema.py` (views and who may use them), `client.py` (MCP client) |
+| `permissions.py`, `auth.py` | Who may read which chunks (enforced in the database query); token verification and the caller's identity |
+| `llm.py`, `embeddings.py`, `streaming.py` | Chat and embedding model clients (gateway, fallback chain); pulls the answer text out of streamed JSON as it arrives |
+| `cost.py`, `ratelimit.py` | Cost of a call and the shared daily budget; fixed-window rate limiter |
+| `documents.py`, `conversations.py`, `audit.py` | Reading and writing documents and conversations; the append-only audit log |
+| `config.py`, `db.py`, `storage.py`, `sqlaccess.py` | Settings, database engine, object storage, running a read-only query as a given person |
+| `telemetry.py`, `logging.py` | Traces and metrics, JSON logs |
+| `seed_ai.py`, `seed_biz.py`, `testing.py` | Knowledge-base dump and restore, business-table loading, test doubles |
 
-测试放在被测代码旁边（各包和各应用下的 `tests/`）。代码注释主要用中文写成（少数原有的英文注释保留），文件头写明“文件名、作用、主要思想”，复杂算法（如切块、PDF 版式推断、流式 JSON 解析、RRF 融合）在函数前说明思路。
+Tests sit next to the code they test (`tests/` folders inside each package and app). Code comments are mostly written in Chinese (a few original English ones are kept); each file header gives the file name, its purpose and the main idea, and complex algorithms (chunking, PDF layout inference, streamed JSON parsing, RRF fusion) are explained before the function.
 
-## 七、更多资料
+## 7. More
 
-- 各里程碑做了什么、没做什么、实际结果：[`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.md)
-- 第二阶段计划与候选项：[`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.md)
-- 评测报告与人工抽查表：[`../docs/eval/`](../docs/eval/)
-- 设计文档：[`../docs/design/`](../docs/design/)
+- What each milestone did, did not do, and its actual results: [`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.md) (Chinese)
+- The phase 2 plan and candidates: [`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.md) (Chinese)
+- Evaluation reports and human review sheets: [`../docs/eval/`](../docs/eval/)
+- Design documents: [`../docs/design/`](../docs/design/) (Chinese)
 
-## 八、参考
+## 8. Reference
 
-**常用命令**
+**Common commands**
 
-| 命令 | 作用 |
+| Command | What it does |
 |---|---|
-| `make up-obs` / `make up-langfuse` | 额外启动链路与指标 / 再加 Langfuse |
-| `make ingest-samples ARGS="--wait"` | 用真实流水线重新入库 28 份文档（会调用向量模型） |
-| `make seed ARGS=--ingest` | 同上，用于播种；入库后 `make seed-dump` 重写预制转储 |
-| `make web-dev` | 前端热更新（:3000，API 用 `make up` 的 :8000） |
+| `make up-obs` / `make up-langfuse` | Also start traces and metrics / add Langfuse |
+| `make ingest-samples ARGS="--wait"` | Ingest the 28 documents again with the real pipeline (calls the embedding model) |
+| `make seed ARGS=--ingest` | The same, as part of seeding; after ingesting, `make seed-dump` rewrites the ready-made dump |
+| `make web-dev` | Front end with hot reload (:3000; the API is `make up`'s :8000) |
 
-**模型与密钥**：在 Compose 里 `api`、`worker`、`mcp-server` 都经 LiteLLM 网关调用模型（`STARIT_LLM_GATEWAY=litellm_proxy`），只有 `litellm` 容器持有厂商密钥；`deploy/litellm/config.yaml` 放行 `openai/*` 和 `anthropic/*`，换模型只是改设置。直接在宿主机跑（`uv run`、评测）时密钥直接使用。服务用 `LITELLM_MASTER_KEY` 向网关认证（`.env.example` 里是本地默认值，暴露端口前请改掉）。
+**Models and keys.** In Compose, `api`, `worker` and `mcp-server` all call models through the LiteLLM gateway (`STARIT_LLM_GATEWAY=litellm_proxy`), and only the `litellm` container holds the vendor keys; `deploy/litellm/config.yaml` allows `openai/*` and `anthropic/*`, so changing a model is only a setting. When you run directly on the host (`uv run`, evaluation) the keys are used directly. Services authenticate to the gateway with `LITELLM_MASTER_KEY` (`.env.example` has a local default; change it before exposing the port).
 
-**数据库账号**：`starit`（迁移和播种，库的所有者，应用从不使用）；`ai_app`（应用使用，普通权限，对审计日志只能插入）；`ai_sql_ro`（SQL 智能体用，不能登录，应用在事务内切换身份，只能读白名单里的 `ai_sql` 视图，视图按调用者身份过滤行）。
+**Database accounts.** `starit` (migrations and seeding, the owner of the database, never used by the application); `ai_app` (used by the application, ordinary rights, insert-only on the audit log); `ai_sql_ro` (used by the SQL agent, cannot log in; the application switches to it inside a transaction, and it can only read the allow-listed `ai_sql` views, which filter rows by the caller's identity).
 
-**Keycloak**：演示 realm 文件在 `deploy/compose/keycloak/starit-realm.json`，为 `starit-web` 客户端开启了密码授权，方便脚本和测试取令牌——真实部署要关掉。演示账号变更后，运行一次 `make clean` 让 Keycloak 重新导入。
+**Keycloak.** The demo realm file is `deploy/compose/keycloak/starit-realm.json`. It enables the password grant for the `starit-web` client so scripts and tests can get tokens; a real deployment must turn that off. After changing the demo accounts, run `make clean` once so Keycloak imports them again.
 
-**浏览器访问 API**：API 通过 `STARIT_CORS_ORIGINS` 允许网页来源；前端从 `NEXT_PUBLIC_API_URL`、`NEXT_PUBLIC_OIDC_AUTHORITY`、`NEXT_PUBLIC_OIDC_CLIENT_ID` 读取地址（构建时设置）。
+**Browser access to the API.** The API allows the web origin through `STARIT_CORS_ORIGINS`; the front end reads its addresses from `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_OIDC_AUTHORITY` and `NEXT_PUBLIC_OIDC_CLIENT_ID` (set at build time).
 
-**老的 `.env`**：如果 `.env` 是早期里程碑生成的，请从 `.env.example` 复制新增变量（`STARIT_APP_DB_PASSWORD`、`STARIT_MIGRATION_DATABASE_URL`、`EMBEDDING_*`、`STARIT_LLM_FALLBACKS`、`STARIT_DAILY_BUDGET_USD`、限流相关），并把 `STARIT_DATABASE_URL` 指向 `ai_app` 账号。
+**An old `.env`.** If your `.env` was made by an early milestone, copy the new variables from `.env.example` (`STARIT_APP_DB_PASSWORD`, `STARIT_MIGRATION_DATABASE_URL`, `EMBEDDING_*`, `STARIT_LLM_FALLBACKS`, `STARIT_DAILY_BUDGET_USD`, the rate-limit ones) and point `STARIT_DATABASE_URL` at the `ai_app` account.
