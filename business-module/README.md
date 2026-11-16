@@ -44,6 +44,7 @@ Built with NestJS, Prisma and PostgreSQL on the server, Next.js 15 with Tailwind
 - The AI assistant can run in *business mode*: it signs in with the company's realm, asks this module which rows and folders the person may see, and reads the database only through read-only views filtered by those scopes.
 
 **For developers**
+- Hosted trial: `TRIAL_PROTECT=1` turns off a short deny-list of risky actions on demo companies, and a daily `demo:reset` rebuilds the data (see `deploy/trial/`).
 - `pnpm gen:module` scaffolds a plain tenant resource (table with row-level security, API, permissions, menu, page, tests, leak-scan entries).
 - A demo mode with a living scenario, demo accounts on the login pages and a one-command reset (see [TRY-IT.md](TRY-IT.md)).
 

@@ -1,0 +1,7 @@
+# Reverse-proxy rules for a public trial host. Put these in the server block that serves Keycloak.
+# Visitors must not change the shared demo passwords, so block the account console, and the
+# Keycloak administration console as well.
+location ~ ^/realms/[^/]+/account(/|$) { return 403; }
+location ~ ^/admin(/|$) { return 403; }
+
+# Also put rate limits here (limit_req) in front of the web app and the API.

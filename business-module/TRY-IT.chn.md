@@ -180,6 +180,10 @@ await call("roles/menu-tree");    // 你能勾选的菜单和按钮
 
 接口文档在 <http://localhost:4000/api-docs>（仅开发环境；页面本身没有登录，不要对外暴露）。
 
+### 搭一个公开试用站
+
+想把演示放到服务器上让别人试用，打开试用保护并安排每天重置。访客仍然可以新建、编辑、删除几乎所有内容；只有新建账号、改登录方式、平台的公司管理这几类被关掉，数据每天重建一次。配置、代理规则和定时任务文件见 [`deploy/trial/`](deploy/trial/README.md)（英文）。
+
 ### 生成你自己的资源
 `pnpm gen:module --name warehouse-item --group edu --fields "title:string!,qty:int,due:date,done:bool,notes:text" --label "Warehouse items" --label-zh "仓库物品"`，然后 `pnpm migrate && pnpm prisma:generate && pnpm --filter @staredu/shared build`。它会生成表（带行级安全）、接口、权限、菜单、页面、测试和泄露扫描登记；加 `--dry-run` 只列出文件、不写入。
 
