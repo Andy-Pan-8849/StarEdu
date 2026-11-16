@@ -4,7 +4,7 @@
 
 # AI 模块
 
-[English](README.md) · [试用整个项目](../TRY-IT.chn.md)
+[English](README.chn.md) · [试用整个项目](../TRY-IT.chn.md)
 
 公司 StarIT Education 的企业知识助手。里程碑 M2–M9 已完成（tag `ai-m2` … `ai-m9`、`v0.1.0`），全部可在本机用 Docker Compose 跑起来。
 
@@ -48,9 +48,9 @@ flowchart LR
 
 `understand` 就相当于 Router Agent 的角色，只是它不是独立的 Agent，而是图里的一个节点，由问题类型来选择分支。
 
-**为什么是一张图，而不是多个 Agent：** 外层流程（检索、权限过滤、校验、收尾）是固定的代码，模型只用在几个明确的步骤里。这样每次运行可预期、可测试、评测成本低。数据路径里的 SQL 部分是有次数上限的小循环（设计文档里叫 SQL Agent 子图）。Analytics Agent、Web Search Agent 在 [第二阶段计划](../docs/design/09-phase2-plan.md) 里是候选项，**还没有做**。
+**为什么是一张图，而不是多个 Agent：** 外层流程（检索、权限过滤、校验、收尾）是固定的代码，模型只用在几个明确的步骤里。这样每次运行可预期、可测试、评测成本低。数据路径里的 SQL 部分是有次数上限的小循环（设计文档里叫 SQL Agent 子图）。Analytics Agent、Web Search Agent 在 [第二阶段计划](../docs/design/09-phase2-plan.chn.md) 里是候选项，**还没有做**。
 
-代码位置：路由表在 [`graph.py`](packages/core/src/starit_core/agent/graph.py)，`understand` 在 [`nodes.py`](packages/core/src/starit_core/agent/nodes.py)，它的提示词在 `packages/core/src/starit_core/agent/prompts/`。设计说明见 [`docs/design/04-agent-flow.md`](../docs/design/04-agent-flow.md)。
+代码位置：路由表在 [`graph.py`](packages/core/src/starit_core/agent/graph.py)，`understand` 在 [`nodes.py`](packages/core/src/starit_core/agent/nodes.py)，它的提示词在 `packages/core/src/starit_core/agent/prompts/`。设计说明见 [`docs/design/04-agent-flow.md`](../docs/design/04-agent-flow.chn.md)。
 
 ## 二、启动（首次约 15 分钟）
 
@@ -358,8 +358,8 @@ StarEdu/
 
 ## 七、更多资料
 
-- 各里程碑做了什么、没做什么、实际结果：[`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.md)
-- 第二阶段计划与候选项：[`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.md)
+- 各里程碑做了什么、没做什么、实际结果：[`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.chn.md)
+- 第二阶段计划与候选项：[`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.chn.md)
 - 评测报告与人工抽查表：[`../docs/eval/`](../docs/eval/)
 - 设计文档：[`../docs/design/`](../docs/design/)
 

@@ -1,168 +1,170 @@
-# 设计文档 06：部署 Profile、可观测性与工程规范（AI 模块，第一阶段）
+# Design document 06: deployment profiles, observability and engineering rules (AI module, phase 1)
 
-状态：**已获用户批准（2026-11-02），第 9 节 6 个确认点全部接受。** 下一步是实施计划，批准前不写应用代码。
-依赖：01–05。标记约定：**【已定】**、**【建议】**、**【待定】**（需要实测）。
-**注意**：本文的内存数字都是粗估，没有实测，不能当作承诺；实测后回填。
+[中文](06-deployment-profiles-and-engineering.chn.md)
 
-## 1. 两个 Profile 的服务清单
+Status: **Approved by the user (2026-11-02); all 6 confirmation points of section 9 were accepted.** The next step is the implementation plan; no application code is written before it is approved.
+Depends on: 01 to 05. Marking convention: **[Decided]**, **[Proposed]**, **[Open]** (needs measuring).
+**Note**: every memory figure in this document is a rough estimate, not measured, and must not be taken as a promise; it is filled in after measuring.
 
-| 服务 | full（本地 Compose） | lite（Oracle k3s） | 备注 |
+## 1. Service list of the two profiles
+
+| Service | full (local Compose) | lite (Oracle k3s) | Notes |
 |---|---|---|---|
-| web（Next.js） | ✅ | ✅ | |
-| api（FastAPI） | ✅ | ✅ | |
+| web (Next.js) | ✅ | ✅ | |
+| api (FastAPI) | ✅ | ✅ | |
 | worker | ✅ | ✅ | |
 | mcp-server | ✅ | ✅ | |
-| Postgres + pgvector | ✅ | ✅ | 现成的 pgvector 镜像；BM25 扩展暂不引入（见 05） |
-| Redis | ✅ | ✅（单节点） | 限流和缓存 |
-| 对象存储 | MinIO | 【待定】单节点 MinIO 或 Oracle 对象存储 | |
-| Keycloak | ✅ | 【待定】 | 见 3 |
-| LiteLLM 代理 | ✅ | ❌（进程内 litellm 库） | 见 01 的 4.2 |
-| Langfuse | ✅ | ❌ | 依赖较多，仅本地 |
+| Postgres + pgvector | ✅ | ✅ | The ready-made pgvector image; the BM25 extension is not brought in for now (see 05) |
+| Redis | ✅ | ✅ (single node) | Rate limiting and cache |
+| Object store | MinIO | [Open] single-node MinIO or Oracle object storage | |
+| Keycloak | ✅ | [Open] | See 3 |
+| LiteLLM proxy | ✅ | ❌ (litellm library in the process) | See 4.2 of 01 |
+| Langfuse | ✅ | ❌ | Many dependencies, local only |
 | OTel Collector | ✅ | ✅ | |
-| Prometheus、Grafana | ✅ | ✅（精简） | |
-| Loki、Tempo | ✅ | 【待定】视内存 | |
+| Prometheus, Grafana | ✅ | ✅ (slimmed down) | |
+| Loki, Tempo | ✅ | [Open] depending on memory | |
 
-## 2. 本地 full profile
+## 2. The local full profile
 
-### 2.1 启动【建议】
+### 2.1 Starting [Proposed]
 
-- 一个 `deploy/compose/` 目录：`compose.yaml`（核心服务）加可选的 override 文件（`observability.yaml`、`langfuse.yaml`），用 profile 或多文件组合，**学习者可以只启动核心服务**。
-- 提供 `make up`、`make down`、`make seed` 等封装；每个服务有健康检查，依赖顺序用 `depends_on: condition: service_healthy`。
-- `.env.example` 列出所有变量并带说明；真实 `.env` 不进 Git。**必须由用户提供的只有 LLM 的 API 密钥**（OpenAI；用 Anthropic 时再加）。
+- One `deploy/compose/` directory: `compose.yaml` (the core services) plus optional override files (`observability.yaml`, `langfuse.yaml`), combined by profile or multiple files, so **a learner can start only the core services**.
+- `make up`, `make down`, `make seed` and similar wrappers are provided; every service has a health check, and the order of dependencies uses `depends_on: condition: service_healthy`.
+- `.env.example` lists every variable with a note; the real `.env` stays out of Git. **The only thing the user must supply is the LLM API key** (OpenAI; Anthropic too when it is used).
 
-### 2.2 资源（粗估，待实测）
+### 2.2 Resources (rough estimates, to be measured)
 
-你的机器是 16 GB 的 Mac。把 Docker Desktop 的内存上限设为约 8–10 GB 比较稳妥。粗略估计各部分占用：
+Your machine is a 16 GB Mac. Setting Docker Desktop's memory limit to about 8 to 10 GB is the safe choice. A rough estimate of each part:
 
-| 部分 | 粗估 |
+| Part | Rough estimate |
 |---|---|
-| Postgres | 0.3–0.5 GB |
-| api + worker + mcp-server | 约 0.2–0.4 GB 各一个 |
-| web | 约 0.3 GB |
-| Keycloak | 约 1–1.5 GB（需求文档里查到的数值） |
-| Redis、MinIO | 各约 0.1–0.2 GB |
-| Prometheus、Grafana、Loki、Tempo、OTel | 合计约 1–1.5 GB |
-| Langfuse（含其依赖的存储） | 可能 2 GB 以上，**未核实** |
+| Postgres | 0.3 to 0.5 GB |
+| api + worker + mcp-server | about 0.2 to 0.4 GB each |
+| web | about 0.3 GB |
+| Keycloak | about 1 to 1.5 GB (the figure found in the requirements document) |
+| Redis, MinIO | about 0.1 to 0.2 GB each |
+| Prometheus, Grafana, Loki, Tempo, OTel | about 1 to 1.5 GB together |
+| Langfuse (with the stores it depends on) | possibly over 2 GB, **not verified** |
 
-**实测记录（M1，Mac 上空闲状态，`docker stats`，2026-11-02）**：
+**Measurements (M1, idle on the Mac, `docker stats`, 2026-11-02)**:
 
-| 服务 | 实测内存 |
+| Service | Measured memory |
 |---|---|
-| Keycloak（`start-dev`） | 约 650–675 MiB，启动约 10 秒 |
-| api | 约 70 MiB |
-| 对象存储（pgsty/silo） | 约 190 MiB |
-| Postgres | 约 32 MiB（空库） |
-| Redis | 约 10 MiB |
-| 合计 | 约 1 GB |
+| Keycloak (`start-dev`) | about 650 to 675 MiB, starting in about 10 seconds |
+| api | about 70 MiB |
+| Object store (pgsty/silo) | about 190 MiB |
+| Postgres | about 32 MiB (empty database) |
+| Redis | about 10 MiB |
+| Total | about 1 GB |
 
-Keycloak 比上面粗估的 1–1.5 GB 低，这是开发模式、空闲状态的数字，有负载时会更高。
+Keycloak is lower than the rough 1 to 1.5 GB above; this is a development-mode, idle figure and will be higher under load.
 
-核心服务能跑在 4 GB 以内，完整的可观测性和 Langfuse 另加。**学习者可以分层启动**，这是 2.1 要把可选组件拆开的原因。
+The core services can run within 4 GB, with the full observability and Langfuse on top. **A learner can start layer by layer**, which is why 2.1 splits the optional components.
 
-## 3. lite profile（Oracle k3s）
+## 3. The lite profile (Oracle k3s)
 
-- **只开 1 台 VM、单节点 k3s、两个 namespace**【已定】；Oracle 的实际额度由你核实（需求文档里记的"2 核 12 GB"是网上报道，未核实）。
-- 部署用 Helm chart，变量名与 `.env` 保持一致（Secret 存密钥）。
-- **身份服务**【待定】：判断规则是"先实测 Keycloak 在该机器上的内存占用"。备选：Logto，或由 api 自己签发 JWT 并公开 JWKS（接口不变，api 和 MCP 仍然只校验 JWKS）。**第一阶段先完成 full，lite 的身份方案在实施计划里单独排期。**
-- 对外：公网 IP + 端口，演示用虚构账号，**不放任何真实数据**；LLM 调用设置**每日费用上限**，避免被滥用。
-- lite 先上线最小集：web、api、worker、mcp-server、Postgres、Redis，加身份服务；可观测性视内存逐步加。
+- **One VM only, single-node k3s, two namespaces** [Decided]; the real Oracle quota is for you to verify (the "2 cores 12 GB" noted in the requirements document is an online report and not verified).
+- Deployment uses a Helm chart, with variable names consistent with `.env` (secrets in a Secret).
+- **Identity service** [Open]: the rule is "first measure Keycloak's memory use on that machine". Alternatives: Logto, or the api signs JWTs itself and publishes JWKS (the interface does not change, and the api and MCP still only verify JWKS). **Phase 1 finishes full first, and the identity plan of lite is scheduled separately in the implementation plan.**
+- Public side: public IP + port, invented demo accounts, **no real data at all**; LLM calls get a **daily cost cap** to prevent abuse.
+- lite goes live with a minimal set first: web, api, worker, mcp-server, Postgres, Redis, plus the identity service; observability is added step by step depending on memory.
 
-## 4. 配置与密钥【建议】
+## 4. Configuration and secrets [Proposed]
 
-- 环境变量是唯一来源；变量名前缀 `STARIT_`，按组件分组。示例：
+- Environment variables are the only source; variable names have the prefix `STARIT_`, grouped by component. Examples:
 
-| 分组 | 变量（节选） |
+| Group | Variables (excerpt) |
 |---|---|
-| LLM | `STARIT_LLM_GATEWAY`（`litellm_proxy` / `litellm_lib`）、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、各节点模型名 `STARIT_MODEL_UNDERSTAND`、`STARIT_MODEL_GENERATE`、`STARIT_MODEL_RERANK` |
-| Embedding | `EMBEDDING_PROVIDER`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS` |
-| 检索 | `STARIT_RETRIEVAL_MODE`、`STARIT_KEYWORD_SEARCHER`、各数值参数（见 05 的 2.1） |
-| 身份 | `STARIT_OIDC_ISSUER`、`STARIT_OIDC_AUDIENCE_API`、`STARIT_OIDC_AUDIENCE_MCP` |
-| 限额 | `STARIT_RATE_LIMIT_CHAT`、`STARIT_DAILY_LLM_BUDGET` |
+| LLM | `STARIT_LLM_GATEWAY` (`litellm_proxy` / `litellm_lib`), `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, the model name of each node `STARIT_MODEL_UNDERSTAND`, `STARIT_MODEL_GENERATE`, `STARIT_MODEL_RERANK` |
+| Embedding | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` |
+| Search | `STARIT_RETRIEVAL_MODE`, `STARIT_KEYWORD_SEARCHER`, the numeric parameters (see 2.1 of 05) |
+| Identity | `STARIT_OIDC_ISSUER`, `STARIT_OIDC_AUDIENCE_API`, `STARIT_OIDC_AUDIENCE_MCP` |
+| Limits | `STARIT_RATE_LIMIT_CHAT`, `STARIT_DAILY_LLM_BUDGET` |
 
-- 密钥只放 `.env` 或 Secret，**不写进镜像、不进日志、不进 trace**；日志里对密钥和 JWT 做脱敏。
+- Secrets go only in `.env` or a Secret, and **never into the image, the log or the trace**; secrets and JWTs are masked in logs.
 
-## 5. 样例数据与种子【建议】
+## 5. Sample data and seeding [Proposed]
 
-1. `make seed` 做三件事：创建 Keycloak 的 realm、角色和测试账号；把 `sample-data/structured/*.csv` 导入 `biz` schema 并创建白名单视图和 `ai_sql_ro` 账号；用 05 的入库接口导入 28 份文档。
-2. **预置向量库转储**（需求文档中遗留的待办）：把入库完成后的 `ai` schema 数据（分块、向量、派生内容）导出成压缩的 SQL 转储，放进仓库的 `seed/` 或发布附件。学习者可以**不用 OpenAI 密钥就先看到检索效果**，用自己的密钥时再重新入库。转储里记录 embedding 模型和维度（02 的约定），启动时发现不一致就提示重新入库。
-3. 转储文件的大小需要评估（28 份文档，量级不大），超过 GitHub 限制则用发布附件。
+1. `make seed` does three things: create the Keycloak realm, roles and test accounts; import `sample-data/structured/*.csv` into the `biz` schema and create the allow-listed views and the `ai_sql_ro` account; import the 28 documents through the ingestion interface of 05.
+2. **A ready-made vector store dump** (an item left over from the requirements document): after ingestion, export the `ai` schema data (chunks, vectors, derived content) as a compressed SQL dump and put it in the repository's `seed/` or a release attachment. A learner can **see the search results without an OpenAI key** and re-ingest when using their own key. The dump records the embedding model and dimensions (the convention of 02), and at start-up a mismatch prompts re-ingestion.
+3. The size of the dump needs evaluating (28 documents, not large); if it exceeds the GitHub limit it goes in a release attachment.
 
-## 6. 可观测性【建议】
+## 6. Observability [Proposed]
 
-- 所有服务统一接入 OpenTelemetry：HTTP 请求、数据库、LLM 调用、图的每个节点都是 span；日志带 `request_id`、`run_id`、`trace_id`。
-- 指标（Prometheus）：请求量和延迟、`end_state` 分布、检索延迟、LLM 调用数和 token、入库队列长度和失败数、被权限过滤的分块比例。
-- Grafana 预置仪表盘：运行概览、End 状态分布、检索与 LLM 延迟、入库任务。
-- Langfuse（仅 full）：每次运行的 trace、提示词版本、评测 score。
-- 审计日志在数据库里（02 的 3.4），不依赖可观测性组件。
+- All services are wired uniformly to OpenTelemetry: HTTP requests, the database, LLM calls and every node of the graph are spans; logs carry `request_id`, `run_id` and `trace_id`.
+- Metrics (Prometheus): request volume and latency, the `end_state` distribution, search latency, LLM calls and tokens, ingestion queue length and failures, the share of chunks filtered out by permissions.
+- Preset Grafana dashboards: run overview, End state distribution, search and LLM latency, ingestion jobs.
+- Langfuse (full only): the trace of each run, prompt versions, evaluation scores.
+- The audit log is in the database (3.4 of 02) and does not depend on the observability components.
 
-## 7. 工程规范【建议】
+## 7. Engineering rules [Proposed]
 
-| 项 | 选择 |
+| Item | Choice |
 |---|---|
-| Python | uv、Python 3.12；格式化和静态检查用 Ruff；类型检查用 mypy 或 pyright（实施时选一个）；测试用 pytest |
-| 前端 | TypeScript 严格模式、ESLint、Prettier |
-| 提交钩子 | pre-commit：格式、静态检查、密钥扫描（防止把 `.env` 和密钥提交上去） |
-| CI（GitHub Actions） | 每次提交：Python 和前端的检查、单元和图结构测试（假 LLM）、迁移能在空库上运行；**不跑真实 LLM 的评测** |
-| 数据库迁移 | Alembic；每个迁移可在空库和已有库上运行；CI 验证 |
-| 依赖 | uv 的锁文件进 Git；固定 Docker 镜像的版本标签 |
-| 分支与提交 | 主分支保护；小步提交，提交信息说明为什么；每个阶段完成打 tag |
-| 许可证 | MIT，依赖的许可证要兼容（见 05 对 PDF 库的说明） |
+| Python | uv, Python 3.12; Ruff for formatting and static checks; mypy or pyright for types (one is chosen at implementation); pytest for tests |
+| Front end | TypeScript strict mode, ESLint, Prettier |
+| Commit hooks | pre-commit: formatting, static checks, secret scanning (to keep `.env` and keys from being committed) |
+| CI (GitHub Actions) | On every commit: Python and front-end checks, unit and graph structure tests (fake LLM), migrations that run on an empty database; **no evaluation with a real LLM** |
+| Database migrations | Alembic; every migration runs on an empty and on an existing database; verified in CI |
+| Dependencies | uv's lock file goes into Git; Docker image version tags are pinned |
+| Branches and commits | Protected main branch; small commits with messages that say why; a tag when each phase completes |
+| License | MIT; the licenses of dependencies must be compatible (see the note on the PDF library in 05) |
 
-## 8. 第一阶段的验收标准【建议】
+## 8. Acceptance criteria of phase 1 [Proposed]
 
-1. `make up && make seed` 在一台干净的 Mac 上跑通，只需要填写 LLM 密钥。
-2. 各角色账号登录后，在聊天页提问，得到带引用的回答或明确的拒绝，且每次运行都有 End 状态。
-3. `RAGETLAdmin` 能在文档管理页上传、改权限、删除、重新入库，并看到入库状态和失败原因。
-4. **权限回归全部通过**（05 的 4.3），`Admin` 账号读不到受限文档内容。
-5. 评测命令能运行并产出报告，包含检索模式对比。
-6. Langfuse 和 Grafana 能看到同一次运行的 trace 和指标。
-7. 单元和图结构测试在 CI 中通过。
+1. `make up && make seed` runs through on a clean Mac, needing only the LLM key.
+2. After signing in with each role's account, asking on the chat page gives an answer with citations or a clear refusal, and every run has an End state.
+3. `RAGETLAdmin` can upload, change permissions, delete and re-ingest on the document management page, and sees the ingestion status and failure reasons.
+4. **Permission regression fully passes** (4.3 of 05), and the `Admin` account cannot read restricted document content.
+5. The evaluation command runs and produces a report that includes a comparison of search modes.
+6. Langfuse and Grafana show the trace and metrics of the same run.
+7. Unit and graph structure tests pass in CI.
 
-## 9. 需要你确认的点
+## 9. Points for you to confirm
 
-1. 2.1 的分层启动（核心服务 / 可观测性 / Langfuse 可分开启动），是否接受？
-2. 3：第一阶段先完成 full，lite 的身份方案和部署在实施计划里单独排期，是否接受？
-3. 5 节的"预置向量库转储"：学习者无需 OpenAI 密钥即可先看到检索效果，是否接受？
-4. 6 节的可观测性范围，是否接受？
-5. 7 节的工程规范（Ruff、pre-commit、CI 不跑真实评测等），是否接受？
-6. 8 节的验收标准，是否有要增删的？
+1. The layered start of 2.1 (core services / observability / Langfuse can start separately): accepted?
+2. 3: phase 1 finishes full first, and the identity plan and deployment of lite are scheduled separately in the implementation plan: accepted?
+3. The "ready-made vector store dump" of section 5: a learner can see the search results without an OpenAI key: accepted?
+4. The observability scope of section 6: accepted?
+5. The engineering rules of section 7 (Ruff, pre-commit, CI not running the real evaluation and so on): accepted?
+6. Anything to add or remove in the acceptance criteria of section 8?
 
-## 10. 确认结果（2026-11-02）
+## 10. Confirmation results (2026-11-02)
 
-6 个确认点全部接受：分层启动；第一阶段先完成 full、lite 的身份方案单独排期；预置向量库转储；可观测性范围；工程规范；验收标准。
+All 6 points were accepted: layered start; full first in phase 1 with the identity plan of lite scheduled separately; the ready-made vector store dump; the observability scope; the engineering rules; the acceptance criteria.
 
-## 11. M8 修订与实测（2026-11-04）
+## 11. M8 revision and measurements (2026-11-04)
 
-### 11.1 实测内存（Mac，Docker Desktop 上限约 11.7 GiB，空闲状态，`docker stats`）
+### 11.1 Measured memory (Mac, Docker Desktop limit about 11.7 GiB, idle, `docker stats`)
 
-| 服务 | 实测 |
+| Service | Measured |
 |---|---|
-| Keycloak（`start-dev`） | 约 730 MiB |
-| LiteLLM 代理 | 约 580–590 MiB |
-| Grafana | 约 340–680 MiB |
-| api | 约 330–350 MiB |
-| 对象存储（pgsty/silo） | 约 220–250 MiB |
-| Tempo | 约 60–195 MiB |
-| OTel Collector | 约 70–120 MiB |
-| worker | 约 100 MiB |
-| mcp-server | 约 90 MiB |
-| Postgres、Redis、Prometheus、web | 约 60 + 10 + 50 + 40 MiB |
-| **核心服务合计（含 LiteLLM）** | **约 2.1 GiB** |
-| **核心 + 可观测性（Collector、Tempo、Prometheus、Grafana，约 0.85 GiB）** | **约 3.0 GiB** |
-| Langfuse（web 约 880、worker 约 770、ClickHouse 约 700、MinIO、Postgres、Redis 约 185 MiB） | 约 2.5 GiB |
-| **全部一起** | **约 5.4 GiB（占上限的 47%）** |
+| Keycloak (`start-dev`) | about 730 MiB |
+| LiteLLM proxy | about 580 to 590 MiB |
+| Grafana | about 340 to 680 MiB |
+| api | about 330 to 350 MiB |
+| Object store (pgsty/silo) | about 220 to 250 MiB |
+| Tempo | about 60 to 195 MiB |
+| OTel Collector | about 70 to 120 MiB |
+| worker | about 100 MiB |
+| mcp-server | about 90 MiB |
+| Postgres, Redis, Prometheus, web | about 60 + 10 + 50 + 40 MiB |
+| **Core services in total (with LiteLLM)** | **about 2.1 GiB** |
+| **Core + observability (Collector, Tempo, Prometheus, Grafana, about 0.85 GiB)** | **about 3.0 GiB** |
+| Langfuse (web about 880, worker about 770, ClickHouse about 700, MinIO, Postgres, Redis about 185 MiB) | about 2.5 GiB |
+| **Everything together** | **about 5.4 GiB (47% of the limit)** |
 
-比第 2.2 节的粗估低；这是空闲数字，有负载时更高（尤其 ClickHouse 和 Langfuse）。Langfuse 官方文档对自己推荐 "4 核 16 GiB" 的虚拟机，是给生产用的；本地演示在 11.7 GiB 的 Docker 内存里能和其余服务一起跑，没有更多余量给别的东西。lite profile 不含 Langfuse，这个数字不影响它。
+This is lower than the rough estimate of section 2.2; these are idle figures and are higher under load (especially ClickHouse and Langfuse). Langfuse's own documentation recommends a "4 cores 16 GiB" virtual machine for itself, which is meant for production; for a local demo it runs together with the other services within 11.7 GiB of Docker memory, leaving no more room for anything else. The lite profile does not include Langfuse, so this figure does not affect it.
 
-### 11.2 与第 5 节的差异：种子转储的格式
+### 11.2 A difference from section 5: the format of the seed dump
 
-预置转储不是 SQL 文件，而是 `seed/ai-seed.jsonl.gz`（gzip 压缩的 JSON 行：一行头部，之后每行一条记录）。原因：不依赖宿主机上有 `pg_dump`/`psql`，用 `uv run` 即可读写；列由 `information_schema` 现取，后续迁移加的列不用改脚本；生成的列（全文索引向量）不写入、由数据库重算。内容：28 份文档、39 个块、39 个向量（`text-embedding-3-small`）、0 条派生内容，约 270 KB，直接放在仓库里。**不含**会话、审计、评测记录。`make seed` = 导入业务表 + 恢复转储（一个事务，先清掉已有文档）+ 把样例原文件放进对象存储（点击引用才能打开原文）；`make seed ARGS=--ingest` 走真实的入库管线。
+The ready-made dump is not an SQL file but `seed/ai-seed.jsonl.gz` (gzip-compressed JSON lines: one header line, then one record per line). The reasons: it does not depend on `pg_dump`/`psql` being on the host and can be read and written with `uv run`; the columns are fetched from `information_schema` at run time, so columns added by later migrations need no script change; generated columns (the full-text index vector) are not written and are recomputed by the database. Content: 28 documents, 39 chunks, 39 vectors (`text-embedding-3-small`), 0 derived items, about 270 KB, kept directly in the repository. It **does not include** conversations, audit or evaluation records. `make seed` = import the business tables + restore the dump (one transaction, clearing existing documents first) + put the sample original files in the object store (so that clicking a citation can open the original); `make seed ARGS=--ingest` goes through the real ingestion pipeline.
 
-### 11.3 与第 6 节的差异
+### 11.3 Differences from section 6
 
-- 追踪后端用 **Tempo**，指标用 **Prometheus**（Collector 把 OTLP 指标暴露给它抓取），仪表盘用 **Grafana**（4 个：运行概览、End 状态、检索与模型延迟、入库）。**没有做 Loki**：日志仍是 JSON，带 `request_id`、`run_id`、`trace_id`，用 `docker logs` 看，省约 0.5 GB。
-- 跨服务的 trace：API 调 MCP 时通过 W3C `traceparent` 头把 trace 接起来（一次数据类提问在 Tempo 里是 api 和 mcp-server 两个服务的同一个 trace）。
-- **span 里放什么是决定出来的**：运行 ID、会话 ID、模型名、token 数、状态、耗时；**不放**令牌、问题原文和回答原文（设置 `STARIT_OTEL_CAPTURE_CONTENT=true` 才把每次模型调用输入输出的前 2000 个字符加进去，供 Langfuse 显示，默认关闭）。有测试断言令牌、问题文本不出现在任何 span、事件、指标属性里。数据库 span 带语句文本，不带参数值（有测试）。
-- Langfuse 通过 OTLP/HTTP 接收（它不支持 gRPC）；Collector 用 `basicauth` 扩展从项目的公钥和私钥现场编码认证头，仓库里没有编码后的凭据（提交时 gitleaks 拦下了我最初预先算好的 base64，改成了这种做法）。Langfuse 的项目、用户和密钥由 `LANGFUSE_INIT_*` 在首次启动时创建，凭据是仅限本地的固定值，对外暴露前必须改。Langfuse 4 的"events_only"模式下旧的 `/api/public/traces` 不可用，读数据用 Observations API v2。
-- 版本（均已核对镜像存在）：OTel Collector contrib 0.164.0、Tempo 3.1.1、Prometheus v3.15.1、Grafana 13.3.0、Langfuse 4、ClickHouse 26.3.62.3、LiteLLM v1.106.6。
-- 已知的坑：`opentelemetry-instrumentation-sqlalchemy` 声明只支持 SQLAlchemy < 2.1，而本项目用 2.1.6，它会拒绝启动（日志里一条 ERROR，**没有数据库 span**）；用它的 `skip_dep_check` 绕过，并有测试证明语句确实被记录。
+- The tracing back end is **Tempo**, metrics are **Prometheus** (the Collector exposes OTLP metrics for it to scrape) and dashboards are **Grafana** (4: run overview, End states, search and model latency, ingestion). **Loki was not built**: logs are still JSON with `request_id`, `run_id` and `trace_id`, read with `docker logs`, saving about 0.5 GB.
+- Cross-service traces: when the API calls MCP it connects the trace through the W3C `traceparent` header (a data question appears in Tempo as one trace across two services, the api and the mcp-server).
+- **What goes into a span was decided**: run id, conversation id, model name, token counts, status, duration; **not** tokens, the original question or the original answer (setting `STARIT_OTEL_CAPTURE_CONTENT=true` adds the first 2000 characters of the input and output of each model call for Langfuse to show, off by default). A test asserts that tokens and the question text appear in no span, event or metric attribute. A database span carries the statement text and no parameter values (tested).
+- Langfuse receives over OTLP/HTTP (it does not support gRPC); the Collector uses the `basicauth` extension to encode the authentication header on the spot from the project's public and private keys, so the repository holds no encoded credentials (gitleaks stopped the base64 I had first computed in advance at commit time, so it was changed to this approach). The Langfuse project, user and keys are created by `LANGFUSE_INIT_*` on first start, and the credentials are fixed local-only values that must be changed before exposing it. In Langfuse 4's "events_only" mode the old `/api/public/traces` is not available, and the Observations API v2 is used to read data.
+- Versions (all checked to exist as images): OTel Collector contrib 0.164.0, Tempo 3.1.1, Prometheus v3.15.1, Grafana 13.3.0, Langfuse 4, ClickHouse 26.3.62.3, LiteLLM v1.106.6.
+- A known trap: `opentelemetry-instrumentation-sqlalchemy` declares support only for SQLAlchemy < 2.1, while this project uses 2.1.6, so it refuses to start (one ERROR in the log, **and no database spans**); its `skip_dep_check` works around it, and a test proves that statements are recorded.

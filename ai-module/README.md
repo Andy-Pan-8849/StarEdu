@@ -50,7 +50,7 @@ flowchart LR
 
 **Why one graph rather than several agents:** the outer flow (search, permission filter, verification, wrap-up) is fixed code, and the model is used only in a few named steps. That keeps runs predictable, testable and cheap to evaluate. The SQL part of the data path is a bounded sub-loop (called the SQL agent subgraph in the design documents). Analytics and web-search agents are candidates in the [phase 2 plan](../docs/design/09-phase2-plan.md) and are **not built**.
 
-Code: the routing table is in [`graph.py`](packages/core/src/starit_core/agent/graph.py), `understand` is in [`nodes.py`](packages/core/src/starit_core/agent/nodes.py), and its prompt is in `packages/core/src/starit_core/agent/prompts/`. See [`docs/design/04-agent-flow.md`](../docs/design/04-agent-flow.md) for the design (in Chinese).
+Code: the routing table is in [`graph.py`](packages/core/src/starit_core/agent/graph.py), `understand` is in [`nodes.py`](packages/core/src/starit_core/agent/nodes.py), and its prompt is in `packages/core/src/starit_core/agent/prompts/`. See [`docs/design/04-agent-flow.md`](../docs/design/04-agent-flow.md) for the design.
 
 ## 2. Start it (about 15 minutes the first time)
 
@@ -358,10 +358,10 @@ Tests sit next to the code they test (`tests/` folders inside each package and a
 
 ## 7. More
 
-- What each milestone did, did not do, and its actual results: [`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.md) (Chinese)
-- The phase 2 plan and candidates: [`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.md) (Chinese)
+- What each milestone did, did not do, and its actual results: [`../docs/design/08-milestone-checklists.md`](../docs/design/08-milestone-checklists.md)
+- The phase 2 plan and candidates: [`../docs/design/09-phase2-plan.md`](../docs/design/09-phase2-plan.md)
 - Evaluation reports and human review sheets: [`../docs/eval/`](../docs/eval/)
-- Design documents: [`../docs/design/`](../docs/design/) (Chinese)
+- Design documents: [`../docs/design/`](../docs/design/)
 
 ## 8. Reference
 

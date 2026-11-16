@@ -1,34 +1,36 @@
-# 里程碑清单记录
+# Milestone checklist record
 
-每个里程碑开始前，把"要新建和修改的文件、要运行的命令、验证标准、开始前不确定的事"列出来并存在这里，用户确认后才写代码。完成后补充"实际结果"（与计划不一致的地方单独写明）。新里程碑追加在文末。
+[中文](08-milestone-checklists.chn.md)
 
-依据：[07 实施计划](07-implementation-plan.md)。
+Before each milestone starts, "the files to create and change, the commands to run, the verification criteria and the things that were unclear beforehand" are listed and kept here, and code is written only after the user confirms. After completion, the "actual results" are added (anything that differs from the plan is written separately). New milestones are appended at the end.
+
+Basis: [07 implementation plan](07-implementation-plan.md).
 
 ---
 
-## M0 脚手架与基础设施
+## M0 Scaffold and infrastructure
 
-状态：**已完成并合并**（标签 `ai-m0`，合并提交 `6812320`，2026-11-02）。
+Status: **Done and merged** (tag `ai-m0`, merge commit `6812320`, 2026-11-02).
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `.python-version` | 固定 3.12 |
-| `pyproject.toml` | uv workspace 根；Ruff、pytest、mypy 配置 |
-| `Makefile` | `up`、`down`、`test`、`lint`、`migrate` 等 |
-| `.env.example` | 变量说明与默认值 |
-| `packages/core/`（`config.py`、`db.py`、`logging.py`、`tests/`） | 配置加载、数据库连接、带 `request_id` 的日志 |
-| `apps/api/`（`main.py`、`tests/`） | FastAPI，`/healthz` 检查数据库 |
-| `apps/worker/`、`apps/mcp-server/` | 最小入口和导入测试（功能留到 M3、M6） |
-| `migrations/`（`alembic.ini`、`env.py`、`versions/0001_baseline.py`） | 创建 `ai`、`biz` schema 和 `vector` 扩展 |
-| `deploy/compose/compose.yaml` | Postgres+pgvector、Redis、对象存储、api，均带健康检查 |
-| `deploy/docker/python.Dockerfile` | 用 uv 构建 Python 服务镜像 |
-| 仓库根 `.pre-commit-config.yaml` | Ruff、格式检查、密钥扫描 |
-| 仓库根 `.github/workflows/ci.yml` | 检查、测试、迁移在空库运行 |
-| `README.md`（`ai-module/`） | 开发环境启动说明 |
+| `.python-version` | Pins 3.12 |
+| `pyproject.toml` | uv workspace root; Ruff, pytest and mypy configuration |
+| `Makefile` | `up`, `down`, `test`, `lint`, `migrate` and so on |
+| `.env.example` | Variable notes and defaults |
+| `packages/core/` (`config.py`, `db.py`, `logging.py`, `tests/`) | Configuration loading, database connection, logging with `request_id` |
+| `apps/api/` (`main.py`, `tests/`) | FastAPI, `/healthz` checks the database |
+| `apps/worker/`, `apps/mcp-server/` | Minimal entry points and import tests (functions left to M3 and M6) |
+| `migrations/` (`alembic.ini`, `env.py`, `versions/0001_baseline.py`) | Creates the `ai` and `biz` schemas and the `vector` extension |
+| `deploy/compose/compose.yaml` | Postgres+pgvector, Redis, object store, api, all with health checks |
+| `deploy/docker/python.Dockerfile` | Builds the Python service image with uv |
+| Repository root `.pre-commit-config.yaml` | Ruff, format check, secret scan |
+| Repository root `.github/workflows/ci.yml` | Checks, tests, migrations run on an empty database |
+| `README.md` (`ai-module/`) | Development environment start instructions |
 
-### 计划的命令
+### Planned commands
 
 ```bash
 git switch -c m0-scaffold
@@ -39,62 +41,62 @@ make migrate
 curl localhost:8000/healthz
 ```
 
-### 验证标准
+### Verification criteria
 
-1. `make up` 后所有服务 healthy，`/healthz` 返回成功且包含数据库状态。
-2. `make test` 全部通过，`make lint` 无报错。
-3. `make migrate` 在空库上成功，存在 `ai`、`biz` schema 和 `vector` 扩展。
-4. 提交含假密钥的文件时，pre-commit 会拦截。
-5. CI 在 GitHub 上变绿。
+1. After `make up` every service is healthy, and `/healthz` returns success including the database status.
+2. `make test` passes entirely and `make lint` reports nothing.
+3. `make migrate` succeeds on an empty database, and the `ai` and `biz` schemas and the `vector` extension exist.
+4. Committing a file with a fake secret is blocked by pre-commit.
+5. CI turns green on GitHub.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-镜像标签、MinIO 镜像是否还能拉取。
+Image tags, and whether the MinIO image can still be pulled.
 
-### 实际结果
+### Actual results
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| 验证标准 1–5 | 全部满足：lint 与 mypy 通过；11 个测试通过（含集成测试）；四个容器 healthy；迁移可重复运行；gitleaks 拦截了假的 GitHub 令牌；CI 通过 |
-| **与计划不一致** | 官方 MinIO 镜像已无法拉取，改用 MinIO 兼容分支 `pgsty/silo`（固定版本）；已先改设计文档 01（4.7 节）再写代码 |
-| **与计划不一致** | CI 原本只在 `main` 和 PR 上触发，分支推送不会运行，已改为所有推送都触发 |
-| 镜像版本 | `pgvector/pgvector:0.8.7-pg17`、`redis:7-alpine`、`pgsty/silo:RELEASE.2026-08-06T00-00-00Z` |
-| pre-commit 版本 | 初稿里的版本过旧，用 `pre-commit autoupdate` 更新（ruff v0.17.3、gitleaks v8.30.0、pre-commit-hooks v6.0.0） |
+| Criteria 1 to 5 | All met: lint and mypy pass; 11 tests pass (including integration tests); four containers healthy; migrations can be run repeatedly; gitleaks blocked a fake GitHub token; CI passes |
+| **Differs from the plan** | The official MinIO image can no longer be pulled, so the MinIO-compatible fork `pgsty/silo` (pinned version) is used; design document 01 (section 4.7) was changed first and then the code written |
+| **Differs from the plan** | CI was first triggered only on `main` and PRs, so branch pushes did not run it; it now triggers on every push |
+| Image versions | `pgvector/pgvector:0.8.7-pg17`, `redis:7-alpine`, `pgsty/silo:RELEASE.2026-08-06T00-00-00Z` |
+| pre-commit versions | The versions in the first draft were too old and were updated with `pre-commit autoupdate` (ruff v0.17.3, gitleaks v8.30.0, pre-commit-hooks v6.0.0) |
 
 ---
 
-## M1 身份
+## M1 Identity
 
-状态：**已完成，待合并**（分支 `m1-identity`）。
+Status: **Done, awaiting merge** (branch `m1-identity`).
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `deploy/compose/compose.yaml`（改） | 增加 `keycloak` 服务，api 依赖它 |
-| `deploy/compose/keycloak/starit-realm.json`（新） | realm：7 个角色、测试账号、客户端、受众 |
-| `packages/core/src/starit_core/auth.py`（新） | JWT 校验、`Identity`、FastAPI 依赖 `get_identity` 与 `require_roles` |
-| `packages/core/src/starit_core/config.py`（改） | 增加 OIDC 相关配置 |
-| `packages/core/pyproject.toml`（改） | 增加 `PyJWT[crypto]` |
-| `apps/api/src/starit_api/main.py`（改） | 增加 `GET /me` |
-| `packages/core/tests/test_auth.py`（新） | JWT 校验单元测试（本地生成密钥，不需要 Keycloak） |
-| `apps/api/tests/test_me.py`（新） | `/me` 单元测试 |
-| `apps/api/tests/integration/test_keycloak.py`（新） | 用真实 Keycloak 取令牌，验证每个账号的 `/me` |
-| `scripts/token.sh`（新） | `make token ACCOUNT=staff.sh` 取测试令牌 |
-| `.env.example`、`Makefile`、`README.md`（改） | 新增变量和命令说明 |
-| `.github/workflows/ci.yml`（改） | CI 中启动 Keycloak 并运行集成测试 |
-| `docs/design/01-architecture-and-repo.md`（改） | 记录 M1 的实现决定 |
+| `deploy/compose/compose.yaml` (changed) | Adds the `keycloak` service, and the api depends on it |
+| `deploy/compose/keycloak/starit-realm.json` (new) | The realm: 7 roles, test accounts, clients, audiences |
+| `packages/core/src/starit_core/auth.py` (new) | JWT verification, `Identity`, the FastAPI dependencies `get_identity` and `require_roles` |
+| `packages/core/src/starit_core/config.py` (changed) | Adds OIDC settings |
+| `packages/core/pyproject.toml` (changed) | Adds `PyJWT[crypto]` |
+| `apps/api/src/starit_api/main.py` (changed) | Adds `GET /me` |
+| `packages/core/tests/test_auth.py` (new) | Unit tests of JWT verification (keys generated locally, no Keycloak needed) |
+| `apps/api/tests/test_me.py` (new) | Unit tests of `/me` |
+| `apps/api/tests/integration/test_keycloak.py` (new) | Gets tokens from a real Keycloak and checks `/me` for every account |
+| `scripts/token.sh` (new) | `make token ACCOUNT=staff.sh` gets a test token |
+| `.env.example`, `Makefile`, `README.md` (changed) | Notes on the new variables and commands |
+| `.github/workflows/ci.yml` (changed) | CI starts Keycloak and runs the integration tests |
+| `docs/design/01-architecture-and-repo.md` (changed) | Records the implementation decisions of M1 |
 
-### 具体设计
+### Detailed design
 
-- **Keycloak**：`quay.io/keycloak/keycloak:26.8.1`，`start-dev`，内置文件数据库放在容器卷里；`KC_HOSTNAME` 固定为 `http://localhost:8080`，使令牌的签发者固定；后端用 `STARIT_OIDC_ISSUER`（校验签发者）和 `STARIT_OIDC_JWKS_URL`（拉取公钥，容器内用 `http://keycloak:8080/...`）两个配置。
-- **角色**：`student`、`staff`、`manager`、`hr`、`finance`、`Admin`、`RAGETLAdmin`。
-- **令牌内容**：角色、`campus_id`、`level`（来自用户属性，需开启非托管属性）。受众同时包含 `starit-api` 和 `starit-mcp`。
-- **测试账号**：`student.sh`（SH）、`staff.bj`、`staff.sh`、`manager.sh`、`hr.bj`、`finance.bj`、`admin.bj`、`ragetl.bj`。密码为固定的演示值，仅用于本地。
-- **客户端**：`starit-web`（授权码 + PKCE）；为了脚本和测试取令牌，开启密码模式，仅在本地演示的 realm 中启用，生产环境应关闭。
-- **后端校验**：检查签名、过期时间、`iss`、`aud`；拒绝 `alg: none`；只认 7 个已知角色；JWKS 缓存。
+- **Keycloak**: `quay.io/keycloak/keycloak:26.8.1`, `start-dev`, with the built-in file database in a container volume; `KC_HOSTNAME` is fixed to `http://localhost:8080` so the token issuer is fixed; the back end uses two settings, `STARIT_OIDC_ISSUER` (to verify the issuer) and `STARIT_OIDC_JWKS_URL` (to fetch public keys; inside containers `http://keycloak:8080/...`).
+- **Roles**: `student`, `staff`, `manager`, `hr`, `finance`, `Admin`, `RAGETLAdmin`.
+- **Token content**: roles, `campus_id`, `level` (from user attributes; unmanaged attributes must be switched on). The audience contains both `starit-api` and `starit-mcp`.
+- **Test accounts**: `student.sh` (SH), `staff.bj`, `staff.sh`, `manager.sh`, `hr.bj`, `finance.bj`, `admin.bj`, `ragetl.bj`. Passwords are fixed demo values, for local use only.
+- **Client**: `starit-web` (authorization code + PKCE); to let scripts and tests get tokens, the password grant is on, enabled only in the local demo realm and to be turned off in production.
+- **Back-end verification**: checks signature, expiry, `iss` and `aud`; rejects `alg: none`; recognises only the 7 known roles; JWKS cache.
 
-### 计划的命令
+### Planned commands
 
 ```bash
 git switch -c m1-identity
@@ -105,1103 +107,1103 @@ curl -H "Authorization: Bearer $(make -s token USER=staff.sh)" localhost:8000/me
 make lint && make test
 ```
 
-### 验证标准
+### Verification criteria
 
-1. 8 个账号都能取到令牌，`/me` 返回正确的角色和校区。
-2. 无令牌、过期、签名被改、签发者或受众不对，均返回 401。
-3. 单元测试覆盖上述情况，不需要 Keycloak 也能运行。
-4. 集成测试用真实 Keycloak 通过，CI 通过。
-5. 记录 Keycloak 实际内存占用，回填到设计文档 06。
+1. All 8 accounts can get a token, and `/me` returns the right role and campus.
+2. No token, expired, a tampered signature, a wrong issuer or audience all return 401.
+3. Unit tests cover the above and can run without Keycloak.
+4. The integration tests pass with a real Keycloak, and CI passes.
+5. Record Keycloak's actual memory use and fill it back into design document 06.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- Keycloak 26.8 的 realm 导入格式和非托管属性的开启方式（对照官方文档确认）。
-- Keycloak 容器没有 `curl`，健康检查的写法；启动较慢，`make up` 等待时间会变长。
-- CI 里启动 Keycloak 会让每次 CI 多约一分钟。
+- The realm import format of Keycloak 26.8 and how to switch on unmanaged attributes (confirm against the official documentation).
+- The Keycloak container has no `curl`, so how to write the health check; start-up is slow, and the waiting time of `make up` gets longer.
+- Starting Keycloak in CI makes each CI run about a minute longer.
 
-### 实际结果
+### Actual results
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| 验证标准 1 | 8 个账号都取到令牌，`/me` 返回正确的角色、校区和级别（集成测试逐个验证，容器里的 api 也用真实令牌验证过） |
-| 验证标准 2 | 无令牌、乱码令牌、过期、签名被改、签发者错、受众错、缺少 `sub`、`alg: none`、HS256 算法混淆，均为 401（单元测试 + 真实令牌篡改的集成测试） |
-| 验证标准 3 | 单元测试不需要 Keycloak，用本地生成的 RSA 密钥 |
-| 验证标准 4 | 本地 43 个测试全部通过（含集成）；GitHub CI 通过（含启动 Keycloak，用时约 1 分 38 秒） |
-| 验证标准 5 | 已回填到设计文档 06 的 2.2 节（Keycloak 约 650–675 MiB，启动约 10 秒） |
-| **与计划不一致** | 命令参数名由 `USER` 改为 `ACCOUNT`（`USER` 会和系统环境变量混淆） |
-| **与计划不一致** | 没有开启"非托管属性"，而是在用户属性配置里显式声明 `campus_id`、`level`，更明确 |
-| **新增（计划外）** | `starit_api/errors.py` 和 `deps.py`：统一错误格式、`get_identity`、`require_roles`；取不到公钥时返回 503；`pyproject.toml` 里对 FastAPI 的 `Depends` 放宽了 ruff 的 B008 |
-| 开始前不确定的事 | Keycloak 26.8.1 的 realm 导入一次成功；健康检查用管理端口 9000 加 bash 的 `/dev/tcp`，有效；`make up` 现在多等约 10–30 秒 |
-| 镜像版本 | `quay.io/keycloak/keycloak:26.8.1` |
+| Criterion 1 | All 8 accounts got tokens, and `/me` returns the right role, campus and level (the integration test checks them one by one, and the api in a container was checked with real tokens too) |
+| Criterion 2 | No token, a garbled token, expired, a tampered signature, a wrong issuer, a wrong audience, a missing `sub`, `alg: none` and HS256 algorithm confusion are all 401 (unit tests + an integration test with a really tampered token) |
+| Criterion 3 | The unit tests do not need Keycloak and use a locally generated RSA key |
+| Criterion 4 | All 43 local tests pass (including integration); GitHub CI passes (including starting Keycloak, taking about 1 minute 38 seconds) |
+| Criterion 5 | Filled back into section 2.2 of design document 06 (Keycloak about 650 to 675 MiB, start-up about 10 seconds) |
+| **Differs from the plan** | The command parameter name changed from `USER` to `ACCOUNT` (`USER` is confused with a system environment variable) |
+| **Differs from the plan** | "Unmanaged attributes" were not switched on; `campus_id` and `level` are declared explicitly in the user attribute configuration, which is clearer |
+| **Added (beyond the plan)** | `starit_api/errors.py` and `deps.py`: the common error format, `get_identity`, `require_roles`; 503 when the public keys cannot be fetched; ruff's B008 relaxed for FastAPI's `Depends` in `pyproject.toml` |
+| Things unclear beforehand | The realm import of Keycloak 26.8.1 worked at the first attempt; the health check uses the management port 9000 with bash's `/dev/tcp` and works; `make up` now waits about 10 to 30 seconds more |
+| Image version | `quay.io/keycloak/keycloak:26.8.1` |
 
 ---
 
-## M2 数据模型与权限核心
+## M2 Data model and permission core
 
-状态：**已完成并合并**（标签 `ai-m2`，合并提交 `bf6fd4d`，2026-11-02）。这是整个项目最关键的安全基础，不需要 OpenAI 密钥。
+Status: **Done and merged** (tag `ai-m2`, merge commit `bf6fd4d`, 2026-11-02). This is the most critical security foundation of the whole project and needs no OpenAI key.
 
-### 用户的决定（2026-11-02，对本清单初稿的回复）
+### The user's decisions (2026-11-02, reply to the first draft of this checklist)
 
-| # | 问题 | 决定 |
+| # | Question | Decision |
 |---|---|---|
-| 1 | 数据库账号 | `starit`（所有者，迁移）、`ai_app`（应用）、`ai_sql_ro`（只读，不能登录，`SET LOCAL ROLE` 切换）。**通过** |
-| 2 | 视图可见范围 | 坚持"员工只看本校区"，并据此**修改评测集和样本数据**。同时澄清：**政策文件**全公司一份，只按角色控制，与校区无关；**结构化数据和校区资料**按数据范围（全公司 / 本校区 / 仅本人）控制。`hr`、`finance`（总部职能）为全公司范围。这与企业后台常见的"数据权限"一致，**采纳** |
-| 3 | 账号命名 | `<名>.<职能>.<校区>`，对应真实员工。**通过**（9 个账号，见 sample-data README） |
-| 4 | 职级对照 | 1：S1、I1；2：S2、I2；3：S3、I3；4：I4；5：I5；6：M2；7：M3。**写入 README**（已写入 `sample-data/README.md`，并在设计 02 第 4 节） |
-| 5 | 行级过滤 | 只用视图 `WHERE`，不用 RLS。**通过**（RLS 与视图的区别已向用户解释，以后可作为第二道保险） |
+| 1 | Database accounts | `starit` (owner, migrations), `ai_app` (application), `ai_sql_ro` (read-only, cannot log in, switched to with `SET LOCAL ROLE`). **Approved** |
+| 2 | Visibility of the views | Stick to "an employee sees only their own campus", and **change the evaluation set and the sample data** accordingly. Also clarified: **policy documents** exist once for the whole company and are controlled by role only, regardless of campus; **structured data and campus materials** are controlled by data scope (whole company / own campus / own records only). `hr` and `finance` (headquarters functions) have whole-company scope. This matches the usual "data permission" of enterprise back offices, **adopted** |
+| 3 | Account naming | `<given name>.<function>.<campus>`, matching real employees. **Approved** (9 accounts, see the sample-data README) |
+| 4 | Grade mapping | 1: S1, I1; 2: S2, I2; 3: S3, I3; 4: I4; 5: I5; 6: M2; 7: M3. **Written in the README** (written into `sample-data/README.md` and into section 4 of design 02) |
+| 5 | Row filtering | Only a `WHERE` in the view, no RLS. **Approved** (the difference between RLS and views was explained to the user, and RLS can serve as a second safeguard later) |
 
-### M2.0 样本数据与评测集修订（已完成）
+### M2.0 Revision of the sample data and the evaluation set (done)
 
-| 项 | 内容 |
+| Item | Content |
 |---|---|
-| 样本数据 | HR、财务、IT、教务办 5 名总部职能员工从成都（CD）改到总部北京（BJ）；工单的校区改为**开单人所在校区**（只改 `campus_id` 列，其余随机数据不变，用校验证实） |
-| 新增 | `demo-accounts.csv`：9 个演示账号，对应真实员工或学员；职级档位 |
-| 评测集 | `sql-qa.jsonl` 从 16 题增加到 33 题：每题带 `asker`（账号）、`role`、`scope`、`should_answer`；全公司 16、本校区 7、仅本人 3、越权应拒绝 7；答案只按该账号可见的行计算 |
-| 生成器 | `tools/generate_structured.py` 增加数据范围函数 `visible()`（与视图规则一致）；脚本带断言，演示账号指向的人变了会立即报错；运行两次结果相同（确定性） |
-| README | `sample-data/README.md` 新增"Who can see what""Job levels""Demo accounts"；顶层与 AI 模块 README 加了指引；评测题总数 87 |
-| 设计文档 | 02（三个账号、两类访问控制、过滤条件、职级对照表、视图规则、防篡改）、01（令牌增加 `employee_id` / `student_id`、账号命名）、03（`/me`）、05（评测集构成）已更新 |
+| Sample data | The 5 headquarters-function employees of HR, Finance, IT and the Academic Office moved from Chengdu (CD) to the headquarters in Beijing (BJ); the campus of a ticket became the **campus of the person who opened it** (only the `campus_id` column changed, the other random data stayed the same, confirmed by a check) |
+| Added | `demo-accounts.csv`: 9 demo accounts, matching real employees or students; grade levels |
+| Evaluation set | `sql-qa.jsonl` grew from 16 to 33 questions: each carries `asker` (account), `role`, `scope`, `should_answer`; whole company 16, own campus 7, own records 3, overreaching and to be refused 7; answers are computed only from the rows that account can see |
+| Generator | `tools/generate_structured.py` gained the data-scope function `visible()` (consistent with the view rules); the script has assertions and errors at once if the person a demo account points to changes; running twice gives the same result (deterministic) |
+| README | `sample-data/README.md` gained "Who can see what", "Job levels" and "Demo accounts"; the top-level and AI module READMEs gained pointers; the total number of evaluation questions is 87 |
+| Design documents | 02 (three accounts, two kinds of access control, the filter, the grade table, the view rules, tamper protection), 01 (tokens gain `employee_id` / `student_id`, account naming), 03 (`/me`), 05 (composition of the evaluation set) were updated |
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `migrations/versions/0002_knowledge_tables.py` | `ai.documents`、`document_chunks`（`tsv`、`identifiers`、反规范化的权限字段、`min_level_rank`）、`chunk_embeddings`、`chunk_derived`、`ingestion_jobs`，及索引 |
-| `migrations/versions/0003_conversation_audit_eval.py` | `ai.conversations`、`messages`、`runs`、`audit_log`、`eval_runs`、`eval_results`；创建 `ai_app`；授权（`audit_log` 只 INSERT）；一致性检查视图 `ai.v_chunk_permission_drift` |
-| `migrations/versions/0004_biz_and_sql_views.py` | `biz` 的 7 张表；`ai_sql` 的白名单视图；`ai_sql_ro` 角色（不能登录）及授权；撤销 `set_config` 的 `PUBLIC` 执行权限 |
-| `packages/core/src/starit_core/permissions.py` | 访问等级展开表、职级档对照、`COMPANY_WIDE_ROLES`、**统一的检索权限过滤函数**（SQLAlchemy 表达式，不拼字符串） |
-| `packages/core/src/starit_core/documents.py` | 文档服务：登记文档、修改权限或状态时**同一事务**更新文档和全部分块，并写审计 |
-| `packages/core/src/starit_core/audit.py` | 写审计记录 |
-| `packages/core/src/starit_core/sqlaccess.py` | 在事务里设置身份变量并 `SET LOCAL ROLE ai_sql_ro` |
-| `packages/core/src/starit_core/auth.py`（改） | `Identity` 增加 `employee_id`、`student_id` |
-| `packages/core/src/starit_core/config.py`（改） | `migration_database_url`、应用账号密码 |
-| `migrations/env.py`（改） | 迁移用库所有者连接 |
-| `scripts/seed_biz.py`（新）、`Makefile`（改） | `make seed-biz`：导入 `sample-data/structured/*.csv` |
-| `scripts/build_realm.py`（新） | 从 `demo-accounts.csv` 生成 `starit-realm.json`，保证账号与样本数据一致 |
-| `deploy/compose/compose.yaml`、`.env.example`（改） | api 用 `ai_app` 连接；增加迁移连接和应用账号密码变量 |
-| `deploy/compose/keycloak/starit-realm.json`（重新生成） | 9 个账号，新属性 `employee_id` / `student_id` |
-| `apps/api/tests/integration/test_keycloak.py`、`README.md`（改） | 账号改名后的测试和文档 |
-| `packages/core/tests/test_permissions.py`（新，单元） | 展开表与 `manifest.csv` 逐行对照；职级档对照 |
-| `packages/core/tests/integration/`（新，需要数据库） | 权限矩阵、文档服务、审计、视图、安全防线 |
+| `migrations/versions/0002_knowledge_tables.py` | `ai.documents`, `document_chunks` (`tsv`, `identifiers`, denormalised permission fields, `min_level_rank`), `chunk_embeddings`, `chunk_derived`, `ingestion_jobs`, and indexes |
+| `migrations/versions/0003_conversation_audit_eval.py` | `ai.conversations`, `messages`, `runs`, `audit_log`, `eval_runs`, `eval_results`; creates `ai_app`; grants (`audit_log` INSERT only); the consistency check view `ai.v_chunk_permission_drift` |
+| `migrations/versions/0004_biz_and_sql_views.py` | The 7 `biz` tables; the allow-listed views of `ai_sql`; the `ai_sql_ro` role (cannot log in) and grants; revokes `PUBLIC` execution of `set_config` |
+| `packages/core/src/starit_core/permissions.py` | The access-level expansion table, the grade mapping, `COMPANY_WIDE_ROLES`, **the one shared search permission filter function** (a SQLAlchemy expression, no string concatenation) |
+| `packages/core/src/starit_core/documents.py` | The document service: registering documents; when permissions or status change, updates the document and all chunks in **the same transaction** and writes audit |
+| `packages/core/src/starit_core/audit.py` | Writes audit records |
+| `packages/core/src/starit_core/sqlaccess.py` | Sets the identity variables inside a transaction and does `SET LOCAL ROLE ai_sql_ro` |
+| `packages/core/src/starit_core/auth.py` (changed) | `Identity` gains `employee_id` and `student_id` |
+| `packages/core/src/starit_core/config.py` (changed) | `migration_database_url`, the application account password |
+| `migrations/env.py` (changed) | Migrations connect as the database owner |
+| `scripts/seed_biz.py` (new), `Makefile` (changed) | `make seed-biz`: imports `sample-data/structured/*.csv` |
+| `scripts/build_realm.py` (new) | Generates `starit-realm.json` from `demo-accounts.csv`, keeping accounts consistent with the sample data |
+| `deploy/compose/compose.yaml`, `.env.example` (changed) | The api connects as `ai_app`; adds the migration connection and the application account password variables |
+| `deploy/compose/keycloak/starit-realm.json` (regenerated) | 9 accounts, new attributes `employee_id` / `student_id` |
+| `apps/api/tests/integration/test_keycloak.py`, `README.md` (changed) | Tests and documents after the account renaming |
+| `packages/core/tests/test_permissions.py` (new, unit) | The expansion table compared line by line with `manifest.csv`; the grade mapping |
+| `packages/core/tests/integration/` (new, needs the database) | Permission matrix, document service, audit, views, security defences |
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m2-data-permissions        # 已创建
-make up && make migrate                  # 迁移现在以库所有者身份运行
+git switch -c m2-data-permissions        # already created
+make up && make migrate                  # migrations now run as the database owner
 make seed-biz
 make test
 make lint
 ```
 
-### 验证标准
+### Verification criteria
 
-1. **迁移**：全新数据库上从头升级成功；降级再升级也成功。
-2. **展开表**：`manifest.csv` 的 28 行逐行展开后，等于评测集的访问模型（单元测试）。
-3. **权限矩阵（差分测试）**：往数据库写入覆盖各访问等级、校区范围、`allowed_users`、职级档、状态的分块，对 7 个角色 × 多个校区 × 多个职级档，用**独立写的 Python 判定**与 SQL 过滤函数比对，必须完全一致，包括 `hr`、`finance` 的全公司范围。
-4. **最小权限**：`Admin`、`RAGETLAdmin`（没有其他业务角色）查不到任何文档分块；没有角色或只有未知角色的身份什么也查不到。
-5. **文档服务**：修改权限或状态后，文档与所有分块同一事务一致；中途抛异常整体回滚；一致性检查视图为空。
-6. **审计**：`ai_app` 能插入，**不能 UPDATE 或 DELETE**。
-7. **SQL 视图**：对 9 个演示账号，各视图返回的行数与用 CSV 独立计算的预期一致（按"数据范围"表）；`ai_sql_ro` 读不到 `biz` 原表和 `ai` 的任何表；没有身份变量时视图返回空；评测集里答案可由视图查询得到的题，视图结果与 `expected_answer` 一致。
-8. **防篡改**：以 `ai_sql_ro` 身份执行 `SELECT set_config('app.roles','hr',true)` 被权限拒绝；`SET LOCAL ROLE ai_sql_ro` 流程可用。
-9. M1 的集成测试在账号改名和新增属性后仍通过；CI 通过。
+1. **Migrations**: upgrade from scratch on a brand-new database succeeds; downgrade and upgrade again also succeed.
+2. **Expansion table**: the 28 lines of `manifest.csv` expanded one by one equal the access model of the evaluation set (unit test).
+3. **Permission matrix (differential test)**: write chunks covering every access level, campus scope, `allowed_users`, grade and status into the database, and for 7 roles × several campuses × several grades compare an **independently written Python decision** with the SQL filter function; they must agree completely, including the whole-company scope of `hr` and `finance`.
+4. **Least privilege**: `Admin` and `RAGETLAdmin` (with no other business role) cannot find any document chunk; an identity with no role or only unknown roles finds nothing.
+5. **Document service**: after changing permissions or status the document and all chunks are consistent within the same transaction; an exception midway rolls everything back; the consistency check view is empty.
+6. **Audit**: `ai_app` can insert and **cannot UPDATE or DELETE**.
+7. **SQL views**: for the 9 demo accounts the number of rows each view returns matches the expectation computed independently from the CSV (per the "data scope" table); `ai_sql_ro` cannot read the original `biz` tables or any table of `ai`; with no identity variables the views return nothing; for the evaluation questions whose answer can be obtained from the views, the view result matches `expected_answer`.
+8. **Tamper protection**: running `SELECT set_config('app.roles','hr',true)` as `ai_sql_ro` is refused by permissions; the `SET LOCAL ROLE ai_sql_ro` flow works.
+9. The integration tests of M1 still pass after the account renaming and the new attributes; CI passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- `tsv` 做成生成列时，Postgres 要求表达式 immutable，`array_to_string` 可能不满足；若被拒绝，改用触发器维护 `tsv`。
-- 在 `pg_catalog` 里撤销系统函数的执行权限，需要确认在 pgvector 镜像里可行，并且不影响 Alembic 与应用的正常使用（测试里验证）。
-- 迁移里读取环境变量创建 `ai_app` 的密码，需要确认写法在本地和 CI 都可用。
-- `ai_app` 成为非超级用户后，`/healthz` 与 M1 的测试是否需要补授权。
-- 已有的 `starit-ai_pgdata` 数据卷里是 M0、M1 的旧库：迁移是向前的，不需要清空；但 Keycloak 的卷里旧 realm 不会重新导入，账号改名后需要 `make clean` 或删除 `keycloakdata` 卷（只丢失演示数据）。
+- When `tsv` is a generated column, Postgres requires the expression to be immutable and `array_to_string` may not satisfy that; if it is refused, a trigger will maintain `tsv` instead.
+- Revoking execution of a system function in `pg_catalog` must be confirmed to work in the pgvector image without affecting the normal use of Alembic and the application (verified in tests).
+- Creating the password of `ai_app` by reading an environment variable in a migration needs confirming that the way it is written works both locally and in CI.
+- After `ai_app` becomes a non-superuser, whether `/healthz` and the tests of M1 need additional grants.
+- The existing `starit-ai_pgdata` volume holds the old database of M0 and M1: migrations go forward and need no clearing; but the old realm in the Keycloak volume is not imported again, so after the account renaming `make clean` or deleting the `keycloakdata` volume is needed (only demo data is lost).
 
-### 实际结果
+### Actual results
 
-**验证标准**（全部满足；本地 117 个测试全部通过，含集成测试；M1 为 43 个）：
+**Verification criteria** (all met; all 117 local tests pass, including integration tests; M1 had 43):
 
-| # | 结果 |
+| # | Result |
 |---|---|
-| 1 迁移 | 全新数据库上升级、降级到 0001、再升级成功（自动化测试，用临时数据库）；干净环境 `make clean && make up` 也成功 |
-| 2 展开表 | `manifest.csv` 28 行逐行与评测集的访问模型一致，管理角色不在任何展开结果里 |
-| 3 权限矩阵 | 216 份文档（访问等级 × 校区 × 状态 × 职级要求 × 点名用户）和 384 种调用者（角色组合 × 校区 × 职级 × 用户）逐一比对，SQL 过滤与独立的 Python 规则**完全一致**，查询以 `ai_app` 角色执行 |
-| 4 最小权限 | 只有 `Admin` / `RAGETLAdmin`、没有角色或只有未知角色时，查不到任何分块；被文档点名的用户除外（按设计） |
-| 5 文档服务 | 修改权限或状态后文档与所有分块一致；中途失败整体回滚且不留审计记录；一致性检查视图能发现直接改库造成的不一致 |
-| 6 审计 | `ai_app` 能插入；UPDATE、DELETE、TRUNCATE、SELECT 均被权限拒绝 |
-| 7 SQL 视图 | 9 个演示账号 × 7 个视图，返回的行与独立计算的预期**完全一致**；评测集 26 道应回答的题中，17 道（SQL-03、07、11、12、14–26）能由视图查询得出与 `expected_answer` 相同的结果；7 道应拒绝的题，对应数据对提问者不可见（行数为 0） |
-| 8 防篡改 | 查询里调用 `set_config` 被拒绝；`ai_sql_ro` 读不到 `biz` 原表、`ai` 的任何表、`public` 的表 |
-| 9 M1 与 CI | M1 的集成测试在账号改名后通过；GitHub CI 通过（含 Keycloak、全部集成测试，用时约 1 分 49 秒） |
+| 1 Migrations | Upgrade, downgrade to 0001 and upgrade again succeed on a brand-new database (automated test, with a temporary database); `make clean && make up` in a clean environment also succeeds |
+| 2 Expansion table | The 28 lines of `manifest.csv` match the access model of the evaluation set one by one, and the administrative roles are in no expansion result |
+| 3 Permission matrix | 216 documents (access level × campus × status × grade requirement × named users) compared one by one with 384 kinds of caller (role combinations × campus × grade × user); the SQL filter and the independent Python rules agree **completely**, and the query runs as the `ai_app` role |
+| 4 Least privilege | With only `Admin` / `RAGETLAdmin`, with no role, or with only unknown roles, no chunk can be found; except for a user named by a document (by design) |
+| 5 Document service | After changing permissions or status the document and all chunks are consistent; a failure midway rolls back entirely and leaves no audit record; the consistency check view can find inconsistencies caused by editing the database directly |
+| 6 Audit | `ai_app` can insert; UPDATE, DELETE, TRUNCATE and SELECT are all refused by permissions |
+| 7 SQL views | 9 demo accounts × 7 views return rows **completely identical** to the independently computed expectation; of the 26 evaluation questions that should be answered, 17 (SQL-03, 07, 11, 12, 14 to 26) get from the view query the same result as `expected_answer`; for the 7 questions that should be refused, the data is invisible to the asker (0 rows) |
+| 8 Tamper protection | Calling `set_config` in a query is refused; `ai_sql_ro` cannot read the original `biz` tables, any table of `ai`, or tables of `public` |
+| 9 M1 and CI | The M1 integration tests pass after the account renaming; GitHub CI passes (including Keycloak and all integration tests, taking about 1 minute 49 seconds) |
 
-**变异检查**：临时削弱过滤规则（去掉职级、让所有人享有全公司范围、放行草稿、忽略点名用户），差分测试每次都失败，说明测试能发现这类退化；之后已恢复。
+**Mutation check**: the filter rules were weakened temporarily (dropping the grade, giving everyone whole-company scope, letting drafts through, ignoring named users), and the differential test failed every time, which shows that the test can find such regressions; it was restored afterwards.
 
-**与计划不一致或新增的地方：**
+**Differences from the plan, or additions:**
 
-| 项 | 说明 |
+| Item | Note |
 |---|---|
-| 迁移划分 | 数据库角色在 0002 创建（计划在 0003）；降级**不删除**集群共享的角色 |
-| `up` 流程 | compose 新增一次性的 `migrate` 服务，API 等它完成；否则全新环境里应用账号还不存在，API 无法通过健康检查 |
-| 辅助函数授权 | 视图里调用的 `ai_auth` 函数以调用者权限执行，所以对 `ai_sql_ro` 开放了 `USAGE` / `EXECUTE`（它们只读调用者自己的身份）；因此去掉了"不能调用 `ai_auth.has_role`"的测试项 |
-| 生成列 | `array_to_string` 非 IMMUTABLE，用声明为 IMMUTABLE 的包装函数解决（开始前的不确定项，已验证可行） |
-| `set_config` 限制 | 撤销 PUBLIC 的执行权限可行，已被测试证明有效 |
-| 评测题 SQL-31 | 学员问"我的校区有多少讲师"，原题（学员数）会被学员自己的一行数据误答，改成员工表的问题，并重新生成评测集 |
-| 命令 | `make seed-biz` 为本地开发新增；账号改名后，已有环境需要 `make clean` 重新导入 Keycloak realm |
-| 新增脚本 | `scripts/build_realm.py` 从 `demo-accounts.csv` 生成 realm，账号与样本数据始终一致 |
+| Migration split | Database roles are created in 0002 (planned for 0003); a downgrade **does not drop** the cluster-shared roles |
+| `up` flow | Compose gained a one-shot `migrate` service that the API waits for; otherwise in a brand-new environment the application account does not exist yet and the API cannot pass its health check |
+| Helper function grants | The `ai_auth` functions called by the views run with the caller's rights, so `USAGE` / `EXECUTE` was opened to `ai_sql_ro` (they only read the caller's own identity); so the test item "cannot call `ai_auth.has_role`" was removed |
+| Generated column | `array_to_string` is not IMMUTABLE and a wrapper function declared IMMUTABLE solves it (an item unclear beforehand, verified to work) |
+| `set_config` restriction | Revoking PUBLIC's execution works, proved effective by a test |
+| Evaluation question SQL-31 | A student asked "how many instructors are on my campus"; the original question (the number of students) could be answered wrongly from the student's own single row, so it became a question about the employee table and the evaluation set was regenerated |
+| Commands | `make seed-biz` was added for local development; after the account renaming an existing environment needs `make clean` to import the Keycloak realm again |
+| New script | `scripts/build_realm.py` generates the realm from `demo-accounts.csv`, so accounts always match the sample data |
 
-**已知限制（诚实记录）：**
-- Postgres 无法用权限禁止对自定义配置项 `app.*` 的 `SET` 语句。当前防线是：`set_config` 只授予 `ai_app`；执行入口只接受单条 `SELECT`（测试覆盖了拒绝多语句和 `SET` 的入口检查，**不是数据库本身拒绝 `SET`**）。语句校验（视图和函数白名单）在 M6 加入。
-- 评测集中 9 道应回答的题（SQL-01、02、04、05、06、08、09、10、13）的答案核对留到 M6，那时 SQL Agent 才会生成对应的查询。
-- 旧版 `.env` 里的 `STARIT_DATABASE_URL` 仍指向库所有者，需要手动改（README 已说明）。
+**Known limits (recorded honestly):**
+- Postgres cannot forbid the `SET` statement on the custom configuration item `app.*` through permissions. The defence now is: `set_config` is granted to `ai_app` only; the execution entry accepts only a single `SELECT` (the tests cover the entry check that rejects multiple statements and `SET`; **it is not the database itself that rejects `SET`**). Statement checks (allow-lists of views and functions) arrive in M6.
+- The answer checks of 9 questions that should be answered (SQL-01, 02, 04, 05, 06, 08, 09, 10, 13) are left to M6, when the SQL agent will generate the matching queries.
+- In an old `.env` the `STARIT_DATABASE_URL` still points to the database owner and has to be changed by hand (the README explains).
 
 
 ---
 
-## M3 入库管线
+## M3 Ingestion pipeline
 
-状态：**已完成并合并**（标签 `ai-m3`，合并提交 `9dd000a`，2026-11-03）。本里程碑开始使用 OpenAI 密钥（本地 `.env` 里已配置，不会提交；检查时只确认非空，没有显示）。
+Status: **Done and merged** (tag `ai-m3`, merge commit `9dd000a`, 2026-11-03). This milestone starts using the OpenAI key (already set in the local `.env` and never committed; during checks only that it is non-empty was confirmed and it was not shown).
 
-### 开始前的调研结果（已核对）
+### Findings of the research before starting (verified)
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| 样例文档 | 28 份：docx 10、pdf 7、md 6、txt 5；全部 `campus_scope = all`；`HR-REC-001` 有两个版本（v1.0 superseded、v2.1 active）；文本总量约 9,000 词、55 KB |
-| md / txt | 开头是元数据块（`key: value`，md 用 `---` 包起来），与 `manifest.csv` 重复；md 有标题和表格；txt 用 `1. 标题` 这样的编号行做标题，**列表项也用同样的编号**，需要靠规则区分 |
-| **docx（问题）** | 抽查两份：**没有任何标题样式**（全部是 `Normal`），**表格被压成了单独的段落**（`tables: 0`）。原因是样例用 macOS `textutil` 转换，丢失了结构。标题只能靠字号和加粗推测，表格要从相邻的小字号段落还原 |
-| pdf | 用 pdfplumber 可以抽取：字号 20 为标题、14 为小节标题、11 为正文，**表格能被识别**（第一页 3 个） |
-| tiktoken | 可用（`cl100k_base`，首次使用需要联网下载词表） |
-| litellm | 1.106.6 能在本机（arm64）安装，导入约 5 秒 |
-| boto3 | 可用 |
-| 费用估算 | 全部文档约 9,000 词，折合 1.2–1.5 万 token；`text-embedding-3-small` 的价格我记得是每百万 token 0.02 美元（**未联网核对**），所以整套入库的 embedding 费用不到 0.01 美元；实际调用前会先打印精确 token 数和估算，等你确认 |
+| Sample documents | 28: docx 10, pdf 7, md 6, txt 5; all `campus_scope = all`; `HR-REC-001` has two versions (v1.0 superseded, v2.1 active); about 9,000 words and 55 KB of text in all |
+| md / txt | They begin with a metadata block (`key: value`, wrapped in `---` for md) that duplicates `manifest.csv`; md has headings and tables; txt uses numbered lines such as `1. Title` as headings, **and list items use the same numbering**, so rules are needed to tell them apart |
+| **docx (a problem)** | Two spot-checked: **no heading styles at all** (everything is `Normal`) and **tables flattened into separate paragraphs** (`tables: 0`). The cause is that the samples were converted with macOS `textutil`, which lost the structure. Headings can only be guessed from font size and bold, and tables have to be rebuilt from adjacent small-font paragraphs |
+| pdf | Extractable with pdfplumber: font size 20 is a title, 14 a section title, 11 body text, and **tables can be recognised** (3 on the first page) |
+| tiktoken | Available (`cl100k_base`; the first use needs the network to download the vocabulary) |
+| litellm | 1.106.6 installs on this machine (arm64), and takes about 5 seconds to import |
+| boto3 | Available |
+| Cost estimate | All documents are about 9,000 words, or 12,000 to 15,000 tokens; I remember the price of `text-embedding-3-small` as US$0.02 per million tokens (**not checked online**), so the embedding cost of the whole ingestion is under US$0.01; before a real call the exact token count and the estimate are printed and you confirm |
 
-### 需要先确认的问题
+### Questions to confirm first
 
-1. **docx 样例要不要重新生成？** 现在的 docx 没有标题样式和真实表格，解析器只能靠字号猜。真实企业的 docx 通常有标题样式和表格。建议把 `build_documents.py` 的 docx 部分改用 `python-docx` 生成（真实的 Heading 样式、真实的表格），10 个 docx 会被重新生成，内容不变，也不再依赖 macOS 的 `textutil`。解析器两种情况都处理：优先用标题样式，没有样式时用"加粗、较大字号、编号开头"的规则兜底。**建议这样做。**
-2. **embedding 用 litellm 库**（设计 01 的 4.2 决定：代码依赖统一接口，lite 用进程内的 litellm），提供方和模型都由变量配置。备选是直接用 `openai` SDK，更轻但绑定供应商。**建议 litellm。**
-3. **派生内容（摘要、假设性问题、关键词）在 M3 只留阶段占位，默认不生成**。它需要聊天用的 LLM 客户端（M5 才有），而且设计 05 规定要用评测证明有用再开启。**建议放到 M8 实现并评测。**
-4. **对象存储**：原始文件上传到本地的 S3 兼容存储（`starit-documents` 桶），数据库里记 `object_key`。用 `boto3`，桶在 worker 启动时自动创建。
+1. **Should the docx samples be regenerated?** The current docx files have no heading styles and no real tables, so the parser can only guess from font size. Real companies' docx files usually have heading styles and tables. It is proposed that the docx part of `build_documents.py` be changed to generate with `python-docx` (real Heading styles, real tables); the 10 docx files are regenerated with the same content and no longer depend on macOS's `textutil`. The parser handles both cases: heading styles first, and the rule "bold, larger font size, starting with a number" as the fallback when there are no styles. **Proposed.**
+2. **Embedding uses the litellm library** (the decision of 4.2 of design 01: code depends on one interface, and lite uses litellm in the process), with provider and model set by variables. The alternative is to use the `openai` SDK directly, which is lighter but ties us to a vendor. **litellm proposed.**
+3. **Derived content (summary, hypothetical questions, keywords) is only a placeholder stage in M3 and not generated by default.** It needs the chat LLM client (which only exists in M5), and design 05 says it is switched on only after evaluation proves it useful. **It is proposed to implement and evaluate it in M8.**
+4. **Object store**: original files are uploaded to the local S3-compatible store (bucket `starit-documents`) and the database records `object_key`. Using `boto3`, with the bucket created automatically when the worker starts.
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `sample-data/tools/build_documents.py`（改） | docx 改用 python-docx 生成（真实标题样式和表格）；重新生成 10 个 docx |
-| `packages/core/src/starit_core/ingest/models.py`（新） | `Block`（标题、段落、列表项、表格、代码）、`ParsedDocument`、`Chunk` 数据类 |
-| `packages/core/src/starit_core/ingest/parsers/`（新）：`base.py`、`markdown.py`、`text.py`、`docx.py`、`pdf.py`、`registry.py` | 解析器接口和四种实现，按扩展名选择；去掉与 `manifest.csv` 重复的元数据块 |
-| `packages/core/src/starit_core/ingest/clean.py`（新） | 清洗：多余空白、不可见字符、页眉页脚重复行；**不改写正文** |
-| `packages/core/src/starit_core/ingest/chunker.py`（新） | 结构化分块：按标题切分，300–500 token、重叠约 50；表格和代码块不拆；`heading_path`、页码 |
-| `packages/core/src/starit_core/ingest/identifiers.py`（新） | 编号抽取（连字符大写编号、18 位编号），并加入文档自己的 `doc_code` |
-| `packages/core/src/starit_core/ingest/tokens.py`（新） | 用 tiktoken 计数 |
-| `packages/core/src/starit_core/embeddings.py`（新） | `EmbeddingClient` 接口；litellm 实现；确定性的假实现（测试用，不花钱） |
-| `packages/core/src/starit_core/storage.py`（新） | S3 客户端：确保桶存在、上传、下载 |
-| `packages/core/src/starit_core/ingest/pipeline.py`（新） | 阶段：parse → clean → chunk → derive（占位）→ embed → write；**写入在一个事务里替换旧分块**；每个阶段更新 `ingestion_jobs.stage` |
-| `packages/core/src/starit_core/ingest/queue.py`（新） | 任务队列：`FOR UPDATE SKIP LOCKED` 领取、重试与退避、失败记录阶段和原因 |
-| `apps/worker/src/starit_worker/main.py`（改） | 轮询循环；`--once` 处理完队列就退出 |
-| `scripts/ingest_samples.py`（新）、`Makefile`（改：`make ingest-samples`） | 读取 `manifest.csv`，登记文档、上传原文件、创建任务（与以后的上传接口走同一条路径） |
-| `deploy/compose/compose.yaml`、`.env.example`（改） | 增加 `worker` 服务；增加 embedding 相关变量 |
-| `packages/core/src/starit_core/config.py`（改） | `embedding_provider`、`embedding_model`、`embedding_dimensions`、批大小、分块参数 |
-| `packages/core/pyproject.toml`、`apps/worker/pyproject.toml`（改） | 依赖：`python-docx`、`pdfplumber`、`markdown-it-py`、`tiktoken`、`litellm`、`boto3` |
-| `packages/core/tests/ingest/`（新，单元）、`packages/core/tests/integration/test_ingest_*.py`（新） | 见验证标准 |
-| `sample-data/README.md`、`ai-module/README.md`、设计 05（改） | 说明 docx 的变化、入库命令 |
+| `sample-data/tools/build_documents.py` (changed) | docx generated with python-docx (real heading styles and tables); the 10 docx files regenerated |
+| `packages/core/src/starit_core/ingest/models.py` (new) | The data classes `Block` (heading, paragraph, list item, table, code), `ParsedDocument`, `Chunk` |
+| `packages/core/src/starit_core/ingest/parsers/` (new): `base.py`, `markdown.py`, `text.py`, `docx.py`, `pdf.py`, `registry.py` | The parser interface and four implementations, chosen by extension; drop the metadata block that duplicates `manifest.csv` |
+| `packages/core/src/starit_core/ingest/clean.py` (new) | Cleaning: extra whitespace, invisible characters, repeated header and footer lines; **never rewrites the body text** |
+| `packages/core/src/starit_core/ingest/chunker.py` (new) | Structured chunking: split by heading, 300 to 500 tokens, overlap about 50; tables and code blocks not split; `heading_path`, page number |
+| `packages/core/src/starit_core/ingest/identifiers.py` (new) | Code extraction (hyphenated uppercase codes, 18-character codes), also adding the document's own `doc_code` |
+| `packages/core/src/starit_core/ingest/tokens.py` (new) | Counting with tiktoken |
+| `packages/core/src/starit_core/embeddings.py` (new) | The `EmbeddingClient` interface; the litellm implementation; a deterministic fake (for tests, free) |
+| `packages/core/src/starit_core/storage.py` (new) | S3 client: ensure the bucket exists, upload, download |
+| `packages/core/src/starit_core/ingest/pipeline.py` (new) | Stages: parse → clean → chunk → derive (placeholder) → embed → write; **the write replaces the old chunks in one transaction**; each stage updates `ingestion_jobs.stage` |
+| `packages/core/src/starit_core/ingest/queue.py` (new) | Job queue: claiming with `FOR UPDATE SKIP LOCKED`, retries and backoff, a failure records the stage and the reason |
+| `apps/worker/src/starit_worker/main.py` (changed) | Polling loop; `--once` exits after the queue is processed |
+| `scripts/ingest_samples.py` (new), `Makefile` (changed: `make ingest-samples`) | Reads `manifest.csv`, registers documents, uploads the original files, creates jobs (the same path as the later upload endpoint) |
+| `deploy/compose/compose.yaml`, `.env.example` (changed) | Adds the `worker` service; adds the embedding variables |
+| `packages/core/src/starit_core/config.py` (changed) | `embedding_provider`, `embedding_model`, `embedding_dimensions`, batch size, chunking parameters |
+| `packages/core/pyproject.toml`, `apps/worker/pyproject.toml` (changed) | Dependencies: `python-docx`, `pdfplumber`, `markdown-it-py`, `tiktoken`, `litellm`, `boto3` |
+| `packages/core/tests/ingest/` (new, unit), `packages/core/tests/integration/test_ingest_*.py` (new) | See the verification criteria |
+| `sample-data/README.md`, `ai-module/README.md`, design 05 (changed) | Explain the change of the docx files and the ingestion command |
 
-### 关键设计决定（建议）
+### Key design decisions (proposed)
 
-- **编号抽取**：正则覆盖 `ERR-PORTAL-403`、`TS-NET-009` 这类连字符大写编号，以及税号这类 18 位字母数字编号；用评测集里的关键词题（`ERR-PORTAL-403`、`ERR-PORTAL-429`、税号 `91510000FAKE00001X`）作为测试用例。
-- **向量化文本**：`标题路径 + 正文`；存储的 `text` 是纯原文（设计 05 的 1.4）。
-- **元数据块**：解析时去掉，不进入分块；但文档标题进入标题路径，`doc_code` 进入 `identifiers`，所以按文档编号检索仍然有效。
-- **幂等**：同一 `(doc_code, version)` 且 `content_hash` 相同则跳过；内容变了则更新并重新入库；新分块在同一事务里替换旧分块，失败时旧分块保持不变。
-- **并发**：两个 worker 同时运行，同一个任务只会被其中一个领取。
-- **embedding 的批量和重试**：批大小可配；单批失败按退避重试，超过次数则任务失败，记录阶段 `embed` 和原因。
-- **模型与维度**：每个向量行记录 `model` 和 `dimensions`；入库时若配置的维度与列的 1536 不一致则直接失败并提示（换维度需要新的迁移，见设计 02 的 2.4）。
-- **测试不花钱**：自动化测试和 CI 使用假的 embedding；真实调用只在我手动运行的一次（先估算、你确认）。
+- **Code extraction**: regular expressions cover hyphenated uppercase codes such as `ERR-PORTAL-403` and `TS-NET-009`, and 18-character alphanumeric codes such as tax IDs; the keyword questions of the evaluation set (`ERR-PORTAL-403`, `ERR-PORTAL-429`, tax ID `91510000FAKE00001X`) serve as test cases.
+- **Text for embedding**: `heading path + body`; the stored `text` is the pure original (1.4 of design 05).
+- **Metadata block**: removed at parse time and not part of chunks; but the document title goes into the heading path and `doc_code` into `identifiers`, so searching by document code still works.
+- **Idempotency**: the same `(doc_code, version)` with the same `content_hash` is skipped; if the content changed it is updated and re-ingested; the new chunks replace the old ones in one transaction, and the old chunks stay unchanged on failure.
+- **Concurrency**: with two workers running at the same time, a given job is claimed by only one of them.
+- **Embedding batches and retries**: the batch size is configurable; a failed batch is retried with backoff, and after too many attempts the job fails, recording the stage `embed` and the reason.
+- **Model and dimensions**: every vector row records `model` and `dimensions`; if the configured dimension at ingestion differs from the column's 1536, it fails at once with a message (changing dimension needs a new migration, see 2.4 of design 02).
+- **Tests cost nothing**: automated tests and CI use a fake embedding; real calls happen only in the one run I start by hand (estimate first, you confirm).
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m3-ingestion                 # 已创建
+git switch -c m3-ingestion                 # already created
 uv sync --all-packages
-(cd sample-data && uv run --with python-docx python tools/build_documents.py)   # 重新生成 docx（需要 macOS 和 Chrome）
-make up                                    # 现在包含 worker
-make ingest-samples                        # 登记 28 份文档、上传、创建任务
+(cd sample-data && uv run --with python-docx python tools/build_documents.py)   # regenerate the docx files (needs macOS and Chrome)
+make up                                    # now includes the worker
+make ingest-samples                        # register 28 documents, upload, create jobs
 make test && make lint
 ```
 
-### 验证标准
+### Verification criteria
 
-1. **解析**：28 份样例文档全部解析成功；每份至少有一个标题和一个分块；docx 与 pdf 里的表格在分块里保持为完整的表格文本。
-2. **分块**：没有分块超过上限；表格不在行中间被切开；md 的代码围栏不丢失；`heading_path` 与文档结构一致（用样例做断言）。
-3. **编号**：评测集关键词题里的编号都出现在对应分块的 `identifiers` 里，且全文检索能精确命中。
-4. **入库**：28 份文档全部入库成功，文档数与 `manifest.csv` 一致；每个分块的 `allowed_roles` 与展开表一致；一致性检查视图为空；`HR-REC-001` 的两个版本都在，状态分别为 `superseded` 和 `active`。
-5. **幂等**：同一份文档重复入库，分块数和内容不变；修改内容后重新入库，旧分块被替换。
-6. **失败处理**：放一个损坏的文件，任务以明确的阶段和原因失败；embedding 失败时，旧分块保持不变（原子替换）；超过最大重试次数后任务为 `failed`。
-7. **并发**：两个 worker 同时领取任务，每个任务只被处理一次。
-8. **模型记录**：每个向量行都有 `model` 和 `dimensions`；维度不一致时入库失败。
-9. **真实 embedding**：先打印精确的 token 数和估算费用，你确认后，对 28 份文档运行一次，确认向量维度为 1536、数据写入成功（只确认这件事，不评估检索效果；检索评测在 M4）。
-10. 本地测试、lint、mypy 通过，CI 通过。
+1. **Parsing**: all 28 sample documents are parsed; each has at least one heading and one chunk; tables in docx and pdf stay whole table text in the chunks.
+2. **Chunking**: no chunk exceeds the limit; a table is not cut in the middle of a row; md code fences are not lost; `heading_path` matches the document structure (asserted with the samples).
+3. **Codes**: the codes in the keyword questions of the evaluation set appear in the `identifiers` of the matching chunks, and full-text search can hit them exactly.
+4. **Ingestion**: all 28 documents are ingested, and the number of documents matches `manifest.csv`; every chunk's `allowed_roles` matches the expansion table; the consistency check view is empty; both versions of `HR-REC-001` are there, with the statuses `superseded` and `active`.
+5. **Idempotency**: ingesting the same document again leaves the number and content of chunks unchanged; after changing the content, re-ingestion replaces the old chunks.
+6. **Failure handling**: with a broken file the job fails with a clear stage and reason; when embedding fails the old chunks stay unchanged (atomic replacement); after the maximum number of retries the job is `failed`.
+7. **Concurrency**: when two workers claim jobs at the same time, each job is processed only once.
+8. **Model record**: every vector row has `model` and `dimensions`; a dimension mismatch makes ingestion fail.
+9. **Real embedding**: first print the exact token count and estimated cost; after you confirm, run once over the 28 documents and confirm that the vector dimension is 1536 and the data was written (only that; search quality is not evaluated, the search evaluation is in M4).
+10. Local tests, lint and mypy pass, and CI passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- pdfplumber 对表格的识别能否覆盖 7 份 pdf 的所有表格，需要逐份检查；识别不到的表格会退化成普通文字行，会在测试里列出。
-- txt 里标题与编号列表项的区分规则，需要在 5 份 txt 上逐一验证。
-- litellm 导入较慢（约 5 秒），worker 启动时间会受影响；若影响测试速度，embedding 的 litellm 实现只在真正调用时才导入。
-- 容器里的 worker 镜像会因为 litellm、pdfplumber 等依赖变大，构建时间变长。
-- tiktoken 首次使用要联网下载词表，CI 和 Docker 构建里也一样；离线环境需要预先缓存。
+- Whether pdfplumber's table recognition covers all the tables of the 7 pdf files needs checking one by one; tables it cannot recognise degrade into ordinary text lines and will be listed in the tests.
+- The rule that tells titles from numbered list items in txt needs verifying one by one on the 5 txt files.
+- litellm is slow to import (about 5 seconds), which affects the worker's start-up time; if that slows the tests, the litellm implementation of embedding is imported only when really called.
+- The worker image in the container grows with dependencies such as litellm and pdfplumber, and builds take longer.
+- tiktoken needs the network on first use to download the vocabulary, the same in CI and Docker builds; an offline environment must cache it in advance.
 
-### 需要你确认
+### For you to confirm
 
-1. docx 样例重新生成（python-docx，真实标题样式和表格）。
-2. embedding 用 litellm 库。
-3. 派生内容在 M3 只留占位，放到 M8 评测后实现。
-4. 对象存储用 boto3，桶自动创建。
+1. The docx samples regenerated (python-docx, real heading styles and tables).
+2. Embedding uses the litellm library.
+3. Derived content is only a placeholder in M3 and implemented after evaluation in M8.
+4. The object store uses boto3, with the bucket created automatically.
 
-### 用户的确认（2026-11-03）
+### The user's confirmation (2026-11-03)
 
-四条全部接受：docx 样例用 python-docx 重新生成；embedding 用 litellm 库；派生内容 M3 只留占位、M8 评测后实现；对象存储用 boto3，桶自动创建。
+All four were accepted: the docx samples regenerated with python-docx; embedding through the litellm library; derived content a placeholder in M3 and implemented after evaluation in M8; the object store through boto3 with the bucket created automatically.
 
-### 实际结果
+### Actual results
 
-**验证标准**（全部满足；本地 316 个测试全部通过，含集成测试；M2 为 117 个）：
+**Verification criteria** (all met; all 316 local tests pass, including integration tests; M2 had 117):
 
-| # | 结果 |
+| # | Result |
 |---|---|
-| 1 解析 | 28 份样例全部解析成功；四种格式的标题、章节、小节、表格数量与 Markdown 原稿完全一致；原稿的每一行文字都在解析结果里；pdf 的表格全部识别（7 份 pdf 无遗漏）；元数据块没有混进正文 |
-| 2 分块 | 39 块（目标 400 token），中位数 358、最大 453，没有超过 500；每个块都和原文逐段对得上（没有丢内容）；每个表格完整地在某个块里；表格太大时按行拆开并重复表头、代码块拆开时围栏保持成对（样例里没有这两种情况，由合成数据的测试覆盖） |
-| 3 编号 | 原稿里的每个编号在四种格式的解析结果里都完整保留；评测集关键词题（`ERR-PORTAL-403`、`ERR-PORTAL-429`、税号）都能由全文索引精确命中，且命中的文档在对应的 `source_docs` 里 |
-| 4 入库 | 28 份文档全部 `ready`；每个块的 `allowed_roles` 与展开表一致；一致性检查视图为空；`HR-REC-001` 的 v1.0（`superseded`）和 v2.1（`active`）都在，v2.1 的 `supersedes_id` 指向 v1.0 |
-| 5 幂等 | 重复运行：28 份全部 `unchanged`、没有新任务、块完全不变；修改一份文档后只有它被更新，其他文档的块行保持原样；`--force` 会重新向量化 |
-| 6 失败处理 | 损坏的 pdf：任务 `failed`，阶段 `parse`，原因 `parse_failed`，只尝试 1 次；找不到存储的文件：`object_missing`；向量化失败：按退避重试，3 次后 `failed`，**旧块始终保持不变**（原子替换）；没有文本、文档被删除等也有对应的原因码 |
-| 7 并发 | 两个 worker 同时处理 6 个任务：各自都领到任务，每个任务只尝试 1 次，只有 6 条入库审计 |
-| 8 模型记录 | 每个向量行记录 `model` 和 `dimensions`；配置的维度（768）与列（1536）不一致时任务直接失败，原因 `unsupported_dimensions`，不重试 |
-| 9 真实 embedding | 先精确计数：**11,537 token**，估算费用约 **0.00023 美元**（价格 0.02 美元 / 百万 token，来自 OpenAI 模型页面，经搜索核对）；你确认后重新入库一次（28 次调用，每份文档一次）：39 个向量，模型 `text-embedding-3-small`，宽度 1536，模长在 0.9995–1.0005 之间，没有零向量，没有失败、没有告警 |
-| 10 工程检查 | lint、mypy 通过；GitHub CI 通过（含 Keycloak 和全部集成测试，用时约 2 分 38 秒） |
+| 1 Parsing | All 28 samples were parsed; the number of headings, chapters, sections and tables in all four formats matches the Markdown source exactly; every line of text of the source is in the parsing result; all pdf tables were recognised (none missed in the 7 pdf files); the metadata block did not get mixed into the body |
+| 2 Chunking | 39 chunks (target 400 tokens), median 358, maximum 453, none over 500; every chunk matches the original passage by passage (no content lost); every table is whole in some chunk; when a table is too large it is split by rows with the header repeated, and when a code block is split the fences stay paired (neither occurs in the samples and both are covered by tests with synthetic data) |
+| 3 Codes | Every code in the source is fully kept in the parsing result of all four formats; the keyword questions of the evaluation set (`ERR-PORTAL-403`, `ERR-PORTAL-429`, the tax ID) can all be hit exactly by the full-text index, and the hit document is in the matching `source_docs` |
+| 4 Ingestion | All 28 documents are `ready`; every chunk's `allowed_roles` matches the expansion table; the consistency check view is empty; both v1.0 (`superseded`) and v2.1 (`active`) of `HR-REC-001` are there, and v2.1's `supersedes_id` points to v1.0 |
+| 5 Idempotency | Running again: all 28 are `unchanged`, no new jobs, chunks completely unchanged; after changing one document only it is updated and the chunk rows of the other documents stay as they were; `--force` embeds again |
+| 6 Failure handling | A broken pdf: the job is `failed`, stage `parse`, reason `parse_failed`, tried only once; a file missing in storage: `object_missing`; an embedding failure: retried with backoff, `failed` after 3 attempts, **and the old chunks always stay unchanged** (atomic replacement); no text, a deleted document and so on also have their reason codes |
+| 7 Concurrency | Two workers processing 6 jobs at the same time: each claimed jobs, each job was tried only once, and there are only 6 ingestion audit records |
+| 8 Model record | Every vector row records `model` and `dimensions`; when the configured dimension (768) differs from the column (1536) the job fails at once with the reason `unsupported_dimensions`, with no retry |
+| 9 Real embedding | The exact count came first: **11,537 tokens**, an estimated cost of about **US$0.00023** (price US$0.02 per million tokens, from OpenAI's model page, checked by search); after you confirmed, ingested once more (28 calls, one per document): 39 vectors, model `text-embedding-3-small`, width 1536, norm between 0.9995 and 1.0005, no zero vectors, no failures, no warnings |
+| 10 Engineering checks | lint and mypy pass; GitHub CI passes (including Keycloak and all integration tests, taking about 2 minutes 38 seconds) |
 
-**与计划不一致或新增的地方：**
+**Differences from the plan, or additions:**
 
-| 项 | 说明 |
+| Item | Note |
 |---|---|
-| 分块目标 | 样例文档很短，按章节切分只有 50 token 的中位数，所以实现了"章节边界在达到目标大小后才断开"，默认目标 400；`chunk_target_tokens=0` 即一节一块，留给 M4 做分块大小的对比实验 |
-| pdf 编号换行 | 覆盖测试发现 `FIN-TAX-008` 会在连字符处换行并被拼成 `FIN- TAX-008`，已修复并加了专门的测试 |
-| 变量名 | embedding 变量按设计 06 不带 `STARIT_` 前缀（`EMBEDDING_PROVIDER` 等） |
-| 新增 | `make ingest-samples` 的 `--force`（换模型后全部重新向量化）、`--process`（在本机直接处理队列）；`register_from_manifest` 可复用于以后的上传接口 |
-| 测试隔离 | 真实入库之后，开发数据库里有了真实的文档，M2 的几个集成测试（权限差分、编号检索）一度因此失败；现在这些测试在各自回滚的事务里先清空知识库再开始，真实数据不受影响（测试后仍是 28 份文档、39 个块） |
-| 测试方式 | 入库的集成测试在一次性的 scratch 数据库里运行（流水线自己提交事务，不能放进回滚的事务）；自动化测试和 CI 一律使用假 embedding，不花钱 |
+| Chunk target | The sample documents are very short, and splitting by section gives a median of only 50 tokens, so "a section boundary only breaks once the target size is reached" was implemented, with a default target of 400; `chunk_target_tokens=0` means one chunk per section, left for the chunk-size comparison experiment of M4 |
+| pdf code line breaks | The coverage test found that `FIN-TAX-008` breaks at the hyphen and was joined as `FIN- TAX-008`; fixed, with a dedicated test |
+| Variable names | The embedding variables carry no `STARIT_` prefix, as in design 06 (`EMBEDDING_PROVIDER` and so on) |
+| Added | `--force` of `make ingest-samples` (embed everything again after changing the model) and `--process` (process the queue directly on this machine); `register_from_manifest` can be reused for the later upload endpoint |
+| Test isolation | After the real ingestion the development database held real documents, which for a while made a few M2 integration tests fail (the permission differential, the code search); these tests now clear the knowledge base first inside their own rolled-back transactions, so the real data is unaffected (after the tests it is still 28 documents and 39 chunks) |
+| How it is tested | The ingestion integration tests run in a throw-away scratch database (the pipeline commits its own transactions and cannot sit inside a rolled-back transaction); automated tests and CI always use a fake embedding and cost nothing |
 
-**已知限制（诚实记录）：**
-- pdf 的段落拼接和 txt 的小标题识别靠版面和规则，只在这 28 份样例上验证过；换一种排版的真实文档可能需要调整。
-- 第一次运行需要联网下载分词词表（tiktoken），离线环境要预先缓存。
-- worker 镜像因为 litellm、pdfplumber 等依赖变大，构建时间变长。
-- 真实 embedding 只确认了"写入成功、维度和模长正常"，检索效果在 M4 评测。
-- 本机的 `ai.ingestion_jobs` 里有 56 条记录：28 条是先用假 embedding 干跑的，28 条是真实运行；不影响后续（向量已被真实模型的结果替换）。
+**Known limits (recorded honestly):**
+- The paragraph joining of pdf and the sub-heading recognition of txt rely on layout and rules and were verified only on these 28 samples; real documents with a different layout may need adjustment.
+- The first run needs the network to download the tokenizer vocabulary (tiktoken); an offline environment must cache it in advance.
+- The worker image grows with dependencies such as litellm and pdfplumber, and builds take longer.
+- The real embedding only confirmed "the write succeeded and the dimension and norm are normal"; search quality is evaluated in M4.
+- This machine's `ai.ingestion_jobs` holds 56 records: 28 from a dry run with the fake embedding and 28 from the real run; this does not affect later work (the vectors were replaced by those of the real model).
 
 
 ---
 
-## M4 检索与首个评测切片
+## M4 Search and the first evaluation slice
 
-状态：**已完成并合并**（标签 `ai-m4`，合并提交 `9bdcacc`，2026-11-03）。这是第一次能看到检索的实际效果：关键词、向量、hybrid、hybrid + Rerank 四种模式的对比，也是项目的学习目标之一。
+Status: **Done and merged** (tag `ai-m4`, merge commit `9bdcacc`, 2026-11-03). This is the first time the real effect of search can be seen: a comparison of the four modes keyword, vector, hybrid and hybrid + rerank, which is also one of the learning goals of the project.
 
-### 开始前的调研结果（已核对）
+### Findings of the research before starting (verified)
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| 评测集 `qa-set.jsonl` | 54 题：single 31、multi 7、access 7、keyword 3、unanswerable 3、version 2、paraphrase 1；每题 1 个来源文档的 43 题，2 个来源的 8 题，没有来源（无答案）的 3 题；`should_answer = false` 共 6 题（3 道 access：DOC-46、47、50；3 道 unanswerable） |
-| 知识库现状 | 28 份文档、**只有 39 个块**，平均 286 token。候选列表（各 30 个）几乎覆盖全部块，Rerank 的输入（20 个）超过一半的知识库——**这个规模下四种模式的差距会被压缩，很多题会直接命中**，要如实看待结果；更有说服力的对比要等 M8 扩充评测题和文档之后 |
-| 关键词查询 | 问题文本用 `plainto_tsquery('english', 问题)` 再把 `&` 换成 `\|` 得到"任一词命中"的查询，例如 `What does ERR-PORTAL-403 mean?` 变成 `'err-port' \| 'err' \| 'portal' \| '403' \| 'mean'`（已在数据库里验证）；用 AND 会因为问句里的虚词而几乎查不到 |
-| 排序 | `ts_rank_cd`（设计 05 已定方案 A），再给 `identifiers` 精确命中的块加分 |
-| 评测身份 | 评测集只有角色没有账号；按角色对应到演示账号：student → `wei.stu.sh`、staff → `ning.adm.bj`、manager → `ling.mgr.bj`、hr → `qing.hr.bj`、finance → `ning.fin.bj`（样例文档的校区范围都是 `all`，所以校区不影响结果） |
+| Evaluation set `qa-set.jsonl` | 54 questions: single 31, multi 7, access 7, keyword 3, unanswerable 3, version 2, paraphrase 1; 43 questions have 1 source document, 8 have 2, and 3 have no source (unanswerable); `should_answer = false` on 6 (3 access: DOC-46, 47, 50; 3 unanswerable) |
+| State of the knowledge base | 28 documents, **only 39 chunks**, an average of 286 tokens. The candidate lists (30 each) cover almost all chunks, and the rerank input (20) is over half of the knowledge base: **at this scale the gaps between the four modes are compressed and many questions are hit directly**, so the results must be read honestly; a more convincing comparison has to wait until M8 adds evaluation questions and documents |
+| Keyword query | The question text is turned by `plainto_tsquery('english', question)` and then `&` is replaced with `\|` into an "any word hits" query, for example `What does ERR-PORTAL-403 mean?` becomes `'err-port' \| 'err' \| 'portal' \| '403' \| 'mean'` (verified in the database); with AND almost nothing is found because of the function words of a question |
+| Ranking | `ts_rank_cd` (plan A decided in design 05), then chunks with an exact `identifiers` hit get a boost |
+| Evaluation identities | The evaluation set has roles and no accounts; roles are mapped to demo accounts: student → `wei.stu.sh`, staff → `ning.adm.bj`, manager → `ling.mgr.bj`, hr → `qing.hr.bj`, finance → `ning.fin.bj` (the campus scope of the sample documents is all `all`, so campus does not affect the result) |
 
-### 需要先确认的问题
+### Questions to confirm first
 
-1. **评测运行器作为 uv 工作区的新成员 `eval/`**（设计 01 的目录结构里就有 `eval/`），命令行 `starit-eval`。
-2. **现在就加一个最小的聊天模型客户端 `starit_core/llm.py`**（只做"发消息、取文本"，带假实现）。Rerank 需要它，M5 再扩展成流式和工具调用。
-3. **Rerank 默认模型 `openai/gpt-4o-mini`**（环境变量 `STARIT_MODEL_RERANK` 可改）。开始前我会先查你的密钥能用哪些模型（列出模型的接口是免费的），不能用就换。
-4. **在 M4 里实现"被权限过滤的内容"探测**（设计 04 的 5.1，用来区分 `no_permission` 和 `not_found`）：只返回数量和最高分，**绝不返回文本**，不进提示词，只用于审计和统计。
-5. **评测的权限回归扫描**：把 54 个问题分别用 7 个角色（5 个业务角色 + `Admin` + `RAGETLAdmin`）各问一遍，检查返回的每个块是否都被独立的 Python 规则允许，**零容忍**。这一项用关键词、向量、hybrid 三种模式做（只查数据库，几乎不花钱）；Rerank 只重新排序已通过过滤的候选，不改变权限，所以不重复扫。
-6. **分块大小对比实验（目标 400 与一节一块）是否放在 M4 做？** 重新入库一次约 0.0002 美元，然后重跑评测。我的建议是**放在基线出来之后做一次**，结果写进报告；你也可以推到 M8。
+1. **The evaluation runner is a new member of the uv workspace, `eval/`** (the directory structure of design 01 already has `eval/`), with the command line `starit-eval`.
+2. **Add a minimal chat model client `starit_core/llm.py` right now** (only "send a message, get the text", with a fake implementation). Rerank needs it, and M5 extends it to streaming and tool calls.
+3. **The default rerank model is `openai/gpt-4o-mini`** (changeable with the environment variable `STARIT_MODEL_RERANK`). Before starting I will first check which models your key can use (the endpoint that lists models is free), and switch if it cannot use this one.
+4. **Implement the "filtered content" probe in M4** (5.1 of design 04, used to tell `no_permission` and `not_found` apart): it returns only a count and a top score, **never any text**, does not enter the prompt, and is used only for audit and statistics.
+5. **The permission regression sweep of the evaluation**: ask each of the 54 questions as each of the 7 roles (5 business roles + `Admin` + `RAGETLAdmin`) and check that every returned chunk is allowed by the independent Python rules, **zero tolerance**. This is done with the keyword, vector and hybrid modes (it only queries the database, costing almost nothing); rerank only reorders candidates that already passed the filter and changes no permission, so it is not swept again.
+6. **Should the chunk-size comparison experiment (target 400 versus one chunk per section) be done in M4?** Ingesting once more costs about US$0.0002, then the evaluation is rerun. My suggestion is to **do it once after the baseline is out** and write the result into the report; you can also defer it to M8.
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `packages/core/src/starit_core/permissions.py`（改） | `chunks` 表对象补全检索需要的列（文本、标题路径、页码、编号、`tsv` 等），保证权限条件和检索查询用**同一个表对象**，避免生成笛卡尔积 |
-| `packages/core/src/starit_core/retrieval/models.py`（新） | `Candidate`、`RetrievedChunk`（含各路得分）、`RetrievalResult`（块、诊断信息） |
-| `packages/core/src/starit_core/retrieval/keyword.py`（新） | `KeywordSearcher` 接口；`ts_rank_cd` 实现（OR 查询 + 编号加分） |
-| `packages/core/src/starit_core/retrieval/vector.py`（新） | 向量检索（余弦距离，精确扫描） |
-| `packages/core/src/starit_core/retrieval/fusion.py`（新） | RRF 融合 |
-| `packages/core/src/starit_core/retrieval/rerank.py`（新） | `Reranker` 接口；LLM 列表式重排（要求返回 JSON，容错解析；失败时退回融合顺序并标记） |
-| `packages/core/src/starit_core/retrieval/assemble.py`（新） | 上下文组装：去重、按分数取前 N、token 预算、附带文档标题、版本、状态、标题路径 |
-| `packages/core/src/starit_core/retrieval/probe.py`（新） | 被权限过滤内容的探测：只返回数量和最高分 |
-| `packages/core/src/starit_core/retrieval/search.py`（新） | 入口 `retrieve(identity, query, mode, ...)`：所有检索都必须带身份 |
-| `packages/core/src/starit_core/llm.py`（新） | 最小聊天客户端接口 + litellm 实现 + 假实现 |
-| `packages/core/src/starit_core/config.py`（改） | `retrieval_mode`、各路候选数、`rrf_k`、`rerank_in`、`final_k`、上下文预算、`model_rerank` |
-| `eval/pyproject.toml`、`eval/src/starit_eval/`（新）：`cli.py`、`dataset.py`、`metrics.py`、`runner.py`、`report.py` | 评测运行器：读取评测集，按角色换成演示账号身份，逐题检索，计算指标，写 `ai.eval_runs` / `ai.eval_results` 和 Markdown、JSON 报告 |
-| `pyproject.toml`（改）、`Makefile`（改） | 工作区成员；`make eval ARGS="..."` |
-| `packages/core/tests/retrieval/`（新，单元）、`packages/core/tests/integration/test_retrieval*.py`（新） | 见验证标准 |
-| `eval/tests/`（新） | 指标计算和报告的测试 |
-| `docs/eval/`（新） | 基线报告（Markdown），随结果提交 |
-| `docs/design/05`、`ai-module/README.md`（改） | 实现记录、使用方式 |
+| `packages/core/src/starit_core/permissions.py` (changed) | The `chunks` table object gets the columns search needs (text, heading path, page, codes, `tsv` and so on), making sure the permission condition and the search query use **the same table object**, to avoid generating a Cartesian product |
+| `packages/core/src/starit_core/retrieval/models.py` (new) | `Candidate`, `RetrievedChunk` (with the score of each leg), `RetrievalResult` (chunks, diagnostics) |
+| `packages/core/src/starit_core/retrieval/keyword.py` (new) | The `KeywordSearcher` interface; the `ts_rank_cd` implementation (OR query + code boost) |
+| `packages/core/src/starit_core/retrieval/vector.py` (new) | Vector search (cosine distance, exact scan) |
+| `packages/core/src/starit_core/retrieval/fusion.py` (new) | RRF fusion |
+| `packages/core/src/starit_core/retrieval/rerank.py` (new) | The `Reranker` interface; the LLM listwise rerank (asks for JSON, parsed tolerantly; on failure falls back to the fusion order and marks it) |
+| `packages/core/src/starit_core/retrieval/assemble.py` (new) | Context assembly: deduplicate, take the top N by score, token budget, with document title, version, status and heading path attached |
+| `packages/core/src/starit_core/retrieval/probe.py` (new) | The probe for permission-filtered content: returns only a count and a top score |
+| `packages/core/src/starit_core/retrieval/search.py` (new) | The entry `retrieve(identity, query, mode, ...)`: every search must carry an identity |
+| `packages/core/src/starit_core/llm.py` (new) | The minimal chat client interface + litellm implementation + fake implementation |
+| `packages/core/src/starit_core/config.py` (changed) | `retrieval_mode`, candidates per leg, `rrf_k`, `rerank_in`, `final_k`, the context budget, `model_rerank` |
+| `eval/pyproject.toml`, `eval/src/starit_eval/` (new): `cli.py`, `dataset.py`, `metrics.py`, `runner.py`, `report.py` | The evaluation runner: reads the evaluation set, turns roles into demo-account identities, searches question by question, computes metrics, writes `ai.eval_runs` / `ai.eval_results` and the Markdown and JSON reports |
+| `pyproject.toml` (changed), `Makefile` (changed) | Workspace member; `make eval ARGS="..."` |
+| `packages/core/tests/retrieval/` (new, unit), `packages/core/tests/integration/test_retrieval*.py` (new) | See the verification criteria |
+| `eval/tests/` (new) | Tests of the metric computation and the report |
+| `docs/eval/` (new) | The baseline report (Markdown), committed with the results |
+| `docs/design/05`, `ai-module/README.md` (changed) | Implementation record, how to use |
 
-### 检索流程（沿用设计 05 的 2.1，默认参数不变）
+### The search flow (following 2.1 of design 05, defaults unchanged)
 
 ```
-问题 ─┬─▶ 关键词检索（权限过滤后）前 30 ─┐
-      │                                    ├─▶ RRF（k=60）─▶ Rerank 前 20 取前 6 ─▶ 上下文组装（预算 3500 token）
-      └─▶ 向量检索（权限过滤后）前 30 ───┘
+question ─┬─▶ keyword search (after permission filter) top 30 ─┐
+          │                                                     ├─▶ RRF (k=60) ─▶ rerank top 20, keep 6 ─▶ context assembly (budget 3500 tokens)
+          └─▶ vector search (after permission filter) top 30 ───┘
 ```
 
-- 四种模式 `keyword`、`vector`、`hybrid`、`hybrid_rerank`（默认）；所有数值都是配置项。
-- 过滤放在两路检索各自的 `WHERE` 里，**先过滤再排序**；旧版本默认参与检索并带 `status`，草稿不参与。
-- Rerank 失败（输出不是合法 JSON、漏了编号、重复编号、模型报错）：退回 RRF 顺序，结果上标记 `rerank_failed`，不让一次重排失败变成整次检索失败。
+- Four modes `keyword`, `vector`, `hybrid`, `hybrid_rerank` (default); all numbers are configuration items.
+- The filter sits in the `WHERE` of each of the two searches, **filtering before ranking**; old versions take part in search by default with their `status`, and drafts do not.
+- Rerank failure (the output is not valid JSON, a number is missing, a number is duplicated, the model errors): fall back to the RRF order and mark `rerank_failed` on the result, so that one rerank failure does not turn into the failure of the whole search.
 
-### 评测指标（设计 05 的 4.3，检索部分）
+### Evaluation metrics (4.3 of design 05, the search part)
 
-- `hit@k`（`k` 取 1、3、6：前 k 个结果里是否出现任一来源文档）、`recall@k`（多来源的题，来源文档出现的比例）、MRR；按题型分别统计。
-- `unanswerable` 和 `should_answer = false` 的题不算召回，单独记录它们的最高分（M5 的 `grade_retrieval` 阈值要用）。
-- **权限回归**：见确认问题 5；任何泄露都算失败。
-- 延迟：检索（数据库）和 Rerank 的 p50 / p95。
-- 每次运行记录配置（模式、参数、模型、git 提交号）和每道题的结果，可以横向对比。
+- `hit@k` (`k` of 1, 3, 6: whether any source document appears in the top k results), `recall@k` (for multi-source questions, the share of source documents that appear), MRR; counted separately by question type.
+- `unanswerable` questions and those with `should_answer = false` do not count towards recall, and their top scores are recorded separately (needed for the `grade_retrieval` threshold in M5).
+- **Permission regression**: see confirmation question 5; any leak counts as a failure.
+- Latency: p50 / p95 of search (database) and rerank.
+- Each run records the configuration (mode, parameters, model, git commit) and the result of each question, so runs can be compared side by side.
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m4-retrieval                       # 已创建
+git switch -c m4-retrieval                       # already created
 uv sync --all-packages
 make test && make lint
-make eval ARGS="retrieval --all-modes"          # 先打印调用数和估算费用，等确认
-make eval ARGS="retrieval --leak-sweep"         # 权限回归扫描（只查数据库）
+make eval ARGS="retrieval --all-modes"          # first prints the number of calls and the estimated cost, waits for confirmation
+make eval ARGS="retrieval --leak-sweep"         # permission regression sweep (database only)
 ```
 
-### 验证标准
+### Verification criteria
 
-1. 四种模式都能运行，每次返回不超过 `final_k` 个块，字段齐全（文档标题、版本、状态、标题路径、页码、各路得分）。
-2. **权限回归零泄露**：54 个问题 × 7 个角色，关键词、向量、hybrid 三种模式返回的每个块都被独立规则允许（自动化测试里用合成数据覆盖更多情形，评测里用真实数据）。
-3. **关键词题**：`ERR-PORTAL-403`、`ERR-PORTAL-429`、税号三题，hybrid 前 3 个结果里有来源文档（自动化测试里用假向量也能通过，因为靠的是关键词一路）。
-4. **访问题**：学员问只有 HR 看得到的问题，返回里没有该文档的任何块，且探测显示"有被过滤的高相关内容"；HR 问同一问题能得到该文档。
-5. **旧版本**：员工问旧招聘政策，返回里 v1.0（`superseded`）和 v2.1（`active`）的块都有，且带状态标注。
-6. **Rerank 容错**：输出乱码、缺编号、重复编号、模型报错的情况（假的聊天客户端）都退回融合顺序并标记。
-7. **探测只返回数字**：测试断言探测的返回值里没有任何文本字段。
-8. **真实评测**：先打印调用数和估算费用（查询向量化、Rerank 的输入 token），你确认后运行四种模式；产出基线报告，写入 `docs/eval/` 并提交；报告里写明局限（39 个块的知识库）。
-9. 本地测试、lint、mypy 通过，CI 通过。
+1. All four modes run, each returning at most `final_k` chunks, with every field present (document title, version, status, heading path, page, the score of each leg).
+2. **Zero leaks in the permission regression**: 54 questions × 7 roles, and every chunk returned by the keyword, vector and hybrid modes is allowed by the independent rules (automated tests cover more cases with synthetic data, and the evaluation uses real data).
+3. **Keyword questions**: for the three questions `ERR-PORTAL-403`, `ERR-PORTAL-429` and the tax ID, hybrid has the source document in the top 3 results (automated tests also pass with fake vectors, since they rely on the keyword leg).
+4. **Access questions**: a student asking something only HR can see gets no chunk of that document back, and the probe shows "there is highly relevant filtered content"; HR asking the same question gets that document.
+5. **Old versions**: an employee asking about the old recruitment policy gets chunks of both v1.0 (`superseded`) and v2.1 (`active`), with status labels.
+6. **Rerank fault tolerance**: garbled output, missing numbers, duplicate numbers and model errors (with a fake chat client) all fall back to the fusion order and are marked.
+7. **The probe returns only numbers**: a test asserts that the probe's return value has no text field.
+8. **Real evaluation**: first print the number of calls and the estimated cost (query embedding, rerank input tokens); after you confirm, run the four modes; produce the baseline report, write it to `docs/eval/` and commit it; the report states the limits (a knowledge base of 39 chunks).
+9. Local tests, lint and mypy pass, and CI passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- 你的密钥能用哪些聊天模型（接口免费，开始时先查）；Rerank 默认的 `gpt-4o-mini` 如果不可用就换。
-- LLM 列表式重排的提示词写法和 JSON 输出的稳定性，需要实测；每个问题的输入约 20 个块（最多 9,000 token），54 题一轮约 49 万 token。费用按 `gpt-4o-mini` 的价格估算时我会先联网核对价格，**现在不报数字**。
-- `ts_rank_cd` 用 OR 查询的排序质量、对连字符编号的分词行为，需要实测（编号另有 `identifiers` 加分兜底）。
-- 评测规模很小（54 题，39 个块），差距可能不明显，也可能因个别题而波动，不能据此下结论；M8 会补充评测题和文档。
-- 评测要写 `ai.eval_runs` / `ai.eval_results`：应用账号对它们有读写权限（已授权），但主键是 `(run_id, question_id, role)`，同一题同一角色在同一次运行里只能有一行，多个模式要分成多次运行。
+- Which chat models your key can use (the endpoint is free, checked first at the start); if the default `gpt-4o-mini` of rerank is not available, switch.
+- How the prompt of the LLM listwise rerank should be written and how stable the JSON output is need measuring; each question's input is about 20 chunks (at most 9,000 tokens), so a round of 54 questions is about 490,000 tokens. When estimating the cost at the price of `gpt-4o-mini` I will check the price online first, **so no figure is given now**.
+- The ranking quality of `ts_rank_cd` with an OR query and its tokenisation of hyphenated codes need measuring (codes also have the `identifiers` boost as a fallback).
+- The evaluation is very small (54 questions, 39 chunks), so differences may not be clear and may fluctuate on individual questions; no conclusion can be drawn from it, and M8 adds evaluation questions and documents.
+- The evaluation writes `ai.eval_runs` / `ai.eval_results`: the application account has read and write rights on them (granted), but the primary key is `(run_id, question_id, role)`, so one row per question and role in one run, and several modes must be split into several runs.
 
-### 需要你确认
+### For you to confirm
 
-1. 评测运行器作为工作区成员 `eval/`。
-2. 现在加最小的聊天模型客户端 `llm.py`。
-3. Rerank 默认模型 `openai/gpt-4o-mini`（先查可用性）。
-4. 实现"被过滤内容"的探测（只返回数字）。
-5. 权限回归扫描：54 题 × 7 个角色 × 三种模式。
-6. 分块大小对比实验：放在 M4 基线之后做一次，还是推到 M8？
+1. The evaluation runner as the workspace member `eval/`.
+2. Add the minimal chat model client `llm.py` now.
+3. The default rerank model `openai/gpt-4o-mini` (availability checked first).
+4. Implement the "filtered content" probe (returning only numbers).
+5. The permission regression sweep: 54 questions × 7 roles × three modes.
+6. The chunk-size comparison experiment: once after the M4 baseline, or deferred to M8?
 
-### 用户的确认（2026-11-03）
+### The user's confirmation (2026-11-03)
 
-- **Rerank 默认模型改为 `gpt-6-luna`**，不可用时再用 `gpt-4o-mini`。已核实：这把密钥能看到 `gpt-6-luna`（模型列表接口，免费）；联网查到的价格是每百万 token 输入 0.10 美元、输出 0.50 美元（来自多个二手来源，官方价格页没有直接核对），是 GPT-6 档里最便宜的。实际能否用于重排（参数是否被接受、输出是否稳定）要在实现时用一次极小的调用验证。
-- 分块大小对比实验：**放在 M4 基线之后做一次**。
-- 其余 5 条（评测运行器作为 `eval/` 工作区成员；现在加最小聊天客户端；探测被过滤内容且只返回数字；权限回归扫描 54 题 × 7 角色 × 三种模式；）全部接受。
-- 每次真实调用之前仍先打印调用数和费用估算，等你确认。
+- **The default rerank model changes to `gpt-6-luna`**, with `gpt-4o-mini` when it is unavailable. Verified: this key can see `gpt-6-luna` (the model-listing endpoint, free); the price found online is US$0.10 per million input tokens and US$0.50 per million output tokens (from several secondary sources, not checked directly on the official price page), the cheapest of the GPT-6 tier. Whether it can really be used for rerank (whether the parameters are accepted, whether the output is stable) is verified at implementation with one tiny call.
+- The chunk-size comparison experiment: **done once after the M4 baseline**.
+- The other 5 (the evaluation runner as the `eval/` workspace member; add the minimal chat client now; the probe for filtered content returning only numbers; the permission regression sweep of 54 questions × 7 roles × three modes) were all accepted.
+- Before every real call the number of calls and the cost estimate are still printed first and you confirm.
 
-### 实际结果
+### Actual results
 
-**验证标准**（全部满足；本地 378 个测试通过；M3 为 316 个）：
+**Verification criteria** (all met; 378 local tests pass; M3 had 316):
 
-| # | 结果 |
+| # | Result |
 |---|---|
-| 1 四种模式 | 都能运行，每次返回不超过 6 个块，字段齐全（文档标题、版本、状态、标题路径、页码、各路得分）；重排结果和退回融合顺序的情形都有测试 |
-| 2 权限回归 | **零越权**。自动化测试：54 题 × 7 角色 × 3 种模式（合成数据之外还用真实的样例文档）；真实运行：两次各 1,134 次检索，独立规则检查返回的每个块，越权块 0；另外 M2 的差分测试仍通过 |
-| 3 关键词题 | `ERR-PORTAL-403`、`ERR-PORTAL-429`、税号：关键词模式前 3 个里有来源；真实基线里混合模式 MRR 为 0.83（`ERR-PORTAL-429` 排第 2，见下） |
-| 4 访问题 | 学员问只有 HR 看得到的问题：所有模式都没有返回该文档的块，探测显示"有被过滤的强匹配"；HR 问同一问题能得到；`Admin` / `RAGETLAdmin` 什么也得不到，探测显示内容存在 |
-| 5 旧版本 | 员工问旧招聘政策，v1.0（`superseded`）和 v2.1（`active`）的块都回来了，并带状态标注 |
-| 6 重排容错 | 乱码、空排名、缺编号、重复和越界编号、模型报错：都退回融合顺序并标记；真实运行 108 次重排调用（两次各 54 次），**没有一次失败** |
-| 7 探测只返回数字 | 测试断言结果类型里没有文本字段 |
-| 8 真实评测 | 先打印估算（调用 54 次重排、最多 329,400 输入 token、约 0.039 美元）并经你确认；基线实际用了 318,665 输入、7,546 输出 token，约 0.036 美元；分块对比实验约 0.016 美元，加上两次重新向量化约 0.0006 美元，总计约 0.052 美元；报告在 `docs/eval/` |
-| 9 工程检查 | lint、mypy 通过；GitHub CI 通过（含全部集成测试，用时约 3 分 8 秒） |
+| 1 Four modes | All run, each returns at most 6 chunks with every field present (document title, version, status, heading path, page, the score of each leg); the reranked result and the fall-back to the fusion order are both tested |
+| 2 Permission regression | **Zero overreach.** Automated tests: 54 questions × 7 roles × 3 modes (besides synthetic data, also the real sample documents); real runs: two runs of 1,134 searches each, with the independent rules checking every returned chunk, 0 overreaching chunks; the M2 differential test still passes as well |
+| 3 Keyword questions | `ERR-PORTAL-403`, `ERR-PORTAL-429`, the tax ID: the source is in the top 3 of the keyword mode; in the real baseline the MRR of hybrid is 0.83 (`ERR-PORTAL-429` ranks 2nd, see below) |
+| 4 Access questions | A student asking something only HR can see: no mode returned a chunk of that document, and the probe shows "a strong filtered match exists"; HR asking the same gets it; `Admin` / `RAGETLAdmin` get nothing, and the probe shows the content exists |
+| 5 Old versions | An employee asking about the old recruitment policy got the chunks of both v1.0 (`superseded`) and v2.1 (`active`), with status labels |
+| 6 Rerank fault tolerance | Garbled output, an empty ranking, missing numbers, duplicate and out-of-range numbers, model errors: all fell back to the fusion order and were marked; in the real runs there were 108 rerank calls (54 in each of two runs), **and not one failed** |
+| 7 The probe returns only numbers | A test asserts that the result type has no text field |
+| 8 Real evaluation | The estimate was printed first (54 rerank calls, at most 329,400 input tokens, about US$0.039) and you confirmed; the baseline actually used 318,665 input and 7,546 output tokens, about US$0.036; the chunk comparison experiment about US$0.016, plus two re-embeddings of about US$0.0006, about US$0.052 in all; the reports are in `docs/eval/` |
+| 9 Engineering checks | lint and mypy pass; GitHub CI passes (including all integration tests, taking about 3 minutes 8 seconds) |
 
-**结果摘要**（详见 [`docs/eval/README.md`](../eval/README.md)）：
+**Summary of results** (details in [`docs/eval/README.md`](../eval/README.md)):
 
-- 知识库只有 39 个块（一节一块时 189 块），**hit@6 全部是 1.0，指标饱和**，差别只在 hit@1 和 MRR：400 token 分块时 keyword 0.896、vector 0.917、hybrid 0.938、hybrid_rerank 1.0；一节一块时 keyword 0.833，其余三种都是 1.0。
-- 重排两次都是满分，检索延迟 p50 约 2.1 秒（其余模式几十毫秒）。
-- 重排分数在 48 道可回答题上全部是 10，在 6 道无答案或应拒绝的题上是 0、0、1、2、5、8，是 M5 判断证据够不够的依据，但样本很小，8 分那道说明间隔不宽。
+- The knowledge base has only 39 chunks (189 with one chunk per section), **hit@6 is 1.0 everywhere and the metrics are saturated**, so the differences are only in hit@1 and MRR: with 400-token chunks keyword 0.896, vector 0.917, hybrid 0.938, hybrid_rerank 1.0; with one chunk per section keyword 0.833 and the other three all 1.0.
+- Rerank scored full marks both times; search latency p50 about 2.1 seconds (the other modes tens of milliseconds).
+- Rerank scores are all 10 on the 48 answerable questions and 0, 0, 1, 2, 5, 8 on the 6 unanswerable or to-be-refused ones; this is the basis in M5 for judging whether the evidence is enough, but the sample is very small, and the question with 8 shows the gap is not wide.
 
-**与计划不一致或新增的地方：**
+**Differences from the plan, or additions:**
 
-| 项 | 说明 |
+| Item | Note |
 |---|---|
-| 指名文档加分 | 测试发现问"FIN-REIM-002 说了什么"时，另一份只在正文里提到该编号的文档排在前面；关键词检索新增"块属于被点名的文档"再加一份分 |
-| RRF 的弱点 | 基线里 `ERR-PORTAL-429` 在混合模式只排第 2：向量一路把 `ERR-PORTAL-403` 的块排第一，RRF 只看名次，压下了唯一的精确命中；重排把它纠正了。自动化测试里向量是假的随机向量，所以混合模式的编号测试只要求来源出现在结果里，不要求前 3 |
-| 聊天模型参数 | `gpt-6-luna` 在开启推理时只接受 `temperature = 1`；客户端设置 `reasoning_effort = "none"` 和 `temperature = 0`，不支持的模型由 `drop_params` 忽略。极小的试调用（约 20 token）确认了这一点 |
-| 代码位置 | `vector_literal` 移到 `embeddings.py`，检索模块不用依赖入库流水线 |
-| 新增 | `eval/` 作为 uv 工作区成员；`make eval`；`--dry-run`（假模型演练）、`--no-db` |
-| 评测记录 | 数据库里有 8 次评测运行（2 个标签 × 4 种模式），432 行结果；知识库已恢复为默认分块（39 个块、真实向量、一致性检查为空），worker 容器已重新启动 |
+| Boost for the named document | Testing found that when asking "what does FIN-REIM-002 say", another document that only mentions the code in its body ranked first; keyword search gained one more share of score for "the chunk belongs to the named document" |
+| A weakness of RRF | In the baseline `ERR-PORTAL-429` ranks only 2nd in hybrid mode: the vector leg put the chunk of `ERR-PORTAL-403` first, and RRF looks only at rank and pushed down the one exact hit; rerank corrected it. In the automated tests the vectors are fake random vectors, so the code test of hybrid mode only requires the source to appear in the result, not the top 3 |
+| Chat model parameters | When reasoning is on, `gpt-6-luna` accepts only `temperature = 1`; the client sets `reasoning_effort = "none"` and `temperature = 0`, and models that do not support them ignore them through `drop_params`. A tiny trial call (about 20 tokens) confirmed this |
+| Code location | `vector_literal` moved to `embeddings.py`, so the search module does not depend on the ingestion pipeline |
+| Added | `eval/` as a uv workspace member; `make eval`; `--dry-run` (rehearsal with a fake model), `--no-db` |
+| Evaluation records | The database holds 8 evaluation runs (2 labels × 4 modes), 432 result rows; the knowledge base was restored to the default chunking (39 chunks, real vectors, consistency check empty), and the worker container was restarted |
 
-**用户的决定（2026-11-03）：保持目标 400 token 一块。** （以下是当时提出的问题）默认分块要不要改成一节一块？检索排名上更细的块对向量和混合有帮助，重排下两者持平，且重排输入更便宜；但一节一块时 6 个块只有约 350 token，给生成答案的上下文可能太少，而这次没有衡量答案质量。**我的建议是先保持 400 token，M5 有了答案之后，M8 再用答案质量一起对比。**
+**The user's decision (2026-11-03): keep one chunk per 400 tokens.** (The question put forward at that time follows.) Should the default chunking change to one chunk per section? For search ranking, finer chunks help vector and hybrid, and under rerank the two are level and the rerank input is cheaper; but with one chunk per section the 6 chunks are only about 350 tokens, which may be too little context for generating the answer, and answer quality was not measured this time. **My suggestion is to keep 400 tokens for now, and once M5 has answers, compare together with answer quality in M8.**
 
-**已知限制（诚实记录）：**
-- 知识库太小、评测题太少（每种题型只有几道），数字只能说明流程正确和方向，不能说明各方法在真实规模上的优劣。
-- 价格来自第三方价格表，没有直接核对 OpenAI 的价格页。
-- 重排的稳定性只在这 108 次调用上验证；换模型或换文档风格需要重新评估。
+**Known limits (recorded honestly):**
+- The knowledge base is too small and the evaluation questions too few (only a few per question type), so the numbers only show that the flow is correct and the direction, and cannot show how the methods compare at real scale.
+- The prices come from a third-party price table and were not checked directly on OpenAI's price page.
+- The stability of rerank was verified only on these 108 calls; a different model or document style needs a new assessment.
 
 
 ---
 
-## M5 Agent 图与对话 API
+## M5 Agent graph and the chat API
 
-状态：**已完成并合并**（标签 `ai-m5`，合并提交 `1e3d4dd`，2026-11-03）。这是项目最核心的一块：用户提问，经过固定的图，得到带引用的回答或一个明确的拒绝，每次运行都有显式的 End 状态。本里程碑会调用 OpenAI 的聊天模型（`understand` 和 `generate` 两个节点，加上 M4 已有的重排）。
+Status: **Done and merged** (tag `ai-m5`, merge commit `1e3d4dd`, 2026-11-03). This is the core of the project: the user asks, goes through the fixed graph, and gets an answer with citations or a clear refusal, and every run has an explicit End state. This milestone calls OpenAI's chat models (the two nodes `understand` and `generate`, plus the rerank that M4 already has).
 
-### 开始前的调研结果（已核对）
+### Findings of the research before starting (verified)
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| LangGraph | `langgraph 1.2.19` 和 `langgraph-checkpoint-postgres 3.2.0` 能在本机（Python 3.12、arm64）安装并导入；`redis 8.1.0` 同样可用 |
-| M4 留下的东西 | `retrieve(...)` 已经能按身份检索并返回重排分数和"被过滤内容"的探测数字；最小的聊天客户端 `llm.py` 已有 JSON 模式；`gpt-6-luna` 验证可用 |
-| 可用的聊天模型 | 这把密钥能看到 `gpt-6-luna`、`gpt-6-sol`、`gpt-6.1-sol`、`gpt-6.1-terra`、`gpt-6-astra`、`gpt-4o-mini` 等。查到的标价（二手来源）：Luna 每百万 token 输入 0.10 / 输出 0.50 美元，Sol 2 / 10 美元，Astra 10 / 50 美元 |
-| 数据库已有的表 | `ai.conversations`、`ai.messages`、`ai.runs`、`ai.audit_log`（02 里已建好，M2 迁移） |
-| M4 的评测数据 | 重排分数在 48 道可回答题上全部是 10，在 6 道无答案或应拒绝的题上是 0–8，用来定 `grade_retrieval` 的初始阈值 |
+| LangGraph | `langgraph 1.2.19` and `langgraph-checkpoint-postgres 3.2.0` install and import on this machine (Python 3.12, arm64); `redis 8.1.0` works as well |
+| What M4 left | `retrieve(...)` already searches by identity and returns the rerank scores and the numbers of the "filtered content" probe; the minimal chat client `llm.py` already has a JSON mode; `gpt-6-luna` is verified usable |
+| Available chat models | This key can see `gpt-6-luna`, `gpt-6-sol`, `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-astra`, `gpt-4o-mini` and so on. The list prices found (secondary sources): Luna US$0.10 / 0.50 per million tokens in / out, Sol 2 / 10, Astra 10 / 50 |
+| Tables the database already has | `ai.conversations`, `ai.messages`, `ai.runs`, `ai.audit_log` (built in 02, the M2 migration) |
+| M4's evaluation data | Rerank scores are all 10 on the 48 answerable questions and 0 to 8 on the 6 unanswerable or to-be-refused ones, used to set the initial `grade_retrieval` threshold |
 
-### 需要先确认的问题
+### Questions to confirm first
 
-1. **不使用 LangGraph 的 Postgres checkpointer，会话状态存在 `ai.conversations` 里**（新增迁移 0005，加三列：`session_mode`、`pending_question`、`clarify_count`）。理由：第一阶段每次运行都是一次完整的、没有中断的运行（"需要澄清"也是以 End 结束，下一轮再带着补充进来），checkpointer 用不上，却要多一套表、一次 `setup()` 和版本耦合。第二阶段做"写操作确认"（`interrupt`）时再启用。这改变了设计 04 里"由 checkpointer 保存"的说法，我会同步修改设计 04。**建议这样做。**
-2. **`data_query` 在 M5 先拒绝**，End 状态 `refused`，原因码临时用 `not_available_yet`（M6 实现数据查询后去掉）；`action` 意图按设计 04 返回 `refused / write_not_enabled`。
-3. **历史只保留最近 6 轮（截断），暂不做滚动摘要**。设计 04 写的是"更早的用滚动摘要"，摘要要多一次 LLM 调用，样例里没有长对话，建议放到之后。
-4. **默认模型**：`understand`、`generate` 都用 `openai/gpt-6-luna`（可由环境变量分别改）。生成答案对质量最敏感（RAGFlow 试用里小模型算错了迟交扣分），所以真实检查时会用同一批难题对比 `gpt-6-sol`，按结果选默认值。
-5. **会话标题**用第一个问题的前 60 个字符，不调用 LLM。
-6. **限流**（设计 03 第 7 节：对话接口每用户每分钟 20 次）在 M5 一起做，用 Redis 计数，超出返回 `429 rate_limited`。
-7. **`grade_retrieval` 分两道关**：第一道用重排分数（初始阈值 6，参考 M4 的分布，可配置，用评测集标定）；第二道是生成节点自己返回的 `sufficient` 标志，模型判断片段不足以回答时以 `not_found / no_relevant_documents` 结束。这样阈值不用定得太紧，也不会让一个"相关但没答案"的片段（M4 里 DOC-47 得了 8 分）变成瞎编的回答。
-8. **真实检查**：约 12 个代表性的问题（迟交扣分计算、旧政策版本、两个错误码、学员问 HR 文件、无答案、需要澄清、越界、问候），先给出调用数和估算费用，确认后运行。
+1. **The LangGraph Postgres checkpointer is not used, and the conversation state is stored in `ai.conversations`** (a new migration 0005 adding three columns: `session_mode`, `pending_question`, `clarify_count`). Reason: in phase 1 every run is one complete, uninterrupted run ("needs clarification" also ends with an End, and the next turn comes in with the addition), so a checkpointer would not be used yet would add a set of tables, a `setup()` and a version coupling. It is enabled in phase 2 when "write action confirmation" (`interrupt`) is built. This changes the statement "saved by the checkpointer" in design 04, and I will change design 04 to match. **Proposed.**
+2. **`data_query` is refused in M5 for now**, with End state `refused` and a temporary reason code `not_available_yet` (removed once M6 implements data queries); the `action` intent returns `refused / write_not_enabled` per design 04.
+3. **The history keeps only the last 6 turns (truncation), with no rolling summary yet.** Design 04 says "older content uses a rolling summary"; a summary needs one more LLM call, the samples have no long conversations, and it is proposed to leave it for later.
+4. **Default models**: `understand` and `generate` both use `openai/gpt-6-luna` (each changeable by environment variable). Answer generation is the most sensitive to quality (in the RAGFlow trial a small model got the late penalty wrong), so in the real check the same batch of hard questions is compared against `gpt-6-sol`, and the default is chosen by the result.
+5. **The conversation title** is the first 60 characters of the first question, with no LLM call.
+6. **Rate limiting** (section 7 of design 03: 20 per user per minute on the chat endpoint) is done together in M5 with Redis counters, and going over returns `429 rate_limited`.
+7. **`grade_retrieval` has two gates**: the first uses the rerank score (initial threshold 6, following the distribution of M4, configurable, calibrated with the evaluation set); the second is the `sufficient` flag returned by the generate node itself, and when the model judges the passages not enough to answer it ends with `not_found / no_relevant_documents`. This way the threshold need not be set too tight, and a "relevant but answerless" passage (DOC-47 scored 8 in M4) does not become an invented answer.
+8. **Real check**: about 12 representative questions (the late-penalty calculation, an old policy version, two error codes, a student asking for an HR file, no answer, needs clarification, out of scope, a greeting); the number of calls and the estimated cost are given first, and it runs after confirmation.
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `migrations/versions/0005_conversation_state.py` | `ai.conversations` 增加 `session_mode`、`pending_question`、`clarify_count` |
-| `packages/core/src/starit_core/agent/state.py` | 图状态（身份只读、会话状态、意图、检索结果、预算、答案、End 状态） |
-| `packages/core/src/starit_core/agent/prompts/understand.md`、`generate.md` + `prompts.py` | 提示词文件和版本号（设计 04 第 6 节的生成规则） |
-| `packages/core/src/starit_core/agent/nodes.py` | 各节点：`load_context`、`guard_input`、`understand`、`retrieve_docs`、`grade_retrieval`、`rewrite_query`、`generate`、`verify_answer` |
-| `packages/core/src/starit_core/agent/graph.py` | 构建 LangGraph 图；6 个 End 节点；路由；预算与步数上限 |
-| `packages/core/src/starit_core/agent/finish.py` | `finish_run`：一次事务里写 `ai.runs`、`ai.messages`、`ai.audit_log`，更新会话（时间、标题、会话状态） |
-| `packages/core/src/starit_core/agent/runtime.py` | `AgentRuntime.run(identity, conversation_id, text)`：组装依赖、60 秒总超时、保证无论怎样都走到 `finish_run` |
-| `packages/core/src/starit_core/conversations.py` | 会话与消息的读写（只能访问自己的会话；归档不删除） |
-| `packages/core/src/starit_core/ratelimit.py` | Redis 限流（带内存版本供测试） |
-| `packages/core/src/starit_core/llm.py`（改） | 返回 token 数；每次调用的超时；结构化输出辅助 |
-| `packages/core/src/starit_core/config.py`（改） | `model_understand`、`model_generate`、各项上限（步数、LLM 调用数、澄清次数、重试）、`grade_min_rerank_score`、历史轮数、限流 |
-| `apps/api/src/starit_api/conversations.py`（新） | 路由：`POST/GET /conversations`、`GET/PATCH/DELETE /conversations/{id}`、`POST/GET /conversations/{id}/messages` |
-| `apps/api/src/starit_api/main.py`（改） | 在 lifespan 里构建运行时；注册路由；限流中间件 |
-| `packages/core/pyproject.toml`（改） | 依赖：`langgraph`、`redis` |
-| `packages/core/tests/agent/`（新，单元）、`packages/core/tests/integration/test_agent*.py`（新）、`apps/api/tests/test_conversations*.py`（新） | 见验证标准 |
-| `eval/` 或 `scripts/`（改） | 一个小工具：把约 12 个问题真实地问一遍并打印每次的 End 状态、引用和耗时 |
-| `docs/design/04`、`02`、`03`、`ai-module/README.md`（改） | 同步实现记录 |
+| `migrations/versions/0005_conversation_state.py` | `ai.conversations` gains `session_mode`, `pending_question`, `clarify_count` |
+| `packages/core/src/starit_core/agent/state.py` | The graph state (read-only identity, conversation state, intent, search results, budget, answer, End state) |
+| `packages/core/src/starit_core/agent/prompts/understand.md`, `generate.md` + `prompts.py` | Prompt files and version numbers (the generation rules of section 6 of design 04) |
+| `packages/core/src/starit_core/agent/nodes.py` | The nodes: `load_context`, `guard_input`, `understand`, `retrieve_docs`, `grade_retrieval`, `rewrite_query`, `generate`, `verify_answer` |
+| `packages/core/src/starit_core/agent/graph.py` | Builds the LangGraph graph; 6 End nodes; routing; budget and step limits |
+| `packages/core/src/starit_core/agent/finish.py` | `finish_run`: in one transaction writes `ai.runs`, `ai.messages`, `ai.audit_log` and updates the conversation (time, title, conversation state) |
+| `packages/core/src/starit_core/agent/runtime.py` | `AgentRuntime.run(identity, conversation_id, text)`: assembles the dependencies, a 60-second total timeout, and guarantees that however it goes it reaches `finish_run` |
+| `packages/core/src/starit_core/conversations.py` | Reading and writing conversations and messages (only your own conversations; archiving does not delete) |
+| `packages/core/src/starit_core/ratelimit.py` | Redis rate limiting (with an in-memory version for tests) |
+| `packages/core/src/starit_core/llm.py` (changed) | Returns token counts; a timeout per call; a structured-output helper |
+| `packages/core/src/starit_core/config.py` (changed) | `model_understand`, `model_generate`, the limits (steps, LLM calls, clarifications, retries), `grade_min_rerank_score`, number of history turns, rate limits |
+| `apps/api/src/starit_api/conversations.py` (new) | Routes: `POST/GET /conversations`, `GET/PATCH/DELETE /conversations/{id}`, `POST/GET /conversations/{id}/messages` |
+| `apps/api/src/starit_api/main.py` (changed) | Builds the runtime in the lifespan; registers the routes; rate-limit middleware |
+| `packages/core/pyproject.toml` (changed) | Dependencies: `langgraph`, `redis` |
+| `packages/core/tests/agent/` (new, unit), `packages/core/tests/integration/test_agent*.py` (new), `apps/api/tests/test_conversations*.py` (new) | See the verification criteria |
+| `eval/` or `scripts/` (changed) | A small tool: really asks the about 12 questions and prints the End state, citations and time of each |
+| `docs/design/04`, `02`, `03`, `ai-module/README.md` (changed) | Synchronised implementation record |
 
-### 图（沿用设计 04，M5 实现的部分）
+### The graph (following design 04, the part M5 implements)
 
 ```
-load_context → guard_input → understand ─┬─ 需要澄清且未超限 → END_NEED_CLARIFICATION
+load_context → guard_input → understand ─┬─ needs clarification, not over the limit → END_NEED_CLARIFICATION
                                           ├─ out_of_scope / action / data_query → END_REFUSED
                                           ├─ chitchat → generate
                                           └─ doc_qa → retrieve_docs → grade_retrieval
-        grade_retrieval ─┬─ 足够 → generate → verify_answer → END_ANSWERED
-                         ├─ 不足且可重试 → rewrite_query → retrieve_docs
-                         ├─ 无内容但探测到被过滤的强匹配 → END_NO_PERMISSION
-                         └─ 无内容 → END_NOT_FOUND
-        generate 返回 sufficient=false → END_NOT_FOUND；校验失败重试一次，仍失败 → END_ERROR(llm_error)
-        任何异常或超时 → END_ERROR
+        grade_retrieval ─┬─ enough → generate → verify_answer → END_ANSWERED
+                         ├─ not enough, can retry → rewrite_query → retrieve_docs
+                         ├─ no content but a strong filtered match is probed → END_NO_PERMISSION
+                         └─ no content → END_NOT_FOUND
+        generate returns sufficient=false → END_NOT_FOUND; a failed verification retries once, and if it still fails → END_ERROR(llm_error)
+        any exception or timeout → END_ERROR
 ```
 
-### 关键设计决定（建议）
+### Key design decisions (proposed)
 
-- **身份只读**，来自 JWT；`understand` 只做意图、独立问题和反问，**不判断身份**。
-- **同一个问题的 `no_permission` 与 `not_found` 对用户使用相同文案**（设计 04 的 5.1），差别只记在 `ai.runs` 和审计里；探测的数字只进审计，不进提示词。
-- **会话状态**：`session_mode` 为 `need_clarification` 时，下一条消息被视为对 `pending_question` 的补充，合并成独立问题；连续澄清 2 次后以 `not_found / clarification_limit` 结束。
-- **预算**：一次运行 LLM 调用不超过 6 次（含重排）、检索重试 1 次、校验重试 1 次、总时长 60 秒、`recursion_limit` 20；超出以 `error` 结束并带原因码。
-- **检索模式**：默认 `hybrid_rerank`；重排失败退回融合顺序，此时 `grade_retrieval` 只看有没有结果，把判断交给生成节点。
-- **引用**：只来自本轮检索到的、用户有权看到的块；`n` 与正文里的 `[n]` 对应；答案里引用了不存在的编号会被校验拦下。
-- **提示词**：放在文件里，带版本号，写进审计记录的 `details`，方便以后对照。
-- **输入防护**（`guard_input`）：空输入、过长（初始上限 2,000 字符）、明显的提示词注入特征（一份简短的规则列表）；这只是第一层，真正的防线是权限在数据库里过滤，模型拿不到无权的内容。
+- **Identity is read-only**, from the JWT; `understand` only does intent, the standalone question and the clarifying question, and **does not judge identity**.
+- **`no_permission` and `not_found` for the same question use the same text for the user** (5.1 of design 04); the difference is recorded only in `ai.runs` and the audit; the probe numbers go only into the audit and never into the prompt.
+- **Conversation state**: when `session_mode` is `need_clarification`, the next message is treated as an addition to `pending_question` and merged into a standalone question; after 2 consecutive clarifications it ends with `not_found / clarification_limit`.
+- **Budget**: at most 6 LLM calls in one run (including rerank), 1 search retry, 1 verification retry, 60 seconds in total, `recursion_limit` 20; going over ends with `error` and a reason code.
+- **Search mode**: `hybrid_rerank` by default; if rerank fails it falls back to the fusion order, and then `grade_retrieval` only looks at whether there is any result and leaves the judgement to the generate node.
+- **Citations**: only from the chunks found in this run that the user may see; `n` matches the `[n]` in the text; an answer citing a number that does not exist is stopped by verification.
+- **Prompts**: kept in files with version numbers, written into the `details` of the audit record to ease later comparison.
+- **Input guard** (`guard_input`): empty input, too long (initial limit 2,000 characters), obvious prompt-injection signs (a short list of rules); this is only the first layer, and the real defence is that permissions are filtered in the database, so the model cannot get content it may not see.
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m5-agent                      # 已创建
+git switch -c m5-agent                      # already created
 uv sync --all-packages
-make migrate                                # 新的迁移 0005
+make migrate                                # the new migration 0005
 make test && make lint
-make up                                     # API 带上新路由
-# 真实检查（先打印估算并确认）
-uv run python scripts/ask_samples.py        # 约 12 个问题
+make up                                     # the API now carries the new routes
+# real check (estimate printed and confirmed first)
+uv run python scripts/ask_samples.py        # about 12 questions
 ```
 
-### 验证标准
+### Verification criteria
 
-1. **每个 End 状态都有场景测试**（假的聊天客户端和检索桩）：`answered`、`need_clarification`（含连续 2 次后的 `clarification_limit`）、`no_permission`、`not_found`（检索为空、证据不足、生成返回 `sufficient=false`）、`refused`（越界、输入被拦、写操作、数据查询暂未开放）、`error`（超时、LLM 出错、检索出错、步数超限、校验失败）。
-2. **图结构测试**：遍历图的所有边，断言每个节点都能到达某个 End 节点；文档里的流程图由图定义导出，不手工维护。
-3. **`finish_run` 的完整性**：任何一次运行（含异常和超时）都写了一行 `ai.runs`（带 `end_state` 和 `end_reason`）、对应的消息和一条 `chat.query` 审计记录；写入在一个事务里，失败时不留半截记录。
-4. **API**：会话的创建、列表、读取、改名、归档、发消息、读历史；别人的会话 ID 返回 404；未登录 401；错误格式统一；响应结构与设计 03 一致（`run_id`、`message`、`citations`、`end_state`、`end_reason`）；限流超出返回 429。
-5. **权限**：用真实的样例文档（假 embedding 的检索 + 脚本化的聊天模型）：学员问 HR 文件，回答里没有该文档的任何内容、没有引用、`end_state` 是 `no_permission`；HR 问同一问题得到引用；`Admin` 提问得到 `no_permission` / `not_found`，不会读到受限内容；引用只包含用户有权看到的文档。
-6. **澄清的两轮**：第一轮含糊的问题得到反问（`need_clarification`），第二轮的补充被合并后得到回答；会话状态在两次请求之间保存在数据库里。
-7. **真实检查**（确认费用后）：约 12 个问题真实地问一遍，报告每个的 End 状态、引用、耗时和费用；其中迟交扣分那道（DOC-40）必须算对（先判断落在哪个区间）；`ERR-PORTAL-429` 的回答必须是配额用完，不是设备数量；学员问 HR 文件必须被拒绝且不泄露内容。
-8. 本地测试、lint、mypy 通过，CI 通过。
+1. **Every End state has a scenario test** (fake chat client and search stubs): `answered`, `need_clarification` (including `clarification_limit` after 2 in a row), `no_permission`, `not_found` (empty search, not enough evidence, generation returning `sufficient=false`), `refused` (out of scope, input blocked, write action, data query not open yet), `error` (timeout, LLM error, search error, step limit exceeded, failed verification).
+2. **Graph structure test**: walk every edge of the graph and assert that every node can reach some End node; the flow chart in the document is exported from the graph definition, not maintained by hand.
+3. **Completeness of `finish_run`**: any run (including exceptions and timeouts) wrote one row of `ai.runs` (with `end_state` and `end_reason`), the matching messages and one `chat.query` audit record; the write is in one transaction and leaves no half record on failure.
+4. **API**: create, list, read, rename, archive a conversation, send a message, read the history; someone else's conversation id returns 404; not signed in is 401; the error format is uniform; the response structure matches design 03 (`run_id`, `message`, `citations`, `end_state`, `end_reason`); going over the rate limit returns 429.
+5. **Permissions**: with the real sample documents (search with fake embeddings + a scripted chat model): a student asking for an HR file gets an answer with none of that document's content, no citations, and `end_state` is `no_permission`; HR asking the same question gets citations; an `Admin` asking gets `no_permission` / `not_found` and cannot read restricted content; citations contain only documents the user may see.
+6. **The two rounds of clarification**: a vague question in the first round gets a clarifying question (`need_clarification`), and the addition in the second round is merged and gets an answer; the conversation state is kept in the database between the two requests.
+7. **Real check** (after the cost is confirmed): really ask the about 12 questions once, and report each one's End state, citations, time and cost; the late-penalty question (DOC-40) must be calculated correctly (decide the range first); the answer to `ERR-PORTAL-429` must be that the quota is used up, not the number of devices; a student asking for an HR file must be refused without leaking content.
+8. Local tests, lint and mypy pass, and CI passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- 生成节点的结构化输出（`sufficient`、`answer`、`citations`）在 `gpt-6-luna` 上是否稳定；不稳定时的退路是校验失败重试一次，再失败就 `error`。
-- 评分阈值 6 和"不足就重试一次"的效果，需要用评测集和真实检查标定；样本很小，M4 里无答案题的最高分达到过 8。
-- LangGraph 1.x 的异步调用、`recursion_limit` 和图导出（用于可达性测试和流程图）的具体接口，开始时对照文档确认。
-- 60 秒总超时和每次模型调用 30 秒超时在 `gpt-6-luna` 上够不够；重排平均 2 秒，加上理解和生成，预计总时长 5–8 秒。
-- 提示词注入的规则列表只能拦住最明显的写法，不是安全边界；已在上面说明。
+- Whether the structured output of the generate node (`sufficient`, `answer`, `citations`) is stable on `gpt-6-luna`; the fallback when it is not is one retry after a failed verification, then `error`.
+- The effect of the score threshold 6 and "retry once if not enough" needs calibrating with the evaluation set and the real check; the sample is very small, and in M4 the top score of an unanswerable question reached 8.
+- The exact interfaces of LangGraph 1.x for async calls, `recursion_limit` and graph export (for the reachability test and the flow chart) are checked against the documentation at the start.
+- Whether the 60-second total timeout and the 30-second timeout per model call are enough on `gpt-6-luna`; rerank takes about 2 seconds on average, and with understanding and generation the total is expected to be 5 to 8 seconds.
+- The rule list for prompt injection can only stop the most obvious forms and is not a security boundary; stated above.
 
-### 需要你确认
+### For you to confirm
 
-1. 会话状态存在 `ai.conversations`（迁移 0005），不用 LangGraph 的 checkpointer。
-2. `data_query` 暂时以 `not_available_yet` 拒绝。
-3. 历史只截断最近 6 轮，不做摘要。
-4. 默认模型 `gpt-6-luna`，真实检查时对比 `gpt-6-sol` 再定。
-5. 会话标题用第一个问题的前 60 个字符。
-6. 限流（每用户每分钟 20 次）一起做。
-7. `grade_retrieval` 两道关（重排分数阈值 6 + 生成节点的 `sufficient`）。
-8. 真实检查约 12 个问题。
+1. The conversation state stored in `ai.conversations` (migration 0005), without LangGraph's checkpointer.
+2. `data_query` refused for now with `not_available_yet`.
+3. The history truncated to the last 6 turns, with no summary.
+4. The default model `gpt-6-luna`, compared against `gpt-6-sol` in the real check before deciding.
+5. The conversation title is the first 60 characters of the first question.
+6. Rate limiting (20 per user per minute) done together.
+7. The two gates of `grade_retrieval` (rerank score threshold 6 + the generate node's `sufficient`).
+8. A real check of about 12 questions.
 
-### 用户的确认（2026-11-03）
+### The user's confirmation (2026-11-03)
 
-- 默认聊天模型 `openai/gpt-6-luna`；真实检查时**对比 `gpt-4o-mini`**（不是 `gpt-6-sol`），按结果选默认值。
-- 其余 7 条全部接受：会话状态存在 `ai.conversations`（迁移 0005）、不用 LangGraph 的 checkpointer；`data_query` 暂时以 `not_available_yet` 拒绝；历史只截断最近 6 轮；会话标题用第一个问题的前 60 个字符；限流（每用户每分钟 20 次）一起做；`grade_retrieval` 两道关；真实检查约 12 个问题（先估算再确认）。
+- The default chat model is `openai/gpt-6-luna`; in the real check **compare against `gpt-4o-mini`** (not `gpt-6-sol`) and choose the default by the result.
+- The other 7 were all accepted: the conversation state stored in `ai.conversations` (migration 0005) without LangGraph's checkpointer; `data_query` refused for now with `not_available_yet`; the history truncated to the last 6 turns; the conversation title as the first 60 characters of the first question; rate limiting (20 per user per minute) done together; the two gates of `grade_retrieval`; a real check of about 12 questions (estimate first, then confirm).
 
-### 实际结果
+### Actual results
 
-**验证标准**（全部满足；本地 437 个测试通过；M4 为 378 个）：
+**Verification criteria** (all met; 437 local tests pass; M4 had 378):
 
-| # | 结果 |
+| # | Result |
 |---|---|
-| 1 每个 End 状态都有场景测试 | 在真实数据库上用脚本化的模型和检索替身：`answered`（含问候、答案被拒后重试一次成功）、`need_clarification`（含连续 2 次后的 `clarification_limit`）、`no_permission`、`not_found`（检索为空、证据不足、重试成功、生成返回 `sufficient=false`）、`refused`（越界、写操作、数据查询暂未开放、输入被拦的 4 种情形）、`error`（模型出错、检索出错、生成不是 JSON、答案没有引用或引用不存在的编号、工具出错、调用次数超限、60 秒超时） |
-| 2 图结构测试 | 遍历图的所有边：每个节点都能到达某个 End 节点；绘制出的图与文档里列出的路由完全一致；6 个 End 节点正好对应 6 个 End 状态；图可以导出为 mermaid |
-| 3 `finish_run` 完整性 | 每次运行（含异常、超时）都写了一行 `ai.runs`、两条消息、一条 `chat.query` 审计记录，并更新会话；写入在同一个事务里，审计写入失败时什么都不留下；出错不会丢失"正在等待澄清"的状态 |
-| 4 API | 会话创建、列表（分页、最新在前）、读取、改名、归档（归档后发消息返回 409）、发消息、读历史（分页）；别人的会话返回 404（和不存在一样）；未登录 401；格式错误的 ID 或游标 422；空消息和超长消息 422；响应结构与设计 03 一致；限流超出返回 429 带 `Retry-After`，按用户计数 |
-| 5 权限 | 真实的样例文档加真实检索：学员问只有 HR 看得到的问题得到 `no_permission`，回答不含任何内容，模型看到的全部文本里没有 `HR-REC-002`，审计记录了"有被隐藏的内容"（只有数量）；HR 问同一问题得到来自该文档的回答和引用；`Admin`、`RAGETLAdmin` 什么都读不到；5 个业务角色 × 12 个问题的引用和模型看到的片段，全部是该角色有权读的文档 |
-| 6 澄清两轮 | 第一轮含糊的问题得到反问，会话状态存在数据库里；第二轮的补充和待澄清的问题合并后得到回答，状态重置；历史也带进了理解步骤 |
-| 7 真实检查 | 15 轮、两个版本（见下）；容器冒烟：真实令牌经 HTTP 问 `ERR-PORTAL-429` 得到正确回答并引用 `TS-CRS-005`、问候、历史、他人读取返回 404、Redis 限流 200 / 200 / 429 / 429（按用户分开） |
-| 8 工程检查 | lint、mypy 通过；GitHub CI 通过（含全部集成测试，用时约 2 分 38 秒） |
+| 1 Every End state has a scenario test | On the real database with scripted model and search stand-ins: `answered` (including a greeting and a retry that succeeded after the answer was rejected), `need_clarification` (including `clarification_limit` after 2 in a row), `no_permission`, `not_found` (empty search, not enough evidence, a successful retry, generation returning `sufficient=false`), `refused` (out of scope, a write action, a data query not open yet, 4 kinds of blocked input), `error` (model error, search error, generation not JSON, an answer with no citation or citing a number that does not exist, a tool error, call count exceeded, the 60-second timeout) |
+| 2 Graph structure test | Walk every edge of the graph: every node can reach some End node; the drawn graph matches the routes listed in the document exactly; the 6 End nodes correspond exactly to the 6 End states; the graph can be exported as mermaid |
+| 3 `finish_run` completeness | Every run (including exceptions and timeouts) wrote one row of `ai.runs`, two messages and one `chat.query` audit record, and updated the conversation; the write is in one transaction, and if the audit write fails nothing is left behind; an error does not lose the "waiting for clarification" state |
+| 4 API | Conversation create, list (paged, newest first), read, rename, archive (sending a message after archiving returns 409), send a message, read the history (paged); someone else's conversation returns 404 (the same as not existing); not signed in 401; a malformed id or cursor 422; an empty or over-long message 422; the response structure matches design 03; going over the rate limit returns 429 with `Retry-After`, counted per user |
+| 5 Permissions | Real sample documents with real search: a student asking something only HR can see gets `no_permission`, the answer contains nothing, `HR-REC-002` is in none of the text the model saw, and the audit recorded "hidden content exists" (a count only); HR asking the same question gets an answer from that document with citations; `Admin` and `RAGETLAdmin` can read nothing; for 5 business roles × 12 questions, the citations and the passages the model saw are all documents that role may read |
+| 6 Two rounds of clarification | A vague question in the first round gets a clarifying question and the conversation state is kept in the database; the addition in the second round is merged with the pending question and gets an answer, and the state is reset; the history also went into the understand step |
+| 7 Real check | 15 rounds, two versions (see below); container smoke test: a real token asking `ERR-PORTAL-429` over HTTP got the correct answer citing `TS-CRS-005`, a greeting, history, 404 when someone else reads it, Redis rate limiting 200 / 200 / 429 / 429 (separate per user) |
+| 8 Engineering checks | lint and mypy pass; GitHub CI passes (including all integration tests, taking about 2 minutes 38 seconds) |
 
-**真实检查结果**（详见 [`docs/eval/README.md`](../eval/README.md)）：
+**Real check results** (details in [`docs/eval/README.md`](../eval/README.md)):
 
-- 第一次运行：默认版本（生成用 `gpt-6-luna`）14/15，`gpt-4o-mini` 11/15。失败暴露了**两个真实的问题**：重排提示词把片段截在 350 token，隐藏了 `ERR-PORTAL-429` 那一行（重排只给 2 分，第一道关拒绝作答）；理解步骤把 Maven 问题当越界。都已修复并加了回归测试。
-- 修复后重跑：默认 14/15，`gpt-4o-mini` 12/15。默认版本剩下的一道（DOC-43）是我的判定条件过严，不是助手答错；`gpt-4o-mini` 在迟交扣分题上稳定答错（说得 0 分，答案没有引用标记所以被校验拦下），在 DOC-47 上过于积极地用全员可读的文档作答（没有引用保密文档，不是泄露）。
-- **默认模型保持 `gpt-6-luna`。**
-- 费用：两次运行合计估算不到 0.06 美元（含第一次因为我的脚本读审计表被拒而中途停止之前已经发出的少量调用）。
+- First run: the default version (generation with `gpt-6-luna`) 14/15, `gpt-4o-mini` 11/15. The failures exposed **two real problems**: the rerank prompt cut passages at 350 tokens and hid the `ERR-PORTAL-429` line (rerank gave only 2 and the first gate refused to answer); the understand step treated the Maven question as out of scope. Both were fixed and regression tests added.
+- Rerun after the fixes: default 14/15, `gpt-4o-mini` 12/15. The one question left for the default version (DOC-43) was my overly strict judging condition, not a wrong answer by the assistant; `gpt-4o-mini` consistently got the late-penalty question wrong (it said 0 points, and the answer had no citation mark so verification stopped it), and on DOC-47 it was too eager to answer with documents everyone can read (it did not cite the confidential document, so it is not a leak).
+- **The default model stays `gpt-6-luna`.**
+- Cost: the two runs together are estimated at under US$0.06 (including the few calls already sent before the first run stopped midway because my script's read of the audit table was refused).
 
-**与计划不一致或新增的地方：**
+**Differences from the plan, or additions:**
 
-| 项 | 说明 |
+| Item | Note |
 |---|---|
-| 重排截断 | `rerank_passage_tokens` 默认从 350 改为 600，必须不小于块的上限；这是 M4 的基线没发现的问题，因为基线只看排名，不看绝对分数 |
-| 理解提示词 | 版本 2，明确技术支持范围 |
-| 隐藏内容阈值 | 初始的 0.3 在实测后改为 0.5：问受限文档的问题得分 0.57–0.74，无答案的问题 0.09–0.41（样本小，间隔窄） |
-| `finish_run` 的位置 | 由运行时包装层调用，而不是每个 End 节点（异常和超时也一定会被记录）；已写入设计 04 |
-| 问候 | 用固定回复，不调用模型 |
-| 流程图 | 图可以导出为 mermaid，但设计 04 里的流程图仍是手写的，还没有改成自动导出 |
-| 测试替身 | `ScriptedChat`、`StubRetrieval`、`Harness` 放在 `starit_core/testing.py`，两个测试目录共用；共享的临时数据库夹具移到了 `ai-module/conftest.py` |
-| 容器配置 | API 容器现在传入 `OPENAI_API_KEY`、embedding 变量和 `STARIT_RATE_LIMIT_CHAT_PER_MINUTE` |
-| 我的一个失误 | 提交回归测试时其中一个测试是失败的（我估错了测试数据的 token 数，而它自己的前置断言抓住了这一点），我提交之后才发现，没有在当时的汇报里说明；已在下一个提交里修正，并让它同时断言旧的 350 上限确实会隐藏那一行 |
+| Rerank truncation | The default of `rerank_passage_tokens` changed from 350 to 600, and it must be no smaller than the chunk limit; this is a problem the M4 baseline did not find because the baseline only looked at ranking and not at absolute scores |
+| Understand prompt | Version 2, which makes the scope of tech support explicit |
+| Hidden-content threshold | The initial 0.3 became 0.5 after measuring: questions about restricted documents score 0.57 to 0.74 and unanswerable ones 0.09 to 0.41 (a small sample, a narrow gap) |
+| Where `finish_run` is | Called by the runtime wrapper rather than by each End node (so exceptions and timeouts are always recorded); written into design 04 |
+| Greetings | A fixed reply, with no model call |
+| Flow chart | The graph can be exported as mermaid, but the flow chart in design 04 is still hand-written and has not been changed to automatic export |
+| Test doubles | `ScriptedChat`, `StubRetrieval` and `Harness` are in `starit_core/testing.py`, shared by the two test directories; the shared temporary database fixture moved to `ai-module/conftest.py` |
+| Container configuration | The API container now receives `OPENAI_API_KEY`, the embedding variables and `STARIT_RATE_LIMIT_CHAT_PER_MINUTE` |
+| A mistake of mine | When I committed the regression tests, one of them was failing (I had misjudged the token count of the test data, and its own precondition assertion caught it); I only noticed after committing and did not say so in the report at the time; fixed in the next commit, and made to also assert that the old limit of 350 really would hide that line |
 
-**已知限制（诚实记录）：**
-- 答案校验只做确定性检查（引用编号存在、有引用、不为空、不超长）。**带着引用的错误答案会通过**（例如把事实说错但仍标了 `[1]`）。让模型核对事实的做法放到评测之后再决定。
-- 提示词注入的规则列表只能拦住最明显的写法，不是安全边界；真正的防线是权限在数据库里过滤，模型拿不到无权读的内容。
-- 固定回复只有英文；历史只保留最近 6 轮；会话标题是第一个问题的前 60 个字符。
-- 真实检查每个场景只问一次，模型每次的回答可能略有不同（理解步骤的分类就曾在两次运行里不一样），样本很小，不能据此断定模型的优劣。
-- 隐藏内容的阈值和重排分数的阈值（6）都是在几十道题上标定的，换一批文档或问法可能需要重新标定。
-- 数据查询（M6）和写操作确认（第二阶段）尚未实现，以固定的拒绝回答。
+**Known limits (recorded honestly):**
+- Answer verification does only deterministic checks (the citation numbers exist, there is a citation, not empty, not too long). **A wrong answer carrying citations passes** (for example a fact stated wrongly but still marked `[1]`). Having the model check facts is left to be decided after evaluation.
+- The rule list for prompt injection can only stop the most obvious forms and is not a security boundary; the real defence is that permissions are filtered in the database, so the model cannot get content it may not read.
+- Fixed replies are English only; the history keeps only the last 6 turns; the conversation title is the first 60 characters of the first question.
+- The real check asked each scenario only once, and the model's answer may differ slightly each time (the classification of the understand step did differ between two runs); the sample is very small and no conclusion about the model's merits can be drawn from it.
+- The hidden-content threshold and the rerank score threshold (6) were calibrated on a few dozen questions, and a different set of documents or phrasings may need new calibration.
+- Data queries (M6) and write action confirmation (phase 2) are not implemented yet and are answered with a fixed refusal.
 
 
 ---
 
-## M6 数据访问：MCP 与 SQL Agent
+## M6 Data access: MCP and the SQL agent
 
-状态：**进行中**（分支 `m6-data-access`）。把现在被固定拒绝的"查数据"问题接上：固定的参数化工具（经 MCP）加自由问法的只读 SQL。本里程碑会调用 OpenAI 的聊天模型（选工具、生成 SQL、根据结果作答）。
+Status: **In progress** (branch `m6-data-access`). Connect the "query data" questions that are now refused with a fixed reply: fixed parameterised tools (through MCP) plus free-form read-only SQL. This milestone calls OpenAI's chat models (choosing tools, generating SQL, answering from the result).
 
-### 开始前的调研结果（已核对）
+### Findings of the research before starting (verified)
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| MCP SDK | 最新版是 `mcp 2.3.0`，**API 和旧版不同**（`FastMCP` 改名为 `MCPServer`，客户端也变了）。我做了一个小原型验证：`MCPServer(token_verifier=..., auth=AuthSettings(..., validate_token_resource=False))`、工具里用 `get_access_token()` 取到调用者和原始令牌、客户端用 `Client(streamable_http_client(url, http_client=httpx2.AsyncClient(headers={"Authorization": ...})))`。**有效令牌能调用工具；错误令牌和没有令牌都被拒绝（401）** |
-| SQL 解析 | `sqlglot 30.27.0`（MIT），按 PostgreSQL 方言解析，能取出表名（含 schema）、CTE、函数、语句条数、语句类型；用来做语句校验 |
-| 视图 | `ai_sql` 里 7 个视图：`campuses`、`assignments`、`students`、`submissions`、`support_tickets`、`employees`、`expense_claims`（列见 M2）。行级范围已由视图保证，这是真正的边界 |
-| 评测集 | 26 道应回答的题，M2 只核对了 17 道的答案；**其余 9 道（SQL-01、02、04、05、06、08、09、10、13）要由真实生成的查询核对**。其中 SQL-01、02 问"超过 FIN-REIM-002 的酒店限额"，限额（一线城市 600、二线 450）写在政策文件里，**只靠表无法回答，需要把政策片段也给 SQL 生成步骤** |
-| 设计 03 的约定 | 工具使用固定的参数化查询；**自由问法的 SQL 由 Agent 内部的只读 SQL 工具处理，不经过 MCP**；工具错误码 `forbidden`、`not_found`、`invalid_argument`、`internal_error`；每次调用写 `mcp.<tool>` 审计 |
+| MCP SDK | The latest is `mcp 2.3.0`, **whose API differs from the old one** (`FastMCP` is renamed `MCPServer`, and the client changed too). I built a small prototype to verify: `MCPServer(token_verifier=..., auth=AuthSettings(..., validate_token_resource=False))`, a tool gets the caller and the raw token with `get_access_token()`, and the client uses `Client(streamable_http_client(url, http_client=httpx2.AsyncClient(headers={"Authorization": ...})))`. **A valid token can call the tools; a wrong token and no token are both refused (401)** |
+| SQL parsing | `sqlglot 30.27.0` (MIT), parsing in the PostgreSQL dialect, which can extract table names (with schema), CTEs, functions, the number of statements and the statement type; used for statement validation |
+| Views | 7 views in `ai_sql`: `campuses`, `assignments`, `students`, `submissions`, `support_tickets`, `employees`, `expense_claims` (columns in M2). The row scope is already guaranteed by the views, which is the real boundary |
+| Evaluation set | 26 questions that should be answered; M2 only checked the answers of 17; **the other 9 (SQL-01, 02, 04, 05, 06, 08, 09, 10, 13) have to be checked by really generated queries**. Of these, SQL-01 and 02 ask about "over the hotel limit of FIN-REIM-002"; the limit (600 for tier 1, 450 for tier 2) is written in the policy file, **so the table alone cannot answer it, and the policy passage must also be given to the SQL generation step** |
+| Conventions of design 03 | Tools use fixed parameterised queries; **free-form SQL is handled by the SQL tool inside the agent and does not go through MCP**; tool error codes `forbidden`, `not_found`, `invalid_argument`, `internal_error`; every call writes a `mcp.<tool>` audit |
 
-### 需要先确认的问题
+### Questions to confirm first
 
-1. **使用 MCP SDK 2.x**（`MCPServer`），依赖固定为 `mcp>=2.3,<3`。SDK 很新，2.x 的接口以我验证过的为准。
-2. **Agent 调用 MCP 工具的方式**：生产环境经 HTTP，**转发用户自己的 JWT**，由 MCP Server 自己校验签名和受众 `starit-mcp`（设计 03 的 6.1）；这需要把原始令牌从 API 一路传给运行时（只留在内存里，不写日志、不写审计）。测试和评测不起 HTTP 服务，使用**进程内实现**（和 MCP 服务端共用同一套工具函数）。
-3. **SQL 生成步骤带政策片段**：数据类问题先做一次检索（混合模式、不重排、取前 3 个片段，权限过滤照常）把相关政策放进提示，这样"酒店限额"这类题才答得出来。多一次检索（数据库加一次向量化），不多一次模型调用。
-4. **数据类回答的引用**：引用数据来源而不是文档。设计 03 的引用结构新增 `kind` 字段：`"document"`（现有的，补上这个字段）或 `"data"`（带 `views` 和 `row_count`）。回答里仍用 `[n]` 标记，校验照常要求有引用。
-5. **超出范围的数据问题怎么拒绝**（评测里 7 道"应拒绝"的题）：视图返回空结果分不清"没有"和"没权限"，所以在执行前加两道**尽力而为的检查**：(a) 角色对这张视图本来就没有访问权（例如学员查员工表、Admin 查任何数据）→ `no_permission / restricted_data`；(b) 查询里 `campus_id` 的字面值不是提问者自己的校区，且角色不是全公司范围（hr、finance）→ 同样结束。这两道检查只能识别写在 SQL 里的字面值，真正的保护仍然是视图。
-6. **给 MCP 工具补评测题**：在评测集里新增约 8 道工具类的题（查自己的报销单状态、某门作业有哪些、某个学员的进度等），由样本数据生成器算出答案，因为现有的 33 题几乎都需要聚合，走的是 SQL。
-7. **`search_documents` 工具**默认用混合模式、不重排（MCP 服务端不带聊天模型）；需要重排的场景走助手本身。
-8. **真实检查**：评测集 33 题加新增的工具题约 41 题，先给调用数和估算费用，确认后运行。
+1. **Use the MCP SDK 2.x** (`MCPServer`), with the dependency pinned as `mcp>=2.3,<3`. The SDK is very new, and the 2.x interface follows what I verified.
+2. **How the agent calls MCP tools**: in production over HTTP, **forwarding the user's own JWT**, with the MCP server verifying signature and the audience `starit-mcp` itself (6.1 of design 03); this needs the raw token passed from the API all the way to the runtime (kept only in memory, never written to the log or the audit). Tests and evaluation do not start an HTTP server and use an **in-process implementation** (sharing the same tool functions with the MCP server side).
+3. **The SQL generation step carries policy passages**: a data question first does one search (hybrid mode, no rerank, the top 3 passages, permission filter as usual) to put the relevant policy into the prompt, so that questions such as "hotel limit" can be answered. One more search (the database plus one embedding), not one more model call.
+4. **Citations of data answers**: cite the data source rather than a document. The citation structure of design 03 gains a `kind` field: `"document"` (the existing one, with the field added) or `"data"` (with `views` and `row_count`). The answer still uses `[n]` marks, and verification still requires a citation.
+5. **How to refuse out-of-scope data questions** (the 7 "should be refused" questions of the evaluation): a view returning an empty result cannot tell "none" from "no permission", so two **best-effort checks** are added before execution: (a) the role has no access to this view at all (for example a student querying the employee table, Admin querying any data) → `no_permission / restricted_data`; (b) the literal value of `campus_id` in the query is not the asker's own campus and the role is not company-wide (hr, finance) → likewise ends. These two checks can only recognise literal values written in the SQL, and the real protection is still the views.
+6. **Add evaluation questions for the MCP tools**: about 8 tool-type questions are added to the evaluation set (the status of one's own expense claim, which assignments a course has, one student's progress and so on), with answers computed by the sample data generator, since the existing 33 almost all need aggregation and go through SQL.
+7. **The `search_documents` tool** uses hybrid mode without rerank by default (the MCP server side has no chat model); scenarios needing rerank go through the assistant itself.
+8. **Real check**: the 33 questions of the evaluation set plus the new tool questions, about 41, with the number of calls and the estimated cost given first and run after confirmation.
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `packages/core/src/starit_core/dataaccess/sqlguard.py`（新） | SQL 语句校验：单条 `SELECT`/`WITH`、只能访问 `ai_sql` 视图、函数白名单、禁止 `INTO`、加锁、CTE 里的写操作、`pg_*` 等；校验"校区字面值"与提问者校区的一致性 |
-| `packages/core/src/starit_core/dataaccess/schema.py`（新） | 视图说明（给 SQL 生成的提示用）、校区代码表、角色对视图的访问表 |
-| `packages/core/src/starit_core/dataaccess/tools.py`（新） | 6 个工具的实现（固定的参数化查询，经 `run_as_identity`）、参数校验、错误码、`mcp.<tool>` 审计 |
-| `packages/core/src/starit_core/dataaccess/client.py`（新） | `DataTools` 接口；`McpDataTools`（HTTP 调 MCP，转发用户令牌）和 `LocalDataTools`（进程内） |
-| `packages/core/src/starit_core/sqlaccess.py`（改） | 支持绑定参数 |
-| `packages/core/src/starit_core/agent/nodes.py`、`graph.py`、`state.py`、`messages.py`（改） | 新节点：`plan_data_access`、`call_data_tool`、`run_sql`（生成→校验→执行→重试）、`answer_from_data`；`data_query` 不再以 `not_available_yet` 结束；新增的原因码 `restricted_data`、`no_matching_rows`、`sql_failed`、`tool_error` |
-| `packages/core/src/starit_core/agent/prompts/plan_data.md`、`sql.md`、`answer_data.md`（新） | 提示词和版本号 |
-| `packages/core/src/starit_core/agent/runtime.py`（改） | 接收用户的原始令牌；构造数据工具 |
-| `apps/mcp-server/src/starit_mcp_server/`（改）：`main.py`、`auth.py`、`tools.py` | MCP 服务：`MCPServer`、令牌校验（沿用 `TokenVerifier`，受众 `starit-mcp`）、6 个工具、健康检查 |
-| `apps/api/src/starit_api/conversations.py`（改） | 把令牌交给运行时 |
-| `deploy/compose/compose.yaml`、`.env.example`（改） | `mcp-server` 服务（端口 8100）；API 依赖它；`STARIT_MCP_URL` |
-| `packages/core/src/starit_core/config.py`（改） | `model_plan`、`model_sql`、各项上限（SQL 重试 2 次、工具调用 ≤ 3 次、行数上限、超时）、`mcp_url` |
-| `ai-module/sample-data/tools/generate_structured.py`、`eval/sql-qa.jsonl`（改） | 新增约 8 道工具类的题 |
-| `eval/src/starit_eval/data_check.py`、`cli.py`（改） | `starit-eval data`：把数据题真实地问一遍并按期望答案核对，写报告 |
-| `packages/core/tests/dataaccess/`、`packages/core/tests/integration/test_data_*.py`、`apps/mcp-server/tests/`（新） | 见验证标准 |
-| `docs/design/03`、`04`、`ai-module/README.md`（改） | 引用的 `kind` 字段、数据路径、MCP 使用方式 |
+| `packages/core/src/starit_core/dataaccess/sqlguard.py` (new) | SQL statement validation: a single `SELECT`/`WITH`, only `ai_sql` views, a function allow-list, no `INTO`, locking, writes inside CTEs, `pg_*` and so on; checks that the "campus literal" matches the asker's campus |
+| `packages/core/src/starit_core/dataaccess/schema.py` (new) | View descriptions (for the SQL generation prompt), the campus code table, the role-to-view access table |
+| `packages/core/src/starit_core/dataaccess/tools.py` (new) | The implementation of 6 tools (fixed parameterised queries, through `run_as_identity`), parameter validation, error codes, `mcp.<tool>` audit |
+| `packages/core/src/starit_core/dataaccess/client.py` (new) | The `DataTools` interface; `McpDataTools` (calls MCP over HTTP, forwarding the user token) and `LocalDataTools` (in-process) |
+| `packages/core/src/starit_core/sqlaccess.py` (changed) | Supports bound parameters |
+| `packages/core/src/starit_core/agent/nodes.py`, `graph.py`, `state.py`, `messages.py` (changed) | New nodes: `plan_data_access`, `call_data_tool`, `run_sql` (generate → validate → execute → retry), `answer_from_data`; `data_query` no longer ends with `not_available_yet`; new reason codes `restricted_data`, `no_matching_rows`, `sql_failed`, `tool_error` |
+| `packages/core/src/starit_core/agent/prompts/plan_data.md`, `sql.md`, `answer_data.md` (new) | Prompts and version numbers |
+| `packages/core/src/starit_core/agent/runtime.py` (changed) | Receives the user's raw token; builds the data tools |
+| `apps/mcp-server/src/starit_mcp_server/` (changed): `main.py`, `auth.py`, `tools.py` | The MCP service: `MCPServer`, token verification (reusing `TokenVerifier`, audience `starit-mcp`), 6 tools, a health check |
+| `apps/api/src/starit_api/conversations.py` (changed) | Hands the token to the runtime |
+| `deploy/compose/compose.yaml`, `.env.example` (changed) | The `mcp-server` service (port 8100); the API depends on it; `STARIT_MCP_URL` |
+| `packages/core/src/starit_core/config.py` (changed) | `model_plan`, `model_sql`, the limits (SQL retries 2, tool calls ≤ 3, row limit, timeout), `mcp_url` |
+| `ai-module/sample-data/tools/generate_structured.py`, `eval/sql-qa.jsonl` (changed) | About 8 new tool-type questions |
+| `eval/src/starit_eval/data_check.py`, `cli.py` (changed) | `starit-eval data`: really asks the data questions and checks them against the expected answers, writing a report |
+| `packages/core/tests/dataaccess/`, `packages/core/tests/integration/test_data_*.py`, `apps/mcp-server/tests/` (new) | See the verification criteria |
+| `docs/design/03`, `04`, `ai-module/README.md` (changed) | The `kind` field of citations, the data path, how to use MCP |
 
-### 图的变化（设计 04）
+### Changes to the graph (design 04)
 
 ```
-understand ── data_query ──▶ plan_data_access ─┬─ 参数化工具 ──▶ call_data_tool ─┐
-                                               └─ 自由问法 ───▶ run_sql ────────┤
-        结果：无权限（访问表或校区检查） ──▶ END_NO_PERMISSION (restricted_data)
-              空结果 ───────────────────▶ END_NOT_FOUND (no_matching_rows)
-              校验或执行连续失败 ────────▶ END_ERROR (sql_failed / tool_error)
-              有数据 ──────────────────▶ answer_from_data ──▶ verify_answer ──▶ END_ANSWERED
+understand ── data_query ──▶ plan_data_access ─┬─ parameterised tool ──▶ call_data_tool ─┐
+                                               └─ free-form question ──▶ run_sql ────────┤
+        result: no permission (access table or campus check) ──▶ END_NO_PERMISSION (restricted_data)
+                empty result ───────────────────▶ END_NOT_FOUND (no_matching_rows)
+                validation or execution failing repeatedly ──▶ END_ERROR (sql_failed / tool_error)
+                has data ──────────────────────▶ answer_from_data ──▶ verify_answer ──▶ END_ANSWERED
 ```
 
-`run_sql` 内部：检索政策片段 → 生成 SQL → 校验 → 执行 → 失败时把错误告诉模型再生成，最多重试 2 次。
+Inside `run_sql`: search policy passages → generate SQL → validate → execute → on failure tell the model the error and generate again, at most 2 retries.
 
-### 关键设计决定（建议）
+### Key design decisions (proposed)
 
-- **边界仍是数据库**：模型生成的 SQL 只会在 `ai_sql_ro` 角色下对视图执行，视图只返回该用户有权看到的行；`sqlguard` 是第二层，目的是在到达数据库之前拦下明显有问题的语句，并给出明确的拒绝原因。
-- **校验用白名单而不是黑名单**：只允许 `SELECT`（含 `WITH`）；表必须带 `ai_sql.` 前缀且在 7 个视图之内；函数必须在白名单里（计数、求和、平均、最值、`round`、`coalesce`、`nullif`、`lower`、`upper`、日期函数、`cast` 等）。
-- **回答只基于结果**：`answer_from_data` 只拿到问题、执行的 SQL（用于说明依据）和结果行；被告知"结果只包含用户有权看到的数据，不要把它说成全公司的总数"。
-- **结果行数上限 200、语句超时 5 秒**（沿用 M2 的 `run_as_identity`）；结果很大时只把前几十行交给模型并说明被截断。
-- **审计**：每次数据查询写 `data.sql` 或 `mcp.<tool>` 审计（用户、语句或参数摘要、行数），不写结果内容。
-- **令牌只在内存里**：不进日志、不进审计、不进错误信息。
+- **The boundary is still the database**: SQL generated by the model is only run against the views under the `ai_sql_ro` role, and the views return only rows that user may see; `sqlguard` is a second layer whose purpose is to stop obviously wrong statements before they reach the database and to give a clear reason for the refusal.
+- **Validation uses an allow-list, not a deny-list**: only `SELECT` (including `WITH`); tables must carry the `ai_sql.` prefix and be among the 7 views; functions must be on the allow-list (count, sum, average, min and max, `round`, `coalesce`, `nullif`, `lower`, `upper`, date functions, `cast` and so on).
+- **The answer is based only on the result**: `answer_from_data` gets only the question, the SQL that was run (to explain the basis) and the result rows; it is told that "the result contains only data the user may see, so do not present it as a company-wide total".
+- **A result limit of 200 rows and a statement timeout of 5 seconds** (following M2's `run_as_identity`); when the result is large, only the first few dozen rows go to the model and the truncation is stated.
+- **Audit**: every data query writes a `data.sql` or `mcp.<tool>` audit (user, a summary of the statement or arguments, number of rows) and never the result content.
+- **Tokens stay in memory**: not in logs, not in the audit, not in error messages.
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m6-data-access                      # 已创建
+git switch -c m6-data-access                      # already created
 uv sync --all-packages
-(cd sample-data && python3 tools/generate_structured.py)   # 新增工具类的题
+(cd sample-data && python3 tools/generate_structured.py)   # the new tool-type questions
 make test && make lint
-make up                                           # 现在包含 mcp-server
-make eval ARGS="data --yes"                       # 数据题真实评测（先打印估算并确认）
+make up                                           # now includes mcp-server
+make eval ARGS="data --yes"                       # real evaluation of the data questions (estimate printed and confirmed first)
 ```
 
-### 验证标准
+### Verification criteria
 
-1. **SQL 校验**：一批（60 条以上）人工构造的语句逐条断言放行或拒绝：合法的聚合、连接、CTE、日期运算放行；多条语句、非 `SELECT`、`biz.*`、`ai.*`、`pg_catalog.*`、`public.*`、不带前缀的表名、`set_config`、`pg_sleep`、`current_setting`、`INTO`、`FOR UPDATE`、CTE 里的 `DELETE` 等全部拒绝，并给出原因。
-2. **校区与访问表检查**：校区字面值（`=`、`IN`、别名列）不一致的情形有测试矩阵；**角色对视图的访问表与数据库里的视图行为一致**（对 9 个演示账号 × 7 个视图：访问表说"无权"的，视图一定返回空）。
-3. **每个数据路径的结束状态都有测试**（脚本化的模型）：`answered`、`no_permission / restricted_data`、`not_found / no_matching_rows`、SQL 第一次无效第二次修正、连续三次无效 → `error / sql_failed`、数据库超时 → `error / sql_failed`、工具参数错误或工具出错 → `error / tool_error`、调用次数超限 → `step_limit`。
-4. **敌意输出的测试**：模型返回 `SELECT * FROM biz.students`、多条语句、`set_config` 等，在到达数据库之前被拦下，没有任何查询被执行。
-5. **MCP 服务**：真实启动服务端做集成测试：有效令牌可调用；签名被改、过期、受众只有 `starit-api` 的令牌、没有令牌都被拒绝；6 个工具对演示账号返回与视图一致的数据；`list_students` 对学员只返回自己、对员工只返回本校区；查别人的报销单返回 `not_found`；参数错误返回 `invalid_argument`；每次调用都有 `mcp.<tool>` 审计记录。
-6. **图结构**：每个节点仍能到达某个 End 节点；绘制出的图与文档里的路由一致。
-7. **真实检查**（确认费用后）：评测集的数据题（26 道应回答的 + 7 道应拒绝的 + 新增的工具题）真实地问一遍，**应回答的按期望答案核对，应拒绝的必须以 `no_permission` 或 `not_found` 结束且不泄露数字**；报告里写明每一道的结果、失败的原因、费用；**不预设通过率**，先看结果再决定怎么调。
-8. **容器冒烟**：`mcp-server` 容器健康；经 HTTP 用真实令牌问一个数据题，确认 API → MCP 的令牌转发有效。
-9. 本地测试、lint、mypy 通过，CI 通过。
+1. **SQL validation**: a batch (60 or more) of hand-built statements each asserted to pass or be refused: valid aggregations, joins, CTEs and date arithmetic pass; multiple statements, non-`SELECT`, `biz.*`, `ai.*`, `pg_catalog.*`, `public.*`, table names without a prefix, `set_config`, `pg_sleep`, `current_setting`, `INTO`, `FOR UPDATE`, `DELETE` inside a CTE and so on are all refused, with a reason.
+2. **Campus and access-table checks**: cases where the campus literal (`=`, `IN`, an aliased column) differs have a test matrix; **the role-to-view access table agrees with the behaviour of the views in the database** (for 9 demo accounts × 7 views: where the access table says "no right" the view must return empty).
+3. **Every End state of the data path has a test** (scripted model): `answered`, `no_permission / restricted_data`, `not_found / no_matching_rows`, SQL invalid the first time and fixed the second, three invalid in a row → `error / sql_failed`, database timeout → `error / sql_failed`, a tool parameter error or a tool error → `error / tool_error`, call count exceeded → `step_limit`.
+4. **Hostile output tests**: the model returns `SELECT * FROM biz.students`, multiple statements, `set_config` and so on, and they are stopped before reaching the database, with no query executed at all.
+5. **MCP service**: integration tests start a real server: a valid token can call; a token with a tampered signature, expired, with an audience of only `starit-api`, or no token are all refused; the 6 tools return data consistent with the views for the demo accounts; `list_students` returns only the student themselves to a student and only the own campus to an employee; querying someone else's expense claim returns `not_found`; a parameter error returns `invalid_argument`; every call has a `mcp.<tool>` audit record.
+6. **Graph structure**: every node can still reach some End node; the drawn graph matches the routes in the document.
+7. **Real check** (after the cost is confirmed): really ask the data questions of the evaluation set (26 that should be answered + 7 that should be refused + the new tool questions) once; **those that should be answered are checked against the expected answers, and those that should be refused must end with `no_permission` or `not_found` and leak no number**; the report states each question's result, the reasons for failures and the cost; **no pass rate is set in advance**, and the results are looked at first before deciding how to tune.
+8. **Container smoke test**: the `mcp-server` container is healthy; ask one data question over HTTP with a real token and confirm that the token forwarding API → MCP works.
+9. Local tests, lint and mypy pass, and CI passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- **MCP SDK 2.x 很新**（2.3.0），接口以原型验证的为准，可能还会变；固定版本，并在 README 里写明。
-- **模型生成 SQL 的质量**：日期运算（`submitted_date - expense_date`）、"超过 30 天"之类的口径、`CASE` 分档，`gpt-6-luna` 能答对多少我不知道，以真实评测为准；调不好的话退路是改提示词、给更多例子，而不是放宽校验。
-- **`sqlglot` 的 PostgreSQL 方言与数据库的实际语义有细微差异**，可能误拒合法语句或漏掉冷僻写法；漏掉的不会造成越权（数据库角色只能读视图），但可能让模型执行到不该执行的函数，所以用函数白名单，并由数据库角色兜底。
-- **每次调用 MCP 都新建会话**，会增加一点延迟（预计 100–300 毫秒）；以后可以改成复用连接。
-- **把原始令牌传进运行时**会扩大令牌的暴露面，需要保证任何异常信息和日志里都不含令牌（有测试）。
-- 校区检查只能识别 SQL 里写明的字面值；用子查询、连接绕过的写法它看不出来，但视图仍然只返回有权看到的行。
+- **The MCP SDK 2.x is very new** (2.3.0), the interface follows what the prototype verified and may still change; the version is pinned and stated in the README.
+- **The quality of the SQL the model generates**: date arithmetic (`submitted_date - expense_date`), definitions such as "over 30 days", `CASE` tiers; how many `gpt-6-luna` gets right I do not know, and the real evaluation decides; if it cannot be tuned, the fallback is to change the prompt and give more examples, not to loosen validation.
+- **`sqlglot`'s PostgreSQL dialect differs subtly from the database's real semantics**, and may wrongly refuse valid statements or miss rare forms; what is missed causes no overreach (the database role can only read the views), but could let the model run a function it should not, so a function allow-list is used and the database role is the backstop.
+- **Every MCP call creates a new session**, which adds a little latency (expected 100 to 300 milliseconds); the connection can be reused later.
+- **Passing the raw token into the runtime** widens the exposure of the token, and it must be ensured that no exception message or log contains the token (tested).
+- The campus check can only recognise literal values written in the SQL; it cannot see forms that go around it with subqueries or joins, but the views still return only rows the user may see.
 
-### 需要你确认
+### For you to confirm
 
-1. 使用 MCP SDK 2.x（`mcp>=2.3,<3`）。
-2. 生产环境 Agent 经 HTTP 调 MCP 并转发用户令牌；测试和评测用进程内实现。
-3. SQL 生成步骤带检索到的政策片段（不重排）。
-4. 引用结构新增 `kind`（`document` / `data`）。
-5. 执行前的两道检查：角色访问表、校区字面值。
-6. 评测集新增约 8 道工具类的题。
-7. `search_documents` 工具默认混合模式、不重排。
-8. 真实检查约 41 题（先估算再确认）。
+1. Use the MCP SDK 2.x (`mcp>=2.3,<3`).
+2. In production the agent calls MCP over HTTP and forwards the user token; tests and evaluation use the in-process implementation.
+3. The SQL generation step carries the retrieved policy passages (no rerank).
+4. The citation structure gains `kind` (`document` / `data`).
+5. The two checks before execution: the role access table and the campus literal.
+6. About 8 new tool-type questions in the evaluation set.
+7. The `search_documents` tool in hybrid mode without rerank by default.
+8. A real check of about 41 questions (estimate first, then confirm).
 
-### 用户的确认（2026-11-03）
+### The user's confirmation (2026-11-03)
 
-8 条全部接受：MCP SDK 2.x（`mcp>=2.3,<3`）；生产环境经 HTTP 调 MCP 并转发用户令牌，测试和评测用进程内实现；SQL 生成步骤带检索到的政策片段（不重排）；引用结构新增 `kind`；执行前的两道检查（角色访问表、校区字面值）；评测集新增约 8 道工具类的题；`search_documents` 默认混合模式不重排；真实检查约 41 题（先估算再确认）。
+All 8 were accepted: the MCP SDK 2.x (`mcp>=2.3,<3`); in production the agent calls MCP over HTTP and forwards the user token, with tests and evaluation using the in-process implementation; the SQL generation step carrying the retrieved policy passages (no rerank); the citation structure gaining `kind`; the two checks before execution (role access table, campus literal); about 8 new tool-type questions in the evaluation set; `search_documents` in hybrid mode without rerank by default; a real check of about 41 questions (estimate first, then confirm).
 
-### 实际结果
+### Actual results
 
-**状态：代码完成，真实检查已跑；CI 待检查，待你确认合并。**
+**Status: code complete, the real check has run; CI still to be checked, awaiting your confirmation to merge.**
 
-- **自动测试**：615 个全部通过（M5 结束时 437 个）。新增：SQL 校验 100 多条语句（放行/拒绝/视图白名单/函数白名单/角色与校区检查）、角色访问表与视图一致性（逐账号）、视图列与结构描述一致性、6 个工具（各角色、越权、参数错误、审计）、真实 MCP 服务（线程中的 uvicorn、真实签名校验；无令牌、乱码、错误密钥、过期、受众不符都得到 401）、Agent 数据路径（工具路径、SQL 路径、重试、拒绝、空结果、令牌不落盘）、评测判分。lint 和 mypy 干净。
-- **容器冒烟**：`mcp-server` 容器健康；用 Keycloak 签发的真实令牌调用工具：经理查本校学员成功，查别校（`campus_id=BJ`）得 `forbidden`，学员调用报销工具得 `forbidden`，员工查自己的报销单成功、查别人的得 `not_found`，乱码令牌被拒；`ai.audit_log` 里有对应的 `mcp.*` 记录（含被拒的），容器日志里没有令牌。
-- **经 API 容器的整条链路**（真实模型）：问"我的报销单 C0107 状态是什么"，API 把用户令牌转发给 `mcp-server` 容器，工具返回 `paid`，回答带 `kind: "data"` 的引用，审计里有 `mcp.get_expense_claim_status`，容器日志里没有令牌。**这次检查发现了一个真实的缺陷**：SDK 的主机头检查（防 DNS 重绑定）拒绝了 Compose 内的服务名 `mcp-server:8100`，API 得到 `tool_error`。之前的服务测试用 `127.0.0.1` 访问，没覆盖到。已加配置项 `mcp_allowed_hosts`（保持防护开启，只放行列出的主机），并加了两条回归测试（放行服务名、拒绝陌生主机，都带有效令牌，使判定只取决于主机头）。第一次问的"我校区有多少学员"走的是 SQL 路径，答案 5，没有经过 MCP。过程中 Docker 磁盘写满（清理了构建缓存 6 GB 后重建）。
-- **真实数据检查**（`starit-eval data`，默认模型 `openai/gpt-6-luna`，41 题）：第一次 39/41，151 次模型调用，约 $0.03（估算 $0.027）。报告：`docs/eval/data-check-20261103-1733.md`。
-  - **SQL-26**（学员平均分）：答案正确（81.5000…），是**我的判分太严**——只接受写成 `81.5` 的数字。已改为按数值比较。
-  - **SQL-29**（上海经理问北京学员数）：**真实的缺口**。模型写的是 `campuses.name = 'Beijing'` 之类的条件，我的校区检查只认 `campus_id` 的字面值，没拦住，用户得到"0 个学员"。视图没有泄露任何数据，但这不是设计要求的结果（应当拒绝）。已补：语句读取 `campuses` 视图时，字符串里出现别的校区的城市名，同样按 `campus_scope` 拒绝；`expense_claims.city` 是出差城市，不受影响（有测试）。
-  - 修复后只重跑这两题：2/2 通过，7 次模型调用，约 $0.001。报告：`docs/eval/data-check-20261103-1737.md`。**41 题没有整体重跑**，所以"41/41"没有在同一次运行里出现过。
-- **与设计的差异**：
-  - `search_documents` 的 `top_k` 最大 8（设计写 10）；没有 `doc_code` 参数；`domain` 是对 `doc_code` 前缀（HR-/FIN-/TS-）的过滤，在检索之后做；返回的字段里没有 `status`、`page`、`chunk_id`、`score`（只有 `doc_code`、`title`、`version`、`heading_path`、`text`）。Agent 的规划步骤不用这个工具（文档问题走原来的检索路径），它主要给其他 MCP 客户端。
-  - 一次运行最多调一个数据工具（清单写的是 ≤3）；工具参数错误时退到 SQL 路径。
-  - `agent_max_llm_calls` 从 6 提到 8，容纳 SQL 重试。
-  - 未用 `doc_code` 前缀以外的方式给 `Candidate` 加 `domain`。
-  - 对 MCP SDK 的 `custom_route` 装饰器加了一处 `type: ignore`（SDK 的类型标注不完整）。
-- **已知限制**：校区检查只能识别写在 SQL 里的校区编码或（读 `campuses` 时的）城市名，换一种写法（比如用子查询按别的列间接指向别校）可能漏过去——真正的保护仍是视图，漏过去的结果是"空数据"，不是别校的数据。空结果统一说"没找到匹配记录"，分不清"没有"和"没权限"，这是有意的。SQL 路径的质量取决于模型；41 题里只有这一次拦截缺口，样本小，不能当作基准。
+- **Automated tests**: all 615 pass (437 at the end of M5). Added: SQL validation with 100-plus statements (pass / refuse / view allow-list / function allow-list / role and campus checks), the consistency of the role access table with the views (account by account), the consistency of view columns with the schema description, the 6 tools (each role, overreach, parameter errors, audit), the real MCP service (uvicorn in a thread, real signature verification; no token, a garbled one, a wrong key, expired and an audience mismatch all get 401), the agent data path (the tool path, the SQL path, retries, refusal, an empty result, the token not written to disk), evaluation scoring. lint and mypy are clean.
+- **Container smoke test**: the `mcp-server` container is healthy; calling tools with real tokens issued by Keycloak: a manager querying the own campus's students succeeded, querying another campus (`campus_id=BJ`) got `forbidden`, a student calling the expense tools got `forbidden`, an employee querying their own expense claim succeeded and someone else's got `not_found`, a garbled token was refused; `ai.audit_log` has the matching `mcp.*` records (including the refused ones), and the container log has no token.
+- **The whole chain through the API container** (real model): asking "what is the status of my expense claim C0107", the API forwarded the user token to the `mcp-server` container, the tool returned `paid`, the answer carried a citation with `kind: "data"`, the audit has `mcp.get_expense_claim_status`, and the container log has no token. **This check found a real defect**: the SDK's host header check (against DNS rebinding) refused the Compose service name `mcp-server:8100`, and the API got `tool_error`. The earlier service tests accessed it through `127.0.0.1` and did not cover this. A configuration item `mcp_allowed_hosts` was added (keeping the protection on and only letting the listed hosts through), with two regression tests (the service name allowed, a strange host refused, both with a valid token so that the decision depends only on the host header). The first question asked, "how many students on my campus", went through the SQL path and the answer was 5, without passing MCP. During this the Docker disk filled up (6 GB of build cache was cleaned and the images rebuilt).
+- **Real data check** (`starit-eval data`, default model `openai/gpt-6-luna`, 41 questions): the first run 39/41, 151 model calls, about $0.03 (estimate $0.027). Report: `docs/eval/data-check-20261103-1733.md`.
+  - **SQL-26** (a student's average score): the answer was correct (81.5000…) and it was **my scoring being too strict**, accepting only a number written as `81.5`. Changed to compare by numeric value.
+  - **SQL-29** (a Shanghai manager asking for the number of Beijing students): **a real gap**. The model wrote a condition such as `campuses.name = 'Beijing'`, my campus check only recognised literal values of `campus_id`, did not stop it, and the user got "0 students". The views leaked no data, but this is not the result the design requires (it should be refused). Fixed: when a statement reads the `campuses` view and a string contains another campus's city name, it is likewise refused by `campus_scope`; `expense_claims.city` is a travel city and is unaffected (tested).
+  - After the fix only these two questions were rerun: 2/2 passed, 7 model calls, about $0.001. Report: `docs/eval/data-check-20261103-1737.md`. **The 41 questions were not rerun as a whole**, so "41/41" never appeared in a single run.
+- **Differences from the design**:
+  - The `top_k` of `search_documents` is at most 8 (the design says 10); there is no `doc_code` parameter; `domain` is a filter on the `doc_code` prefix (HR-/FIN-/TS-) applied after search; the returned fields do not include `status`, `page`, `chunk_id` or `score` (only `doc_code`, `title`, `version`, `heading_path` and `text`). The agent's planning step does not use this tool (document questions go through the original search path), and it is mainly for other MCP clients.
+  - A run calls at most one data tool (the checklist says ≤ 3); on a tool parameter error it falls back to the SQL path.
+  - `agent_max_llm_calls` was raised from 6 to 8 to leave room for SQL retries.
+  - `domain` was not added to `Candidate` in any way other than the `doc_code` prefix.
+  - One `type: ignore` was added on the MCP SDK's `custom_route` decorator (the SDK's type annotations are incomplete).
+- **Known limits**: the campus check can only recognise campus codes written in the SQL or (when reading `campuses`) city names; another way of writing it (for example a subquery that points indirectly to another campus by another column) may slip past, and the real protection is still the views; what slips past gives "empty data", not another campus's data. An empty result always says "no matching records found", which cannot tell "none" from "no permission", and this is deliberate. The quality of the SQL path depends on the model; across the 41 questions there was only this one interception gap, the sample is small and must not be taken as a benchmark.
 
-## M7 文档管理与前端
+## M7 Document management and front end
 
-状态：**进行中**（分支 `m7-docs-frontend`）。两件事：(1) 后端的文档管理 API 和"点击引用看原文"的接口；(2) `ai-module/web/` 的 Next.js 前端：登录、聊天页、会话列表、引用查看、文档管理页。本里程碑**不调用付费模型**，只在最后做一次小的真实检查（见下）。
+Status: **In progress** (branch `m7-docs-frontend`). Two things: (1) the back end's document management API and the interface for "click a citation to see the original"; (2) the Next.js front end in `ai-module/web/`: sign-in, chat page, conversation list, citation viewing, document management page. This milestone **does not call paid models**, and only does one small real check at the end (see below).
 
-### 开始前的现状（已核对）
+### State before starting (verified)
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| 已有的 API | `/healthz`、`/me`、`/conversations` 及其消息接口。路径没有 `/api/v1` 前缀（M5 就是这样做的）。**没有** CORS 配置。**没有**任何 `/documents` 接口 |
-| 已有的文档服务（core） | `register_document`、`update_access`、`set_status`、`delete_document`、`set_content`、入库队列、`ObjectStorage`（只有 `put`/`get`，**没有 `delete`**）。上传的路径与 `register_from_manifest` 相同 |
-| 引用里缺什么 | 文档类引用有 `doc_code`、`chunk_id`，**没有 `document_id`**，前端点击引用时无法请求 `/documents/{id}/chunks` |
-| 前端 | 目录 `ai-module/web/` 还不存在。Node 20.19.6、npm 10.8.2 已装；`.nvmrc` 还没有 |
-| Keycloak | `starit-web` 客户端已配好：公开客户端、授权码 + PKCE（S256）、重定向 `http://localhost:3000/*`、Web 源 `http://localhost:3000`、令牌受众含 `starit-api` 和 `starit-mcp` |
-| 权限 | `RAGETLAdmin` 的账号只有这一个角色，按设计 01 的 4.3，**只能看文档元数据，看不了正文**；管理接口只允许 `RAGETLAdmin` |
-| CI | 目前只有 `ai-module` 一个作业（Python），没有前端作业 |
+| The existing API | `/healthz`, `/me`, `/conversations` and its message endpoints. Paths have no `/api/v1` prefix (M5 already did it this way). **No** CORS configuration. **No** `/documents` endpoint at all |
+| The existing document service (core) | `register_document`, `update_access`, `set_status`, `delete_document`, `set_content`, the ingestion queue, `ObjectStorage` (only `put`/`get`, **no `delete`**). The upload path is the same as `register_from_manifest` |
+| What the citations lack | Document citations have `doc_code` and `chunk_id` but **no `document_id`**, so the front end cannot request `/documents/{id}/chunks` when a citation is clicked |
+| Front end | The directory `ai-module/web/` does not exist yet. Node 20.19.6 and npm 10.8.2 are installed; there is no `.nvmrc` yet |
+| Keycloak | The `starit-web` client is already set up: a public client, authorization code + PKCE (S256), redirect `http://localhost:3000/*`, web origin `http://localhost:3000`, token audiences include `starit-api` and `starit-mcp` |
+| Permissions | A `RAGETLAdmin` account has only this one role and, by 4.3 of design 01, **can see only document metadata and not the body**; the management endpoints allow `RAGETLAdmin` only |
+| CI | At the moment there is only one job, `ai-module` (Python), and no front-end job |
 
-### 需要先确认的问题
+### Questions to confirm first
 
-1. **浏览器登录方式**：用 `oidc-client-ts` 在浏览器里做授权码 + PKCE，令牌放在内存（刷新页面时用 `sessionStorage` 恢复），请求 API 时直接带 `Authorization: Bearer`。不做服务端会话、不用 NextAuth。好处是和后端"只信 JWT"的模型完全一致，没有第二套会话；代价是令牌在浏览器里（用 PKCE 和短有效期缓解）。
-2. **浏览器怎么访问 API**：API 增加 CORS 中间件，允许的来源由 `STARIT_CORS_ORIGINS` 配置（默认 `http://localhost:3000`），只允许 `Authorization`、`Content-Type` 头，不带 cookie。备选是 Next.js 反向代理，会多一跳，也让 SSE（以后）更麻烦。
-3. **路径前缀**：保持已经实现的无前缀路径（`/conversations`、`/documents`……），把设计 03 里的 `/api/v1` 前缀改成"以后需要时再加"。前缀改动会牵动 M5 的全部测试和脚本，价值不大。
-4. **文档管理 API 的范围**：设计 03 第 5 节的 7 个端点（`POST/GET /documents`、`GET/PATCH/DELETE /documents/{id}`、`POST …/reindex`、`GET …/jobs`）加阅读用的 `GET /documents/{id}/chunks` 与 `GET /documents/{id}/file`。上传限制：单文件 ≤ 20 MB，只收 docx/pdf/md/txt（按扩展名和文件头双重判断）；相同 `content_hash` 且相同 `(doc_code, version)` 返回 409。`DELETE` 是硬删除（设计已定），所以给 `ObjectStorage` 加 `delete`。所有写动作写审计。
-5. **引用加 `document_id`**：文档类引用新增 `document_id`（设计 03 同步修改），前端点击 `[n]` 时请求该文档的分块并高亮被引用的块；数据类引用（`kind: "data"`）只显示视图名和行数，不能点开。
-6. **前端技术栈**：Next.js 15（App Router）、TypeScript 严格模式、Tailwind、shadcn/ui、ESLint、Prettier；单元测试用 Vitest + Testing Library；包管理用 npm（`package-lock.json` 入库）；`.nvmrc` 固定 Node 20。
-7. **第一阶段不做流式**：聊天页发送后显示"思考中"，等 `POST …/messages` 返回完整回答（实测约 3–8 秒）。设计里的 SSE 属于第二阶段。
-8. **端到端冒烟测试（Playwright）**：需要下载 Chromium（约 150–300 MB）——**下载前要你同意**。覆盖：登录、提问、查看引用、上传文档。为了不花钱也不依赖模型，提问这一步**拦截 `POST …/messages` 返回固定回答**；上传这一步走真实的 API → 入库队列 → worker，但容器里的嵌入用 `EMBEDDING_PROVIDER=fake`（M3 已有）。在本地用 `make e2e` 运行（需要 `make up`），**CI 里不跑**（CI 没有完整的 Compose 栈），CI 只跑前端的 lint、类型检查、Vitest 和构建。
-9. **容器**：Compose 增加 `web` 服务（Next.js standalone 构建，端口 3000，依赖 api 与 keycloak），`.env.example` 增加 `NEXT_PUBLIC_*` 配置（API 地址、Keycloak 地址与客户端 ID）。
-10. **真实检查**：做完后用 `RAGETLAdmin` 账号上传 1 个小文档，用**真实嵌入**入库（估算不到 $0.001），再用一个有权限的账号问一个关于它的问题（约 4 次模型调用，约 $0.001）。先给估算，你确认后再跑。
+1. **Browser sign-in**: use `oidc-client-ts` to do authorization code + PKCE in the browser, keeping the token in memory (restored from `sessionStorage` when the page is refreshed) and sending `Authorization: Bearer` directly when requesting the API. No server-side session and no NextAuth. The benefit is that it matches the back end's "trust only the JWT" model exactly, with no second session; the cost is that the token is in the browser (mitigated by PKCE and a short lifetime).
+2. **How the browser reaches the API**: the API gets a CORS middleware, the allowed origins are set by `STARIT_CORS_ORIGINS` (default `http://localhost:3000`), only the `Authorization` and `Content-Type` headers are allowed, and no cookies. The alternative is a Next.js reverse proxy, which adds a hop and also makes SSE (later) harder.
+3. **Path prefix**: keep the prefix-less paths already implemented (`/conversations`, `/documents` and so on) and change the `/api/v1` prefix of design 03 to "added when needed later". Changing the prefix would touch all the tests and scripts of M5 and is of little value.
+4. **Scope of the document management API**: the 7 endpoints of section 5 of design 03 (`POST/GET /documents`, `GET/PATCH/DELETE /documents/{id}`, `POST …/reindex`, `GET …/jobs`) plus `GET /documents/{id}/chunks` and `GET /documents/{id}/file` for reading. Upload limits: a single file ≤ 20 MB, only docx/pdf/md/txt (judged by both extension and file header); the same `content_hash` with the same `(doc_code, version)` returns 409. `DELETE` is a hard delete (decided in the design), so `ObjectStorage` gets a `delete`. Every write action is audited.
+5. **Citations gain `document_id`**: document citations gain `document_id` (design 03 is changed to match), and when `[n]` is clicked the front end requests that document's chunks and highlights the cited chunk; data citations (`kind: "data"`) only show the view name and row count and cannot be opened.
+6. **Front-end stack**: Next.js 15 (App Router), TypeScript strict mode, Tailwind, shadcn/ui, ESLint, Prettier; unit tests with Vitest + Testing Library; package management with npm (`package-lock.json` committed); `.nvmrc` pins Node 20.
+7. **No streaming in phase 1**: after sending, the chat page shows "thinking" and waits for `POST …/messages` to return the full answer (measured about 3 to 8 seconds). The SSE in the design belongs to phase 2.
+8. **End-to-end smoke tests (Playwright)**: needs a Chromium download (about 150 to 300 MB), **so your agreement is needed before downloading**. They cover: sign-in, asking, viewing a citation, uploading a document. To cost nothing and not depend on the model, the asking step **intercepts `POST …/messages` and returns a fixed answer**; the upload step goes through the real API → ingestion queue → worker, but the embedding in the container uses `EMBEDDING_PROVIDER=fake` (already there since M3). Run locally with `make e2e` (needs `make up`), **not run in CI** (CI has no full Compose stack), and CI only runs the front end's lint, type check, Vitest and build.
+9. **Containers**: Compose gains a `web` service (a Next.js standalone build, port 3000, depending on api and keycloak), and `.env.example` gains `NEXT_PUBLIC_*` settings (API address, Keycloak address and client id).
+10. **Real check**: when done, upload 1 small document as `RAGETLAdmin`, ingest it with **real embedding** (an estimated under $0.001), then ask an account with permission a question about it (about 4 model calls, about $0.001). The estimate comes first and it runs after you confirm.
 
-### 计划的文件（`ai-module/` 下）
+### Planned files (under `ai-module/`)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `apps/api/src/starit_api/documents.py`（新） | 文档管理与阅读的 8 个端点；`require_roles("RAGETLAdmin")`；分页（`limit`/`cursor`）、过滤；上传校验 |
-| `apps/api/src/starit_api/main.py`、`config`（改） | 挂载路由；CORS（`cors_origins`） |
-| `packages/core/src/starit_core/storage.py`（改） | `ObjectStorage.delete`（S3 与内存实现） |
-| `packages/core/src/starit_core/documents.py`（改） | 列表查询、读取分块、元数据更新的服务函数（保持"同一事务更新文档和分块"） |
-| `packages/core/src/starit_core/agent/nodes.py`（改） | 文档引用带 `document_id` |
-| `apps/api/tests/integration/test_documents.py`（新）等 | 见验证标准 |
-| `web/`（新） | `app/`（登录回调、聊天页、文档管理页）、`components/`（对话、引用抽屉、会话列表、文档表格与上传表单，shadcn/ui）、`lib/`（OIDC、API 客户端）、`tests/`（Vitest）、`e2e/`（Playwright）、`Dockerfile`、`package.json`、`.nvmrc` |
-| `deploy/compose/compose.yaml`、`.env.example`、`Makefile`（改） | `web` 服务；`make web-dev`、`make e2e` |
-| `.github/workflows/ci.yml`（改） | 前端作业：`npm ci`、lint、类型检查、Vitest、构建 |
-| `docs/design/01`、`03`、`ai-module/README.md`（改） | 路径前缀说明、引用的 `document_id`、前端的启动方式 |
+| `apps/api/src/starit_api/documents.py` (new) | The 8 endpoints of document management and reading; `require_roles("RAGETLAdmin")`; paging (`limit`/`cursor`), filtering; upload validation |
+| `apps/api/src/starit_api/main.py`, `config` (changed) | Mount the routes; CORS (`cors_origins`) |
+| `packages/core/src/starit_core/storage.py` (changed) | `ObjectStorage.delete` (S3 and in-memory implementations) |
+| `packages/core/src/starit_core/documents.py` (changed) | Service functions for listing, reading chunks and updating metadata (keeping "update the document and chunks in the same transaction") |
+| `packages/core/src/starit_core/agent/nodes.py` (changed) | Document citations carry `document_id` |
+| `apps/api/tests/integration/test_documents.py` (new) and so on | See the verification criteria |
+| `web/` (new) | `app/` (sign-in callback, chat page, document management page), `components/` (conversation, citation drawer, conversation list, document table and upload form, shadcn/ui), `lib/` (OIDC, API client), `tests/` (Vitest), `e2e/` (Playwright), `Dockerfile`, `package.json`, `.nvmrc` |
+| `deploy/compose/compose.yaml`, `.env.example`, `Makefile` (changed) | The `web` service; `make web-dev`, `make e2e` |
+| `.github/workflows/ci.yml` (changed) | The front-end job: `npm ci`, lint, type check, Vitest, build |
+| `docs/design/01`, `03`, `ai-module/README.md` (changed) | The note on the path prefix, the citation's `document_id`, how to start the front end |
 
-### 页面（第一阶段）
+### Pages (phase 1)
 
-- `/`：已登录进入聊天页；未登录跳转 Keycloak。左侧会话列表（新建、重命名、归档），中间对话，回答里的 `[n]` 是可点击的标记，点击打开右侧抽屉：文档名、编号、版本、状态、章节路径、被引用的块（高亮）和前后块；数据类引用显示"来自数据：students，12 行"。回答的结束状态为 `no_permission`/`not_found`/`refused`/`error` 时显示对应的普通提示（后端已给出统一文案）。
-- `/admin/documents`：只有 `RAGETLAdmin` 在菜单里看得到；表格（编号、标题、版本、状态、入库状态、更新时间），过滤；上传表单（设计 03 第 5 节的字段）；行内操作：编辑元数据与权限、重新入库、删除（二次确认）、查看入库任务（阶段、次数、错误码与错误信息）。其他角色直接访问该地址显示"没有权限"，后端同样返回 403。
-- 菜单、按钮是否显示只依据 `/me`；后端每个接口都再次校验。
+- `/`: a signed-in user enters the chat page; a user not signed in is redirected to Keycloak. The conversation list is on the left (new, rename, archive), the conversation in the middle, and the `[n]` in an answer is a clickable mark that opens a drawer on the right: document name, code, version, status, section path, the cited chunk (highlighted) and the chunks before and after; a data citation shows "From data: students, 12 rows". When an answer ends with `no_permission`/`not_found`/`refused`/`error` the matching ordinary notice is shown (the back end already supplies the uniform text).
+- `/admin/documents`: visible in the menu only to `RAGETLAdmin`; a table (code, title, version, status, ingestion status, update time) with filters; an upload form (the fields of section 5 of design 03); per-row actions: edit metadata and permissions, re-ingest, delete (confirmed twice), view ingestion jobs (stage, attempts, error code and message). Other roles who go to that address directly see "no permission", and the back end likewise returns 403.
+- Whether a menu or button is shown depends only on `/me`; the back end checks again on every endpoint.
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m7-docs-frontend                    # 已创建
+git switch -c m7-docs-frontend                    # already created
 uv sync --all-packages
 (cd web && npm ci)
-make test && make lint                            # 后端
+make test && make lint                            # back end
 (cd web && npm run lint && npm run typecheck && npm test && npm run build)
-make up                                           # 现在包含 web
-make e2e                                          # Playwright（需先同意下载浏览器）
+make up                                           # now includes web
+make e2e                                          # Playwright (agree to the browser download first)
 ```
 
-### 验证标准
+### Verification criteria
 
-1. **文档管理 API 的权限矩阵**：9 个演示账号 × 每个端点：只有 `RAGETLAdmin` 成功，其余 403，未登录 401。
-2. **上传**：合法的四种格式 202 并入队；超过 20 MB、扩展名与文件头不符、缺必填字段、非法 `access_level` → 422；重复 → 409 并给出已有文档 ID；写审计。
-3. **完整流程**（假嵌入）：上传 → worker 入库 → `ingest_status = ready` → 有权限的账号能检索到、无权限的账号检索不到。
-4. **元数据与权限修改**：`PATCH` 后文档和所有分块在同一事务里一致（沿用 M2 的测试方式）；状态改为 `superseded`/`archived` 后检索行为符合设计 02。
-5. **删除与重新入库**：删除后文档、分块、向量、原文件都没有了，会话历史里的引用文本保留；重新入库成功后原子替换旧分块，失败时旧分块不动。
-6. **阅读接口**：`chunks`/`file` 与检索使用同一个权限函数；无权限返回 404；`RAGETLAdmin`（无业务角色）读正文得到 404、读元数据得到 200。
-7. **引用**：文档类引用带 `document_id`，用它请求分块能得到被引用的块。
-8. **CORS**：允许的来源能通过预检；其他来源不返回 `Access-Control-Allow-Origin`。
-9. **前端**：Vitest 覆盖 OIDC 回调与令牌处理、`/me` 驱动的菜单（7 个角色各一个断言）、引用抽屉、上传表单校验、错误状态；lint、类型检查、构建通过。
-10. **Playwright 冒烟**（本地）：登录、提问（拦截的回答）、点击引用看到原文、`RAGETLAdmin` 上传到 `ready`；普通账号看不到管理菜单，直接访问管理地址得到无权限页面。
-11. **容器冒烟**：`web` 容器健康，浏览器经 `http://localhost:3000` 完成登录和一次提问。
-12. 真实检查（确认后）：上传 1 个小文档用真实嵌入入库，再问一个问题得到带引用的回答。
-13. 本地测试、lint、mypy 通过，CI（含新的前端作业）通过。
+1. **Permission matrix of the document management API**: 9 demo accounts × each endpoint: only `RAGETLAdmin` succeeds, the rest get 403, and not signed in gets 401.
+2. **Upload**: the four valid formats get 202 and are queued; over 20 MB, an extension that does not match the file header, a missing required field, an invalid `access_level` → 422; a duplicate → 409 with the id of the existing document; audited.
+3. **Whole flow** (fake embedding): upload → worker ingestion → `ingest_status = ready` → an account with permission can find it by search and an account without permission cannot.
+4. **Metadata and permission changes**: after `PATCH` the document and all chunks are consistent within the same transaction (the same test approach as M2); after the status becomes `superseded`/`archived`, search behaves as design 02 says.
+5. **Deleting and re-ingesting**: after deleting, the document, chunks, vectors and original file are all gone and the citation text in conversation history is kept; after a successful re-ingestion the old chunks are replaced atomically, and on failure the old chunks stay untouched.
+6. **Reading endpoints**: `chunks`/`file` use the same permission function as search; no permission returns 404; `RAGETLAdmin` (with no business role) gets 404 reading the body and 200 reading the metadata.
+7. **Citations**: document citations carry `document_id`, and requesting chunks with it gets the cited chunk.
+8. **CORS**: allowed origins pass the preflight; other origins get no `Access-Control-Allow-Origin`.
+9. **Front end**: Vitest covers the OIDC callback and token handling, the menu driven by `/me` (one assertion for each of 7 roles), the citation drawer, upload form validation and error states; lint, type check and build pass.
+10. **Playwright smoke** (local): sign in, ask (the intercepted answer), click a citation and see the original, `RAGETLAdmin` uploads until `ready`; an ordinary account does not see the management menu and gets a no-permission page when going to the management address directly.
+11. **Container smoke test**: the `web` container is healthy, and the browser completes sign-in and one question through `http://localhost:3000`.
+12. Real check (after confirmation): upload 1 small document and ingest it with real embedding, then ask one question and get an answer with citations.
+13. Local tests, lint and mypy pass, and CI (including the new front-end job) passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- **令牌放在浏览器里**是安全上的取舍（XSS 能读到 `sessionStorage`）。缓解：Keycloak 令牌有效期短（沿用现在的设置）、前端不渲染未经转义的 HTML、回答按纯文本/受控的 Markdown 渲染。若你更想用服务端会话（NextAuth + 后端换令牌），代价是多一套会话，要在第 1 条里改。
-- **shadcn/ui、Tailwind、Next.js 15 的最新次版本**我会在开始时核对并固定版本；Next.js 的大版本更新快，可能和我记忆里的 API 有差别，以实际安装的为准。
-- **Playwright 在 Mac 上的浏览器下载**需要网络和约 300 MB 磁盘（Docker 磁盘刚刚满过一次，这是本机的实际约束，与浏览器无关，但提醒一下）。
-- **上传大文件和入库时长**：docx/pdf 的解析在 worker 里，上传接口只入队；页面靠轮询 `GET /documents`（每 3 秒）更新状态，没有推送。
-- **删除是硬删除**，不可恢复；前端用二次确认，后端写审计，但没有"回收站"。
+- **Keeping the token in the browser** is a security trade-off (XSS can read `sessionStorage`). Mitigation: Keycloak tokens have a short lifetime (keeping the current setting), the front end renders no unescaped HTML, and answers are rendered as plain text or controlled Markdown. If you would rather use a server-side session (NextAuth + the back end exchanging tokens), the cost is a second session, to be changed in item 1.
+- **The latest minor versions of shadcn/ui, Tailwind and Next.js 15** will be checked and pinned at the start; Next.js major versions move fast and may differ from the APIs I remember, and what is actually installed prevails.
+- **Playwright's browser download on the Mac** needs the network and about 300 MB of disk (the Docker disk has just filled up once; that is a real constraint of this machine and has nothing to do with the browser, but a reminder).
+- **Uploading large files and the ingestion time**: the parsing of docx/pdf is in the worker, the upload endpoint only enqueues; the page updates the status by polling `GET /documents` (every 3 seconds), with no push.
+- **Deleting is a hard delete** and cannot be recovered; the front end asks for a second confirmation and the back end writes an audit, but there is no "recycle bin".
 
-### 需要你确认
+### For you to confirm
 
-1. 浏览器内 OIDC（授权码 + PKCE），令牌在内存/`sessionStorage`。
-2. API 加 CORS，来源可配置。
-3. 保持无前缀路径，修改设计 03。
-4. 文档管理 8 个端点，上传 ≤ 20 MB、四种格式，`ObjectStorage` 加 `delete`。
-5. 文档类引用加 `document_id`。
-6. 前端栈：Next.js 15、TypeScript 严格、Tailwind、shadcn/ui、Vitest、npm、Node 20。
-7. 第一阶段不做流式。
-8. Playwright 本地运行、拦截聊天回答、假嵌入上传；**同意下载 Chromium**；CI 只跑 lint/类型/Vitest/构建。
-9. Compose 增加 `web` 服务。
-10. 真实检查：上传 1 个小文档（真实嵌入，不到 $0.001）+ 1 个问题（约 $0.001），先估算后确认。
+1. In-browser OIDC (authorization code + PKCE), with the token in memory/`sessionStorage`.
+2. CORS added to the API, with configurable origins.
+3. Keep the prefix-less paths and change design 03.
+4. The 8 document management endpoints, uploads ≤ 20 MB, four formats, `ObjectStorage` gets `delete`.
+5. Document citations gain `document_id`.
+6. Front-end stack: Next.js 15, strict TypeScript, Tailwind, shadcn/ui, Vitest, npm, Node 20.
+7. No streaming in phase 1.
+8. Playwright runs locally, intercepts the chat answer, uploads with fake embedding; **agree to download Chromium**; CI only runs lint/types/Vitest/build.
+9. Compose gains a `web` service.
+10. Real check: upload 1 small document (real embedding, under $0.001) + 1 question (about $0.001), estimate first and confirm afterwards.
 
-### 用户的确认（2026-11-03）
+### The user's confirmation (2026-11-03)
 
-10 条全部接受（浏览器内 OIDC；CORS；无前缀路径；8 个文档端点；引用加 `document_id`；前端栈；不做流式；Playwright 本地运行并**同意下载 Chromium**；Compose 加 `web`；真实检查先估算后确认）。
+All 10 were accepted (in-browser OIDC; CORS; prefix-less paths; 8 document endpoints; citations gaining `document_id`; the front-end stack; no streaming; Playwright running locally and **agreeing to download Chromium**; Compose gaining `web`; the real check with estimate first and confirmation afterwards).
 
-### 暂停记录（2026-11-04）
+### Pause record (2026-11-04)
 
-用户临时离开，**M7 暂停**，等用户下达"恢复"指令再继续。当时的状态：
+The user stepped away for a while and **M7 was paused**, to continue when the user gives the "resume" instruction. The state at the time:
 
-- **已完成并提交**（分支 `m7-docs-frontend`）：后端文档管理 API、读取接口、CORS、引用 `document_id`（699 个 Python 测试通过）；Next.js 前端（登录、聊天、引用抽屉、文档管理页，61 个 Vitest 测试，lint、类型、格式、构建通过）；web 的 Dockerfile、Compose `web` 服务、CI 前端作业、Makefile 目标、Playwright 测试、README 和设计 03 的修订。
-- **容器**：`api`、`web`、`worker`、`mcp-server` 等都在运行且健康；`web` 返回 200，API 的 CORS 对 `http://localhost:3000` 放行；`worker` 已恢复为正常（`openai`）嵌入配置。
-- **没有完成**：(1) Playwright 冒烟测试**一次都没有跑完**——Chromium 下载到约 50% 时被我按暂停指令中止；再跑一遍 `make e2e` 会重新下载（约 186 MB）。(2) 真实检查（上传 1 个小文档 + 1 个问题）还没做，需先给估算并等确认。(3) 本节"实际结果"还没填。(4) CI 还没在新分支上跑过前端作业。(5) 合并和 `ai-m7` 标签。
-- **本机环境的发现**（会写进实际结果）：Docker Desktop 的虚拟磁盘曾写满（`no space left on device`），Postgres 因此崩溃并进入恢复模式，`worker` 重启了一个多小时；清理了 6 GB 构建缓存后恢复。镜像构建里下载 Python 依赖的网络很慢，`uv` 默认的 30 秒超时导致失败，已在 `python.Dockerfile` 里设为 `UV_HTTP_TIMEOUT=120`；这次 API 镜像构建用了约 40 分钟。Docker 里还有约 8.6 GB 镜像和 10 GB 卷可回收，未动。
-- **未提交的改动**：`ai-module/deploy/docker/python.Dockerfile`（超时设置）和本记录。
+- **Done and committed** (branch `m7-docs-frontend`): the back end's document management API, the reading endpoints, CORS, the citation `document_id` (699 Python tests pass); the Next.js front end (sign-in, chat, citation drawer, document management page, 61 Vitest tests, lint, types, format and build pass); the web Dockerfile, the Compose `web` service, the CI front-end job, Makefile targets, Playwright tests, and the revisions to the README and design 03.
+- **Containers**: `api`, `web`, `worker`, `mcp-server` and the others are running and healthy; `web` returns 200, the API's CORS lets `http://localhost:3000` through; `worker` is back to the normal (`openai`) embedding configuration.
+- **Not finished**: (1) the Playwright smoke test **has not completed even once**: the Chromium download was at about 50% when I stopped it on the pause instruction; running `make e2e` again will download it again (about 186 MB). (2) The real check (upload 1 small document + 1 question) is not done yet and needs an estimate first and your confirmation. (3) The "Actual results" of this section is not filled in. (4) CI has not run the front-end job on the new branch yet. (5) The merge and the `ai-m7` tag.
+- **Findings about this machine's environment** (to go into the actual results): Docker Desktop's virtual disk once filled up (`no space left on device`), Postgres crashed and entered recovery mode, and `worker` restarted for more than an hour; it recovered after 6 GB of build cache was cleaned. The network is very slow when downloading Python dependencies during image builds, and `uv`'s default 30-second timeout made a build fail, now set to `UV_HTTP_TIMEOUT=120` in `python.Dockerfile`; this build of the API image took about 40 minutes. Docker still holds about 8.6 GB of images and 10 GB of volumes that could be reclaimed, left untouched.
+- **Uncommitted changes**: `ai-module/deploy/docker/python.Dockerfile` (the timeout setting) and this record.
 
-恢复后的顺序：确认容器健康 → `make e2e` → 处理失败（如有）→ 填实际结果 → 给真实检查的估算并等确认 → 推送、看 CI → 请用户确认合并并打 `ai-m7`。
+The order after resuming: confirm the containers are healthy → `make e2e` → handle failures (if any) → fill in the actual results → give the estimate for the real check and wait for confirmation → push, look at CI → ask the user to confirm the merge and tag `ai-m7`.
 
-### 实际结果
+### Actual results
 
-**状态：代码完成，端到端冒烟和真实检查通过，待你确认合并。**
+**Status: code complete, the end-to-end smoke test and the real check pass, awaiting your confirmation to merge.**
 
-- **后端测试**：699 个通过（M6 结束时 615 个）。新增 82 个文档 API 测试：7 个角色 × 7 个管理端点（只有 `RAGETLAdmin` 成功，其余 403，未登录 401）；上传校验（扩展名与文件头不符、空文件、非 UTF-8 文本、含二进制的文本、超过 20 MB、缺字段、非法 `access_level`/`doc_code`/`version`/`domain`/`status`/`min_level`、路径穿越的文件名）；重复上传 409 且消息带已有文档 ID；**完整流程**（真实 worker、假嵌入）：上传 → `ready` → 员工检索得到、学员和 `RAGETLAdmin` 检索不到；`chunks`/`file` 对员工 200、对学员和 `RAGETLAdmin` 404；`around` 取前后块；`PATCH` 后文档和所有分块的权限在同一事务里一致，改成 `draft` 后读不到；等级要求可设置、可清除；删除后文档、分块、原文件都没有、审计保留、再删 404；重新入库后分块被整体替换、任务历史两条；列表过滤（域、状态、入库状态、标题或编号、`%` 当字面量）与分页；CORS（允许前端来源，不允许其他来源，普通请求也不带 `Access-Control-Allow-Origin`）。
-- **前端**：Vitest 61 个通过；lint、类型检查（严格模式，含 `noUncheckedIndexedAccess`）、格式检查、生产构建都干净。覆盖：`[n]` 解析（未知编号保持文本、内容不当作 HTML）、返回路径只接受站内路径、7 个角色的菜单（只有 `RAGETLAdmin` 看到"文档"链接；直接进入管理页也显示无权限且不发请求）、引用抽屉（数据类显示视图与行数；文档类请求 `around`、高亮被引用的块、读取失败或没有 `document_id` 时的提示）、上传表单（校验、不发请求、字段与重复项的编码、服务器错误如重复）、文档页（列表、删除要二次确认、过滤、入库任务与错误原因）、聊天（建会话、发送、显示回答与来源、限流提示）、API 客户端（带令牌、401 触发重新登录、无令牌不发请求）。
-- **Playwright 冒烟**（`make e2e`，Chromium，对真实的 Compose 栈）：3 个通过。(1) 员工登录：看得到助手、看不到"文档"、直接进管理页显示无权限、**直接用令牌请求 `/documents` 得到 403**；(2) 提问（模型被拦截为固定回答，页面和 API 是真的）、点击 `[1]` 看到来源；(3) `RAGETLAdmin` 上传文档 → 等到 `ready`（worker 临时用假嵌入）→ 管理员账号读不到正文（404）、员工读得到 → 在聊天页点击引用看到原文 → 管理员在页面里删除（有确认）→ 行消失。`make e2e` 结束后 worker 自动恢复成真实嵌入，数据库里没有残留的测试文档。
-- **e2e 的两处是我的测试写错了，不是应用的问题**：Next.js 自带的路由播报元素也是 `role="alert"`，我的定位器匹配到两个；`Title` 同时匹配了标题输入框和"Search title or code"，改成按文字和精确标签定位。
-- **容器**：`web`（standalone 构建）、`api`、`mcp-server`、`worker` 等都健康；`web` 返回 200；API 对 `http://localhost:3000` 的 CORS 预检通过。
-- **与确认点的差异**：(a) shadcn/ui 的组件（按钮、输入、徽章、对话框等）是我**手写**的，沿用它的工具库（`class-variance-authority`、`clsx`、`tailwind-merge`）和风格，没有用它的 CLI，避免交互式安装和多出来的 Radix 依赖；对话框用 `role="dialog"` 自己实现。(b) 前端用 Next.js 15.5.29 + React 19 + Tailwind 4（npm 上最新是 Next 16，按设计固定在 15）。(c) `min_level` 是 1–7 的等级序号。(d) 列表的 `cursor` 是偏移量，不是游标键。(e) 回答按纯文本渲染（`[n]` 变按钮），不渲染 Markdown。(f) 第 8 条里"上传这一步走假嵌入"是通过 `make e2e` 临时切换 worker 实现的。
-- **本机环境的发现**：Docker Desktop 虚拟磁盘曾写满（`no space left on device`），Postgres 崩溃进入恢复模式，`worker` 重启了一个多小时；清理 6 GB 构建缓存后恢复，之后用户把磁盘上限调到 80 GB，又清理了停止的容器、悬空镜像和构建缓存（约 6 GB）。镜像构建里下载 Python 依赖的网络很慢，`uv` 默认的 30 秒超时导致一次构建失败，已在 `python.Dockerfile` 设 `UV_HTTP_TIMEOUT=120`；API 镜像构建用了约 40 分钟。
-- **已知限制**：令牌放在浏览器的 `sessionStorage`（XSS 能读到；缓解：Keycloak 令牌有效期短、不渲染 HTML）；`npm audit` 报告 16 条中高危，来自开发工具（Vitest 的依赖、`minimatch`）和 Next.js 自带的 PostCSS（只涉及不可信 CSS 输入，本项目的构建只处理自己的 CSS），**接受，没有强制升级**到会引入 Next 16 的版本；上传后的状态靠每 3 秒轮询，没有推送；删除是硬删除，没有回收站；Playwright 只在本地运行，CI 只跑前端的 lint、类型、格式、Vitest 和构建。
-- **真实检查**（用户确认后运行，真实嵌入和真实模型 `openai/gpt-6-luna`）：用 `RAGETLAdmin` 账号经 API 上传一个小文档 `VERIFY-001`（"核查城市的酒店标准是 CNY 777/晚"）→ 状态 `queued → running → ready`；再用员工账号提问"What is the hotel allowance per night for the verification city?"。**第一次助手没有直接回答，而是反问"Which verification city do you mean?"**（`need_clarification`）——是模型对我措辞的判断，不是链路问题；我在同一会话里补一句"The one in the Verification city allowance document."，第二次得到正确回答"CNY 777 per night … need approval from the finance controller [1]"，`end_state = answered`，引用带 `document_id` 和 `chunk_id`，用它请求 `GET /documents/{id}/chunks?around=…` 员工读到被引用的原文，`RAGETLAdmin` 账号读同一个文档得到 404；最后用 `RAGETLAdmin` 删除（204），数据库里文档和分块都是 0，测试文件已清理。**只问了这一个问题（两轮），不是一个题集**，不能当作质量结论；费用按估算不到 $0.002，没有逐项统计。**没有经真实浏览器登录点击这条真实回答的引用**——浏览器里点击引用由 Playwright（回答被固定）覆盖，真实回答的引用只用 API 验证了。
-- **未完成**：本分支最新一次推送的 CI 结果。
+- **Back-end tests**: 699 pass (615 at the end of M6). 82 new document API tests: 7 roles × 7 management endpoints (only `RAGETLAdmin` succeeds, the rest get 403, not signed in 401); upload validation (an extension that does not match the file header, an empty file, non-UTF-8 text, text containing binary, over 20 MB, missing fields, invalid `access_level`/`doc_code`/`version`/`domain`/`status`/`min_level`, a file name with path traversal); a duplicate upload gets 409 and the message carries the existing document's id; **the whole flow** (real worker, fake embedding): upload → `ready` → an employee finds it by search, a student and `RAGETLAdmin` cannot; `chunks`/`file` give 200 to an employee and 404 to a student and `RAGETLAdmin`; `around` fetches the chunks before and after; after `PATCH` the permissions of the document and all chunks are consistent within one transaction, and after changing to `draft` it can no longer be read; a grade requirement can be set and cleared; after deleting, the document, chunks and original file are all gone, the audit is kept, and deleting again gives 404; after re-ingestion the chunks are replaced as a whole and the job history has two entries; list filters (domain, status, ingestion status, title or code, `%` taken as a literal) and paging; CORS (the front-end origin allowed, other origins not, and an ordinary request also carries no `Access-Control-Allow-Origin`).
+- **Front end**: Vitest 61 pass; lint, type check (strict mode, including `noUncheckedIndexedAccess`), format check and production build are all clean. Covered: `[n]` parsing (an unknown number stays text, content is not treated as HTML), the return path accepting only in-site paths, the menus of 7 roles (only `RAGETLAdmin` sees the "Documents" link; going directly to the management page also shows no permission and sends no request), the citation drawer (data citations show view and row count; document citations request `around`, highlight the cited chunk, and show a notice when reading fails or there is no `document_id`), the upload form (validation, sending no request, encoding of fields and duplicates, server errors such as a duplicate), the documents page (list, deleting needs a second confirmation, filters, ingestion jobs and error reasons), chat (create a conversation, send, show the answer and sources, a rate-limit notice), the API client (carries the token, 401 triggers a new sign-in, no token sends no request).
+- **Playwright smoke** (`make e2e`, Chromium, against the real Compose stack): 3 pass. (1) An employee signs in: sees the assistant, does not see "Documents", going directly to the management page shows no permission, and **requesting `/documents` directly with the token gets 403**; (2) asking (the model intercepted as a fixed answer, the page and API real), clicking `[1]` shows the source; (3) `RAGETLAdmin` uploads a document → waits for `ready` (the worker temporarily on fake embedding) → the administrator account cannot read the body (404), the employee can → clicking the citation on the chat page shows the original → the administrator deletes it in the page (with confirmation) → the row disappears. After `make e2e` finishes the worker automatically returns to real embedding, and no test document remains in the database.
+- **Two e2e failures were my test being wrong, not the application**: the route announcer element that Next.js ships with is also `role="alert"` and my locator matched two; `Title` matched both the title input and "Search title or code", so it was changed to locate by text and exact label.
+- **Containers**: `web` (a standalone build), `api`, `mcp-server`, `worker` and the others are healthy; `web` returns 200; the API's CORS preflight for `http://localhost:3000` passes.
+- **Differences from the confirmation points**: (a) the shadcn/ui components (button, input, badge, dialog and so on) were **written by hand** by me, following its utility libraries (`class-variance-authority`, `clsx`, `tailwind-merge`) and its style, without its CLI, to avoid an interactive install and the extra Radix dependencies; the dialog is implemented by itself with `role="dialog"`. (b) The front end uses Next.js 15.5.29 + React 19 + Tailwind 4 (the latest on npm is Next 16, pinned to 15 by the design). (c) `min_level` is a grade number from 1 to 7. (d) The list's `cursor` is an offset, not a cursor key. (e) Answers are rendered as plain text (`[n]` becomes a button), with no Markdown rendering. (f) In item 8, "the upload step uses fake embedding" is done by temporarily switching the worker through `make e2e`.
+- **Findings about this machine's environment**: Docker Desktop's virtual disk once filled up (`no space left on device`), Postgres crashed into recovery mode, and `worker` restarted for more than an hour; it recovered after cleaning 6 GB of build cache, and later the user raised the disk limit to 80 GB, and stopped containers, dangling images and build cache (about 6 GB) were cleaned again. The network is very slow when downloading Python dependencies in image builds, and `uv`'s default 30-second timeout made one build fail, now set to `UV_HTTP_TIMEOUT=120` in `python.Dockerfile`; building the API image took about 40 minutes.
+- **Known limits**: the token is kept in the browser's `sessionStorage` (XSS can read it; mitigation: Keycloak tokens have a short lifetime and no HTML is rendered); `npm audit` reports 16 medium and high findings, coming from development tools (the dependencies of Vitest, `minimatch`) and the PostCSS bundled with Next.js (it only matters for untrusted CSS input, and this project's build only processes its own CSS), **accepted, without forcing an upgrade** to versions that would bring in Next 16; the status after an upload relies on polling every 3 seconds, with no push; deleting is a hard delete with no recycle bin; Playwright runs only locally, and CI only runs the front end's lint, types, format, Vitest and build.
+- **Real check** (run after the user's confirmation, real embedding and the real model `openai/gpt-6-luna`): with the `RAGETLAdmin` account, a small document `VERIFY-001` ("the hotel standard of the verification city is CNY 777 per night") was uploaded through the API → status `queued → running → ready`; then an employee account asked "What is the hotel allowance per night for the verification city?". **The first time the assistant did not answer directly but asked "Which verification city do you mean?"** (`need_clarification`); that is the model's judgement about my wording and not a problem of the chain; in the same conversation I added "The one in the Verification city allowance document.", and the second time it gave the correct answer "CNY 777 per night … need approval from the finance controller [1]", `end_state = answered`, with a citation carrying `document_id` and `chunk_id`; requesting `GET /documents/{id}/chunks?around=…` with it let the employee read the cited original, while the `RAGETLAdmin` account reading the same document got 404; finally deleting as `RAGETLAdmin` (204) left 0 documents and chunks in the database, and the test file was cleaned up. **Only this one question (two rounds) was asked, not a question set**, so it cannot be taken as a conclusion about quality; the cost was estimated at under $0.002 and was not counted item by item. **A real browser did not sign in and click the citation of this real answer**: clicking a citation in the browser is covered by Playwright (with a fixed answer), and the citation of the real answer was verified only through the API.
+- **Not finished**: the CI result of the latest push of this branch.
 
-## M8 完整评测、可观测性与收尾
+## M8 Full evaluation, observability and wrap-up
 
-状态：**已完成，待合并**（分支 `m8-eval-observability`）。第一阶段的最后一个里程碑：把评测补全（更多的题、答案正确性、实验矩阵、一份汇总报告）、给所有服务接上 OpenTelemetry 和 Grafana（Langfuse 可选）、做"一条命令起来、不用 OpenAI 密钥也能有数据"的种子，最后对照设计 06 第 8 节的 7 条逐条验收并打 `v0.1.0`。评测和 LiteLLM 代理的真实检查会花钱，**先估算再等你确认**。
+Status: **Done, awaiting merge** (branch `m8-eval-observability`). The last milestone of phase 1: complete the evaluation (more questions, answer correctness, the experiment matrix, one summary report), connect all services to OpenTelemetry and Grafana (Langfuse optional), make a seed for "one command to start, with data even without an OpenAI key", and finally accept item by item the 7 criteria of section 8 of design 06 and tag `v0.1.0`. The real checks of the evaluation and the LiteLLM proxy cost money, so **the estimate comes first and then you confirm**.
 
-### 开始前的现状（已核对）
+### State before starting (verified)
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| 评测 | 已有：检索评测（4 种模式、权限扫描 54 题 × 7 角色）、助手抽查（15 轮）、数据题（41 题，`starit-eval data`）。**没有**：答案正确性评分、拒绝正确性的汇总、运行指标汇总、实验矩阵的其余项、一份把它们合起来的报告。`ai.eval_runs`/`ai.eval_results` 表已有 |
-| 评测题 | `qa-set.jsonl` 54 题（`keyword` 3、`version` 2、`paraphrase` 1、`unanswerable` 3，`manager`/`hr` 各 1 题）——设计 05 已指出太少，说好 M8 补充 |
-| 派生内容（摘要、假设性问题） | `derive` 阶段在管线里是**空的**（注释写着"评测证明有用再加"），实验矩阵里"派生内容"这一项目前做不了 |
-| 可观测性 | **完全没有**：没有 OTel、没有指标、没有 Grafana。日志是 JSON，带 `request_id`，没有 `trace_id` 和 `run_id` |
-| 种子 | 没有 `make seed`；现在是 `make seed-biz` + `make ingest-samples`，后者**需要 OpenAI 密钥**。没有预置的向量库转储，也没有 `seed/` 目录 |
-| **一个我之前没有记录的偏差** | 设计 01 的 4.2（你已确认）写的是：full profile 经 **LiteLLM 代理服务**调用模型，lite 才用进程内的 litellm 库。**M5 做的是所有 profile 都用进程内的 litellm 库**，Compose 里没有 LiteLLM 服务，`STARIT_LLM_GATEWAY` 这个变量也不存在。这是我在 M5 漏记的偏差，现在补上，第 1 个确认点请你决定 |
-| 资源 | Docker Desktop 的内存上限约 11.7 GB，现在 8 个核心服务合计约 2.1 GB（Keycloak 826 MiB、api 331 MiB、worker 279 MiB、对象存储 306 MiB、mcp-server 139 MiB、web 131 MiB、Postgres 89 MiB、Redis 39 MiB）。虚拟磁盘 80 GB |
+| Evaluation | Existing: the search evaluation (4 modes, permission sweep of 54 questions × 7 roles), the assistant spot check (15 rounds), the data questions (41 questions, `starit-eval data`). **Missing**: answer correctness scoring, a summary of refusal correctness, a summary of run metrics, the rest of the experiment matrix, one report that merges them. The tables `ai.eval_runs`/`ai.eval_results` already exist |
+| Evaluation questions | `qa-set.jsonl` has 54 questions (`keyword` 3, `version` 2, `paraphrase` 1, `unanswerable` 3, and 1 each for `manager`/`hr`): design 05 already pointed out that this is too few and said M8 would add more |
+| Derived content (summary, hypothetical questions) | The `derive` stage in the pipeline is **empty** (the comment says "add it once evaluation proves it useful"), so the "derived content" item of the experiment matrix cannot be done yet |
+| Observability | **None at all**: no OTel, no metrics, no Grafana. Logs are JSON with `request_id` but no `trace_id` or `run_id` |
+| Seed | There is no `make seed`; today it is `make seed-biz` + `make ingest-samples`, and the latter **needs an OpenAI key**. There is no ready-made vector store dump and no `seed/` directory |
+| **A deviation I had not recorded before** | 4.2 of design 01 (which you confirmed) says: the full profile calls models through the **LiteLLM proxy service**, and only lite uses the in-process litellm library. **What M5 did was use the in-process litellm library for every profile**; Compose has no LiteLLM service and the variable `STARIT_LLM_GATEWAY` does not exist. This is a deviation I failed to record in M5; it is recorded now, and confirmation point 1 asks you to decide |
+| Resources | Docker Desktop's memory limit is about 11.7 GB, and the 8 core services together now use about 2.1 GB (Keycloak 826 MiB, api 331 MiB, worker 279 MiB, object store 306 MiB, mcp-server 139 MiB, web 131 MiB, Postgres 89 MiB, Redis 39 MiB). The virtual disk is 80 GB |
 
-### 需要先确认的问题
+### Questions to confirm first
 
-1. **LiteLLM 代理**：补上设计 01 约定的做法——Compose 增加 `litellm` 服务（端口 4100，模型别名和密钥放在它的配置里），api、worker、mcp-server 通过 `STARIT_LLM_GATEWAY=litellm_proxy` 经它调用；在宿主机直接运行（`uv run`、评测）时默认仍用进程内库（`litellm_lib`）。好处：密钥只在一个服务里、调用和费用有统一的记录、与设计一致；代价：多一个服务（预计 0.3–0.5 GB）和一层配置，我**还没核对**当前 LiteLLM 代理镜像的版本和配置格式，开始时先核对。备选：不做，改设计 01，把"full 经代理"改成"所有 profile 进程内"。
-2. **评测运行器的完整版**：新增 `starit-eval answers`（对 `qa-set.jsonl` 问助手并打分）：编号、数字、日期等**确定性比对**；其余用 LLM 判官（判官模型单独配置，默认 `gpt-6-luna`），并**随机抽 20% 导出成一张表供人工核对**（判官的结论没有核对前不当作事实）；拒绝正确性（`should_answer=false` 的题：状态合法且回答不含受限事实）；每次运行的 `end_state`/`end_reason` 合法性；延迟 p50/p95、token、估算成本（来自 `ai.runs`——**注意应用账号读不到审计表，但能读 `ai.runs`**，我会先核对）。再加一个 `starit-eval all`，把检索、答案、数据、权限扫描合成**一份报告**，写入 `ai.eval_runs`（含提交号和全部配置）并生成 `docs/eval/` 下的 Markdown。
-3. **补充评测题（合成）**：我读样例文档，补写 `keyword`、`version`、`paraphrase`、`unanswerable` 各至少 8 题，`manager`/`hr`/`finance` 提问者至少再 6 题，每个受限文档至少一道"不被允许的角色问它"的题。每题写明来源文档和期望答案，并**用脚本核对期望答案里的事实确实出现在来源文档里**（防止我写错）。题集总数大约从 54 涨到 90 多。样本仍然很小——补完也**不对准确率下结论**，只是让各题型至少有 8 题。
-4. **实验矩阵里做哪些**（设计 05 的 4.4）：
-   - 检索模式（4 种）：在补充后的题集上重跑——**做**。
-   - 分块大小 300 / 500 / 800：重新入库（嵌入费用可以忽略，约 11k token）——**做**。
-   - 编号查询的 `identifiers` 加权开/关：加一个配置开关——**做**，不花钱。
-   - 派生内容（无 / 摘要 / 假设性问题 / 全部）：要**先实现** `derive` 阶段（入库时每个块多 1–2 次模型调用，28 份文档 39 个块约 80 次调用，约 $0.01），再比较——**建议做**，这是学习"改写问法"最直接的实验；若你想控制范围可以去掉。
-   - Rerank 实现（LLM 列表式 / 专用 API）：专用 API 没有接入——**不做**，记录为"只比较了 LLM 列表式"。
-   - 关键词排序 `ts_rank_cd` / BM25 扩展：扩展没有安装、没有验证过——**不做**，记录决定"第一阶段不引入 BM25"。
-5. **可观测性的范围**：api、worker、mcp-server 接入 OpenTelemetry：HTTP 请求、SQLAlchemy 查询、**每次模型调用**（模型名、token、耗时）、**图的每个节点**、每次工具调用都是 span；日志加 `trace_id`、`run_id`。指标：请求量与延迟、`end_state` 分布、检索延迟、模型调用数与 token、入库队列长度与失败数、被权限过滤的分块比例。Compose 增加 `observability.yaml`（OTel Collector、Prometheus、Grafana、Tempo），Grafana 预置 4 个仪表盘（运行概览、End 状态分布、检索与模型延迟、入库任务）；`make up-obs` 启动。**Loki（日志）这次不做**：日志仍是带 `trace_id` 的 JSON，用 `docker logs` 看，省约 0.5 GB 内存；你若想要，设计 06 里 Loki 本来标的是"视内存"。
-6. **Langfuse（可选 Compose 文件）**：`langfuse.yaml`（Langfuse 的 web、worker 和它依赖的 Postgres、ClickHouse、Redis、对象存储），通过 Collector 把**同一份 trace** 用 OTLP 发过去，并把评测分数写到 Langfuse。验收标准 6 要求"Langfuse 和 Grafana 能看到同一次运行"，所以需要它。**我还没核对 Langfuse 当前版本自托管需要哪些服务、OTLP 接入方式和镜像版本**，开始时先核对并实测内存，回填到设计 06（预计比其他可观测性组件重得多，粗估 2 GB 以上，**未核实**）。
-7. **种子与 `make seed`**：`make seed` = 导入业务表（`seed-biz`）+ 载入**预置的向量库转储** + 把样例原文件放进对象存储（这样点击引用能打开原文）。转储 `seed/ai-seed.sql.gz` 含文档、分块、向量（`text-embedding-3-small`）、派生内容，**不含**会话、审计、评测记录；由 `make seed-dump` 从验证过的库导出。这样**不需要 OpenAI 密钥就能有一个可用的知识库**（提问仍需要密钥）。`make seed ARGS=--ingest` 走真实的入库管线（需要密钥）。体积预计不到几 MB；超过 GitHub 限制则放发布附件。Keycloak 的 realm 本来就在 `make up` 时导入。
-8. **验收**：把设计 06 第 8 节的 7 条逐条跑一遍，写成 `docs/eval/acceptance-v0.1.0.md`（每条的命令、结果、没验证到的部分）。第 1 条"干净的 Mac 上 `make up && make seed`"：我在**这台机器**上执行 `make clean`（**会删除这个项目的本地数据卷**：Postgres、Redis、Keycloak、对象存储里的演示数据，不动别的项目的卷；`.env` 保留）后重新 `make up && make seed`，记录耗时。这不等于一台真正干净的机器，报告里会写明。
-9. **标签**：合并后同时打 `ai-m8` 和计划里写的 `v0.1.0`（AI 模块第一阶段）。
-10. **真实检查**（先估算再确认）：(a) `starit-eval all`：约 90 道文档题（每题理解 + 重排 + 生成 + 判官约 4 次调用）+ 数据题 41 道（约 4 次/题），估计 500–600 次模型调用，**估算费用我在命令里算出来给你看**，预计在 $0.2 以内；(b) 分块大小、`identifiers`、派生内容的矩阵重跑，主要是检索评测，费用主要是重排；(c) 经 LiteLLM 代理问 1 个真实问题；(d) Langfuse/Grafana 看同一次运行。
+1. **The LiteLLM proxy**: fill in what design 01 agreed: Compose gains a `litellm` service (port 4100, with model aliases and keys in its configuration), and the api, worker and mcp-server call through it with `STARIT_LLM_GATEWAY=litellm_proxy`; when running directly on the host (`uv run`, evaluation) the in-process library (`litellm_lib`) is still the default. Benefits: keys live in one service, calls and costs have one record, and it matches the design; costs: one more service (expected 0.3 to 0.5 GB) and one more layer of configuration, and I have **not yet checked** the current LiteLLM proxy image version and configuration format, to be checked at the start. The alternative: do not do it, and change design 01 so that "full through the proxy" becomes "all profiles in the process".
+2. **The full evaluation runner**: add `starit-eval answers` (asks the assistant the `qa-set.jsonl` questions and scores them): **deterministic comparison** of codes, numbers, dates and so on; the rest by an LLM judge (the judge model is configured separately, default `gpt-6-luna`), and **a random 20% exported to a table for human checking** (the judge's conclusion is not taken as fact before it is checked); refusal correctness (for questions with `should_answer=false`: a valid state and an answer containing no restricted fact); the validity of the `end_state`/`end_reason` of every run; latency p50/p95, tokens and estimated cost (from `ai.runs`; **note the application account cannot read the audit table but can read `ai.runs`**, which I will check first). Also add `starit-eval all`, merging search, answers, data and the permission sweep into **one report**, written to `ai.eval_runs` (with the commit and the whole configuration) and a Markdown under `docs/eval/`.
+3. **Additional evaluation questions (synthetic)**: I read the sample documents and write at least 8 more each for `keyword`, `version`, `paraphrase` and `unanswerable`, at least 6 more questions from `manager`/`hr`/`finance` askers, and at least one "a forbidden role asks about it" question for every restricted document. Each question states its source document and expected answer, and **a script checks that the facts in the expected answer really appear in the source document** (to guard against my own mistakes). The total grows from 54 to a bit over 90. The sample is still small, and even after the additions **no conclusion about accuracy is drawn**; it only gives each question type at least 8 questions.
+4. **What the experiment matrix does** (4.4 of design 05):
+   - Search mode (4 kinds): rerun on the enlarged question set: **do**.
+   - Chunk size 300 / 500 / 800: re-ingest (the embedding cost is negligible, about 11k tokens): **do**.
+   - The `identifiers` boost on or off for code queries: add a configuration switch: **do**, costs nothing.
+   - Derived content (none / summary / hypothetical questions / all): needs the `derive` stage to be **implemented first** (1 to 2 more model calls per chunk at ingestion, about 80 calls for 28 documents and 39 chunks, about $0.01), then comparing: **proposed to do**, this is the most direct experiment for learning about "paraphrased questions"; it can be dropped if you want to limit the scope.
+   - The rerank implementation (LLM listwise / dedicated API): the dedicated API is not connected: **not done**, recorded as "only the LLM listwise was compared".
+   - Keyword ranking `ts_rank_cd` / BM25 extension: the extension is not installed and was never verified: **not done**, with the decision recorded as "BM25 is not brought in in phase 1".
+5. **Scope of observability**: the api, worker and mcp-server are connected to OpenTelemetry: HTTP requests, SQLAlchemy queries, **every model call** (model name, tokens, duration), **every node of the graph** and every tool call are spans; logs gain `trace_id` and `run_id`. Metrics: request volume and latency, the `end_state` distribution, search latency, the number of model calls and tokens, ingestion queue length and failures, the share of chunks filtered out by permissions. Compose gains `observability.yaml` (OTel Collector, Prometheus, Grafana, Tempo), Grafana has 4 preset dashboards (run overview, End state distribution, search and model latency, ingestion jobs); started by `make up-obs`. **Loki (logs) is not done this time**: logs remain JSON with `trace_id`, read with `docker logs`, saving about 0.5 GB of memory; if you want it, Loki was marked "depending on memory" in design 06.
+6. **Langfuse (an optional Compose file)**: `langfuse.yaml` (Langfuse's web, worker and the Postgres, ClickHouse, Redis and object store it depends on), sending **the same traces** over OTLP through the Collector, and writing the evaluation scores to Langfuse. Acceptance criterion 6 requires "Langfuse and Grafana can show the same run", so it is needed. **I have not yet checked which services self-hosting the current Langfuse version needs, how OTLP is connected and the image versions**; they are checked and the memory measured at the start, and filled back into design 06 (expected to be much heavier than the other observability components, roughly over 2 GB, **not verified**).
+7. **The seed and `make seed`**: `make seed` = import the business tables (`seed-biz`) + load the **ready-made vector store dump** + put the sample original files in the object store (so that clicking a citation can open the original). The dump `seed/ai-seed.sql.gz` contains documents, chunks, vectors (`text-embedding-3-small`) and derived content, **and not** conversations, audit or evaluation records; it is exported from a verified database by `make seed-dump`. This way **a usable knowledge base exists without an OpenAI key** (asking still needs the key). `make seed ARGS=--ingest` goes through the real ingestion pipeline (needs the key). The size is expected to be under a few MB; if it exceeds the GitHub limit it goes in a release attachment. Keycloak's realm is already imported at `make up`.
+8. **Acceptance**: run the 7 criteria of section 8 of design 06 one by one and write `docs/eval/acceptance-v0.1.0.md` (the command, result and unverified parts of each). For criterion 1, "`make up && make seed` on a clean Mac": on **this machine** I run `make clean` (**which deletes this project's local data volumes**: the demo data in Postgres, Redis, Keycloak and the object store, leaving other projects' volumes alone; `.env` is kept) and then `make up && make seed` again and record the time. This is not the same as a truly clean machine, and the report says so.
+9. **Tags**: after merging, tag both `ai-m8` and the `v0.1.0` in the plan (phase 1 of the AI module).
+10. **Real checks** (estimate first, then confirm): (a) `starit-eval all`: about 90 document questions (understand + rerank + generate + judge, about 4 calls per question) + 41 data questions (about 4 per question), an estimated 500 to 600 model calls, **I will compute the estimated cost in the command and show it to you**, expected within $0.2; (b) the matrix rerun for chunk size, `identifiers` and derived content, mainly the search evaluation, with the cost mostly in rerank; (c) ask 1 real question through the LiteLLM proxy; (d) look at the same run in Langfuse/Grafana.
 
-### 计划的文件（`ai-module/` 下）
+### Planned files (under `ai-module/`)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `eval/src/starit_eval/answers.py`（新）、`judge.py`（新）、`report.py`、`cli.py`、`runner.py`（改） | 答案正确性（确定性 + 判官 + 20% 人工抽查表）、拒绝正确性、运行指标、`starit-eval answers` 与 `all`、汇总报告 |
-| `eval/src/starit_eval/matrix.py`（新） | 实验矩阵：重新入库后跑检索评测，保存每个配置的结果 |
-| `sample-data/eval/qa-set.jsonl`、`sample-data/tools/`（改） | 补充的评测题与核对来源事实的脚本 |
-| `packages/core/src/starit_core/ingest/derive.py`（新）、`pipeline.py`、`config.py`、`retrieval/keyword.py`（改） | 派生内容、`identifiers` 加权开关 |
-| `packages/core/src/starit_core/telemetry.py`（新）、`agent/nodes.py`、`llm.py`、`dataaccess/tools.py`、三个服务的入口（改） | OTel 初始化、节点/模型/工具的 span、指标、日志里的 `trace_id`/`run_id` |
-| `deploy/compose/observability.yaml`、`langfuse.yaml`、`deploy/observability/`（新） | Collector、Prometheus、Tempo、Grafana（预置数据源与 4 个仪表盘）、Langfuse |
-| `deploy/compose/compose.yaml`、`deploy/litellm/config.yaml`（新/改） | LiteLLM 代理服务；`STARIT_LLM_GATEWAY` |
-| `packages/core/src/starit_core/llm.py`、`embeddings.py`、`config.py`（改） | 经代理调用（`api_base`），两种网关的切换 |
-| `scripts/seed.py`、`scripts/seed_dump.py`、`seed/`（新）、`Makefile`（改） | `make seed`、`make seed-dump`、`make up-obs` |
-| 相应的测试 | 见验证标准 |
-| `docs/design/01`、`04`、`05`、`06`、`ai-module/README.md`、`docs/eval/README.md`、`docs/eval/acceptance-v0.1.0.md`（改/新） | 偏差与实测的回填、使用文档、验收报告 |
+| `eval/src/starit_eval/answers.py` (new), `judge.py` (new), `report.py`, `cli.py`, `runner.py` (changed) | Answer correctness (deterministic + judge + the 20% human spot-check table), refusal correctness, run metrics, `starit-eval answers` and `all`, the summary report |
+| `eval/src/starit_eval/matrix.py` (new) | The experiment matrix: run the search evaluation after re-ingestion and save the result of every configuration |
+| `sample-data/eval/qa-set.jsonl`, `sample-data/tools/` (changed) | The additional evaluation questions and the script that checks the source facts |
+| `packages/core/src/starit_core/ingest/derive.py` (new), `pipeline.py`, `config.py`, `retrieval/keyword.py` (changed) | Derived content, the `identifiers` boost switch |
+| `packages/core/src/starit_core/telemetry.py` (new), `agent/nodes.py`, `llm.py`, `dataaccess/tools.py`, the entry points of the three services (changed) | OTel initialisation, spans for nodes, models and tools, metrics, `trace_id`/`run_id` in logs |
+| `deploy/compose/observability.yaml`, `langfuse.yaml`, `deploy/observability/` (new) | Collector, Prometheus, Tempo, Grafana (preset data sources and 4 dashboards), Langfuse |
+| `deploy/compose/compose.yaml`, `deploy/litellm/config.yaml` (new/changed) | The LiteLLM proxy service; `STARIT_LLM_GATEWAY` |
+| `packages/core/src/starit_core/llm.py`, `embeddings.py`, `config.py` (changed) | Calling through the proxy (`api_base`), switching between the two gateways |
+| `scripts/seed.py`, `scripts/seed_dump.py`, `seed/` (new), `Makefile` (changed) | `make seed`, `make seed-dump`, `make up-obs` |
+| The matching tests | See the verification criteria |
+| `docs/design/01`, `04`, `05`, `06`, `ai-module/README.md`, `docs/eval/README.md`, `docs/eval/acceptance-v0.1.0.md` (changed/new) | Filling in deviations and measurements, usage documents, the acceptance report |
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m8-eval-observability                 # 已创建
+git switch -c m8-eval-observability                 # already created
 uv sync --all-packages
 make test && make lint && make web-check
-make up                                             # 现在含 litellm
-make up-obs                                         # Collector、Prometheus、Tempo、Grafana
-make seed-dump && make clean && make up && make seed   # 种子的往返验证（会删本项目的数据卷，先确认）
-make eval ARGS="all"                                # 先打印估算并等确认
-make eval ARGS="matrix"                             # 先估算并等确认
+make up                                             # now includes litellm
+make up-obs                                         # Collector, Prometheus, Tempo, Grafana
+make seed-dump && make clean && make up && make seed   # round trip of the seed (deletes this project's data volumes, confirm first)
+make eval ARGS="all"                                # estimate printed first, wait for confirmation
+make eval ARGS="matrix"                             # estimate first, wait for confirmation
 ```
 
-### 验证标准
+### Verification criteria
 
-1. **答案评分**：确定性比对（数字、编号、日期、金额、带逗号的数）有单元测试；判官用假模型测试它的解析和失败处理；20% 抽查表可重现（同一随机种子）；拒绝正确性的判定有测试（含"回答里带受限事实就算失败"）。
-2. **新增评测题**：脚本核对每题的期望答案事实都在来源文档里；各题型数量达标；每个受限文档至少有一道被禁角色的题；**权限扫描（54 → 全部题 × 7 角色 × 3 种模式）越权为 0**。
-3. **派生内容与加权开关**：`derive` 的单元测试（假模型）；开关关闭时 `identifiers` 加权确实不起作用（有测试）；重新入库后原子替换。
-4. **OTel**：测试里用内存导出器，断言一次对话产生的 span 有预期的层次（HTTP → 图节点 → 模型调用/检索/工具 → 数据库）、同一个 `trace_id`；数据类问题经 MCP 时 trace 跨服务连起来；日志带 `trace_id` 和 `run_id`；**span 属性和日志里没有令牌、没有问题原文以外的个人数据**（有测试：令牌、`Authorization` 头不出现在任何 span 或日志里）。
-5. **指标**：测试用内存读取器断言 `end_state` 计数、模型调用数、token、入库队列长度等指标被记录。
-6. **Compose**：`make up-obs` 后 Collector、Prometheus、Tempo、Grafana 健康；Grafana 里 4 个仪表盘存在且查询有数据（跑几次真实或假模型的对话之后）；Prometheus 能查到 `end_state` 指标；Tempo 里能按 `run_id` 找到 trace。
-7. **Langfuse**：`langfuse.yaml` 启动后，同一次运行的 trace 在 Langfuse 和 Grafana（Tempo）里都能找到；实测内存回填设计 06。
-8. **LiteLLM 代理**：容器健康；经代理问一个真实问题得到带引用的回答；代理不可用时 API 的错误处理走 `error` 终态且不泄露密钥；密钥不出现在 api/worker/mcp-server 的环境变量里（只在 `litellm` 服务里）。
-9. **种子**：`seed-dump` → 清空 → `seed` 的往返：文档数、分块数、向量数、`content_hash` 一致；**不用 OpenAI 密钥**的 `make seed` 之后，无权限账号仍检索不到受限文档（权限回归）；点击引用能打开原文（对象存储里有文件）。
-10. **完整评测与矩阵**（确认费用后）：`starit-eval all` 出报告并写 `ai.eval_runs`；矩阵的每个配置都有结果；报告里写清楚样本量和局限，**不事先承诺任何指标数值**。
-11. **验收报告**：设计 06 第 8 节的 7 条逐条有命令、结果、没验证到的部分。
-12. 本地测试、lint、mypy、前端检查通过，CI 通过。
+1. **Answer scoring**: the deterministic comparison (numbers, codes, dates, amounts, comma-separated numbers) has unit tests; the judge's parsing and failure handling are tested with a fake model; the 20% spot-check table is reproducible (the same random seed); the decision of refusal correctness has tests (including "an answer carrying a restricted fact counts as a failure").
+2. **The new evaluation questions**: a script checks that the facts of every question's expected answer are in the source document; the number per question type is met; every restricted document has at least one question from a forbidden role; **the permission sweep (from 54 to all questions × 7 roles × 3 modes) shows 0 overreach**.
+3. **Derived content and the boost switch**: unit tests of `derive` (fake model); when the switch is off the `identifiers` boost really has no effect (tested); atomic replacement after re-ingestion.
+4. **OTel**: the tests use an in-memory exporter and assert that the spans of one conversation have the expected hierarchy (HTTP → graph node → model call/search/tool → database) and the same `trace_id`; for a data question going through MCP the trace is connected across services; logs carry `trace_id` and `run_id`; **span attributes and logs contain no token and no personal data other than the original question** (tested: the token and the `Authorization` header appear in no span or log).
+5. **Metrics**: tests use an in-memory reader to assert that metrics such as the `end_state` count, the number of model calls, tokens and the ingestion queue length are recorded.
+6. **Compose**: after `make up-obs` the Collector, Prometheus, Tempo and Grafana are healthy; the 4 dashboards exist in Grafana and their queries have data (after a few conversations with a real or fake model); Prometheus can query the `end_state` metric; Tempo can find a trace by `run_id`.
+7. **Langfuse**: after `langfuse.yaml` starts, the trace of the same run can be found in both Langfuse and Grafana (Tempo); the measured memory is filled back into design 06.
+8. **LiteLLM proxy**: the container is healthy; asking one real question through the proxy gets an answer with citations; when the proxy is unavailable the API's error handling ends in the `error` state without leaking keys; the keys are not in the environment variables of the api/worker/mcp-server (only in the `litellm` service).
+9. **Seed**: a round trip of `seed-dump` → clear → `seed`: the numbers of documents, chunks and vectors and the `content_hash` are consistent; after a `make seed` **without an OpenAI key**, an account without permission still cannot find restricted documents by search (permission regression); clicking a citation can open the original (the files are in the object store).
+10. **Full evaluation and matrix** (after the cost is confirmed): `starit-eval all` produces a report and writes `ai.eval_runs`; every configuration of the matrix has a result; the report states the sample size and the limits clearly, **and promises no metric value in advance**.
+11. **Acceptance report**: each of the 7 criteria of section 8 of design 06 has a command, a result and the parts not verified.
+12. Local tests, lint, mypy and front-end checks pass, and CI passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- **OpenTelemetry、Prometheus、Grafana、Tempo、Langfuse、LiteLLM 代理这几个组件的当前版本、镜像名和配置格式我都还没核对**（它们更新很快，我的记忆可能过时）；实现前先逐个核对并固定版本，核对不了的写在记录里。
-- **Langfuse 的资源**：它依赖的服务多（含 ClickHouse），在 11.7 GB 的 Docker 内存里和其余服务一起跑不一定宽裕；实测后再决定是否默认启用，验收时可能需要先停掉别的可选组件。
-- **LiteLLM 代理本身的稳定性和对 `gpt-6-luna` 等模型名的支持**：如果代理对某个模型别名不认，要在它的配置里补，可能影响重排/理解步骤的 JSON 模式。
-- **判官（LLM 评分）会有误判**；20% 抽查只能估计误判率，不能消除；样本小，报告里不会写"准确率 X%"这样的结论，只写通过多少题和哪几题没过。
-- **派生内容**可能没有明显收益，也可能让检索变差（假设性问题会引入噪声）；这是实验，结果可能是"不建议开启"。
-- **`make clean` 后重新 `make up && make seed`** 的耗时主要取决于镜像是否已在本机；这台机器上镜像都已存在，比真正的新机器快得多，报告会写明。
-- **任务量很大**：评测、OTel、三个可选 Compose 文件、代理、种子、验收报告。如果中途发现范围太大，我会先停下来问你要不要把 Langfuse 或派生内容拆到 M8 之后，而不是悄悄缩水。
+- **I have not yet checked the current versions, image names and configuration formats** of OpenTelemetry, Prometheus, Grafana, Tempo, Langfuse and the LiteLLM proxy (they update fast and my memory may be out of date); before implementing I check them one by one and pin the versions, and what cannot be checked is written in the record.
+- **Langfuse's resources**: it depends on many services (including ClickHouse), and running together with the rest in 11.7 GB of Docker memory is not necessarily comfortable; whether to enable it by default is decided after measuring, and for acceptance other optional components may have to be stopped first.
+- **The stability of the LiteLLM proxy itself and its support for model names such as `gpt-6-luna`**: if the proxy does not recognise a model alias it has to be added in its configuration, which may affect the JSON mode of the rerank/understand steps.
+- **The judge (LLM scoring) will make wrong calls**; the 20% spot check can only estimate the error rate and cannot remove it; the sample is small, and the report will not draw conclusions such as "accuracy X%" but only state how many questions passed and which did not.
+- **Derived content** may have no clear benefit, and may even make search worse (hypothetical questions bring noise); this is an experiment, and the result may be "not recommended to switch on".
+- **The time for `make up && make seed` again after `make clean`** depends mainly on whether the images are already on this machine; on this machine all images exist, so it is much faster than a truly new machine, and the report will say so.
+- **The workload is large**: evaluation, OTel, three optional Compose files, the proxy, the seed, the acceptance report. If midway I find the scope too big, I will stop and ask whether to move Langfuse or derived content to after M8, rather than quietly shrinking it.
 
-### 需要你确认
+### For you to confirm
 
-1. 补上 LiteLLM 代理（full 经代理，宿主机运行仍用进程内库）——并承认这是我在 M5 漏记的偏差。
-2. 评测运行器的完整版：答案评分（确定性 + 判官 + 20% 人工抽查表）、拒绝正确性、运行指标、`starit-eval all` 汇总报告。
-3. 合成补充评测题（各题型 ≥ 8，manager/hr/finance ≥ 6，每个受限文档 ≥ 1 道被禁角色的题），脚本核对来源事实。
-4. 实验矩阵：检索模式、分块大小 300/500/800、`identifiers` 加权开关、派生内容（先实现）；不做专用重排 API 和 BM25，并记录决定。
-5. 可观测性范围：OTel 贯穿 api、worker、mcp-server；指标；Collector、Prometheus、Tempo、Grafana（4 个仪表盘）；**不做 Loki**。
-6. Langfuse 作为可选 Compose 文件，接同一份 trace 和评测分数，先核对版本并实测内存。
-7. `make seed` 用预置的向量库转储（不需要 OpenAI 密钥）加原文件上传；`make seed ARGS=--ingest` 走真实管线。
-8. 验收：7 条逐条跑并写 `acceptance-v0.1.0.md`；第 1 条在这台机器上 `make clean` 后重来（**会删除本项目的本地数据卷**）。
-9. 合并后同时打 `ai-m8` 和 `v0.1.0`。
-10. 真实检查：`starit-eval all`、矩阵重跑、经代理问 1 个问题；每项先估算后确认。
+1. Add the LiteLLM proxy (full through the proxy, running directly on the host still using the in-process library), and acknowledge this as a deviation I failed to record in M5.
+2. The full evaluation runner: answer scoring (deterministic + judge + 20% human spot-check table), refusal correctness, run metrics, the `starit-eval all` summary report.
+3. Synthetic additional evaluation questions (each type ≥ 8, manager/hr/finance ≥ 6, every restricted document with ≥ 1 forbidden-role question), with a script checking the source facts.
+4. The experiment matrix: search mode, chunk size 300/500/800, the `identifiers` boost switch, derived content (implemented first); the dedicated rerank API and BM25 are not done, and the decisions are recorded.
+5. Observability scope: OTel through the api, worker and mcp-server; metrics; Collector, Prometheus, Tempo, Grafana (4 dashboards); **no Loki**.
+6. Langfuse as an optional Compose file, taking the same traces and evaluation scores, with the version checked and the memory measured first.
+7. `make seed` using the ready-made vector store dump (no OpenAI key needed) plus uploading the original files; `make seed ARGS=--ingest` goes through the real pipeline.
+8. Acceptance: run the 7 criteria one by one and write `acceptance-v0.1.0.md`; for criterion 1, start over after `make clean` on this machine (**which deletes this project's local data volumes**).
+9. Tag both `ai-m8` and `v0.1.0` after merging.
+10. Real checks: `starit-eval all`, the matrix rerun, asking 1 question through the proxy; each with an estimate first and confirmation afterwards.
 
-### 实际结果
+### Actual results
 
-**状态：代码、评测、验收完成；待你确认合并并打 `ai-m8` 和 `v0.1.0`。**
+**Status: code, evaluation and acceptance are done; awaiting your confirmation to merge and tag `ai-m8` and `v0.1.0`.**
 
-- **做了什么**（对应 10 个确认点）：(1) LiteLLM 代理补上（`ghcr.io/berriai/litellm:v1.106.6`，端口 4100；供应商密钥只在 `litellm` 容器里，api、worker、mcp-server 的环境里没有；用一个真实问题验证——代理处理了 3 次对话调用和 1 次向量化，全是 200）；(2)(3) 评测运行器完整版和 60 道新题；(4) 实验矩阵（检索模式、分块 300/500/800、`identifiers` 开关、派生内容）；(5) OpenTelemetry + Collector + Tempo + Prometheus + Grafana（4 个仪表盘），没做 Loki；(6) Langfuse 可选 Compose；(7) `make seed` 与预置转储；(8) 验收；(9)(10) 见下。
-- **测试**：793 个 Python 测试通过（M7 结束时 699 个）、61 个前端测试、3 个浏览器测试；lint、mypy 严格、前端检查都干净；CI 成功。新增的测试覆盖：网关（直连和经代理的参数、密钥不进 repr 和错误信息）、派生内容（模式、失败只丢派生内容、嵌入文本、入库流程）、`identifiers` 开关、答案评分（事实比对含千分位和 `v` 前缀、拒绝、判官解析、合法的结束状态、20% 抽样可重现）、实验矩阵（临时数据库，跑完不留库）、OTel（span 层次、令牌和问题文本不出现在任何 span/事件/指标、错误标记、日志里的 trace_id 和 run_id、跨 HTTP 到 MCP 的 trace、数据库语句不带参数值、API 的 HTTP span、健康检查不入 trace）、种子转储的往返（内容、权限、向量、派生内容一致，残缺转储被拒绝且不动现有数据，恢复后受限文档仍受限）。
-- **完整评测**（真实，约 $0.25 的估算）：权限回归通过（2,394 次检索越权为 0）；检索 hit@1 keyword 0.862、vector 0.885、hybrid 0.943、hybrid_rerank 1.0；答案 99/114（15 题逐条读过，**无权限泄露**：8 题回答正确但漏了次要细节被判官判错、4 题过度反问澄清、1 题是我的评分脚本的错、2 题应拒绝却回答了——其中 DOC-108 没有泄露，DOC-90 是有歧义的题）；数据题 41/41。详见 `docs/eval/README.md`。
-- **实验矩阵**（真实，约 $0.02）：同一配置两次入库之间 hybrid 的 MRR 就差约 0.01，小于 0.02 的差别不当作效果；分块越小越好的方向（vector hit@1 300 时 0.954 对 baseline 0.885）；`identifiers` 加权对 keyword 型问题有真实的帮助（MRR 1.0 对 0.923，13 题），保持开启；派生内容整体没有明显收益，默认保持关闭，改写型问题值得在更多题上再测。
-- **验收**：见 `docs/eval/acceptance-v0.1.0.md`（7 条逐条，附"没验证到的"）。从 `make clean` 到可以提问约 3 分钟（镜像已在本机）。
-- **与确认点的差异**：(a) 种子转储是 `jsonl.gz` 而不是 SQL 文件（不依赖 `pg_dump`；设计 06 第 11 节）；(b) 派生内容只加强向量一侧；(c) Langfuse 4 的"events_only"模式下旧的 trace 接口不可用，读数据用 Observations API v2；(d) 评测里 `Question` 新增可选字段 `facts`；(e) `matrix` 用 `DELETE` 而不是 `TRUNCATE` 清库（应用角色没有 TRUNCATE 权限，这是对的）。
-- **过程中发现并修好的问题**：(1) **我之前漏记的偏差**——设计里 full profile 经 LiteLLM 代理，M5 起一直是进程内库，现在补上；(2) Python 镜像每改一行代码都要重新下载全部依赖（一次构建约 40 分钟，`uv` 默认 30 秒的下载超时还会让它失败），已把依赖单独成层、加 uv 缓存挂载和 `UV_HTTP_TIMEOUT=120`；(3) `opentelemetry-instrumentation-sqlalchemy` 因 SQLAlchemy 2.1 超出它声明的范围而静默地不记录任何数据库 span（日志里只有一条 ERROR）——用 `skip_dep_check` 并加测试证明；(4) 提交时 gitleaks 拦下了我预先算好的 base64 凭据，改成 Collector 的 `basicauth` 扩展现场编码；(5) 我自己的评分脚本不认 `v2.1` 里的 `2.1`，已修，报告里的数字是修之前的，没有改；(6) 我在 shell 里用 `path` 做循环变量，zsh 里它和 `PATH` 绑在一起，把命令查找弄坏了一次。
-- **已知限制**：见验收报告末尾。**20% 人工抽查还没做**，所以判官的结论不能当作事实。
+- **What was done** (matching the 10 confirmation points): (1) the LiteLLM proxy was added (`ghcr.io/berriai/litellm:v1.106.6`, port 4100; the vendor keys are only in the `litellm` container and not in the environment of the api, worker and mcp-server; verified with one real question: the proxy handled 3 chat calls and 1 embedding, all 200); (2)(3) the full evaluation runner and 60 new questions; (4) the experiment matrix (search mode, chunk 300/500/800, the `identifiers` switch, derived content); (5) OpenTelemetry + Collector + Tempo + Prometheus + Grafana (4 dashboards), without Loki; (6) the optional Langfuse Compose; (7) `make seed` and the ready-made dump; (8) acceptance; (9)(10) see below.
+- **Tests**: 793 Python tests pass (699 at the end of M7), 61 front-end tests, 3 browser tests; lint, strict mypy and the front-end checks are all clean; CI succeeds. The new tests cover: the gateway (parameters for direct and through-proxy calls, keys not in repr or error messages), derived content (modes, a failure only losing the derived content, the embedded text, the ingestion flow), the `identifiers` switch, answer scoring (fact comparison including thousands separators and the `v` prefix, refusal, judge parsing, valid end states, a reproducible 20% sample), the experiment matrix (a temporary database, no database left after it runs), OTel (span hierarchy, the token and question text in no span/event/metric, error marking, trace_id and run_id in logs, a trace across HTTP to MCP, database statements without parameter values, the API's HTTP span, health checks not in traces), and the round trip of the seed dump (content, permissions, vectors and derived content consistent, an incomplete dump refused without touching existing data, restricted documents still restricted after restoring).
+- **Full evaluation** (real, an estimated $0.25): permission regression passes (0 overreach in 2,394 searches); search hit@1 keyword 0.862, vector 0.885, hybrid 0.943, hybrid_rerank 1.0; answers 99/114 (15 questions read one by one, **no permission leak**: 8 questions were answered correctly but missed a minor detail and were marked wrong by the judge, 4 asked too many clarifying questions, 1 was a mistake of my scoring script, and 2 that should have been refused were answered, of which DOC-108 leaked nothing and DOC-90 is an ambiguous question); data questions 41/41. Details in `docs/eval/README.md`.
+- **Experiment matrix** (real, about $0.02): between two ingestions of the same configuration hybrid's MRR already differs by about 0.01, so differences under 0.02 are not taken as an effect; the direction that smaller chunks are better (vector hit@1 0.954 at 300 against 0.885 for the baseline); the `identifiers` boost really helps keyword-type questions (MRR 1.0 against 0.923, 13 questions) and stays on; derived content has no clear benefit overall and stays off by default, and paraphrase-type questions are worth testing again on more questions.
+- **Acceptance**: see `docs/eval/acceptance-v0.1.0.md` (7 criteria one by one, with "what was not verified"). From `make clean` to being able to ask took about 3 minutes (the images are already on this machine).
+- **Differences from the confirmation points**: (a) the seed dump is `jsonl.gz` and not an SQL file (it does not depend on `pg_dump`; section 11 of design 06); (b) derived content strengthens only the vector side; (c) in Langfuse 4's "events_only" mode the old trace interface is unavailable, and the Observations API v2 is used to read data; (d) in the evaluation `Question` gains an optional field `facts`; (e) `matrix` clears the database with `DELETE` rather than `TRUNCATE` (the application role has no TRUNCATE right, which is correct).
+- **Problems found and fixed on the way**: (1) **the deviation I had failed to record earlier**: in the design the full profile goes through the LiteLLM proxy, and from M5 on it had been the in-process library; now added; (2) the Python image downloaded all dependencies again for every line of code changed (one build took about 40 minutes, and `uv`'s default 30-second download timeout could make it fail); the dependencies were made a separate layer, a uv cache mount and `UV_HTTP_TIMEOUT=120` were added; (3) `opentelemetry-instrumentation-sqlalchemy` silently recorded no database span because SQLAlchemy 2.1 is outside the range it declares (only one ERROR in the log), worked around with `skip_dep_check` and proved by a test; (4) at commit time gitleaks stopped the base64 credentials I had computed in advance, so it was changed to the Collector's `basicauth` extension encoding on the spot; (5) my own scoring script did not recognise the `2.1` in `v2.1`; fixed, and the numbers in the report are from before the fix and were not changed; (6) in the shell I used `path` as a loop variable, which zsh ties to `PATH`, and that broke command lookup once.
+- **Known limits**: see the end of the acceptance report. **The 20% human spot check is not done yet**, so the judge's conclusions cannot be taken as fact.
 
-## M9 第二阶段第一批：流式输出、限流补全、模型 fallback、M8 收尾
+## M9 First batch of phase 2: streaming output, rate limit completion, model fallback, M8 wrap-up
 
-状态：**进行中**（分支 `m9-streaming-and-limits`）。这一批把你对 `架构图对照验收表` 的决定落地：M8 的尾巴收口、流式输出（先流出，校验不通过时撤回）、限流补成三维、LiteLLM 的多模型 fallback（gpt-6-luna → gpt-4o-mini → Claude Haiku 5.5）。Memory 和写操作确认按你的决定不做（等企业后台）。成本统计按你的决定不做，见下面的核实。会有少量真实模型调用，**先估算再等你确认**。
+Status: **In progress** (branch `m9-streaming-and-limits`). This batch lands your decisions on the `architecture diagram review table`: closing the tail of M8, streaming output (stream first, withdraw when verification fails), rate limiting completed to three dimensions, and LiteLLM's multi-model fallback (gpt-6-luna → gpt-4o-mini → Claude Haiku 5.5). Memory and write action confirmation are not done, by your decision (wait for the enterprise back office). Cost statistics are not done either, by your decision, see the verification below. There will be a few real model calls, **estimate first and then wait for your confirmation**.
 
-### 你的 7 条决定（原样记录）
+### Your 7 decisions (recorded as given)
 
-1. M8 的尾巴要做：20% 人工抽查、`understand` 过度反问和"没答案仍标已回答"、Anthropic 与 fallback 验证。
-2. 流式输出要做；成本统计 Langfuse 已经有，先不做。
-3. Memory、写操作确认先不做，等企业后台有了再做。
-4. 流式采用"先流出，校验不通过时撤回"。
-5. 图上有、需求清单里没有的（输出端护栏、Jailbreak 检测、MCP Resources 等）先列入第二阶段。
-6. 限流（3 维）要做，把缺的两维补上。
-7. LiteLLM 多模型 fallback 要做：先 OpenAI 的 gpt-6-luna，再 GPT-4 mini，然后 Claude 最便宜的 Haiku 5.5。
+1. The tail of M8 is to be done: the 20% human spot check, `understand` asking too many clarifying questions and "no answer but still marked answered", Anthropic and fallback verification.
+2. Streaming output is to be done; cost statistics already exist in Langfuse, so not for now.
+3. Memory and write action confirmation are not done for now, until the enterprise back office exists.
+4. Streaming uses "stream first, withdraw when verification fails".
+5. Items that are on the diagram but not in the requirements list (output guardrails, jailbreak detection, MCP Resources and so on) are listed under phase 2 first.
+6. Rate limiting (3 dimensions) is to be done, filling in the two missing dimensions.
+7. LiteLLM multi-model fallback is to be done: OpenAI's gpt-6-luna first, then GPT-4 mini, then Claude's cheapest, Haiku 5.5.
 
-### 我先核实的（只读，没花钱）
+### What I verified first (read-only, no money spent)
 
-| 项 | 结果 |
+| Item | Result |
 |---|---|
-| 成本统计 | 你说得对：Langfuse 已经按我们的模型名算出了成本。实测一次生成调用：输入 2,803 token、输出 59 token，成本 0.00031 美元，单价输入 1e-7、输出 5e-7，与我们 `pricing.py` 里的 gpt-6-luna 一致；同一对话的调用共享 `sessionId`，可以按会话汇总。**限制**：Langfuse 只在 full profile 里（"仅本地"），做 lite 时这件事要重新决定。 |
-| 模型名 | LiteLLM 的价格表里有 `gpt-4o-mini`（输入 1.5e-7、输出 6e-7）和 `claude-haiku-5-5`（输入 1e-7、输出 5e-7，与 gpt-6-luna 相同）。经网关的名字是 `anthropic/claude-haiku-5-5`。你写的"GPT-4 mini"我按 M5 里一直用的 `openai/gpt-4o-mini` 理解——**请确认**。`.env` 里有 Anthropic 密钥，**但它是否有效我没验证过**。 |
-| fallback 的实现位置 | LiteLLM 的 `acompletion` 和网关请求都接受 `fallbacks` 参数，所以不必重做网关配置：聊天客户端在直连和经网关两种模式下都传同一个 `fallbacks` 列表（新设置 `STARIT_LLM_FALLBACKS`）。通配路由 `openai/*`、`anthropic/*` 继续有效。Embedding 不做 fallback。 |
+| Cost statistics | You are right: Langfuse already computes cost from our model names. Measured on one generate call: input 2,803 tokens, output 59 tokens, cost US$0.00031, unit price input 1e-7 and output 5e-7, matching gpt-6-luna in our `pricing.py`; calls of the same conversation share a `sessionId` and can be summed per conversation. **Limit**: Langfuse is only in the full profile ("local only"), so this has to be decided again when lite is built. |
+| Model names | LiteLLM's price table has `gpt-4o-mini` (input 1.5e-7, output 6e-7) and `claude-haiku-5-5` (input 1e-7, output 5e-7, the same as gpt-6-luna). The name through the gateway is `anthropic/claude-haiku-5-5`. By the "GPT-4 mini" you wrote I understand the `openai/gpt-4o-mini` used in M5 all along: **please confirm**. The Anthropic key is in `.env`, **but I have not verified whether it is valid**. |
+| Where fallback is implemented | LiteLLM's `acompletion` and the gateway requests both accept a `fallbacks` parameter, so the gateway configuration need not be redone: the chat client passes the same `fallbacks` list in both direct and through-gateway modes (a new setting `STARIT_LLM_FALLBACKS`). The wildcard routes `openai/*` and `anthropic/*` stay valid. Embedding has no fallback. |
 
-### 要先告诉你的几件事（做起来比看上去麻烦或需要你定的）
+### Things to tell you first (harder than they look, or needing your decision)
 
-1. **流式输出比看上去麻烦**。现在 `generate` 输出的是一段 JSON：`{"sufficient": ..., "answer": "...", "citations": [...]}`。流出来的字符是 JSON，不是回答文字，要在收的过程中解析，把 `answer` 字符串的内容（含转义）边解析边发出去。可行：约定键的顺序是 `sufficient` 在前，`sufficient` 为 false 时一个字也不流出；模型不守顺序时退回"整段收完再发"，不会出错。
-2. **流式不会让总时间变短，只改善"等第一个字"**。一次运行 p50 约 5.5 秒，前面是理解、检索、重排，只有最后的生成能流式。预计首字在 3.5–4 秒，而不是 5.5 秒。我会加一个"首字延迟"指标把真实数字量出来，不预先承诺。
-3. **撤回的体验**。校验不通过时（引用了不存在的摘录、不是合法 JSON 等）用户已经看到了前面的字；撤回是发一个事件，页面把这段字清掉并显示"重新生成中…"，再流出第二次的结果。这是你选的方案，我实现它；**撤回应该很少触发**（我没有统计过，评测里没有一次因它而 `error`），触发时用户会看到一次"回退"。
-4. **限流"3 维"图上没写是哪三维，需要你定**。我的建议：① 每用户每分钟（已有，20 次）；② 每 IP 每分钟（例如 60 次，防止一个来源开很多账号）；③ 全站每日 token 预算（防止费用失控，设计 06 里 `STARIT_DAILY_LLM_BUDGET` 就是这个意思）。注意：**本机 Docker 里所有浏览器请求在 API 眼里都来自同一个网关 IP**（`172.25.0.1`），所以 IP 这一维在本机基本等于"全站每分钟"，只有放到真正的反向代理后面并配置可信代理（`X-Forwarded-For`）才有意义；我会做成配置并写清楚。备选的第 ② 维：每用户每天的消息数。
-5. **20% 人工抽查需要你本人**：114 题的 20% 是 **23 条**，每条是问题、参考答案、助手的回答和判官的结论，你判"对 / 错 / 说不好"，约 20–30 分钟。我会做一个可以直接点选的网页（和对照表一样），你点完，我读结果、算判官和你的一致率。如果这个环境里页面保存不了你的选择，就退化成"你把结果复制回来"。
-6. **`understand`/`generate` 的提示词要改**，改完要重跑评测才知道好没好：`understand` 版本 2 → 3（只在确实缺少关键信息、且没有可用的通用答案时才反问；"哪一年"这类不问），`generate` 版本 1 → 2（材料里没有被问的内容时必须 `sufficient: false`，即使有相关内容）。重跑 `starit-eval answers`（114 题，约 $0.13）和助手抽查（约 $0.01），**先打印估算再等你确认**。验收要看：4 道被反问的题改为直接回答；DOC-108 变成拒绝状态；"How much can I claim?" 这类真正含糊的题仍然反问；权限回归越权仍是 0；通过数不下降（M8 基线 99/114，其中 1 题是评分脚本的错，修后 100/114）。
-7. **fallback 之后"哪个模型答的"要看得见**：现在 span 和指标里记的是请求的模型名；fallback 后要记实际答题的模型，并加一个 `starit.llm.fallbacks` 计数和 span 属性，否则 Grafana 里看不出主模型挂了。fallback 只在**报错**时触发（供应商错误、超时、限流、模型不存在），不在"回答质量差"或"JSON 不合法"时触发。
-8. **换成 Haiku 之后行为会不一样**（JSON 的写法、遵守"键的顺序"的程度、重排打分）。我建议用 Haiku 做主模型把 114 题跑一遍，知道它作为兜底靠不靠得住，约 $0.13；**可选**，放在确认点里问你。
-9. **第 5 条"先列入第二阶段"我这次只记录、不实现**：写进新文档 `docs/design/09-phase2-plan.md`（决定、范围、顺序，列出每一项和它在图上的位置）。你点名的三项是输出端护栏（PII 脱敏、敏感词）、Jailbreak 检测、MCP Resources；"等"字我理解为图上其余"没规划"的项也列为**候选（未排期）**：Analytics Agent、Web Search Agent、Local vLLM、Redis 的缓存与黑名单、Vault 与 Sentry、边缘反向代理与 WAF、PITR 备份。**请确认这个范围。**
+1. **Streaming output is harder than it looks.** Today `generate` outputs one JSON: `{"sufficient": ..., "answer": "...", "citations": [...]}`. The characters streamed out are JSON and not the answer text, so they have to be parsed as they arrive, sending out the content of the `answer` string (with escapes) while parsing. It is feasible: the key order is agreed with `sufficient` first, and when `sufficient` is false not a single character is streamed; when the model does not keep the order it falls back to "collect everything and then send", without error.
+2. **Streaming does not shorten the total time, it only improves "waiting for the first character".** One run is about 5.5 seconds at p50, the front part being understanding, search and rerank, and only the final generation can be streamed. The first character is expected at 3.5 to 4 seconds instead of 5.5. I will add a "first-character latency" metric to measure the real number, with nothing promised in advance.
+3. **The experience of withdrawal.** When verification fails (citing an excerpt that does not exist, not valid JSON and so on) the user has already seen the earlier characters; a withdrawal sends an event, the page clears that text and shows "regenerating…", and then streams the second result. This is the plan you chose and I implement it; **withdrawal should trigger rarely** (I have not counted it, and in the evaluation not one run became `error` because of it), and when it triggers the user sees one "step back".
+4. **Which three dimensions the "3-dimension" rate limit means is not written on the diagram and you need to decide.** My suggestion: ① per user per minute (existing, 20); ② per IP per minute (for example 60, to stop one source opening many accounts); ③ a daily whole-site token budget (to stop the cost from running away; `STARIT_DAILY_LLM_BUDGET` in design 06 means this). Note: **in local Docker every browser request looks to the API as coming from the same gateway IP** (`172.25.0.1`), so the IP dimension is basically "whole site per minute" here, and only has meaning behind a real reverse proxy with trusted proxies configured (`X-Forwarded-For`); I will make it configuration and state it clearly. An alternative for dimension ②: the number of messages per user per day.
+5. **The 20% human spot check needs you in person**: 20% of the 114 questions is **23 items**, each being the question, the reference answer, the assistant's answer and the judge's conclusion, and you judge "right / wrong / hard to say", taking about 20 to 30 minutes. I will make a web page you can click on (like the review table); you click through and I read the result and compute the agreement rate between judge and you. If the page cannot save your choices in this environment, it degrades to "you copy the result back".
+6. **The prompts of `understand`/`generate` have to change**, and the evaluation has to be rerun after the change to know whether it is better: `understand` version 2 → 3 (ask a clarifying question only when key information is really missing and there is no usable general answer; "which year" and the like are not asked), `generate` version 1 → 2 (when the material does not contain what was asked, `sufficient: false` is required even if there is related content). Rerun `starit-eval answers` (114 questions, about $0.13) and the assistant spot check (about $0.01), **with the estimate printed first and then waiting for your confirmation**. Acceptance looks at: the 4 questions that got a clarifying question now answered directly; DOC-108 becoming a refusal state; truly vague questions such as "How much can I claim?" still getting a clarifying question; permission regression overreach still 0; the number of passes not dropping (the M8 baseline 99/114, of which 1 was a mistake of the scoring script, so 100/114 after the fix).
+7. **After fallback, "which model answered" must be visible**: spans and metrics now record the requested model name; after a fallback the model that actually answered must be recorded, with a `starit.llm.fallbacks` count and a span attribute added, otherwise Grafana cannot show that the primary model is down. Fallback triggers only on **errors** (vendor error, timeout, rate limit, model not found) and not on "poor answer quality" or "invalid JSON".
+8. **Behaviour will differ after switching to Haiku** (how the JSON is written, how well it keeps the "key order", rerank scoring). I suggest running the 114 questions with Haiku as the primary model to learn whether it is reliable as a fallback, about $0.13; **optional**, asked among the confirmation points.
+9. **For your item 5, "list under phase 2 first", this time I only record and do not implement**: written into the new document `docs/design/09-phase2-plan.md` (decisions, scope, order, listing each item and its place on the diagram). The three items you named are output guardrails (PII masking, sensitive words), jailbreak detection and MCP Resources; I take "and so on" to mean that the other "not planned" items on the diagram are also listed as **candidates (not scheduled)**: the analytics agent, the web search agent, local vLLM, Redis caching and blacklist, Vault and Sentry, an edge reverse proxy and WAF, PITR backup. **Please confirm this scope.**
 
-### 计划的文件（`ai-module/` 下，除非另写）
+### Planned files (under `ai-module/` unless stated otherwise)
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `docs/design/09-phase2-plan.md`（新）、`07`（改） | 第二阶段规划：你的决定、已排期的、候选的、明确不做的 |
-| `packages/core/src/starit_core/streaming.py`（新） | 增量解析：从流出的 JSON 里取出 `answer` 的文字（处理转义、跨块切分、键顺序） |
-| `packages/core/src/starit_core/llm.py`（改） | `stream()`：litellm `stream=True` 和 token 用量；`fallbacks` 参数；记录实际答题的模型 |
-| `packages/core/src/starit_core/agent/nodes.py`、`runtime.py`、`state.py`、`prompts/*.md`（改） | `generate` 和 `answer_from_data` 流式；`verify_answer` 失败时发撤回；`understand` 3、`generate` 2 |
-| `apps/api/src/starit_api/conversations.py`、`deps.py`、`main.py`（改） | `Accept: text/event-stream` 时返回 SSE（`run.started`、`message.delta`、`message.retract`、`citations`、`run.ended`，每 15 秒一个保活注释）；不带该请求头时行为不变（评测、脚本、测试照旧）；三维限流 |
-| `packages/core/src/starit_core/ratelimit.py`、`config.py`（改） | 每 IP、全站每日 token 预算；`STARIT_RATE_LIMIT_IP_PER_MINUTE`、`STARIT_DAILY_TOKEN_BUDGET`、`STARIT_TRUSTED_PROXIES` |
-| `packages/core/src/starit_core/telemetry.py`（改） | `starit.llm.time_to_first_token`、`starit.llm.fallbacks`、`starit.rate_limited` |
-| `web/src/lib/sse.ts`、`web/src/components/chat.tsx`（改） | 用 `fetch` + `ReadableStream`（`EventSource` 不能带 `Authorization` 头）；逐字显示、撤回提示、引用在结束时出现 |
-| `eval/`（改） | 评测仍走非流式路径；加"流式与非流式的最终内容一致"的检查；review 页面的生成脚本和一致率计算 |
-| `deploy/compose/compose.yaml`、`.env.example`（改） | `STARIT_LLM_FALLBACKS`、限流相关变量 |
-| 各层测试；`docs/design/03`、`04`、`README`（改） | 事件格式加 `message.retract`；流式在图里的位置 |
+| `docs/design/09-phase2-plan.md` (new), `07` (changed) | The phase 2 plan: your decisions, what is scheduled, the candidates, what is explicitly not done |
+| `packages/core/src/starit_core/streaming.py` (new) | Incremental parsing: takes the text of `answer` out of the streamed JSON (handling escapes, splits across chunks, key order) |
+| `packages/core/src/starit_core/llm.py` (changed) | `stream()`: litellm `stream=True` and token usage; the `fallbacks` parameter; recording the model that actually answered |
+| `packages/core/src/starit_core/agent/nodes.py`, `runtime.py`, `state.py`, `prompts/*.md` (changed) | `generate` and `answer_from_data` stream; `verify_answer` sends a withdrawal on failure; `understand` 3, `generate` 2 |
+| `apps/api/src/starit_api/conversations.py`, `deps.py`, `main.py` (changed) | With `Accept: text/event-stream` it returns SSE (`run.started`, `message.delta`, `message.retract`, `citations`, `run.ended`, with a keepalive comment every 15 seconds); without that request header the behaviour is unchanged (evaluation, scripts and tests as before); three-dimension rate limiting |
+| `packages/core/src/starit_core/ratelimit.py`, `config.py` (changed) | Per IP, a whole-site daily token budget; `STARIT_RATE_LIMIT_IP_PER_MINUTE`, `STARIT_DAILY_TOKEN_BUDGET`, `STARIT_TRUSTED_PROXIES` |
+| `packages/core/src/starit_core/telemetry.py` (changed) | `starit.llm.time_to_first_token`, `starit.llm.fallbacks`, `starit.rate_limited` |
+| `web/src/lib/sse.ts`, `web/src/components/chat.tsx` (changed) | Uses `fetch` + `ReadableStream` (`EventSource` cannot carry an `Authorization` header); shows characters as they arrive, a withdrawal notice, citations appearing at the end |
+| `eval/` (changed) | Evaluation still uses the non-streaming path; adds a check that "the final content of streaming and non-streaming is the same"; the script that generates the review page and the agreement-rate computation |
+| `deploy/compose/compose.yaml`, `.env.example` (changed) | `STARIT_LLM_FALLBACKS`, the rate-limit variables |
+| Tests of each layer; `docs/design/03`, `04`, `README` (changed) | The event format gains `message.retract`; where streaming sits in the graph |
 
-### 计划的命令
+### Planned commands
 
 ```bash
-git switch -c m9-streaming-and-limits              # 已创建
+git switch -c m9-streaming-and-limits              # already created
 uv sync --all-packages
 make test && make lint && make web-check
 make up
-make eval ARGS="answers"                           # 提示词改动后重跑（先打印估算并确认）
-make e2e                                           # 流式在真浏览器里的冒烟
+make eval ARGS="answers"                           # rerun after the prompt change (estimate printed first and confirmed)
+make e2e                                           # smoke test of streaming in a real browser
 ```
 
-### 验证标准
+### Verification criteria
 
-1. **增量解析**：几十种切分方式（在转义、`\uXXXX`、多字节字符中间切开；`sufficient` 为 false；键顺序颠倒；不合法的 JSON；超长回答）逐一断言：流出的文字拼起来等于最终的 `answer`；`sufficient: false` 时没有任何文字流出；键顺序颠倒时退回整段发送。
-2. **流式运行**（脚本化模型，真实数据库）：事件顺序 `run.started` → `message.delta`×N → `citations` → `run.ended`；最终内容与非流式路径完全一致；校验失败时先 `message.retract` 再重新流出；重试用尽时撤回后以 `error` 结束；澄清、拒绝、闲聊、数据路径各有一个场景。
-3. **断线**：客户端中途断开，运行在服务端继续跑完，`ai.runs`、`ai.messages`、审计记录完整（测试断言）。
-4. **API**：带 `Accept: text/event-stream` 得到 SSE，不带得到和现在一样的 JSON；未登录 401；限流 429 在流开始**之前**返回（是普通 HTTP 响应，不是事件）；令牌不出现在任何事件和日志里。
-5. **三维限流**：每个维度各有测试（超限、窗口过去后恢复、Redis 不可用时放行并告警）；IP 维度在没配置可信代理时用对端地址、配置后用 `X-Forwarded-For` 的最后一个可信跳，**伪造的头不起作用**（测试）；每日预算按运行结束时的实际 token 累加，超出时新请求得 429 并带到次日零点的 `Retry-After`。
-6. **fallback**：单元测试（主模型报错 → 第二个 → 第三个；三个都失败 → `llm_error`；非错误情况不触发）；**真实检查**（先估算）：把主模型临时设成不存在的名字，确认回答来自 `gpt-4o-mini`；再把前两个都设成不存在，确认回答来自 Haiku 5.5；span 和指标里记的是实际答题的模型。
-7. **提示词改动的评测**：见上面第 6 点的 5 项验收；报告写清楚前后对比和样本量，**不事先承诺通过数**。
-8. **20% 人工抽查**：23 条全部有你的判断；报告里写判官与你的一致率和不一致的是哪几条，**一致率低就说明判官不可信**。
-9. **前端**：Vitest 覆盖 SSE 解析（跨块的事件、保活注释、撤回、`run.ended` 里的最终内容兜底）和撤回时的界面；Playwright 用拦截的 SSE 响应走一遍提问、撤回、引用；真实浏览器里用真实模型问一次，看逐字出现。
-10. 本地测试、lint、mypy、前端检查通过，CI 通过。
+1. **Incremental parsing**: dozens of ways of splitting (cutting in the middle of escapes, `\uXXXX`, multibyte characters; `sufficient` false; reversed key order; invalid JSON; over-long answers) each asserted: the streamed text joined together equals the final `answer`; with `sufficient: false` no text is streamed at all; with reversed key order it falls back to sending the whole.
+2. **Streaming runs** (scripted model, real database): the event order `run.started` → `message.delta`×N → `citations` → `run.ended`; the final content is exactly the same as the non-streaming path; when verification fails `message.retract` comes first and then the new streaming; when retries are used up it ends with `error` after the withdrawal; clarification, refusal, small talk and the data path each have a scenario.
+3. **Disconnects**: when the client disconnects midway, the run continues to the end on the server, and `ai.runs`, `ai.messages` and the audit records are complete (asserted by a test).
+4. **API**: with `Accept: text/event-stream` it returns SSE and without it the same JSON as now; not signed in 401; the rate limit 429 is returned **before** the stream starts (an ordinary HTTP response, not an event); the token appears in no event or log.
+5. **Three-dimension rate limiting**: each dimension has its own tests (over the limit, recovery after the window passes, letting through with a warning when Redis is unavailable); the IP dimension uses the peer address when no trusted proxy is configured and the last trusted hop of `X-Forwarded-For` when one is, and **a forged header has no effect** (tested); the daily budget accumulates the actual tokens when a run ends, and after the limit a new request gets 429 with a `Retry-After` until midnight of the next day.
+6. **Fallback**: unit tests (the primary model errors → the second → the third; all three fail → `llm_error`; a non-error situation does not trigger); **real check** (estimate first): temporarily set the primary model to a name that does not exist and confirm the answer comes from `gpt-4o-mini`; then set both of the first two to non-existent names and confirm the answer comes from Haiku 5.5; spans and metrics record the model that actually answered.
+7. **Evaluation of the prompt change**: the 5 acceptance items of point 6 above; the report states the before-and-after comparison and the sample size clearly, **without promising the number of passes in advance**.
+8. **The 20% human spot check**: all 23 items have your judgement; the report states the agreement rate between judge and you and which items disagree, and **a low agreement rate shows that the judge cannot be trusted**.
+9. **Front end**: Vitest covers SSE parsing (events across chunks, the keepalive comment, withdrawal, the fallback to the final content in `run.ended`) and the interface at withdrawal; Playwright goes once through asking, withdrawal and a citation with an intercepted SSE response; ask once with the real model in a real browser and watch the characters appear one by one.
+10. Local tests, lint, mypy and front-end checks pass, and CI passes.
 
-### 开始前不确定的事
+### Things unclear beforehand
 
-- **LiteLLM 网关转发流式 + `response_format: json_object`** 对 gpt-6-luna 是否一切正常，我没试过；先用一次真实调用验证（不到 $0.001）。
-- **`stream_options: include_usage`** 经网关是否能拿到最终的 token 用量；拿不到的话流式运行的 token 统计会缺，我会退回到用估算并明确标出。
-- **`fallbacks` 参数经网关传递**，在通配路由（`openai/*`）下的实际行为我还没验证；验证不通过的话改用网关的 `router_settings.fallbacks` 并为三个模型各建一个具名条目（这会改变模型名的约定，到时再告诉你）。
-- **Haiku 对 JSON 模式、`reasoning_effort` 的处理**：LiteLLM 会转换或丢弃不支持的参数（`drop_params: true`），但转换后的行为没验证。
-- **撤回的前端体验**需要真实用一用才知道合不合适；做完我会用真浏览器看一次，但"合不合适"是你的判断。
-- **IP 限流在本机几乎没有意义**（见上），验收时只能用测试证明逻辑，不能在真实多来源下证明。
+- **Whether the LiteLLM gateway forwards streaming + `response_format: json_object` without trouble for gpt-6-luna** I have not tried; it is verified with one real call first (under $0.001).
+- **Whether `stream_options: include_usage` gives the final token usage through the gateway**; if not, the token accounting of streaming runs will be missing, and I will fall back to an estimate and mark it clearly.
+- **How the `fallbacks` parameter behaves when passed through the gateway** under the wildcard routes (`openai/*`) I have not verified yet; if that fails I will use the gateway's `router_settings.fallbacks` and create one named entry for each of the three models (which would change the model-name convention, and I will tell you then).
+- **How Haiku handles the JSON mode and `reasoning_effort`**: LiteLLM converts or drops unsupported parameters (`drop_params: true`), but the behaviour after conversion is not verified.
+- **The front-end experience of withdrawal** has to be tried for real to know whether it feels right; afterwards I will look at it once in a real browser, but "whether it feels right" is your judgement.
+- **IP rate limiting means almost nothing locally** (see above), so at acceptance the logic can only be proved by tests and cannot be proved under real multi-source conditions.
 
-### 需要你确认
+### For you to confirm
 
-1. 模型链：`openai/gpt-6-luna` → `openai/gpt-4o-mini`（你写的"GPT-4 mini"）→ `anthropic/claude-haiku-5-5`；Anthropic 密钥是否有效由真实检查来验证。
-2. 限流三维：每用户每分钟（已有）、每 IP 每分钟（建议 60）、全站每日 token 预算（数值你定，或我先给个保守默认）——或者把第 ② 维换成"每用户每天消息数"。
-3. 流式：先流出、校验不通过时撤回；`answer_from_data`（数据路径）也流式；澄清、拒绝、闲聊的固定文案作为一个 `message.delta` 发出，保持前端逻辑统一；本期**不做**"停止生成"按钮。
-4. 成本统计不做，用 Langfuse（full profile 里有；lite 没有）。
-5. 提示词改动（`understand` 3、`generate` 2）并重跑评测，先估算后确认。
-6. 20% 人工抽查：我做点选页面，你花 20–30 分钟判 23 条。
-7. 第二阶段规划文档的范围（上面第 9 点：你点名的三项 + 其余候选）。
-8. 是否用 Haiku 做主模型把 114 题跑一遍（约 $0.13，可选）。
+1. The model chain: `openai/gpt-6-luna` → `openai/gpt-4o-mini` (your "GPT-4 mini") → `anthropic/claude-haiku-5-5`; whether the Anthropic key is valid is verified by the real check.
+2. The three rate-limit dimensions: per user per minute (existing), per IP per minute (60 suggested), a whole-site daily token budget (you set the number, or I give a conservative default first), or replace dimension ② with "messages per user per day".
+3. Streaming: stream first, withdraw when verification fails; `answer_from_data` (the data path) also streams; the fixed texts of clarification, refusal and small talk are sent as a single `message.delta`, keeping the front-end logic uniform; this round does **not** do a "stop generating" button.
+4. Cost statistics are not done; use Langfuse (in the full profile; lite has none).
+5. The prompt changes (`understand` 3, `generate` 2) and rerunning the evaluation, estimate first and confirmation afterwards.
+6. The 20% human spot check: I make the click page, and you spend 20 to 30 minutes judging 23 items.
+7. The scope of the phase 2 plan document (point 9 above: the three items you named + the other candidates).
+8. Whether to run the 114 questions with Haiku as the primary model (about $0.13, optional).
 
-### 用户的确认（2026-11-04）
+### The user's confirmation (2026-11-04)
 
-- **限流三维**：IP / 用户 / token。其中 token 这一维定为**全栈每日不超过 0.5 美元**（按实际用量和模型价格累计；"全栈"= api、worker、mcp-server 的所有模型调用，包括对话、重排、向量化、派生内容）；IP 每分钟 60 次、用户每分钟 20 次沿用我的建议。
-- **20% 人工抽查**：我先做完其它功能，**用户最后做这项检查**（样本取自提示词改动后重跑的结果，这样测的是最终的系统）。
-- **Haiku**：不用把 114 题用 Haiku 跑一遍，**只验证 Haiku 可用**。
-- 其余确认点全部接受：模型链 `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`；流式（`answer_from_data` 也流式、固定文案作为一个 `message.delta`、本期不做停止按钮）；成本统计用 Langfuse；提示词改动并重跑评测（**先估算后确认**）；第二阶段规划文档范围。
+- **The three rate-limit dimensions**: IP / user / token. The token dimension is set at **no more than US$0.50 per day for the whole stack** (accumulated by actual usage and model prices; "whole stack" = every model call of the api, worker and mcp-server, including chat, rerank, embedding and derived content); IP 60 per minute and user 20 per minute follow my suggestion.
+- **The 20% human spot check**: I finish the other features first and **the user does this check last** (the sample is taken from the result of the rerun after the prompt change, so that what is tested is the final system).
+- **Haiku**: there is no need to run the 114 questions with Haiku, and **only verify that Haiku works**.
+- All the other confirmation points were accepted: the model chain `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`; streaming (`answer_from_data` also streams, fixed texts as a single `message.delta`, no stop button this round); cost statistics with Langfuse; the prompt changes and the rerun of the evaluation (**estimate first, confirm afterwards**); the scope of the phase 2 plan document.
 
-### 实际结果
+### Actual results
 
-状态：**功能、评测与人工抽查均已完成，CI 通过，等待合并**。
+Status: **features, evaluation and the human spot check are all done, CI passes, awaiting merge**.
 
-- **多模型 fallback + 每日预算 + 三维限流**（提交 c87d0b8）：模型链 `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`；全栈每日预算 0.5 美元（api、worker、mcp-server 共用 Redis 当日计数，超出时聊天 429、worker 暂停取任务）；限流 IP 60/分钟、用户 20/分钟，IP 取自连接，只有来源在 `STARIT_TRUSTED_PROXIES` 内才读 `X-Forwarded-For`。
-- **流式输出**：`Accept: text/event-stream` 时返回 SSE（事件见文档 03 的 4.1）。`generate` 先输出 `sufficient`，确认为 true 才开始流出 `answer`；`answer_from_data` 也流式；固定文案作为一个 `message.delta`；校验不通过时发 `message.retract` 并在网页上显示"草稿未通过检查，已撤回"；客户端断开后运行继续并存档；15 秒保活。新增首字延迟指标（`run_first_token`、`llm_first_token`）。
-- **提示词**：`understand` 2→3、`generate` 1→2。
-- **真实检查**（约 $0.15 以内）：经 LiteLLM 网关流式 + JSON 模式 + 用量统计正常（gpt-6-luna、gpt-4o-mini）；备用链实测：主模型无效→`gpt-4o-mini`，前两级无效→`claude-haiku-5-5`，返回结果记录实际用到的模型；Haiku 直连流式与非流式均可用、JSON 合法。检查脚本：`ai-module/scripts/m9_real_check.py`。没有用 Haiku 跑 114 题（按你的决定）。
-- **答案评测重跑**（`docs/eval/answers-20261104-1722.md`，花费约 $0.129，估算 $0.140）：**107/114**（M8 基线 99/114；应回答 81/87，应拒绝 26/27）。原先被反问的 DOC-04/31/42/69 中，31、42、69 现在通过，DOC-04 现在直接回答但被判官以"漏了 12 个月服务期"判不通过；DOC-108 通过；应回答里"反问而没回答"为 0 题。剩下 7 题：6 题是判官嫌回答漏了次要事实（DOC-04/05/07/27/35/43），1 题是 DOC-90（问题本身含糊，助手引用了采购门槛作答）。
-- **助手抽查**：14/15，与 M8 相同，唯一未过的仍是 DOC-43（没写出当前版本的 3,000）；权限回归越权为 0 题。
-- **未验证 / 如实说明**：流式在真实浏览器里的观感还没看；生成延迟 p50 7.25 秒（M8 约 5.5 秒，本次包含更长的回答与网络波动，没有单独对比），流式主要改善首字时间；本地 Docker 下 IP 限流几乎没有区分度（所有浏览器都显示为 Docker 网关地址）。
-- **20% 人工抽查（用户已完成，`docs/eval/answers-20261104-1722-reviewed.csv`）**：23 题，判官与人工一致 **21/23**。判官判通过的 21 题人工全部认可（没有"误放行"）；判官判不通过的 2 题（DOC-04 漏了 12 个月服务期、DOC-27 漏了镜像地址）人工认为应通过，即判官偏严、会因漏掉次要事实而误杀。结论：判官给出的通过数是偏保守的下限，107/114 不会高估；样本只有 23 题，判官偏严的比例（2/23）只是粗略估计。（用户事后说明：抽查时曾把"参考答案"和"助手回答"两列看反，复核后确认助手的回答是对的，结果仍按 21/23 计，CSV 不改。）
-- **测试**：875 个 Python 测试、62 个前端测试通过；ruff、mypy 严格干净。
+- **Multi-model fallback + daily budget + three-dimension rate limiting** (commit c87d0b8): the model chain `gpt-6-luna → gpt-4o-mini → claude-haiku-5-5`; a whole-stack daily budget of US$0.5 (the api, worker and mcp-server share the day's Redis counter, chat returns 429 once it is exceeded and the worker pauses taking jobs); rate limits IP 60 per minute and user 20 per minute, with the IP taken from the connection, and `X-Forwarded-For` read only when the source is within `STARIT_TRUSTED_PROXIES`.
+- **Streaming output**: with `Accept: text/event-stream` it returns SSE (the events are in 4.1 of document 03). `generate` first outputs `sufficient` and only after it is confirmed true does it start streaming `answer`; `answer_from_data` also streams; fixed texts are a single `message.delta`; when verification fails it sends `message.retract` and the web page shows "The draft did not pass the check and was withdrawn"; after the client disconnects the run continues and is stored; a 15-second keepalive. New first-character latency metrics (`run_first_token`, `llm_first_token`).
+- **Prompts**: `understand` 2→3, `generate` 1→2.
+- **Real checks** (within about $0.15): streaming + JSON mode + usage accounting through the LiteLLM gateway works (gpt-6-luna, gpt-4o-mini); the fallback chain measured: an invalid primary model → `gpt-4o-mini`, the first two invalid → `claude-haiku-5-5`, and the result records the model actually used; Haiku works directly in both streaming and non-streaming with valid JSON. The check script: `ai-module/scripts/m9_real_check.py`. The 114 questions were not run with Haiku (by your decision).
+- **Rerun of the answer evaluation** (`docs/eval/answers-20261104-1722.md`, costing about $0.129, estimate $0.140): **107/114** (the M8 baseline was 99/114; should-answer 81/87, should-refuse 26/27). Of DOC-04/31/42/69, which were previously asked a clarifying question, 31, 42 and 69 now pass; DOC-04 now answers directly but the judge fails it for "missing the 12-month service period"; DOC-108 passes; "asked for clarification instead of answering" among the should-answer ones is 0 questions. Of the remaining 7: 6 are the judge faulting an answer for missing a minor fact (DOC-04/05/07/27/35/43), and 1 is DOC-90 (the question itself is vague and the assistant answered citing the procurement threshold).
+- **Assistant spot check**: 14/15, the same as M8, and the one still not passing is DOC-43 (it did not write the current version's 3,000); permission regression overreach is 0 questions.
+- **Not verified / stated honestly**: how streaming feels in a real browser has not been looked at; generation latency p50 is 7.25 seconds (about 5.5 seconds in M8; this time it includes longer answers and network fluctuation, and was not compared separately), and streaming mainly improves the time to the first character; under local Docker the IP rate limit has almost no discriminating power (every browser appears as the Docker gateway address).
+- **20% human spot check (done by the user, `docs/eval/answers-20261104-1722-reviewed.csv`)**: 23 questions, the judge and the human agree on **21 of 23**. All 21 that the judge passed were endorsed by the human (no "wrongly let through"); of the 2 that the judge failed (DOC-04 missing the 12-month service period, DOC-27 missing the mirror address) the human thought they should pass, that is, the judge is strict and wrongly rejects on a missing minor fact. Conclusion: the number of passes the judge gives is a conservative lower bound, and 107/114 does not overstate; the sample is only 23 questions, and the share of the judge being too strict (2/23) is only a rough estimate. (The user said afterwards that during the check the "reference answer" and "assistant answer" columns had been read the wrong way round; after re-checking it was confirmed that the assistant's answers were right, the result still counts as 21/23, and the CSV was not changed.)
+- **Tests**: 875 Python tests and 62 front-end tests pass; ruff and strict mypy are clean.

@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0}</style>
+<title>Architecture diagram review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Noto+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: 8 layers stacked vertically in the same order as the diagram; every row has three columns side by side: "On the diagram | What we built | Status". */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #16212b;
+  --muted: #566573;
+  --line: #d8dfe6;
+  --accent: #0a6c74;
+  --accent-tint: #dff1f2;
+  --ok: #17703f;       --ok-tint: #e1f3e8;
+  --alt: #2a5db0;      --alt-tint: #e4ecfa;
+  --part: #8f5a00;     --part-tint: #fbefd2;
+  --none: #4b5663;     --none-tint: #e9edf1;
+  --flag: #a4331f;     --flag-tint: #fbe6e1;
+  --font-body: "Noto Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11171d; --surface: #19212a; --ink: #e6ecf1; --muted: #97a5b2; --line: #2c3945;
+    --accent: #55c2cb; --accent-tint: #173a3e;
+    --ok: #6fd69a;  --ok-tint: #17352a;
+    --alt: #8fb4f2; --alt-tint: #1c2c47;
+    --part: #f0bd62; --part-tint: #3b2d0f;
+    --none: #aab6c2; --none-tint: #26303a;
+    --flag: #f19a8b; --flag-tint: #44201b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11171d; --surface: #19212a; --ink: #e6ecf1; --muted: #97a5b2; --line: #2c3945;
+  --accent: #55c2cb; --accent-tint: #173a3e;
+  --ok: #6fd69a;  --ok-tint: #17352a;
+  --alt: #8fb4f2; --alt-tint: #1c2c47;
+  --part: #f0bd62; --part-tint: #3b2d0f;
+  --none: #aab6c2; --none-tint: #26303a;
+  --flag: #f19a8b; --flag-tint: #44201b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1 { font-size: 28px; line-height: 1.25; margin: 0; text-wrap: balance; }
+h2 { font-size: 18px; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.sub { color: var(--muted); max-width: 68ch; }
+.mono { font-family: var(--font-mono); }
+
+/* Verdict */
+.verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.verdict > div { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+.verdict b { display: block; margin-bottom: 4px; }
+.verdict .flag-note { background: var(--flag-tint); border-color: transparent; }
+
+/* Overview bar */
+.overview { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: var(--none-tint); }
+.bar i { display: block; height: 100%; }
+.bar .s-done { background: var(--ok); } .bar .s-alt { background: var(--alt); }
+.bar .s-partial { background: var(--part); } .bar .s-none { background: var(--none); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+.legend span b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.dot.s-done { background: var(--ok); } .dot.s-alt { background: var(--alt); }
+.dot.s-partial { background: var(--part); } .dot.s-none { background: var(--none); }
+
+/* Tabs and filters */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.tab, .chip {
+  font: inherit; font-size: 14px; color: var(--ink); background: transparent; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px;
+}
+.tab[aria-selected="true"], .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .tab[aria-selected="true"], :root[data-theme="dark"] .chip[aria-pressed="true"] { color: #08262a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tab[aria-selected="true"], :root:not([data-theme="light"]) .chip[aria-pressed="true"] { color: #08262a; }
+}
+.tab:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filters .label { color: var(--muted); font-size: 13px; margin-right: 2px; }
+
+/* Layer */
+.layer { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.layer-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--accent-tint); }
+.layer-head .no { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+.layer-head .count { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cols, .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr) minmax(0, 190px); gap: 6px 18px; padding: 11px 16px; }
+.cols { font-size: 12px; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--line); padding-block: 8px; }
+.row { border-bottom: 1px solid var(--line); align-items: start; }
+.row:last-child { border-bottom: 0; }
+.seen { font-weight: 500; }
+.did { color: var(--ink); }
+.did small { display: block; color: var(--muted); margin-top: 2px; font-size: 13px; }
+.state { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.pill { display: inline-block; font-size: 13px; font-weight: 500; padding: 1px 10px; border-radius: 3px; }
+.pill.s-done { background: var(--ok-tint); color: var(--ok); }
+.pill.s-alt { background: var(--alt-tint); color: var(--alt); }
+.pill.s-partial { background: var(--part-tint); color: var(--part); }
+.pill.s-none { background: var(--none-tint); color: var(--none); }
+.why { font-size: 12.5px; color: var(--muted); }
+.why.flag { color: var(--flag); font-weight: 500; }
+.why.flag::before { content: "Needs your decision · "; }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+
+/* Card lists (requirements A to H, P1, to-dos) */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.card h3 { font-size: 15px; margin: 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.card .meta b { color: var(--ink); font-weight: 500; }
+.rec { font-size: 13px; font-weight: 500; padding: 1px 9px; border-radius: 3px; background: var(--accent-tint); color: var(--accent); }
+.rec.later { background: var(--none-tint); color: var(--none); }
+.rec.ask { background: var(--flag-tint); color: var(--flag); }
+.section-note { color: var(--muted); font-size: 14px; max-width: 78ch; }
+.group-title { margin-top: 6px; }
+
+@media (max-width: 760px) {
+  h1 { font-size: 23px; }
+  .cols { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 4px; padding-block: 14px; }
+  .state { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+  .seen::before { content: "On the diagram  "; color: var(--muted); font-weight: 400; font-size: 12px; }
+  .did::before { content: "What we built  "; color: var(--muted); font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <h1>Architecture diagram review</h1>
+    <p class="sub">Every cell of the reference architecture diagram (<span class="mono">interview_arch_traditional_plus_ai_v2.png</span>) that concerns the AI part is compared with what <span class="mono">v0.1.0</span> actually delivers, with a status and a reason for each cell. 2026-11-04.</p>
+  </header>
+
+  <section class="verdict" aria-label="Verdict">
+    <div><b>Phase 1 list A to H</b> has no real gaps; 5 items were scaled back: the context is only truncated and not summarised, explicit denial is in the authentication layer, Loki, lite, the 20% human spot check.</div>
+    <div><b>Done differently from the diagram, by deliberate decision</b>: a Postgres queue instead of Kafka, Postgres full text instead of Elasticsearch, views instead of RLS, LLM rerank instead of Cohere, conversation state in a table instead of a checkpointer.</div>
+    <div class="flag-note"><b>On the diagram, but not in the requirements and not planned</b>: output guardrails and PII masking, jailbreak detection, MCP Resources, Analytics and Web Search, fallback, Redis caching. The ones marked "Needs your decision" in red are these.</div>
+  </section>
+
+  <section class="overview" aria-label="Overview">
+    <h2>Counted by the architecture diagram (<span id="total"></span> cells)</h2>
+    <div class="bar" id="bar" role="img" aria-label="Share of each status"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="t-layers" data-view="layers">By layer of the diagram (8 layers)</button>
+    <button class="tab" role="tab" id="t-req" data-view="req">Requirements A to H</button>
+    <button class="tab" role="tab" id="t-p1" data-view="p1">Phase 2 P1 and later items</button>
+    <button class="tab" role="tab" id="t-todo" data-view="todo">To-dos found this time</button>
+  </nav>
+
+  <div id="view-layers" hidden>
+    <div class="filters" id="filters" style="margin-bottom:14px"></div>
+    <div id="layers" style="display:flex;flex-direction:column;gap:16px"></div>
+  </div>
+  <div id="view-req" hidden></div>
+  <div id="view-p1" hidden></div>
+  <div id="view-todo" hidden></div>
+</div>
+
+<script>
+/* status: done = done, alt = done differently (by decision), partial = partly done, none = not done
+   why: d = decided at design time, p1 = scheduled for phase 2, out = outside the AI scope, none = not planned, unv = I have not verified it, gap = not aligned with the diagram
+   flag: true means you need to decide */
+var STATUS = {
+  done: { label: "Done" }, alt: { label: "Done differently" }, partial: { label: "Partly done" }, none: { label: "Not done" }
+};
+var WHY = {
+  d: ["Decided at design time", false], p1: ["Scheduled for phase 2 (P1)", false], out: ["Outside the AI scope", false],
+  none: ["On the diagram, not in the requirements list, not planned", true], unv: ["Configured, but I have not verified it", true], gap: ["Not aligned with the diagram", true], later: ["Scheduled separately", false]
+};
+var LAYERS = [
+  { no: "①", name: "User browser", items: [
+    ["React SPA（TanStack Query、SSE Client）", "Next.js 15 App Router; the pages are client components calling the API directly; no TanStack Query, no SSE client", "partial", "p1"],
+    ["Mobile App（RN / Native）", "—", "none", "out"]
+  ]},
+  { no: "②", name: "Edge and reverse proxy", items: [
+    ["Keycloak（SSO、JWT / OIDC）", "The demo realm is imported with make up; authorization code + PKCE in the browser; the api and MCP each verify with JWKS", "done"],
+    ["Nginx / Cloudflare reverse proxy, / → Next.js, /api/ai/ → FastAPI", "The browser reaches ports 3000 and 8000 separately, and the api lets the front-end origin through with CORS. It only makes sense once the enterprise back office exists and a single entry is needed", "none", "d"],
+    ["CDN + WAF", "—", "none", "later"]
+  ]},
+  { no: "③", name: "Service process (FastAPI 8000)", items: [
+    ["LangGraph orchestration", "The agent package; the graph structure is tested, and every node can reach some end state", "done"],
+    ["Checkpointer", "Conversation state (session_mode, pending_question, clarify_count) is kept in ai.conversations, without LangGraph's checkpointer", "alt", "d"],
+    ["SSE streaming chat on /chat", "Currently a one-shot JSON; the response structure is already prepared for SSE", "none", "p1"],
+    ["Rate limiting (3 dimensions)", "1 dimension: 20 per user per minute (Redis)", "partial", "gap"],
+    ["PII masking", "—", "none", "none"],
+    ["Reuse of the same JWT", "The api and MCP verify the same Keycloak JWT; when calling MCP the user's own token is forwarded", "done"],
+    ["Langfuse LLM observability", "OTel → Collector → Langfuse; the same trace was seen in both Tempo and Langfuse in a measurement", "done"]
+  ]},
+  { no: "④", name: "Agent layer", items: [
+    ["Router: intent recognition, classification and routing", "The understand node, with 5 intents: document Q&A, data query, write action, small talk, out of scope", "done"],
+    ["Router: failure fallback", "A failure in any node lands in the error end state with a reason code; model calls have a count limit and retries", "done"],
+    ["RAG agent (hybrid search + rerank)", "Keyword + vector + RRF + LLM listwise rerank; in the full evaluation hit@1 reaches 1.0 after rerank", "done"],
+    ["SQL agent (text-to-SQL, Postgres read-only)", "sqlglot allow-list validation + a read-only role + views; the data questions pass 41/41", "done"],
+    ["RLS row-level permissions of the SQL agent", "The row scope is guaranteed by the WHERE of the ai_sql views, not by Postgres RLS", "alt", "d"],
+    ["Chit-chat (plain LLM)", "A fixed reply, with no model call", "alt", "d"],
+    ["Guardrail pre-check: prompt injection detection", "A few regular expressions; the code comments say they are only the simplest cases. The real defence is that the model never gets content the user may not read", "partial", "d"],
+    ["Guardrail pre-check: jailbreak detection", "No classifier", "none", "none"],
+    ["Guardrail post-check: PII masking, sensitive words", "The output has no further filter", "none", "none"],
+    ["Guardrail post-check: blocking overreach", "Not blocked at the output but guaranteed at the data layer: permission filtering, views, data tools. In the permission regression of 2,394 searches overreach is 0", "alt", "d"],
+    ["Analytics agent (data analysis, charts, reports)", "—", "none", "none"],
+    ["Web Search Agent", "—", "none", "none"],
+    ["Action agent (change business data → NestJS REST)", "After a write action is recognised it ends directly with refused / write_not_enabled", "none", "p1"]
+  ]},
+  { no: "⑤", name: "MCP Server", items: [
+    ["Tools", "6 tools; a real HTTP service; an expired, tampered or wrong-audience token gets 401; the user token is forwarded; every call is audited", "done"],
+    ["Resources (read-only data sources located by URI)", "—", "none", "none"],
+    ["Prompt templates (versioned, A/B)", "Prompts are files in the repository with version numbers written into the audit of every run; they are not served through MCP and there is no A/B", "partial", "d"]
+  ]},
+  { no: "⑥", name: "LLM gateway", items: [
+    ["LiteLLM: single entry, routing, retries", "Only added in M8 (a deviation M5 failed to record); vendor keys are only in the litellm container; 3 chat calls + 1 embedding measured, all 200", "done"],
+    ["LiteLLM: multi-model fallback", "No fallback model configured", "none", "none"],
+    ["LiteLLM: billing", "Cost statistics not switched on", "none", "p1"],
+    ["OpenAI main model", "gpt-6-luna for chat, text-embedding-3-small for embedding", "done"],
+    ["Claude Opus / Sonnet", "The gateway configuration has anthropic/* and the key is in .env, but no call has ever been run on an Anthropic model", "partial", "unv"],
+    ["Local vLLM (fallback for sensitive data)", "—", "none", "none"],
+    ["Embedding", "Provider, model and dimensions are all configuration variables; chunks record the model and dimensions", "done"],
+    ["Rerank (Cohere Rerank v3)", "Uses the LLM listwise rerank; the search interface leaves room for a dedicated rerank API, not connected", "alt", "d"]
+  ]},
+  { no: "⑦", name: "Data layer", items: [
+    ["PostgreSQL: chat history, audit, RBAC + ABAC", "Conversations, messages, run records, audit (the application role has INSERT only); a role or a named user is enough (OR), while campus and grade must both be met (AND)", "done"],
+    ["PostgreSQL: primary-replica, PITR backup", "—", "none", "later"],
+    ["Redis: rate limiting", "20 per user per minute, counted in Redis (STARIT_RATE_LIMIT_CHAT_PER_MINUTE)", "done"],
+    ["Redis: sessions, JWT blacklist, response cache, distributed locks, Pub/Sub", "Used only for rate limiting, with no matching requirement", "none", "none"],
+    ["Vector DB (pgvector, metadata filtering)", "Filtering by permission and version inside the database before ranking; exact scan at sample scale, no HNSW built", "done"],
+    ["Kafka", "Ingestion jobs use a Postgres queue (FOR UPDATE SKIP LOCKED)", "alt", "d"],
+    ["Object store (S3 / MinIO, pre-signed URLs)", "pgsty/silo (MinIO compatible); the original is relayed by the api and judged by the same permission function, with no pre-signed URLs", "alt", "d"],
+    ["Elasticsearch（BM25）", "Postgres full text ts_rank_cd + code boost; the BM25 extension is not installed, and evaluation says it is not needed for now", "alt", "d"]
+  ]},
+  { no: "⑧", name: "Observability and deployment", items: [
+    ["Prometheus + Grafana", "4 dashboards, every query verified to run; nobody has looked at how they render", "done"],
+    ["Tempo + OpenTelemetry", "api, worker, mcp-server; cross-service traces; no token or question text in spans (tested)", "done"],
+    ["Langfuse (LLM specific)", "An optional Compose file; model calls show as generations", "done"],
+    ["Loki logs", "Logs are JSON with request_id, run_id and trace_id; no centralised logging", "none", "d"],
+    ["K8s + Helm + ArgoCD", "—", "none", "later"],
+    ["Vault secrets, Sentry errors", "—", "none", "none"]
+  ]}
+];
+
+var REQ = [
+  ["A Knowledge base and ETL", "done", "Upload, pluggable parsers, configurable chunking, sources and heading paths, metadata, embedding configuration, ingestion status with failure reasons and retries are all there. Derived content was built but is off by default (evaluation showed no clear benefit)."],
+  ["B Search", "done", "Full text + vector + RRF, filtering inside the database first, rerank, pluggable searchers. All 13 code-type questions pass."],
+  ["C Employee assistant", "partial", "Q&A with citations, user-created conversations, and saying so plainly when there is no permission or nothing is found are all there. Over-long context is truncated (the last 6 turns) with no summary; with no answer it occasionally still marks \"answered\" (no leak)."],
+  ["D Agent", "done", "A fixed flow + local agents, three kinds of tools, explicit end states and reason codes, conversation state. End states valid 114/114."],
+  ["E Identity and permissions", "partial", "Keycloak JWT + JWKS, grants OR / mandatory AND, audit are all there, and overreach in the permission regression is 0. Explicit denial is handled in the authentication layer (a disabled account is refused), with no separate deny list."],
+  ["G Evaluation and observability", "partial", "An evaluation set of 114 + 41 (more than the planned 54 + 16), and Langfuse, OTel, Prometheus and Grafana are all there. The 20% human spot check and Loki were not done."],
+  ["H Front end and deployment", "partial", "The chat page, conversation list, citation display, document management page, Compose full and one-command sample data import are all there. Lite (k3s) was not done."]
+];
+var P1 = [
+  { g: "The 4 items confirmed in the requirements document", items: [
+    ["Streaming output", "The response structure is already prepared", "Streaming in the back end's generate + SSE, and an SSE client in the front end. Before starting, decide how to handle verify_answer: stream only after verification passes, or stream first and withdraw if it fails.", "Medium", "Add it", "do"],
+    ["Cost and latency statistics (per model, per conversation)", "ai.runs stores only total tokens; Prometheus already has tokens and latency per model", "A per-call usage table + a price table + an endpoint and a page that sum per conversation.", "Small to medium", "Add it", "do"],
+    ["Memory (storing only stable preferences and facts)", "None", "A table, load_memory / save_memory nodes, a page where users can view and delete, privacy rules (no restricted content stored).", "Medium to large", "Postpone", "later"],
+    ["Write actions need user confirmation", "Write actions are refused outright", "confirm_action (LangGraph interrupt) + a writable target. There is no writable business system now.", "Large", "Postpone until the enterprise back office exists", "later"]
+  ]},
+  { g: "Follow-up items mentioned in the design but not among these 4", items: [
+    ["The lite profile (Oracle k3s, Helm, identity plan)", "Scheduled separately", "Depends on you verifying the Oracle quota.", "Large", "Postpone", "later"],
+    ["Enterprise back office (the NestJS business module)", "Sub-project 2", "The next big piece of work.", "Large", "Postpone", "later"],
+    ["An Auditor role and an audit query endpoint", "03 says \"can be added in phase 2\"", "—", "Small", "Postpone", "later"],
+    ["Franchised-campus data, Chinese-language data", "07 lists it as outside phase 1", "—", "Medium", "Postpone", "later"],
+    ["BM25 extension", "Evaluation says it is not needed for now", "—", "Small", "Postpone", "later"],
+    ["Loki centralised logs", "On the diagram, deliberately not done in M8", "Saves about 0.5 GB of memory.", "Small", "Postpone", "later"]
+  ]}
+];
+var TODO = [
+  ["20% human spot check", "docs/eval/answers-20261104-0454.csv. The judge's conclusions must not be taken as fact before a person has looked at them.", "Do first", "do"],
+  ["understand over-asks for clarification", "Of the 87 questions that can be answered directly, 4 got a clarifying question (DOC-04, 31, 42, 69), for example \"which year\". Change the prompt and evaluate again.", "Add it", "do"],
+  ["Still marked \"answered\" when there is no answer", "DOC-108: the answer says \"it is not stated\" yet the end state is answered (no leak). Fix it together with the previous item.", "Add it", "do"],
+  ["Anthropic path and LLM fallback", "Configured but not verified. The cost is tiny, a few calls.", "Add it", "do"],
+  ["Output guardrails (PII, sensitive words), a jailbreak classifier", "On the diagram, and we only have regular expressions. Worth doing for enterprise use, but not in the requirements list.", "You decide", "ask"],
+  ["Rate limiting from 1 to 3 dimensions", "The diagram has 3 dimensions, and the requirements only ask for rate limiting.", "Postpone", "later"],
+  ["Click through the places not yet clicked", "Editing, re-ingesting and failure reasons on the documents page were not clicked in a real browser; Playwright is not in CI; nobody has looked at how the Grafana dashboards render.", "Postpone, or click through yourself", "later"]
+];
+
+var state = { view: "layers", filter: "all" };
+function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+function stats() {
+  var c = { done: 0, alt: 0, partial: 0, none: 0, flag: 0 }, total = 0;
+  LAYERS.forEach(function (L) { L.items.forEach(function (it) { c[it[2]]++; total++; if (it[3] && WHY[it[3]][1]) c.flag++; }); });
+  c.total = total; return c;
+}
+function renderOverview() {
+  var c = stats();
+  document.getElementById("total").textContent = c.total;
+  var bar = document.getElementById("bar"), legend = document.getElementById("legend");
+  ["done", "alt", "partial", "none"].forEach(function (k) {
+    var seg = el("i", "s-" + k); seg.style.width = (c[k] / c.total * 100) + "%"; seg.title = STATUS[k].label + " " + c[k]; bar.appendChild(seg);
+    legend.appendChild(el("span", null, '<i class="dot s-' + k + '"></i>' + STATUS[k].label + " <b>" + c[k] + "</b>"));
+  });
+  legend.appendChild(el("span", null, "Of which need your decision <b style='color:var(--flag)'>" + c.flag + "</b>"));
+}
+function renderFilters() {
+  var f = document.getElementById("filters");
+  f.appendChild(el("span", "label", "Filter"));
+  [["all", "All"], ["done", "Done"], ["alt", "Done differently"], ["partial", "Partly done"], ["none", "Not done"], ["flag", "Needs your decision"]].forEach(function (p) {
+    var b = el("button", "chip", p[1]); b.type = "button"; b.dataset.f = p[0];
+    b.addEventListener("click", function () { state.filter = p[0]; renderLayers(); syncChips(); });
+    f.appendChild(b);
+  });
+  syncChips();
+}
+function syncChips() {
+  document.querySelectorAll("#filters .chip").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.f === state.filter ? "true" : "false"); });
+}
+function match(it) {
+  if (state.filter === "all") return true;
+  if (state.filter === "flag") return !!(it[3] && WHY[it[3]][1]);
+  return it[2] === state.filter;
+}
+function renderLayers() {
+  var box = document.getElementById("layers"); box.innerHTML = "";
+  var shown = 0;
+  LAYERS.forEach(function (L) {
+    var rows = L.items.filter(match); if (!rows.length) return; shown += rows.length;
+    var sec = el("section", "layer");
+    var head = el("div", "layer-head", '<span class="no">' + L.no + '</span><h2>' + L.name + '</h2><span class="count">' + rows.length + " / " + L.items.length + " items</span>");
+    sec.appendChild(head);
+    sec.appendChild(el("div", "cols", "<span>On the diagram</span><span>What we built</span><span>Status and reason</span>"));
+    rows.forEach(function (it) {
+      var why = it[3] ? '<span class="why' + (WHY[it[3]][1] ? " flag" : "") + '">' + WHY[it[3]][0] + "</span>" : "";
+      var r = el("div", "row",
+        '<div class="seen">' + it[0] + '</div><div class="did">' + it[1] + '</div><div class="state"><span class="pill s-' + it[2] + '">' + STATUS[it[2]].label + "</span>" + why + "</div>");
+      sec.appendChild(r);
+    });
+    box.appendChild(sec);
+  });
+  if (!shown) box.appendChild(el("div", "empty", "No entries under this filter."));
+}
+function renderReq() {
+  var v = document.getElementById("view-req");
+  v.appendChild(el("p", "section-note", "The phase 1 list confirmed in round 7 of the requirements document (there is no F, as in the original). Each item says in a sentence what was achieved and what was scaled back."));
+  var grid = el("div", "cards"); grid.style.marginTop = "14px";
+  REQ.forEach(function (r) { grid.appendChild(el("div", "card", "<h3>" + r[0] + ' <span class="pill s-' + r[1] + '">' + STATUS[r[1]].label + "</span></h3><p>" + r[2] + "</p>")); });
+  v.appendChild(grid);
+}
+function renderP1() {
+  var v = document.getElementById("view-p1");
+  P1.forEach(function (grp, gi) {
+    v.appendChild(el("h2", "group-title", grp.g));
+    var grid = el("div", "cards"); grid.style.marginTop = "12px"; grid.style.marginBottom = "20px";
+    grp.items.forEach(function (it) {
+      grid.appendChild(el("div", "card",
+        '<h3>' + it[0] + '</h3><p>' + it[2] + '</p><div class="meta"><span>Now <b>' + it[1] + '</b></span><span>Size <b>' + it[3] + '</b></span></div><div><span class="rec ' + (it[5] === "do" ? "" : "later") + '">Suggestion: ' + it[4] + "</span></div>"));
+    });
+    v.appendChild(grid);
+  });
+}
+function renderTodo() {
+  var v = document.getElementById("view-todo");
+  v.appendChild(el("p", "section-note", "Found in this review and in the M8 evaluation, and not in the original list."));
+  var grid = el("div", "cards"); grid.style.marginTop = "14px";
+  TODO.forEach(function (t) {
+    grid.appendChild(el("div", "card", "<h3>" + t[0] + "</h3><p>" + t[1] + '</p><div><span class="rec ' + (t[3] === "do" ? "" : t[3]) + '">Suggestion: ' + t[2] + "</span></div>"));
+  });
+  v.appendChild(grid);
+}
+function show(view) {
+  state.view = view;
+  ["layers", "req", "p1", "todo"].forEach(function (k) {
+    document.getElementById("view-" + k).hidden = k !== view;
+    var t = document.getElementById("t-" + k); t.setAttribute("aria-selected", k === view ? "true" : "false");
+  });
+  try { if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view); } catch (e) {}
+}
+document.querySelectorAll(".tab").forEach(function (t) { t.addEventListener("click", function () { show(t.dataset.view); }); });
+window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (["layers", "req", "p1", "todo"].indexOf(h) >= 0) show(h); });
+renderOverview(); renderFilters(); renderLayers(); renderReq(); renderP1(); renderTodo();
+(function () { var h = location.hash.slice(1); show(["layers", "req", "p1", "todo"].indexOf(h) >= 0 ? h : "layers"); })();
+</script>
+
+</body>
+</html>

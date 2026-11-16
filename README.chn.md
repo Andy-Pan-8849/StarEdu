@@ -4,14 +4,14 @@
 
 # StarEdu
 
-[English](README.md) · **[试用：运行 AI 模块、业务模块，或两个一起](TRY-IT.chn.md)**
+[English](README.chn.md) · **[试用：运行 AI 模块、业务模块，或两个一起](TRY-IT.chn.md)**
 
 一个开源蓝本：给传统业务系统加上 AI。它把一个企业后台和一个 AI 知识助手、智能体放在一起，用同一家示例公司 **StarIT Education**（一家在全国有八个校区的 IT 培训公司）作为贯穿始终的例子。
 
 | 模块 | 目录 | 状态 |
 |---|---|---|
 | AI 模块：RAG、智能体、接口、网页聊天 | [`ai-module/`](ai-module/) | 用 Docker Compose 在本机运行 |
-| 业务模块：TypeScript 的多租户后台（参照一个开源竞品） | [`business-module/`](business-module/)（[概览](business-module/README.chn.md)、[试用](business-module/TRY-IT.chn.md)、[English](business-module/README.md)） | 用 Docker Compose 在本机运行；自带演示公司、账号和一条命令重置 |
+| 业务模块：TypeScript 的多租户后台（参照一个开源竞品） | [`business-module/`](business-module/)（[概览](business-module/README.chn.md)、[试用](business-module/TRY-IT.chn.md)、[English](business-module/README.chn.md)） | 用 Docker Compose 在本机运行；自带演示公司、账号和一条命令重置 |
 
 ## AI 模块做什么
 
@@ -45,7 +45,7 @@ flowchart LR
 - **账号只决定"能看到什么"。** 身份来自签名的令牌，一次运行开始后只读。文档权限在检索 SQL 里、排序之前过滤；数据问答跑在按提问者过滤行的视图上，MCP 工具会把用户的令牌原样转发。
 - **所以同一个问题，不同账号走同一条路，看到的结果不同。** 用 `qing.hr.bj`（HR）和 `wei.stu.sh`（学员）分别问 "What is the base salary band for a Senior Instructor at a Tier 1 campus?"：HR 得到薪资带并带引用，学员得到固定的"找不到"话术。文档不存在和无权限说的是同一句话，所以回答不会透露受限文档是否存在。
 
-为什么是一张图，而不是多个 Agent：外层流程（检索、权限过滤、校验、收尾）是固定的代码，模型只用在几个明确的步骤里。这样每次运行可预期、可测试、评测成本低。数据路径里的 SQL 部分是有次数上限的小循环。Analytics Agent、Web Search Agent 在[第二阶段计划](docs/design/09-phase2-plan.md)里是候选项，没有做。代码在 [`graph.py`](ai-module/packages/core/src/starit_core/agent/graph.py)（路由表）和 [`nodes.py`](ai-module/packages/core/src/starit_core/agent/nodes.py)（`understand`）。
+为什么是一张图，而不是多个 Agent：外层流程（检索、权限过滤、校验、收尾）是固定的代码，模型只用在几个明确的步骤里。这样每次运行可预期、可测试、评测成本低。数据路径里的 SQL 部分是有次数上限的小循环。Analytics Agent、Web Search Agent 在[第二阶段计划](docs/design/09-phase2-plan.chn.md)里是候选项，没有做。代码在 [`graph.py`](ai-module/packages/core/src/starit_core/agent/graph.py)（路由表）和 [`nodes.py`](ai-module/packages/core/src/starit_core/agent/nodes.py)（`understand`）。
 
 ## 快速开始
 
@@ -73,7 +73,7 @@ make sync && make up && make seed
 | 身份 | Keycloak（OIDC） |
 | 部署 | 目前是 Docker Compose；服务器档位计划用 k3s |
 
-设计文档在 [`docs/design/`](docs/design/)；每个里程碑交付了什么见 [`docs/design/08-milestone-checklists.md`](docs/design/08-milestone-checklists.md)。
+设计文档在 [`docs/design/`](docs/design/)；每个里程碑交付了什么见 [`docs/design/08-milestone-checklists.md`](docs/design/08-milestone-checklists.chn.md)。
 
 ## 仓库结构
 
@@ -98,7 +98,7 @@ AI 模块内部每个文件夹是做什么的，见 [`ai-module/README.chn.md`](
 
 ## 路线图
 
-1. AI 模块：已完成到里程碑 M9。下一批见 [`docs/design/09-phase2-plan.md`](docs/design/09-phase2-plan.md)。
+1. AI 模块：已完成到里程碑 M9。下一批见 [`docs/design/09-phase2-plan.md`](docs/design/09-phase2-plan.chn.md)。
 2. 业务模块（NestJS 后台）：已完成到里程碑 B25，带演示数据和公开试用模式。
 3. 部署档位（完整和精简）和公开演示站。
 4. 示例数据的中文版。

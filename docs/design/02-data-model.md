@@ -1,95 +1,97 @@
-# 设计文档 02：数据模型与权限元数据（AI 模块，第一阶段）
+# Design document 02: data model and permission metadata (AI module, phase 1)
 
-状态：**已获用户批准（2026-11-02），第 8 节 6 个确认点全部接受。** 其余设计文档批准前不写应用代码，也不建表。
-依赖：[01 总体架构](01-architecture-and-repo.md)。标记约定同 01：**【已定】**、**【建议】**、**【待定】**。
+[中文](02-data-model.chn.md)
 
-## 1. 总原则
+Status: **Approved by the user (2026-11-02); all 6 confirmation points of section 8 were accepted.** No application code is written and no tables are created before the other design documents are approved.
+Depends on: [01 overall architecture](01-architecture-and-repo.md). Marking convention as in 01: **[Decided]**, **[Proposed]**, **[Open]**.
 
-1. **权限和版本信息跟着分块走**：每个分块保存自己能被谁看到、属于哪个版本，检索时在同一张表里过滤，不做多表 join。
-2. **权限由代码强制**：所有检索 SQL 都通过 `core` 里的同一个函数生成，函数必须接收用户身份，没有"不带身份的检索"入口。
-3. **入库时把权限展开成明确的集合**（如 `allowed_roles`），查询时只做集合运算，不在查询里算角色继承。
-4. **Keycloak 是用户和角色的唯一来源**：AI 侧不建用户表，只存 Keycloak 的用户 ID（`sub`）。
-5. AI 侧的表放在 Postgres 的 `ai` schema，业务样例数据放在 `biz` schema，SQL Agent 通过 `ai_sql` schema 里的白名单视图访问（见第 5 节）。迁移用 Alembic。
-6. **数据库账号分三个**【M2 修订，已定】：`starit`（库所有者，只用于迁移）、`ai_app`（应用账号，普通权限；审计表只有 INSERT）、`ai_sql_ro`（只读，**不能登录**，应用在事务里用 `SET LOCAL ROLE ai_sql_ro` 切换过去执行 SQL Agent 的查询）。应用不再使用超级用户连接，否则授权和只追加的审计都会失效。
-7. **两类访问控制**【M2 修订，已定】：**政策文件**全公司一份，只按**角色**控制（访问等级，见 2.3），与校区无关；**结构化数据和校区资料**（学员名单、工单、提交记录、报销单，以及以后的课件、讲义）按**数据范围**控制：全公司 / 本校区 / 仅本人。这与企业后台常见的"数据权限"一致。
+## 1. General principles
 
-## 2. 文档与分块
+1. **Permission and version information travels with the chunk**: each chunk stores who may see it and which version it belongs to, so search filters within one table without joins.
+2. **Permissions are enforced by code**: every search SQL is produced by the same function in `core`, and the function must receive the user's identity; there is no "search without identity" entry.
+3. **At ingestion, permissions are expanded into explicit sets** (such as `allowed_roles`), so a query only does set operations and never computes role inheritance.
+4. **Keycloak is the only source of users and roles**: the AI side has no user table and stores only Keycloak's user id (`sub`).
+5. Tables of the AI side live in the Postgres `ai` schema, the sample business data in the `biz` schema, and the SQL agent reaches data through allow-listed views in the `ai_sql` schema (see section 5). Migrations use Alembic.
+6. **Three database accounts** [M2 revision, Decided]: `starit` (database owner, used only for migrations), `ai_app` (the application account, ordinary rights; the audit table has INSERT only), `ai_sql_ro` (read-only, **cannot log in**; the application switches to it inside a transaction with `SET LOCAL ROLE ai_sql_ro` to run the SQL agent's queries). The application no longer connects as a superuser, otherwise grants and the append-only audit would be void.
+7. **Two kinds of access control** [M2 revision, Decided]: **policy documents** exist once for the whole company and are controlled by **role** only (the access level, see 2.3), regardless of campus; **structured data and campus materials** (student lists, tickets, submissions, expense claims, and later courseware and handouts) are controlled by **data scope**: whole company / own campus / own records only. This matches the usual "data permission" of enterprise back offices.
+
+## 2. Documents and chunks
 
 ### 2.1 `ai.documents`
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |---|---|---|
 | `id` | uuid PK | |
-| `doc_code` | text | 业务编号，如 `FIN-PAY-004`；来自 `manifest.csv` 的 `doc_id` |
+| `doc_code` | text | Business code such as `FIN-PAY-004`; the `doc_id` of `manifest.csv` |
 | `title` | text | |
 | `domain` | text | `hr` / `finance` / `support` |
-| `version` | text | 如 `4.0` |
+| `version` | text | such as `4.0` |
 | `status` | text | `active` / `superseded` / `draft` |
 | `effective_date` | date | |
-| `access_level` | text | 原始访问等级，如 `hr-only`（见 2.3），仅用于展示和重新展开 |
-| `allowed_roles` | text[] | 展开后的角色集合 |
-| `allowed_users` | text[] | 按人点名（Keycloak `sub`），默认空 |
-| `campus_scope` | text[] | `{all}` 或校区编号列表 |
-| `min_level_rank` | smallint | 可选，最低职级档（1–7，见第 4 节的对照表），默认空 |
-| `object_key` | text | 对象存储中的原文件 |
+| `access_level` | text | The original access level such as `hr-only` (see 2.3), kept for display and re-expansion |
+| `allowed_roles` | text[] | The expanded set of roles |
+| `allowed_users` | text[] | Named individuals (Keycloak `sub`), empty by default |
+| `campus_scope` | text[] | `{all}` or a list of campus codes |
+| `min_level_rank` | smallint | Optional minimum grade (1 to 7, see the table in section 4), empty by default |
+| `object_key` | text | The original file in the object store |
 | `format` | text | docx / pdf / md / txt |
-| `content_hash` | text | SHA-256，用于判断重复上传和变更 |
+| `content_hash` | text | SHA-256, to detect duplicate uploads and changes |
 | `ingest_status` | text | `queued` / `running` / `ready` / `failed` |
 | `uploaded_by` | text | Keycloak `sub` |
-| `created_at`、`updated_at` | timestamptz | |
-| `supersedes_id` | uuid null | 指向被它取代的旧版本 |
+| `created_at`, `updated_at` | timestamptz | |
+| `supersedes_id` | uuid null | Points to the older version it replaces |
 
-唯一约束：`(doc_code, version)`。
+Unique constraint: `(doc_code, version)`.
 
 ### 2.2 `ai.document_chunks`
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |---|---|---|
 | `id` | uuid PK | |
 | `document_id` | uuid FK | |
 | `chunk_index` | int | |
-| `text` | text | 原文，**始终保留** |
-| `heading_path` | text[] | 标题路径 |
+| `text` | text | The original text, **always kept** |
+| `heading_path` | text[] | Heading path |
 | `page` | int null | |
 | `token_count` | int | |
-| `identifiers` | text[] | 从文本中用规则抽出的编号（如 `ERR-PORTAL-403`），用于精确匹配加权 |
-| `tsv` | tsvector | 由 `text` 生成（含 `identifiers`），GIN 索引 |
-| `allowed_roles`、`allowed_users`、`campus_scope`、`min_level_rank` | 同上 | **从文档复制（反规范化）** |
-| `status`、`effective_date`、`doc_code`、`version` | 同上 | 从文档复制，便于过滤和标注 |
+| `identifiers` | text[] | Codes extracted from the text by rules (such as `ERR-PORTAL-403`), used to boost exact matches |
+| `tsv` | tsvector | Generated from `text` (including `identifiers`), GIN index |
+| `allowed_roles`, `allowed_users`, `campus_scope`, `min_level_rank` | as above | **Copied from the document (denormalised)** |
+| `status`, `effective_date`, `doc_code`, `version` | as above | Copied from the document, to ease filtering and labelling |
 
-一致性规则：文档的权限、状态、版本只能通过 `core` 里的一个服务函数修改，该函数在**同一事务里**更新文档行和它的所有分块，禁止直接 SQL 修改其中之一。另有一个**一致性检查视图** `ai.v_chunk_permission_drift`，列出权限、状态、版本与所属文档不一致的分块；测试和 CI 断言它为空。
+Consistency rule: a document's permissions, status and version can only be changed through one service function in `core`, which updates the document row and all of its chunks **in the same transaction**; changing one of them with direct SQL is forbidden. There is also a **consistency check view** `ai.v_chunk_permission_drift` that lists chunks whose permissions, status or version differ from their document; tests and CI assert that it is empty.
 
-### 2.3 访问等级到角色的展开表【已定，来自评测集的访问模型】
+### 2.3 Expansion table from access level to roles [Decided, from the access model of the evaluation set]
 
-`manifest.csv` 的 `access` 在入库时展开为 `allowed_roles`：
+The `access` of `manifest.csv` is expanded into `allowed_roles` at ingestion:
 
-| `access` | 展开后的 `allowed_roles` |
+| `access` | Expanded `allowed_roles` |
 |---|---|
-| `students-and-staff` | student、staff、manager、hr、finance |
-| `all-staff` | staff、manager、hr、finance |
-| `staff` | staff、manager、hr、finance |
-| `managers` | manager、hr、finance |
-| `finance-and-hr` | hr、finance |
+| `students-and-staff` | student, staff, manager, hr, finance |
+| `all-staff` | staff, manager, hr, finance |
+| `staff` | staff, manager, hr, finance |
+| `managers` | manager, hr, finance |
+| `finance-and-hr` | hr, finance |
 | `hr-only` | hr |
 
-- `Admin`、`RAGETLAdmin` **不在任何展开结果里**（最小权限，见 01 的 4.3）。
-- 映射保存在配置文件里。映射变化时，需要一个"重新展开"任务更新文档和分块。
+- `Admin` and `RAGETLAdmin` are **in no expansion result** (least privilege, see 4.3 of 01).
+- The mapping is kept in a configuration file. When the mapping changes, a "re-expand" job is needed to update documents and chunks.
 
 ### 2.4 `ai.chunk_embeddings`
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |---|---|---|
 | `chunk_id` | uuid PK FK | |
-| `model` | text | 如 `text-embedding-3-small` |
+| `model` | text | such as `text-embedding-3-small` |
 | `dimensions` | int | |
 | `embedding` | vector(1536) | |
 
-- 向量列的维度在建表时固定。换成不同维度的模型，需要新迁移建新表并重新入库；`model` 和 `dimensions` 每行都记录，用于发现混用。
-- **ANN 索引**：样例规模（几百到几千个分块）下，第一版**不建 HNSW**，使用带过滤条件的精确扫描，结果最准确。需要时再加 HNSW，并实测"过滤后结果变少"的问题（pgvector 较新版本提供迭代扫描，需要核对当前版本和行为）【待定】。
+- The dimension of the vector column is fixed when the table is created. Switching to a model of a different dimension needs a new migration that creates a new table, and re-ingestion; `model` and `dimensions` are recorded on every row to detect mixing.
+- **ANN index**: at sample scale (hundreds to thousands of chunks) the first version **does not build HNSW** and uses an exact scan with the filter conditions, which gives the most accurate results. HNSW can be added when needed, together with a measurement of the "fewer results after filtering" problem (newer pgvector versions offer iterative scans; the current version and behaviour must be checked) [Open].
 
 ### 2.5 `ai.chunk_derived`
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |---|---|---|
 | `id` | uuid PK | |
 | `chunk_id` | uuid FK | |
@@ -97,151 +99,151 @@
 | `text` | text | |
 | `tsv` | tsvector | |
 
-- 派生内容是**额外的字段**，不替换原文（RAGFlow 里发现摘要会替换全文索引，我们不这样做）。
-- 检索时，原文命中权重最高，派生内容作补充；权限从所属分块继承（查询时 join，派生内容本身不存权限列）。
+- Derived content is an **extra field** and does not replace the original text (RAGFlow was found to let summaries replace the full-text index; we do not do that).
+- At search time a hit in the original text weighs most and derived content supplements it; permissions are inherited from the chunk (joined at query time; derived content stores no permission columns itself).
 
 ### 2.6 `ai.ingestion_jobs`
 
-| 列 | 类型 | 说明 |
+| Column | Type | Description |
 |---|---|---|
 | `id` | uuid PK | |
 | `document_id` | uuid FK | |
 | `status` | text | `queued` / `running` / `succeeded` / `failed` |
 | `stage` | text | `parse` / `chunk` / `derive` / `embed` / `write` |
-| `attempt`、`max_attempts` | int | |
-| `run_after` | timestamptz | 重试的最早时间 |
-| `locked_by`、`locked_at` | text / timestamptz | worker 领取标记（`FOR UPDATE SKIP LOCKED`） |
-| `config` | jsonb | 解析器、分块参数、是否生成派生内容 |
-| `error_code`、`error_message` | text | 失败原因，文档管理页展示 |
-| `started_at`、`finished_at` | timestamptz | |
+| `attempt`, `max_attempts` | int | |
+| `run_after` | timestamptz | Earliest time of a retry |
+| `locked_by`, `locked_at` | text / timestamptz | Worker claim marks (`FOR UPDATE SKIP LOCKED`) |
+| `config` | jsonb | Parser, chunking parameters, whether to generate derived content |
+| `error_code`, `error_message` | text | Failure reason, shown on the document management page |
+| `started_at`, `finished_at` | timestamptz | |
 
-## 3. 会话、运行与审计
+## 3. Conversations, runs and audit
 
 ### 3.1 `ai.conversations`
 
-`id`、`user_id`（Keycloak `sub`）、`title`、`created_at`、`updated_at`、`archived`。会话由用户创建，不自动过期【已定】。
+`id`, `user_id` (Keycloak `sub`), `title`, `created_at`, `updated_at`, `archived`. A conversation is created by the user and does not expire automatically [Decided].
 
 ### 3.2 `ai.messages`
 
-`id`、`conversation_id`、`run_id`、`role`（user / assistant）、`content`、`citations`（jsonb：文档、分块、页码、版本）、`created_at`。
+`id`, `conversation_id`, `run_id`, `role` (user / assistant), `content`, `citations` (jsonb: document, chunk, page, version), `created_at`.
 
-### 3.3 `ai.runs`（每次图运行一行）
+### 3.3 `ai.runs` (one row per graph run)
 
-| 列 | 说明 |
+| Column | Description |
 |---|---|
-| `id`、`conversation_id`、`user_id` | |
-| `started_at`、`ended_at` | |
-| `end_state`、`end_reason` | 显式 End 状态和原因码（`answered` / `need_clarification` / `no_permission` / `not_found` / `refused` / `error`，详见文档 04） |
-| `model`、`tokens_in`、`tokens_out`、`latency_ms` | 第二阶段的成本统计从这里汇总 |
-| `trace_id` | 对应 Langfuse / OTel 的 trace |
+| `id`, `conversation_id`, `user_id` | |
+| `started_at`, `ended_at` | |
+| `end_state`, `end_reason` | The explicit End state and reason code (`answered` / `need_clarification` / `no_permission` / `not_found` / `refused` / `error`, see document 04) |
+| `model`, `tokens_in`, `tokens_out`, `latency_ms` | The phase 2 cost statistics are summed from here |
+| `trace_id` | The matching Langfuse / OTel trace |
 
-LangGraph 的检查点表由其官方 Postgres checkpointer 自己创建（`ai` schema 下），会话状态（`answering` / `need_clarification`）保存在图状态里。
+LangGraph's checkpoint tables are created by its official Postgres checkpointer itself (under the `ai` schema), and the conversation state (`answering` / `need_clarification`) is kept in the graph state.
 
-### 3.4 `ai.audit_log`（只追加）
+### 3.4 `ai.audit_log` (append-only)
 
-`id`、`ts`、`user_id`、`roles`（jsonb）、`action`（`chat.query` / `doc.upload` / `doc.delete` / `doc.reindex` / `access.denied` 等）、`run_id`、`query_text`、`doc_ids`（本次命中或操作的文档）、`filtered_count`（被权限过滤掉的分块数，**只记数量，不记内容**）、`ip`。
+`id`, `ts`, `user_id`, `roles` (jsonb), `action` (`chat.query` / `doc.upload` / `doc.delete` / `doc.reindex` / `access.denied` and so on), `run_id`, `query_text`, `doc_ids` (documents hit or acted on this time), `filtered_count` (the number of chunks removed by permissions, **only the count, never the content**), `ip`.
 
-- 应用账号只有 INSERT 权限，没有 UPDATE / DELETE。
-- 查询原文是否保存、保存多久，涉及隐私，演示项目先保存，真实环境需要策略【待定】。
+- The application account has INSERT only, no UPDATE / DELETE.
+- Whether and how long to keep the original query text touches privacy; a demo project keeps it, a real environment needs a policy [Open].
 
-## 4. 检索的权限过滤条件【M2 修订】
+## 4. The permission filter of search [M2 revision]
 
-`core` 里构造的过滤条件（所有检索共用）：
+The filter built in `core` (shared by all searches):
 
 ```sql
-status IN ('active', 'superseded')          -- 默认包含旧版本，结果中标注状态
+status IN ('active', 'superseded')          -- old versions are included by default, and labelled in the result
 AND ( allowed_roles && :user_roles
-      OR :user_id = ANY(allowed_users) )     -- 授权：OR
+      OR :user_id = ANY(allowed_users) )     -- grants: OR
 AND ( campus_scope = '{all}'
       OR :campus_id = ANY(campus_scope)
-      OR :all_campuses )                     -- 强制约束：AND（数据范围）
+      OR :all_campuses )                     -- mandatory constraint: AND (data scope)
 AND ( min_level_rank IS NULL
-      OR :user_level_rank >= min_level_rank ) -- 强制约束：AND（职级档）
+      OR :user_level_rank >= min_level_rank ) -- mandatory constraint: AND (grade)
 ```
 
-- 与需求文档第六轮的判定规则一致：授权之间 OR，强制约束 AND；显式拒绝（如账号停用）在认证层处理，被拒绝的用户拿不到有效 JWT。
-- `:all_campuses` 为真表示该用户的角色拥有"全公司"数据范围（`hr`、`finance`，总部职能，配置项 `COMPANY_WIDE_ROLES`）。政策文件的 `campus_scope` 都是 `{all}`，所以它只影响校区资料。
-- **旧版本默认参与检索，但带 `status` 标注**：评测集里有"旧政策是什么、现在用哪个"的问题，两个版本都需要被看到；生成阶段的规则是优先引用 `active` 并说明旧版本已被取代。
-- 过滤必须在排序之前（过滤条件放进全文检索和向量检索的 `WHERE`）。
+- This matches the decision rule of round 6 of the requirements document: grants combine with OR, mandatory constraints with AND; an explicit denial (such as a disabled account) is handled in the authentication layer, and a denied user cannot get a valid JWT.
+- `:all_campuses` being true means the user's role has the "whole company" data scope (`hr`, `finance`, headquarters functions, configuration item `COMPANY_WIDE_ROLES`). The `campus_scope` of policy documents is always `{all}`, so it only affects campus materials.
+- **Old versions take part in search by default, labelled with `status`**: the evaluation set has questions such as "what was the old policy and which one applies now", and both versions must be seen; the rule at generation is to cite `active` first and say the old version has been superseded.
+- Filtering must come before ranking (the filter goes into the `WHERE` of both the full-text and the vector search).
 
-### 职级档对照表【已定，2026-11-02】
+### Grade table [Decided, 2026-11-02]
 
-职级由字母（序列）和数字组成：**I** = 讲师序列（Instructor），**S** = 职能序列（Staff），**M** = 管理序列（Management）。三个序列不能直接比较，所以映射到统一的"档"（1–7）；文档规则写成"第 N 档及以上"。
+A job level is made of a letter (the ladder) and a number: **I** = Instructor ladder, **S** = Staff (support functions) ladder, **M** = Management ladder. The three ladders cannot be compared directly, so they are mapped to one "grade" (1 to 7); document rules are written as "grade N and above".
 
-| 档 | 职级 |
+| Grade | Levels |
 |---|---|
-| 1 | S1、I1 |
-| 2 | S2、I2 |
-| 3 | S3、I3 |
+| 1 | S1, I1 |
+| 2 | S2, I2 |
+| 3 | S3, I3 |
 | 4 | I4 |
 | 5 | I5 |
 | 6 | M2 |
 | 7 | M3 |
 
-这是演示项目的约定，真实公司有自己的对标表。对照表放配置里，并写在 `ai-module/sample-data/README.md`。样例文档目前都没有职级限制，所以先预留并用合成数据测试。
+This is a convention of the demo project; a real company has its own mapping table. The table lives in configuration and is also written in `ai-module/sample-data/README.md`. No sample document has a grade limit at the moment, so it is reserved and tested with synthetic data.
 
-## 5. SQL Agent 的数据访问【M2 修订】
+## 5. Data access of the SQL agent [M2 revision]
 
-数据位置：样例的 7 张 CSV 导入 `biz` schema，作为业务模块完成前的种子数据；以后由业务模块的真实表替代，AI 侧只改视图定义。
+Where the data is: the 7 sample CSV files are imported into the `biz` schema as seed data until the business module is done; later the business module's real tables replace them and the AI side only changes the view definitions.
 
-访问方式：
+How it is accessed:
 
-1. **账号与切换**：应用以 `ai_app` 连接；执行 SQL Agent 的查询时，在一个事务里先设置身份会话变量（`app.user_id`、`app.roles`、`app.campus_id`、`app.subject_id`），再 `SET LOCAL ROLE ai_sql_ro`，然后才执行查询。`ai_sql_ro` 不能登录，只能读 `ai_sql` schema 的**白名单视图**，没有 `biz` 原表和 `ai` schema 的任何权限。
-2. **防篡改**：被执行的 SQL 不能改自己的身份。办法是撤销 `set_config` 对 `PUBLIC` 的执行权限，只授予 `ai_app`；`ai_sql_ro` 无法调用它。M2 有测试证明，M6 还会在应用层增加语句校验（只允许单条 `SELECT`、只访问白名单视图、函数白名单）。
-3. **行级过滤用视图里的 `WHERE`**（读会话变量），不使用 Postgres 的 RLS【已定】。以后需要更强保证时，可以在原表上再加 RLS 作为第二道保险。
-4. 其他限制：语句超时、最大返回行数。
-5. 没有设置身份变量时，所有视图返回空。
+1. **Accounts and switching**: the application connects as `ai_app`; to run a SQL agent query it first sets the identity session variables (`app.user_id`, `app.roles`, `app.campus_id`, `app.subject_id`) in one transaction, then `SET LOCAL ROLE ai_sql_ro`, and only then runs the query. `ai_sql_ro` cannot log in and can only read the **allow-listed views** of the `ai_sql` schema; it has no rights on the original `biz` tables or anything in the `ai` schema.
+2. **Tamper protection**: the SQL being run must not change its own identity. The way is to revoke `set_config` execution from `PUBLIC` and grant it to `ai_app` only; `ai_sql_ro` cannot call it. M2 has a test that proves it, and M6 adds statement checks in the application layer (only a single `SELECT`, only allow-listed views, an allow-list of functions).
+3. **Row filtering is a `WHERE` in the view** (reading the session variables), not Postgres RLS [Decided]. If stronger guarantees are needed later, RLS can be added on the original tables as a second safeguard.
+4. Other limits: statement timeout, maximum number of rows returned.
+5. When the identity variables are not set, every view returns nothing.
 
-视图的可见范围【已定，数据范围；与评测集一致】：
+Visibility of the views [Decided, data scope; consistent with the evaluation set]:
 
-| 视图 | student | staff | manager | hr、finance | Admin、RAGETLAdmin |
+| View | student | staff | manager | hr, finance | Admin, RAGETLAdmin |
 |---|---|---|---|---|---|
-| `campuses`、`assignments` | 全部 | 全部 | 全部 | 全部 | 全部 |
-| `students`、`submissions`、`support_tickets` | 仅本人 | 本校区 | 本校区 | 全公司 | 无 |
-| `employees`、`expense_claims` | 无 | 仅本人 | 本校区 | 全公司 | 无 |
+| `campuses`, `assignments` | all | all | all | all | all |
+| `students`, `submissions`, `support_tickets` | own records | own campus | own campus | whole company | none |
+| `employees`, `expense_claims` | none | own records | own campus | whole company | none |
 
-一张工单属于**开单人所在的校区**。"本人"通过令牌里的 `student_id` / `employee_id` 判断。
+A ticket belongs to the **campus of the person who opened it**. "Own" is judged by the `student_id` / `employee_id` in the token.
 
-MCP 的"课程与学员数据（只读）"和"报销状态"两个工具，复用同一组视图和同一套会话变量。
+The MCP tools "course and student data (read-only)" and "expense status" reuse the same views and the same session variables.
 
-## 6. 评测相关表（第一阶段）
+## 6. Evaluation tables (phase 1)
 
-- `ai.eval_runs`：`id`、`started_at`、`git_sha`、`config`（jsonb：检索方式、模型、是否 Rerank）、`summary`（jsonb：总体准确率、权限回归通过率）。
-- `ai.eval_results`：`run_id`、`question_id`、`role`、`answer`、`passed`、`retrieved_doc_ids`、`latency_ms`、`notes`。
+- `ai.eval_runs`: `id`, `started_at`, `git_sha`, `config` (jsonb: search mode, model, rerank or not), `summary` (jsonb: overall accuracy, permission regression pass rate).
+- `ai.eval_results`: `run_id`, `question_id`, `role`, `answer`, `passed`, `retrieved_doc_ids`, `latency_ms`, `notes`.
 
-评测用的测试账号（每个角色至少一个，加上北京 staff、上海 staff、上海 manager）在 Keycloak 里预置，不放进 `ai` 表。
+The test accounts used for evaluation (at least one per role, plus a Beijing staff, a Shanghai staff and a Shanghai manager) are preset in Keycloak and are not stored in the `ai` tables.
 
-## 7. 索引与迁移摘要【建议】
+## 7. Index and migration summary [Proposed]
 
-- `document_chunks`：`tsv` 用 GIN；`allowed_roles`、`campus_scope` 用 GIN；`document_id` 普通索引。
-- `chunk_embeddings`：第一版不建 ANN 索引（见 2.4）。
-- `ingestion_jobs`：`(status, run_after)` 用于领取任务。
-- `audit_log`：`(user_id, ts)`、`(action, ts)`。
-- 全文检索的语言配置：英文数据先用 `english`；编号类词项的分词行为（如 `ERR-PORTAL-403` 是否被拆开）**需要实测**，所以保留 `identifiers` 列作为精确匹配的保底。中文数据时再引入分词方案【待定】。
-- 迁移：Alembic，`ai` schema；`biz` 种子数据由导入脚本创建，不放进 Alembic 主线。
+- `document_chunks`: GIN on `tsv`; GIN on `allowed_roles` and `campus_scope`; a plain index on `document_id`.
+- `chunk_embeddings`: no ANN index in the first version (see 2.4).
+- `ingestion_jobs`: `(status, run_after)` for claiming jobs.
+- `audit_log`: `(user_id, ts)`, `(action, ts)`.
+- Full-text language configuration: `english` for the English data first; how code-like terms are tokenised (for example whether `ERR-PORTAL-403` is split) **needs measuring**, so the `identifiers` column is kept as the fallback for exact matches. A tokenisation plan is introduced when Chinese data arrives [Open].
+- Migrations: Alembic, `ai` schema; the `biz` seed data is created by an import script and is not in the main Alembic line.
 
-## 8. 需要你确认的点
+## 8. Points for you to confirm
 
-1. 权限和版本字段**复制到分块**（反规范化），用服务函数保证一致，是否接受？
-2. 展开表（2.3）和"`Admin`、`RAGETLAdmin` 不在任何展开结果里"，是否接受？
-3. 旧版本**默认参与检索并标注状态**，是否接受？
-4. 第一版**不建 ANN 索引**，用精确扫描，是否接受？
-5. SQL Agent 的 5 节方案（白名单视图 + 会话变量行级过滤）和可见范围初稿，是否接受？
-6. `ai.audit_log` 保存查询原文，是否接受？
+1. Permission and version fields **copied to the chunk** (denormalised), kept consistent by a service function: accepted?
+2. The expansion table (2.3) and "`Admin` and `RAGETLAdmin` are in no expansion result": accepted?
+3. Old versions **take part in search by default and are labelled with status**: accepted?
+4. **No ANN index** in the first version, an exact scan instead: accepted?
+5. The 5-point plan of the SQL agent (allow-listed views + session-variable row filtering) and the first draft of the visibility: accepted?
+6. `ai.audit_log` stores the original query text: accepted?
 
-## 9. 确认结果（2026-11-02）
+## 9. Confirmation results (2026-11-02)
 
-6 个确认点全部接受：权限与版本字段复制到分块；展开表且管理角色不在展开结果里；旧版本默认参与检索并标注；第一版不建 ANN 索引；SQL Agent 用白名单视图 + 会话变量行级过滤；审计日志保存查询原文。
+All 6 points were accepted: permission and version fields copied to the chunk; the expansion table with the administrative roles outside every expansion result; old versions in search by default and labelled; no ANN index in the first version; the SQL agent on allow-listed views with session-variable row filtering; the audit log storing the original query text.
 
-## 10. M2 修订记录（2026-11-02）
+## 10. M2 revision record (2026-11-02)
 
-用户确认：数据库三个账号；"员工只看本校区"针对结构化数据和校区资料，政策文件全公司一份、只按角色控制，`hr`、`finance` 为全公司数据范围；职级档对照表（1–7）；行级过滤用视图 `WHERE`。样本数据和评测集已据此修订（M2.0）。
+The user confirmed: three database accounts; "an employee sees only their own campus" applies to structured data and campus materials, while policy documents exist once for the whole company and are controlled by role only, and `hr` and `finance` have whole-company data scope; the grade table (1 to 7); row filtering with a `WHERE` in the view. The sample data and the evaluation set were revised accordingly (M2.0).
 
-## 11. M2 实现记录（2026-11-02）
+## 11. M2 implementation record (2026-11-02)
 
-- 迁移：0002（数据库角色、知识库表）、0003（会话、运行、审计、评测表、一致性检查视图）、0004（`biz` 表、`ai_auth` 辅助函数、`ai_sql` 视图、`set_config` 限制）。角色是**整个数据库集群共享**的，所以降级只移除本库的授权，不删除角色；再次升级会复用。
-- `tsv` 做成生成列：`array_to_string` 只是 STABLE，被 Postgres 拒绝，所以用一个声明为 IMMUTABLE 的包装函数 `ai.text_array_join` 解决。
-- 视图调用的 `ai_auth` 辅助函数以调用者的权限执行，所以 `ai_sql_ro` 需要它们的 `USAGE` / `EXECUTE`；它们只读取调用者自己的身份设置，开放它们不会泄露任何信息。
-- 视图使用 `security_barrier`，防止查询中的函数在过滤之前读到行。
-- 身份通过五个会话设置传递：`app.user_id`、`app.roles`、`app.campus_id`、`app.employee_id`、`app.student_id`。
-- 已知限制：自定义配置项（`app.*`）无法用权限禁止 `SET` 语句。当前的防线是：`set_config` 只授予 `ai_app`；执行入口只接受单条 `SELECT`（拒绝多语句和 `SET`）。语句校验（视图和函数白名单）在 M6 加入。
+- Migrations: 0002 (database roles, knowledge-base tables), 0003 (conversation, run, audit and evaluation tables, the consistency check view), 0004 (`biz` tables, the `ai_auth` helper functions, the `ai_sql` views, the `set_config` restriction). Roles are **shared by the whole database cluster**, so a downgrade only removes this database's grants and does not drop the roles; upgrading again reuses them.
+- `tsv` is a generated column: `array_to_string` is only STABLE and Postgres rejects it, so a wrapper function `ai.text_array_join` declared IMMUTABLE solves it.
+- The `ai_auth` helper functions called by the views run with the caller's rights, so `ai_sql_ro` needs `USAGE` / `EXECUTE` on them; they only read the caller's own identity settings, so opening them leaks nothing.
+- The views use `security_barrier`, so that functions in a query cannot read rows before filtering.
+- Identity is passed through five session settings: `app.user_id`, `app.roles`, `app.campus_id`, `app.employee_id`, `app.student_id`.
+- Known limit: custom configuration items (`app.*`) cannot be protected from a `SET` statement by permissions. The defence now is: `set_config` is granted to `ai_app` only; the execution entry accepts only a single `SELECT` (it rejects multiple statements and `SET`). Statement checks (allow-lists of views and functions) arrive in M6.

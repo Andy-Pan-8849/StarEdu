@@ -1,6 +1,6 @@
 # 试用 StarEdu
 
-[English](TRY-IT.md) · [项目总览](README.chn.md)
+[English](TRY-IT.chn.md) · [项目总览](README.chn.md)
 
 StarEdu 有两部分，都能在你自己的机器上运行，可以一起跑，也可以只跑一个：
 

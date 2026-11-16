@@ -1,95 +1,99 @@
-# 检索评测记录
+# Evaluation records
 
-每次运行产生一对文件（`.md` 报告和 `.json` 数据），同时在数据库的 `ai.eval_runs` / `ai.eval_results` 里每种模式一行。运行方式见 [`ai-module/README.chn.md`](../../ai-module/README.chn.md)。
+[中文](README.chn.md)
 
-## M4 基线（2026-11-03，提交 `c264feb`）
+Each run produces a pair of files (a `.md` report and `.json` data), and also one row per mode in the database's `ai.eval_runs` / `ai.eval_results`. How to run it is in [`ai-module/README.md`](../../ai-module/README.md).
 
-两次真实运行，同一套 54 道评测题（有来源文档的可回答题 48 道）、同一个知识库（28 份文档），只改变分块：
+The Markdown reports in this directory are archived output of the evaluation tool. The tool writes them in Chinese; the files with the `.chn.md` suffix are the original Chinese reports and the files without it are English translations of the same content (the data-check reports were already in English).
 
-| 分块 | 模式 | hit@1 | hit@3 | hit@6 | MRR | 检索 p50 |
+## M4 baseline (2026-11-03, commit `c264feb`)
+
+Two real runs, the same 54 evaluation questions (48 answerable questions with a source document) and the same knowledge base (28 documents), changing only the chunking:
+
+| Chunking | Mode | hit@1 | hit@3 | hit@6 | MRR | Search p50 |
 |---|---|---|---|---|---|---|
-| 目标 400 token（39 块，中位数 358） | keyword | 0.896 | 0.958 | 1.0 | 0.937 | 14 ms |
+| Target 400 tokens (39 chunks, median 358) | keyword | 0.896 | 0.958 | 1.0 | 0.937 | 14 ms |
 | | vector | 0.917 | 0.979 | 1.0 | 0.953 | 20 ms |
 | | hybrid | 0.938 | 1.0 | 1.0 | 0.969 | 22 ms |
 | | hybrid_rerank | 1.0 | 1.0 | 1.0 | 1.0 | 2,121 ms |
-| 一节一块（189 块，中位数 50） | keyword | 0.833 | 1.0 | 1.0 | 0.913 | 38 ms |
+| One chunk per section (189 chunks, median 50) | keyword | 0.833 | 1.0 | 1.0 | 0.913 | 38 ms |
 | | vector | 1.0 | 1.0 | 1.0 | 1.0 | 59 ms |
 | | hybrid | 1.0 | 1.0 | 1.0 | 1.0 | 64 ms |
 | | hybrid_rerank | 1.0 | 1.0 | 1.0 | 1.0 | 2,062 ms |
 
-报告：[分块目标 400](retrieval-baseline-chunk400-20261103-0531.md)、[一节一块](retrieval-chunk0-per-section-20261103-0534.md)。
+Reports: [chunk target 400](retrieval-baseline-chunk400-20261103-0531.md), [one chunk per section](retrieval-chunk0-per-section-20261103-0534.md).
 
-### 能读出什么，不能读出什么
+### What can and cannot be read from it
 
-- **hit@6 全部是 1.0**：知识库只有几十个块，前 6 个几乎总是包含来源，这个指标已经饱和。差别只体现在排名靠前的程度（hit@1、MRR）。
-- **重排（hybrid_rerank）两次都是满分**，代价是延迟（约 2 秒，对比几十毫秒）和费用（54 个问题约 0.036 美元 / 0.016 美元）。108 次重排调用没有一次需要退回融合顺序。
-- **精确编号**：`ERR-PORTAL-429`（DOC-30）在 400 token 分块里，向量检索把 `ERR-PORTAL-403` 所在的块排第一（两个错误码在向量空间里很接近），混合检索的 RRF 也让它排在前面；只有重排和关键词检索把正确来源排第一。这印证了为什么要保留关键词检索和 `identifiers` 字段。
-- **分块变细对向量和混合有帮助**（hit@1 从 0.92 / 0.94 升到 1.0），对关键词略差。但这只衡量"找到哪份文档"，**没有衡量生成答案需要的上下文是否足够**：一节一块时，6 个块只有约 350 token。是否改默认分块，要等 M5 之后用答案质量一起判断。
-- **无答案题的最高分**：重排分数（0–10）在可回答题上全部是 10（48 道），在无答案或应拒绝的 6 道题上是 0、0、1、2、5、8。关键词和向量分数的区分度很小（0.60 对 0.47、0.54 对 0.46）。这是 M5 里判断"证据够不够"的依据：用重排分数比用另两个分数可靠，但样本很小，8 分那道（员工问只有 HR 看得到的奖金文件，检索到了相关但不能回答问题的段落）说明阈值的间隔并不宽。
-- **权限**：每次运行都做了 54 题 × 7 角色 × 3 模式 = 1,134 次检索，用独立的规则检查返回的每个块，**越权为 0**。
+- **hit@6 is 1.0 everywhere**: the knowledge base has only a few dozen chunks, so the top 6 almost always contain the source, and this metric is saturated. The difference shows only in how far to the front the rank is (hit@1, MRR).
+- **Rerank (hybrid_rerank) scored full marks both times**, at the price of latency (about 2 seconds against tens of milliseconds) and cost (about US$0.036 / US$0.016 for 54 questions). Not one of the 108 rerank calls had to fall back to the fusion order.
+- **Exact codes**: `ERR-PORTAL-429` (DOC-30) in the 400-token chunking: vector search puts the chunk holding `ERR-PORTAL-403` first (the two error codes are very close in vector space), and the RRF of hybrid search also leaves it in front; only rerank and keyword search put the correct source first. This confirms why keyword search and the `identifiers` field are kept.
+- **Finer chunks help vector and hybrid** (hit@1 rises from 0.92 / 0.94 to 1.0) and are slightly worse for keyword. But this measures only "which document is found" and **does not measure whether the context needed to generate an answer is enough**: with one chunk per section, 6 chunks are only about 350 tokens. Whether to change the default chunking has to wait until after M5 and be judged together with answer quality.
+- **Top scores of unanswerable questions**: the rerank score (0 to 10) is 10 on all answerable questions (48) and 0, 0, 1, 2, 5, 8 on the 6 unanswerable or to-be-refused ones. The keyword and vector scores separate very little (0.60 against 0.47, 0.54 against 0.46). This is the basis in M5 for judging "is the evidence enough": using the rerank score is more reliable than the other two, but the sample is very small, and the one with 8 (an employee asking about the bonus file only HR can see, where a relevant passage that cannot answer the question was found) shows that the gap of the threshold is not wide.
+- **Permissions**: each run did 54 questions × 7 roles × 3 modes = 1,134 searches, checking every returned chunk with independent rules, **with 0 overreach**.
 
-### 局限
+### Limits
 
-知识库太小，评测题太少，每种题型只有几道（关键词 3、版本 2、改写 1）。这些数字用来确认流程正确、看出方向，不能说明各方法在真实规模上的优劣。M8 会扩充评测题和文档。
+The knowledge base is too small and the evaluation questions too few, with only a few per question type (keyword 3, version 2, paraphrase 1). These numbers are used to confirm that the flow is correct and to see the direction, and cannot show how the methods compare at real scale. M8 expands the evaluation questions and the documents.
 
 
-## M5 助手真实检查（2026-11-03）
+## M5 real check of the assistant (2026-11-03)
 
-`make eval ARGS="agent --compare-generate openai/gpt-4o-mini"`：15 轮（14 组场景）真实地问助手，比较生成步骤用 `gpt-6-luna`（默认）还是 `gpt-4o-mini`（理解和重排两个版本都用 `gpt-6-luna`）。判定只看结束状态和答案里是否含有关键事实。两次运行：
+`make eval ARGS="agent --compare-generate openai/gpt-4o-mini"`: 15 rounds (14 groups of scenarios) really asked to the assistant, comparing whether the generation step uses `gpt-6-luna` (the default) or `gpt-4o-mini` (understanding and rerank use `gpt-6-luna` in both versions). The verdict looks only at the end state and whether the answer contains the key fact. Two runs:
 
-| 运行 | 默认（luna） | gpt-4o-mini | 说明 |
+| Run | Default (luna) | gpt-4o-mini | Note |
 |---|---|---|---|
-| [第一次](agent-check-20261103-0612.md) | 14/15 | 11/15 | 暴露了两个问题（见下） |
-| [修复后](agent-check-20261103-0620.md) | 14/15 | 12/15 | 两个问题已修复 |
+| [First](agent-check-20261103-0612.md) | 14/15 | 11/15 | Exposed two problems (see below) |
+| [After the fixes](agent-check-20261103-0620.md) | 14/15 | 12/15 | The two problems were fixed |
 
-### 检查发现并修复的两个问题
+### The two problems the check found and fixed
 
-1. **重排提示词把片段截在 350 token。** `ERR-PORTAL-429` 的答案在它所在的块的第 365 个 token，重排模型看不到它，只给 2 分（满分 10），第一道关（得分至少 6）因此拒绝作答，两个模型都答成了"没找到"。M4 的基线没发现，因为那里只看排名（它仍排第一），不看绝对分数。截断上限改成 600（高于块的 500 上限），同一个块稳定得 10 分；加了回归测试（并断言旧的 350 上限确实会隐藏那一行）。
-2. **理解步骤把 Maven 慢的问题当成越界。** 提示词没有明确技术支持的范围，`gpt-6-luna` 在两次运行里对同一个问题的分类不一样。提示词现在列出了开发环境、学习门户、课件下载、作业提交、设备、VPN、helpdesk 等，并明确"学员或员工用的工具出问题不是越界"（提示词版本 1 → 2）。
+1. **The rerank prompt cut passages at 350 tokens.** The answer to `ERR-PORTAL-429` is at the 365th token of the chunk it is in, so the rerank model could not see it and gave only 2 (out of 10), and the first gate (a score of at least 6) therefore refused to answer, and both models answered "not found". The M4 baseline did not find it, because it only looked at ranking (it still ranked first) and not at absolute scores. The truncation limit was changed to 600 (above the chunk limit of 500), and the same chunk then steadily scores 10; a regression test was added (which also asserts that the old limit of 350 really would hide that line).
+2. **The understand step treated the slow-Maven question as out of scope.** The prompt did not make the scope of tech support explicit, and `gpt-6-luna` classified the same question differently in the two runs. The prompt now lists the development environment, the learning portal, courseware download, assignment submission, devices, VPN, the helpdesk and so on, and states clearly that "a tool that a student or employee uses not working is not out of scope" (prompt version 1 → 2).
 
-### 修复后仍然存在的差异（诚实记录）
+### Differences that remain after the fixes (recorded honestly)
 
-- **DOC-43（旧政策）两个版本都"没通过"，但这是判定条件太严，不是助手答错。** 问题问的是"旧政策的奖金是多少，现在适用哪个版本"，两个模型都答了 2,000 元和 v2.1 适用；我原先还要求答案含有新版的 3,000，问题并没有问。第一次运行里 luna 恰好多说了一句所以通过。判定条件已改成"2,000、2.1、superseded"，之后的检查按新条件，已提交的两份报告保留原样作为记录。
-- **gpt-4o-mini 在迟交扣分题（DOC-40）上稳定地答错**，说成"超过 72 小时、得 0 分"（实际 50 小时落在 48–72 小时档，扣 30%，得 63），并且答案里没有 `[n]` 引用标记，被校验拦下，所以用户看到的是出错提示而不是错误答案。这说明校验确实能拦住没有引用的答案，但**带着引用的错误答案会通过**：第一阶段的校验只做确定性检查，让模型再核对一遍事实的做法放到评测之后再决定（设计 04 已确认）。
-- **gpt-4o-mini 在 DOC-47（只有 Finance 和 HR 能看的奖金公式）上给出了回答，引用的是 `FIN-PAY-004` 和 `HR-PERF-006`。** 这两份都是全体员工可读的文档，保密的 `FIN-PAY-005` 没有被引用，所以**不是泄露**，权限层保证模型根本没拿到受限内容；它是把"绩效工资"当成了"年终奖公式"，属于小模型过于积极地回答。判定现在会明确检查答案是否引用了受限文档。默认的 luna 对这题回答"没找到"。
-- 生成速度：一个需要检索的问题端到端约 4–10 秒（重排约 2 秒，其余是理解和生成）；不需要检索的（问候、越界、写操作、数据查询）约 1 秒。
+- **DOC-43 (old policy) "did not pass" in both versions, but this is a judging condition that was too strict, not a wrong answer by the assistant.** The question asks "what was the bonus under the old policy and which version applies now", and both models answered CNY 2,000 and that v2.1 applies; I had also required the answer to contain the new version's 3,000, which the question does not ask for. In the first run luna happened to say one sentence more and so passed. The condition was changed to "2,000, 2.1, superseded", later checks follow the new condition, and the two reports already committed were kept as they were, as a record.
+- **gpt-4o-mini consistently got the late-penalty question (DOC-40) wrong**, saying "over 72 hours, 0 points" (in fact 50 hours falls in the 48 to 72 hour band, takes 30% off, and gives 63), and the answer had no `[n]` citation mark and was stopped by verification, so what the user sees is an error notice and not a wrong answer. This shows that verification really can stop answers without citations, but **a wrong answer carrying citations passes**: in phase 1 verification does only deterministic checks, and having the model check the facts again is left to be decided after evaluation (confirmed in design 04).
+- **gpt-4o-mini gave an answer on DOC-47 (the bonus formula only Finance and HR can see), citing `FIN-PAY-004` and `HR-PERF-006`.** Both are documents every employee can read, and the confidential `FIN-PAY-005` was not cited, so **this is not a leak**: the permission layer guarantees that the model never got the restricted content at all; it took "performance pay" for "the annual bonus formula", which is a small model answering too eagerly. The verdict now explicitly checks whether the answer cites a restricted document. The default luna answers "not found" to this question.
+- Generation speed: a question that needs search takes about 4 to 10 seconds end to end (rerank about 2 seconds, the rest understanding and generation); one that needs no search (a greeting, out of scope, a write action, a data query) about 1 second.
 
-### 结论
+### Conclusion
 
-默认保持 `gpt-6-luna`。在这批难题上它明显优于 `gpt-4o-mini`（修复后 14/15 对 12/15），而且成本更低。样本很小，每个场景只问一次，只能说明在这些难题上有没有明显差别。
+The default stays `gpt-6-luna`. On this batch of hard questions it is clearly better than `gpt-4o-mini` (14/15 against 12/15 after the fixes) and also cheaper. The sample is very small and each scenario was asked only once, so this only shows whether there is a clear difference on these hard questions.
 
-## M8 完整评测与实验矩阵（2026-11-04，提交 `71feb67` 之后）
+## M8 full evaluation and experiment matrix (2026-11-04, after commit `71feb67`)
 
-两次真实运行：`starit-eval all`（114 道文档题 + 41 道数据题，模型 `gpt-6-luna`，约 $0.25 的估算，实际约 15 分钟）和 `starit-eval matrix`（8 个实验，约 $0.02 的估算）。报告：[完整](full-20261104-0457.md)、[检索](retrieval-full-20261104-0444.md)、[答案](answers-20261104-0454.md)（含 20% 抽查表 `answers-20261104-0454.csv`，**人工抽查还没做**）、[数据题](data-check-20261104-0457.md)、[矩阵](matrix-20261104-0504.md)。
+Two real runs: `starit-eval all` (114 document questions + 41 data questions, model `gpt-6-luna`, an estimated cost of about $0.25, in fact about 15 minutes) and `starit-eval matrix` (8 experiments, an estimated cost of about $0.02). Reports: [full](full-20261104-0457.md), [search](retrieval-full-20261104-0444.md), [answers](answers-20261104-0454.md) (with the 20% spot-check sheet `answers-20261104-0454.csv`, **the human spot check had not been done**), [data questions](data-check-20261104-0457.md), [matrix](matrix-20261104-0504.md).
 
-### 完整评测
+### Full evaluation
 
-- **权限回归：通过**。114 题 × 7 个角色 × 3 种模式 = 2,394 次检索，越权块为 0；四种模式的逐题检查也都是 0。
-- **检索**（87 道有来源文档的可回答题）：hit@1 keyword 0.862、vector 0.885、hybrid 0.943、hybrid_rerank 1.0；MRR 0.916 / 0.940 / 0.971 / 1.0；hit@6 全部是 1.0（知识库只有 39 个块，这个指标早就饱和）。重排的代价是检索 p50 约 1.8 秒（对比几十毫秒）。
-- **答案**：通过 99/114（应回答 74/87，应拒绝 25/27）；判分方式——事实 39 题、判官 48 题、拒绝 27 题；结束状态全部合法（114/114）；延迟 p50 5.5 秒、p95 7.8 秒。按题型：keyword 13/13、unanswerable 11/12、paraphrase 10/11、access 24/26、version 8/10、single 28/35、multi 5/7。
-- **数据题**：41/41（应回答 32/32，应拒绝 9/9），包括 M6 里那两道曾经失败的。
+- **Permission regression: passed.** 114 questions × 7 roles × 3 modes = 2,394 searches with 0 overreaching chunks; the per-question checks of the four modes are also all 0.
+- **Search** (87 answerable questions with a source document): hit@1 keyword 0.862, vector 0.885, hybrid 0.943, hybrid_rerank 1.0; MRR 0.916 / 0.940 / 0.971 / 1.0; hit@6 is 1.0 everywhere (the knowledge base has only 39 chunks, and this metric was saturated long ago). The price of rerank is a search p50 of about 1.8 seconds (against tens of milliseconds).
+- **Answers**: passed 99/114 (should-answer 74/87, should-refuse 25/27); scoring: facts 39 questions, judge 48 questions, refusal 27 questions; all end states valid (114/114); latency p50 5.5 seconds, p95 7.8 seconds. By type: keyword 13/13, unanswerable 11/12, paraphrase 10/11, access 24/26, version 8/10, single 28/35, multi 5/7.
+- **Data questions**: 41/41 (should-answer 32/32, should-refuse 9/9), including the two that had once failed in M6.
 
-### 没通过的 15 题，逐一读过之后
+### The 15 questions not passed, after reading each one
 
-没有一题是权限泄露。分成四类（**这是我读完回答后的分类，不是脚本的结论**）：
+None was a permission leak. They fall into four classes (**this is my classification after reading the answers, not a conclusion of the script**):
 
-1. **回答正确但漏了次要细节，判官判错（8 题：DOC-05、07、25、27、28、37、43、49）**。例如 DOC-05 答了"4 月和 10 月"，漏了"申请提前 4 周"；DOC-28 答了周一 09:00 和 3 台设备，漏了每月 5 GB 的下载额度。有的漏得有道理（DOC-07 漏了"要提名合格的代课老师"，DOC-37 漏了"经理需事先批准"，DOC-49 漏了"退学时佣金全额追回"），有的很次要。判官按"关键事实缺失"的标准判，这是我定的标准；放宽还是收紧由 20% 人工抽查之后再定。
-2. **该直接回答却反问澄清（4 题：DOC-04 认证补贴、DOC-31 作业截止时间、DOC-42 "哪一年"、DOC-69 丢了发票）**。这是 `understand` 步骤的真实行为问题：问题本身可以按文档作答。DOC-42 问"哪一年"尤其多余。**没有修**，只记录；理解提示词（版本 2）的调整留给后面（见"遗留"）。
-3. **我的评分脚本的错（1 题：DOC-79）**。助手答"HR-REC-001 v2.1 is in force"，我的事实匹配不认前面带 `v` 的 `2.1`。已修（容许 `v` 前缀，加了测试）；**报告里的数字是修之前跑出来的，没有改**，按修后的规则 DOC-79 会通过（100/114）。
-4. **应拒绝却回答了（2 题：DOC-90、DOC-108）**。
-   - **DOC-108**（员工问招生顾问的佣金，答案在只有财务和 HR 能读的 FIN-PAY-005）：**没有泄露**——助手引用的只有员工本来能读的三份文档，回答里没有 3% 等任何受限事实，而是说"提供的摘录没有说明佣金"。但它的结束状态是 `answered` 而不是 `not_found`：生成步骤判断"材料足够"，却写出了一句"没有"。状态不对，内容无害。
-   - **DOC-90**（经理问聘请外部承包商的审批额度，我当作"文档没写"的题）：助手引用了 FIN-BUD-007 的采购门槛，把"承包商"理解成"合同采购"。这是有出处的推断，也可以说是越过了问题；**这道题本身设计得有歧义**，我不能说是助手错了。
+1. **Correct answer but a minor detail missing, marked wrong by the judge (8 questions: DOC-05, 07, 25, 27, 28, 37, 43, 49).** For example DOC-05 answered "April and October" and missed "apply 4 weeks ahead"; DOC-28 answered Monday 09:00 and 3 devices and missed the monthly 5 GB download quota. Some omissions are justified (DOC-07 missed "a qualified substitute must be nominated", DOC-37 missed "the manager must approve beforehand", DOC-49 missed "the commission is clawed back in full on withdrawal"), and some are very minor. The judge judged by the standard "a key fact missing", and that standard is mine; whether to loosen or tighten it is decided after the 20% human spot check.
+2. **Asked for clarification when it should have answered directly (4 questions: DOC-04 certification subsidy, DOC-31 assignment deadline, DOC-42 "which year", DOC-69 lost receipt).** This is a real behaviour problem of the `understand` step: the questions themselves can be answered from the documents. DOC-42 asking "which year" is especially needless. **Not fixed**, only recorded; the adjustment of the understand prompt (version 2) is left for later (see "Leftovers").
+3. **A mistake of my scoring script (1 question: DOC-79).** The assistant answered "HR-REC-001 v2.1 is in force", and my fact matching does not recognise the `2.1` after a leading `v`. Fixed (the `v` prefix is tolerated, with a test added); **the numbers in the report are from the run before the fix and were not changed**, and under the fixed rule DOC-79 would pass (100/114).
+4. **Answered when it should have refused (2 questions: DOC-90, DOC-108).**
+   - **DOC-108** (an employee asks about an admissions advisor's commission, whose answer is in FIN-PAY-005, readable only by finance and HR): **no leak**: the assistant cited only the three documents the employee could read anyway, the answer contains no restricted fact such as 3%, and says "the provided excerpts do not state the commission". But its end state was `answered` and not `not_found`: the generate step judged "the material is enough" and yet wrote a sentence saying "there is none". The state is wrong and the content harmless.
+   - **DOC-90** (a manager asks about the approval limit for hiring an external contractor, which I treated as a "the documents do not say" question): the assistant cited the procurement threshold of FIN-BUD-007 and understood "contractor" as "contract procurement". It is an inference with a source, and could also be called going beyond the question; **the question itself is designed ambiguously**, and I cannot say that the assistant was wrong.
 
-### 实验矩阵怎么读
+### How to read the experiment matrix
 
-- **噪声**：同一个配置（baseline）在完整评测和矩阵里各入库一次，hybrid 的 MRR 是 0.9713 和 0.9655，hit@1 是 0.943 和 0.931——**两次入库之间就有约 0.01 的 MRR 差异**（嵌入的细微差别加上并列时按随机 UUID 排序）。小于 0.02 的差别不能当作效果。
-- **检索模式**：hybrid 在 MRR 上不低于 keyword 和 vector（0.966 对 0.916 和 0.940）；重排（只在完整评测里测）把 87 题的 hit@1 提到 1.0。
-- **分块大小**（目标 300 / 400（baseline）/ 500 / 800 token，块数 53 / 39 / 30 / 28）：越小越好的方向——vector 的 hit@1 在 300 时 0.954，baseline 0.885（87 题里多对 6 题）；hybrid 在 300 时 0.954 对 0.931（多对 2 题，在噪声里）。这**只衡量"找到哪份文档"**，没有衡量块里的上下文够不够生成答案；块变小也会让引用的原文片段更短。
-- **`identifiers` 加权**（关掉 vs baseline，同一次入库，只改开关）：hybrid 下 keyword 型问题的 MRR 从 1.0 掉到 0.923（13 题），整体 hit@1 从 0.931 到 0.920；**这是唯一一个看起来是真实效果的**，所以保持开启。paraphrase 型反而从 0.864 升到 0.909（11 题），说明加权偶尔会把不含编号意义的词当编号——样本太小，不处理。
-- **派生内容**（摘要 / 假设性问题 / 全部）：整体没有明显收益——vector 的 MRR 0.931–0.943（baseline 0.940），hybrid 0.957–0.968（baseline 0.966）。分题型看 paraphrase 从 0.864 升到 0.955–1.0（11 题），但 keyword 在 derive-summary 下降到 0.885（13 题）。**结论：默认保持关闭**；改写问法这一项值得在更多 paraphrase 题上再测一次（现在只有 11 题）。
-- **没有的**：专用重排接口、BM25 扩展（见设计 05 第 9 节）。
+- **Noise**: the same configuration (baseline), ingested once in the full evaluation and once in the matrix, gives a hybrid MRR of 0.9713 and 0.9655 and a hit@1 of 0.943 and 0.931: **between two ingestions there is already a difference of about 0.01 in MRR** (small differences in embedding plus ordering by random UUID on ties). A difference under 0.02 must not be taken as an effect.
+- **Search mode**: hybrid is no lower than keyword and vector in MRR (0.966 against 0.916 and 0.940); rerank (tested only in the full evaluation) lifts hit@1 on the 87 questions to 1.0.
+- **Chunk size** (target 300 / 400 (baseline) / 500 / 800 tokens, chunks 53 / 39 / 30 / 28): the direction of smaller being better: vector's hit@1 is 0.954 at 300 against 0.885 for the baseline (6 more correct out of 87); hybrid 0.954 at 300 against 0.931 (2 more correct, within the noise). This **measures only "which document is found"** and does not measure whether the context in a chunk is enough to generate an answer; smaller chunks also make the cited original passage shorter.
+- **The `identifiers` boost** (off vs the baseline, the same ingestion, only the switch changed): under hybrid the MRR of keyword-type questions falls from 1.0 to 0.923 (13 questions) and overall hit@1 from 0.931 to 0.920; **this is the only one that looks like a real effect**, so it stays on. Paraphrase-type questions actually rise from 0.864 to 0.909 (11 questions), which shows that the boost occasionally takes words with no code meaning for codes; the sample is too small and it is left alone.
+- **Derived content** (summary / hypothetical questions / all): no clear benefit overall: vector MRR 0.931 to 0.943 (baseline 0.940), hybrid 0.957 to 0.968 (baseline 0.966). By question type paraphrase rises from 0.864 to 0.955 to 1.0 (11 questions), but keyword falls to 0.885 under derive-summary (13 questions). **Conclusion: keep it off by default**; the paraphrase item is worth testing again on more paraphrase questions (there are only 11 now).
+- **Not there**: the dedicated rerank interface and the BM25 extension (see section 9 of design 05).
 
-### 遗留（没有做，也没有假装做了）
+### Leftovers (not done, and not pretended to be done)
 
-- 20% 人工抽查表（`answers-20261104-0454.csv`）**还没有人看过**。
-- `understand` 对可直接回答的问题过度反问澄清（4/87）；生成步骤在没有答案时偶尔仍标 `sufficient`（DOC-108）。都是已知的行为问题，修的话需要改提示词并重新评测，留给后续。
+- The 20% human spot-check sheet (`answers-20261104-0454.csv`) **has not been looked at by anyone yet**.
+- `understand` over-asks for clarification on questions that can be answered directly (4/87); the generate step still occasionally marks `sufficient` when there is no answer (DOC-108). Both are known behaviour problems, and fixing them needs a prompt change and a new evaluation, left for later.
