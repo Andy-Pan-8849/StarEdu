@@ -20,6 +20,10 @@ const DEMO_TENANTS = [
 
 async function main(): Promise<void> {
   loadLocalEnv();
+  // 演示数据会创建带公开密码的账号：生产环境一律拒绝，除非明确放行（ALLOW_DEMO_SEED=1，只给公开试用站点用）
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "1") {
+    throw new Error("Refusing to create demo accounts and data with NODE_ENV=production (set ALLOW_DEMO_SEED=1 only for a public trial site).");
+  }
   const { values } = parseArgs({ options: { code: { type: "string", default: "hq" }, "no-accounts": { type: "boolean" }, "no-library": { type: "boolean" } } });
   const owner = new PrismaClient({ datasourceUrl: process.env.MIGRATION_DATABASE_URL });
   try {

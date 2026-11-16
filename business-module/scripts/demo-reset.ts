@@ -12,6 +12,7 @@ const KEEP = new Set(["tenant", "tenant_menu_grant", "role", "role_menu", "role_
 
 async function main(): Promise<void> {
   loadLocalEnv();
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "1") throw new Error("Refusing to reset demo companies with NODE_ENV=production (set ALLOW_DEMO_SEED=1 only for a public trial site).");
   const { values } = parseArgs({ options: { code: { type: "string", multiple: true } } });
   const owner = new PrismaClient({ datasourceUrl: process.env.MIGRATION_DATABASE_URL });
   const keycloak = await KeycloakAdmin.connect().catch(() => null);
@@ -66,6 +67,8 @@ async function main(): Promise<void> {
         await owner.platformAccountRole.deleteMany({ where: { accountId: op.id } });
         await owner.platformAccount.delete({ where: { id: op.id } });
       }
+      // 平台登录域也摘掉演示主题（seed:demo 会再加上）：重置后到重建前，平台登录页不显示演示账号
+      await keycloak.updateRealm("platform", { loginTheme: null });
     }
   } finally {
     await owner.$disconnect();
