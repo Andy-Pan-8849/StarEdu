@@ -1,3 +1,4 @@
+/* global process, console */
 // 先把 .env 读进环境变量（不经过 shell，不执行里面的任何内容），再运行后面的命令：
 //   node scripts/with-env.mjs pnpm --filter @staredu/api dev
 // 已经在环境里的变量优先（和 dotenv 的默认行为一致）。需要 Node 20.12 以上（process.loadEnvFile）。
