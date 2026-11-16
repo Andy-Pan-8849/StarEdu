@@ -4,12 +4,14 @@
 
 # StarEdu
 
+[中文](README.chn.md) · **[Try it: run the AI module, the business module, or both](TRY-IT.md)**
+
 An open-source blueprint for adding AI to a traditional business system. It pairs an enterprise back office with an AI knowledge assistant and agents, using one sample company, **StarIT Education** (an IT training company with eight campuses all around the country), as the running example.
 
 | Module | Folder | Status |
 |---|---|---|
 | AI module: RAG, agents, API, web chat | [`ai-module/`](ai-module/) | Runs locally with Docker Compose |
-| Business module: multi-tenant back office in TypeScript (modeled on an open-source competitor) | [`business-module/`](business-module/) ([try it](business-module/TRY-IT.md), [中文](business-module/README.chn.md)) | Runs locally with Docker Compose; demo companies, accounts and one-command reset included |
+| Business module: multi-tenant back office in TypeScript (modeled on an open-source competitor) | [`business-module/`](business-module/) ([overview](business-module/README.md), [try it](business-module/TRY-IT.md), [中文](business-module/README.chn.md)) | Runs locally with Docker Compose; demo companies, accounts and one-command reset included |
 
 ## What the AI module does
 
@@ -47,6 +49,8 @@ Why one graph rather than several agents: the outer flow (search, permission fil
 
 ## Quick start
 
+This is the AI module only; [`TRY-IT.md`](TRY-IT.md) covers the business module and running both together.
+
 Requirements: Docker Compose (8 GB of memory or more), [uv](https://docs.astral.sh/uv/), `make`, and an OpenAI API key.
 
 ```bash
@@ -75,7 +79,8 @@ Design documents are in [`docs/design/`](docs/design/); what each milestone deli
 
 ```
 StarEdu/
-├── README.md              this file
+├── README.md              this file (English); README.chn.md is the Chinese version
+├── TRY-IT.md              how to run and try each module, or both (TRY-IT.chn.md in Chinese)
 ├── LICENSE                MIT
 ├── ai-module/             the AI module: everything you run
 │   ├── README.md          detailed guide, in Chinese: start, try, test, directory layout
@@ -97,7 +102,7 @@ StarEdu/
 │   ├── deploy/            Docker Compose files, Dockerfiles, LiteLLM, Grafana/Tempo/Prometheus config
 │   └── sample-data/       synthetic company: documents, tables, demo accounts, evaluation questions
 ├── assets/logo/           brand logo: logo.svg (full) and logo-mark.svg (small, no lettering)
-├── business-module/       placeholder for the traditional back office (not started)
+├── business-module/       the multi-tenant back office (NestJS + Next.js), with its own README and trial guide
 └── docs/                  design documents and evaluation reports
     ├── design/            numbered design documents 01-09 and the milestone checklists
     └── eval/              evaluation reports, human review sheets and acceptance notes
@@ -128,7 +133,7 @@ Everything in [`ai-module/sample-data/`](ai-module/sample-data/) is synthetic: t
 ## Roadmap
 
 1. AI module: done through milestone M9. Next batch: see [`docs/design/09-phase2-plan.md`](docs/design/09-phase2-plan.md).
-2. Business module (NestJS back office).
+2. Business module (NestJS back office): done through milestone B25, with demo data and a hosted-trial mode.
 3. Deployment profiles (full and lite) and a public demo.
 4. A Chinese version of the sample data.
 
