@@ -1,107 +1,137 @@
-# Business Module
+# StarEdu Business Module
 
-The traditional business back office of StarEdu: a multi-tenant SaaS back office (accounts, roles and permissions, organization, people, teaching, assignments, grades, notifications, document library) built with NestJS, Prisma, Next.js 15, Tailwind and shadcn/ui-style components, with Keycloak for sign-in.
+[中文说明](README.chn.md) · **[Try it: setup, trial data, accounts](TRY-IT.md)** ([中文](TRY-IT.chn.md))
 
-Status: **milestone B23 (demo data).** The demo companies (hq and riverside-franchise) now come with a living scenario built relative to the day you load it (a finished term whose grades were just published, a current term in enrollment with graded, ungraded and upcoming work, a planned next term, pending and handled student requests, announcements, discussions, messages, transcripts, old and new curricula, quota usage) and five demo accounts each (administrator with every permission, academic office, teacher, two students) plus a platform operator; the login page of every entry lists them under the Sign in button (a Keycloak theme used only by the demo realms), and `pnpm demo:reset` rebuilds everything. Earlier: milestone B22 (role template upgrade). When the platform adds menus to a role template, the copy a company already has is not changed (the company may have adjusted it). In **Roles**, a copy that is missing template menus now shows "Update from template (n)": it lists the new menus and adds only those, never removing anything the company ticked or unticked, with the same limits as ticking by hand (only enabled menus, no permission the person doing it lacks), audited, effective at once. Earlier: milestone B21 (browser check and polish). The pages added in B15–B20 were run in a real browser against the demo company (student request, registrar approval, grade change, transcript verification and revocation, curriculum versions, batch enrollment) and the problems found were fixed: approval and revocation now use inline forms instead of browser pop-ups, the AI-assistant link no longer causes a hydration warning, downloaded PDFs keep their document-number file name, and `pnpm seed` now also refreshes the cached permissions of every company so new menus work at once. Earlier: milestone B20 (module generator). `pnpm gen:module` scaffolds a simple tenant resource (table with row-level security, API with permissions and audit, menu, admin page, tests, leak-scan registration) in one step; it is a starting point for developers, not a runtime feature. Earlier: milestone B19 (student requests). Students can ask for a grade re-check (within 14 days of the published grade, at most twice per course) or an assignment extension (1–3 days, before the deadline) from the portal and withdraw while pending; instructors and the academic office see them in "Student requests", approve (an extension is set exactly like a manual one; a grade change needs the amend permission, a new total and a note, and is recorded before/after) or reject with a note, and the student is notified. Earlier: milestone B18 (transcript verification). Every transcript PDF now carries a QR code and a content fingerprint, and a diagonal watermark (official or unofficial); scanning opens a public page on the institution's own address that confirms the document, shows the facts recorded at issue, and shows "revoked" if the academic office revoked it. Earlier: milestone B17 (batch enrollment). The academic office can pick students by major, entry year and campus and enroll them into a course's open sections in one go (preview first; same rules and confirmations as single enrollment). Earlier: milestone B16 (curriculum versions). A major's curriculum now has versions that start at an entry year; each student follows the version of their entry year (portal plan and credit requirement). Earlier: milestone B15 (usage and quota). The platform console shows each company's accounts and storage use and lets the operator set limits (empty = no limit); at a limit, new accounts and uploads are refused and nothing already stored is deleted. Earlier: milestone B14 (sign-in and security). The platform console has a "Sign-in & security" panel per company (password rules, lockout, session time, two-step verification for everyone) and an optional Google sign-in that only links to accounts that already exist (same verified e-mail; otherwise refused, nothing created); every change is audited and the secret is never shown. Earlier: milestone B13 (demo data). `pnpm demo` loads the AI sample company into the `hq` tenant: terms, courses, 20 sections, 12 assignments per program with all 198 sample submissions and published final grades, nine demo accounts (one shared public demo password, signed in through Keycloak, linked to the same people as the AI sample), and a document library with the 27 current sample documents; repeatable. Earlier: milestone B12 (AI knowledge base aligned with the document library). In business mode the AI assistant reads files of the document library (md, txt, docx, pdf; synced through the `library.file_changed` event) under exactly the library's rules: on every question the AI asks this module (internal interface `library-access`, service key + token, never cached) which folders the user may read, and a chunk from a library file is readable only if its folder is in that list; view-only folders are not given to the AI, confidential folders need a grant (the administrator included), grants that expire stop counting at once. Course syllabus and material-list documents keep the earlier role rule. Standalone mode of the AI module is unchanged. Earlier: milestone B11 (document library). A company-wide library of folders and files with three classifications (public, internal, confidential). The final permission is the operation permission AND the access level on the folder (view, edit, manage); several grants add up and there is no deny. Defaults: public = everyone including students (read-only in the portal), internal = the owning department with its sub-departments (all staff when no department is set), plus the creator as manager. Confidential folders have no default grants, never inherit, always write an access log (view, download, grant, move, delete), can be view-only (no download or copy) with a watermark in the viewer, and even the administrator sees them only after a self-grant that needs a reason and is logged. Folders form a tree (ancestors array with a GIN index); a folder can be deleted only when empty, cannot move into its own subtree, and moves or declassification that change who sees what ask for confirmation. Files are uploaded straight to the object store (size limit `LIBRARY_MAX_BYTES`, default 50 MB), keep their versions, and can be copied or moved under the rule: view on the source, edit on the target. Grants can expire. Earlier: milestone B10 (AI assistant integration). The AI module can run in business mode: its tokens come from a company's realm, the roles, permissions and data scopes come from this module's internal interface (service key + token, cached by permission version), structured questions read this database through read-only views (`ai_sql`, login `ai_reader`) that filter rows by exactly those scopes, the AI knowledge base is separated by company, and a course's syllabus and material list reach it through the event bus. The menu has an "AI assistant" link for both the admin console and the student portal. Earlier: milestone B9a (optional Kafka event bus). The outbox table stays the only exit for events. By default (`BIZ_EVENT_BUS=outbox`) the API handles them itself; with `BIZ_EVENT_BUS=kafka` (start the broker with `make biz-up-kafka`) a relay sends them to Kafka in order per class or account, a consumer group turns them into notifications, failed messages go to a dead-letter topic, and nothing is lost while Kafka is down (events wait in the table). Audit and account events are published too. Earlier: milestone B9b (class discussion). Each section has a simple discussion: threads with replies (one level), pinning and marking as solved, deleting (soft), and notifications to the people concerned (instructors for a new thread, the author and instructors for a reply, the author when someone else marks it solved). Instructors and enrolled students write; the registrar and students on leave read; everything is read-only once the section ends. Earlier: milestone B9 (notifications). Events written to the outbox in the same transaction as the change (enrollment by the registrar, new assignment, published score, published final grade, cancelled section) are turned into in-app messages by a background worker (several instances can run together; each event is handled once, retried up to five times, and a repeat delivery never creates a second message). Messages are pushed live over WebSocket (a one-time ticket, Redis fan-out across instances, and a catch-up request after a reconnect) and queued as e-mail in English or Chinese per account, with an unsubscribe link that needs no sign-in. Each person can switch categories off for the inbox or for e-mail. Announcements go to the whole company, one campus or one section within the sender's data scope, with a reader list and withdrawal; the platform can show a banner to every company. A scheduled job reminds students who have not submitted in the last 24 hours before their deadline, once. SMTP settings come from environment variables and the same variables go into the Keycloak realm template. Earlier: milestone B8 (grades and reports). Each section has a grade policy (weights of its assignment groups, total 100%); the total is the sum of group rates times weights, one decimal, exact decimals. Teachers see a grade book (students by assignments, missing work as zero, manual scores for exams), calculate final grades, publish them (which also records whether the student passed), and export CSV; after the section ends grades are locked and only the registrar can amend them, with a reason and a before/after record. The grading scale (A 90 / 4.0 ... F 0, pass line D) is per company and editable. Students see their published grades, GPA by term and cumulative (withdrawals and work in progress excluded, retakes replaced by the latest result), and download a numbered unofficial transcript PDF; the registrar issues the official copy. A dashboard summarises only what the viewer's data scope allows. Earlier: milestone B7 (assignments and submissions). Teachers create assignments for their sections (rubric with points per item, groups, a deadline at 23:59 campus time, an optional late-work table), students submit text and files (the browser uploads straight to the object store through a presigned URL; the server confirms the object exists and has the declared size), resubmit before the deadline (the last submission counts, history is kept), and late work is scored by the table (10/20/30% off, then nothing; the sample's 198 submissions are re-computed exactly in a golden test). Teachers can give one student a 1-3 day extension with a reason. Scoring is per rubric item; the student sees a score only after the teacher publishes it. Earlier: milestone B6 (teaching). Terms, courses with prerequisites, majors with their curriculum, sections (a course in a term on a campus) with instructors, enrollment by students and by the registrar under the same rules, dropping (voided before the deadline, W after), course materials, and a student portal with course enrollment and a degree plan. Earlier: milestone B5 (HR records). People are natural persons with an optional staff profile and an optional student profile (one person can be both, never twice); staff have a history of assignments (primary and secondary, transfers keep the old ones), employment can end at once or on a planned date, and ending it withdraws admin access and ends sessions. Sensitive information and emergency contacts are a separate layer the tenant administrator cannot see. CSV import and export, and a command to load the sample company (`pnpm import:sample`). Earlier: milestone B4 (system management for tenants). A tenant administrator can manage campuses (with the closing checks), departments, posts, accounts (invitation, reset link, temporary password, unlock), roles and their permissions and data scopes, menus and entry assignment, data-scope sets, dictionaries, parameters, and read the operation log, login log, audit log and online users. Earlier: milestone B3 (platform console). The platform operator signs in at `platform.localhost:3001` and can open, edit, notify, suspend and restore tenants, switch tenant features on and off, manage the tenant administrator, manage platform accounts and roles, and run scheduled jobs; there is a monitoring page. Before that, milestone B2 added authentication, roles and permissions, and data scope. Every request is bound to a tenant by its host name and isolation is enforced three times (request scope, Prisma extension, database row-level security) and checked by a cross-tenant leak scan (B1). On top of that, sign-in works end to end (Keycloak, one realm per tenant), the API checks a permission code on every endpoint, roles pick menus and buttons, and data scopes limit which rows a role can see or change. The admin console has a menu-tree shell with tabs and three working pages (online users, login log, audit log); the other pages arrive with their milestones.
+The traditional business system of StarEdu: a **multi-tenant SaaS back office for a training or education company**. It manages organizations and people, teaching and enrollment, assignments and grades, transcripts, notifications and a document library, and it is the system the [AI module](../ai-module/) plugs into. It is built as an open-source reference: the interesting part is not any single screen but the way tenant isolation, permissions, data scope, auditing and testing are done end to end.
 
-To try it as a learner or employer, see **[TRY-IT.md](TRY-IT.md)** (accounts, walk-through by role; it grows with each milestone).
+Built with NestJS, Prisma and PostgreSQL on the server, Next.js 15 with Tailwind and shadcn/ui-style components in the browser, and Keycloak for sign-in. English first, Chinese as a second language.
 
-## What is here
+## What it does
+
+**Platform (for the operator running the SaaS)**
+- Open, edit, notify, suspend and restore companies (tenants); switch features on or off per company.
+- Per-company sign-in and security settings (password rules, lockout, session time, two-step verification, optional Google sign-in), usage and quota (accounts, storage), scheduled jobs with run logs, platform announcements, monitoring, platform accounts and roles.
+
+**Company administration**
+- Campuses, departments (a tree), posts, accounts (invitation, reset link, temporary password, unlock), roles built from menus and buttons, data-scope sets, menus and entry assignment, dictionaries, parameters.
+- Operation log, login log, audit log, online users with force logout.
+- Roles created from platform templates can be brought up to date when a template gains menus (preview, then add only what is missing).
+
+**People (HR)**
+- One person record with an optional staff profile and an optional student profile; assignments with history (primary and secondary, transfers), planned or immediate end of employment.
+- Two layers of data: basic information versus sensitive information and emergency contacts (not even visible to the built-in administrator).
+- CSV import and export that can be repeated safely.
+
+**Teaching**
+- Terms, courses with prerequisites, majors with **curriculum versions by entry year**, sections (a course in a term on a campus) with instructors and a schedule.
+- Enrollment by students and by the academic office under the same rules (capacity under a row lock, prerequisites, schedule clashes, windows); the office can confirm exceptions with a reason. **Batch enrollment** by major, entry year and campus with a preview.
+- Dropping (voided before the deadline, "W" after), course materials, discussions per section.
+
+**Assignments and grades**
+- Assignments with rubrics, groups, deadlines at 23:59 campus time, late-work penalty tables, per-student extensions, multi-file submissions uploaded straight to object storage with version history.
+- Scoring per rubric item, scores visible only after publishing, grade book with manual scores, weighted final grades, publishing, locking at the end of the section, and amendments with a reason and a before/after record.
+- GPA by term and cumulative, a company grading scale, retakes, a dashboard limited to what the viewer's data scope allows.
+
+**Transcripts and student requests**
+- Numbered unofficial and official transcript PDFs with a watermark, a QR code and a content fingerprint; a public verification page per document; revocation.
+- Students can request a grade re-check or an assignment extension and withdraw while pending; instructors and the academic office approve or reject with a note, everything is audited and the student is notified.
+
+**Communication and documents**
+- Notifications by event: in-app, pushed live over WebSocket, and queued as e-mail in English or Chinese, with per-category switches and unsubscribe links; announcements to the company, a campus or a section.
+- A company document library with public, internal and confidential folders, access levels, expiring grants, versions, view-only and watermarked viewing, and an access log for confidential material.
+
+**AI integration**
+- The AI assistant can run in *business mode*: it signs in with the company's realm, asks this module which rows and folders the person may see, and reads the database only through read-only views filtered by those scopes.
+
+**For developers**
+- `pnpm gen:module` scaffolds a plain tenant resource (table with row-level security, API, permissions, menu, page, tests, leak-scan entries).
+- A demo mode with a living scenario, demo accounts on the login pages and a one-command reset (see [TRY-IT.md](TRY-IT.md)).
+
+## How it is built (conventions you will recognize)
+
+### Multi-tenancy: three independent walls
+1. The tenant comes **only from the host name** (`hq.localhost`, `school.example.com`); never from anything the client sends. Unknown tenant: 404. Suspended: 403.
+2. A token must be issued by **that tenant's own Keycloak realm** (one realm per tenant).
+3. Every Prisma operation gets the tenant added by an extension, and writing another tenant's row is refused.
+4. The database enforces it again: the application connects as a low-privilege role and **row-level security** shows it only rows of the tenant set for the current transaction. With no tenant set it sees nothing.
+
+Foreign keys are not covered by row-level security, so any endpoint that accepts another record's id first checks that the id belongs to the current tenant, and is registered in the **cross-tenant leak scan**, which fails for any route that is not registered.
+
+### Identity and permissions
+- **Keycloak says who you are; the API says what you may do.** Browsers never hold tokens: the web app keeps them in a server-side session behind an httpOnly cookie and forwards calls through a backend-for-frontend (`/bff/*`) that also requires a custom header on writes.
+- Every non-public endpoint declares a permission code (`module:resource:action`) or is refused (fail closed). **The menu is the permission**: a role ticks menus and buttons; the codes on them are its operation permissions, limited to the features enabled for the tenant.
+- **Data scope** limits rows: all, own department, own department and below, own records, own classes, or a custom pick; several roles combine as a union; no scope means no rows. Endpoints build their filter with one helper, and writes check the target row against the same scope.
+- Changing roles or assignments bumps a per-tenant version, so cached permissions refresh on the next request. You cannot grant a permission you do not hold (anti-escalation).
+- Built-in roles (tenant administrator, student) cannot be changed; the administrator has every operation permission but no business data scope, by design (separation of duties).
+
+### API and data
+- REST with schema validation (zod) at the boundary, strict objects, explicit error codes for business refusals, and an audit entry for every change.
+- Business rules live in services and are enforced again in the database where it matters (CHECK constraints, triggers, partial unique indexes).
+- Prisma schema with migrations in `prisma/migrations`, including hand-written SQL for row-level security. Seeds and demo loaders are idempotent (natural keys, safe to repeat).
+- Money-like exactness where needed (decimal arithmetic for grades), deadlines in the campus time zone.
+
+### Events and files
+- A transactional **outbox**: events are written in the same transaction as the change and consumed by a worker (or, optionally, relayed through Kafka); handling is at-least-once with de-duplication, retries and a dead-letter path.
+- Files go straight from the browser to S3-compatible storage through presigned URLs; the server confirms the object exists and has the declared size. Storage keys always start with the tenant.
+
+### Security habits
+- Password rules, lockout, session limits and optional two-step verification are realm settings managed per company; secrets are never shown again after saving.
+- Public endpoints (for example transcript verification) are rate limited; CSV exports neutralize spreadsheet formulas; API documentation is off in production.
+- Demo accounts and data exist only in companies explicitly marked as demo companies; the demo scripts refuse to run with `NODE_ENV=production` unless told otherwise.
+
+### Quality
+- **Tests run against the real thing**: PostgreSQL, Redis and Keycloak (jest end-to-end and integration tests), plus unit tests for pure logic (vitest). Golden tests recompute the sample company's 198 submissions exactly.
+- A **cross-tenant leak scan** exercises every read and write with another tenant's ids; a schema test checks row-level security on every table.
+- CI runs lint, type checks and the whole suite on every push.
+- A browser check of the main flows is part of finishing a feature.
+
+### Working conventions
+- Work is delivered in numbered milestones (`B1`, `B2`, ...): one branch per milestone, a pull-request-sized change with its tests and docs, merged with `--no-ff` and tagged `biz-b<N>` once CI is green.
+- English first for code, messages and documents; Chinese is a second language in the UI and in `*.chn.md` documents.
+
+## Architecture and technology
+
+| Part | Technology |
+|---|---|
+| API | NestJS, TypeScript, Prisma, PostgreSQL with row-level security |
+| Web | Next.js 15 (App Router), Tailwind CSS, next-intl; three entries in one app: student portal `/`, admin console `/admin`, platform console (`platform.*` host) |
+| Identity | Keycloak, one realm per tenant plus a platform realm |
+| Cache, sessions, locks | Redis |
+| Files | S3-compatible object storage |
+| Mail | SMTP (Mailpit in development) |
+| Events | Outbox table; optional single-node Kafka (KRaft) |
+| Tests | jest (API), vitest (web, shared), supertest |
+
+## Repository layout
 
 | Path | What |
 |---|---|
 | `apps/api` | NestJS API (port 4000). `GET /healthz` checks Postgres and Redis. |
-| `apps/web` | Next.js app (port 3001), three entry points in one app: student portal `/`, admin console `/admin`, platform console (host `platform.*`, rewritten to `/platform`). English first, Chinese as a second language (cookie `locale`). |
-| `packages/shared` | Shared code: tenant-code rules (reserved words) and the **Keycloak realm template** (all tunable parameters in `src/realm-config.json`). |
-| `prisma/` | Prisma schema and migrations (`biz` schema), including hand-written SQL for row-level security, triggers and the low-privilege role `biz_app`. |
-| `deploy/compose/kafka.yaml` | Optional single-node Kafka (KRaft), merged with `biz.yaml`; `make biz-up-kafka`. About 365 MiB of memory and 7 seconds to restart (measured). |
-| `deploy/compose/biz.yaml` | Postgres, Redis, S3-compatible object storage, Keycloak, Mailpit. Separate Compose project from the AI module, with different ports. |
-| `scripts/` | `bootstrap-platform.ts` (create the first platform account), `dev-set-password.ts` (local only: set a password for a user or a platform account so you can sign in without the invite email), `provision-tenant.ts` (open a tenant: Keycloak realm, headquarters campus, roles, built-in admin, invite email; safe to repeat), `seed.ts` (two demo tenants, `hq` and `riverside-franchise`), `create-realm.ts` (platform realm), `smoke-b0.ts` (end-to-end check of the realm template). |
+| `apps/web` | Next.js app (port 3001). |
+| `packages/shared` | Shared code: permission codes, menu catalog, role templates, tenant-code rules, the Keycloak realm template, pure business logic (quota, curriculum versions) and the module generator core. |
+| `prisma/` | Schema and migrations (`biz` schema). |
+| `deploy/compose` | Docker Compose for Postgres, Redis, object storage, Keycloak, Mailpit (and optional Kafka). Ports differ from the AI module so both can run together. |
+| `deploy/keycloak` | Password block list and the demo-only login theme. |
+| `scripts/` | Provisioning, seeding, demo loading and reset, module generator, local password helper. |
 
-## Run it
-
-Requires Node 20.19+, pnpm 10, Docker.
+## Commands you will use
 
 ```bash
-cd business-module
-cp .env.example .env        # defaults are for local demos only
-pnpm install
-make up                     # Postgres, Redis, object store, Keycloak, Mailpit
-pnpm migrate                # apply Prisma migrations
-pnpm realm                  # create the platform realm from the template
-pnpm bootstrap:platform     # first platform account (username root) and its invitation e-mail
-pnpm seed                   # open two demo tenants: hq and riverside-franchise (safe to repeat)
-pnpm dev:api                # http://localhost:4000/healthz
-pnpm dev:web                # http://hq.localhost:3001  (and platform.localhost:3001)
+pnpm lint && pnpm typecheck && pnpm test   # tests need the Docker services (make up)
+pnpm test:leak                             # only the cross-tenant leak scan
+pnpm gen:module --name ... --group ... --fields "..." --label "..."   # scaffold a resource
+pnpm demo                                  # load demo companies, data and accounts
+pnpm demo:reset                            # rebuild the demo data from scratch
 ```
 
-Sign in to the admin console (local demo):
+Ports: Postgres 5433, Redis 6380, object store 9100/9101, Keycloak 8180, Mailpit 1125 (SMTP) and 8125 (web), API 4000, web 3001.
 
-```bash
-pnpm dev:password --code hq --username admin --password '<10+ characters, upper and lower case, digit, special character>'
-# then open http://hq.localhost:3001/admin and sign in as "admin"
-```
+## What it deliberately does not do
 
-If you set up the local stack with an earlier milestone, run `make reset` and `pnpm seed` again so the realm template changes (logout redirect) and the new menu catalog and role templates are applied. `pnpm seed` also upgrades tenants that are already open: it adds missing menus and role templates.
+No virus scan of uploaded files, no plagiarism detection, no make-up exams, pass/fail courses or dropped-lowest-score rules, no payment or tuition, no student-facing mobile app. The administrator never sees business data. Some of these are listed as ideas, not promises.
 
-`*.localhost` names resolve to your machine in most browsers; if yours does not, add them to `/etc/hosts`. Mailpit shows outgoing mail at http://localhost:8125. Keycloak admin is at http://localhost:8180.
+## More
 
-## Checks
-
-```bash
-pnpm lint && pnpm typecheck && pnpm test   # tests include real Postgres and Redis (make up first)
-pnpm test:leak                             # only the cross-tenant leak scan (reads, writes, foreign ids)
-pnpm smoke                                 # creates a temporary tenant realm, checks token claims,
-                                           # password policy, lockout and email delivery, then removes it
-```
-
-## How tenant isolation works
-
-1. The tenant comes only from the **host name** (`hq.localhost`, `franchise.staredu.com`), never from anything the client sends. Unknown tenant: 404. Suspended: 403.
-2. A token must be issued by **that tenant's Keycloak realm**; a token from another tenant's realm is rejected.
-3. Every Prisma operation gets the tenant added automatically (`src/tenancy/`), and creating or changing another tenant's row is refused.
-4. The database enforces it again: the app connects as `biz_app`, and row-level security shows it only rows of the tenant set for the current transaction (`app.tenant_id`). With no tenant set it sees nothing.
-
-Prisma queries are lazy: they read the current tenant when they are awaited, so always `await` inside the request.
-
-Foreign keys are **not** covered by row-level security (Postgres skips policies when it checks them), so any endpoint that accepts another record's id must first check that the id belongs to the current tenant. Use `assertVisible` (`src/tenancy/owned.ts`) and register the endpoint in `apps/api/test/leak/registry.ts`; a test fails for any route that is not registered.
-
-## How permissions work
-
-- **Keycloak says who you are; the API says what you may do.** A token must come from a known tenant realm (issuer allow-list, signature, audience, expiry), match the host's tenant, and belong to an active account whose session was not force-logged-out.
-- **Every non-public endpoint declares a permission code** (`@RequirePermissions('module:resource:action')`, constants in `packages/shared/src/permissions.ts`) or explicitly `@AnyAuthenticated()`. An endpoint with neither is refused (fail closed).
-- **The menu is the permission**: a role ticks menus and buttons; the permission codes on the ticked items are the role's operation permissions, limited to the features the platform enabled for the tenant. The platform-provided menu catalog is in `packages/shared/src/menu-catalog.ts` and is synced into the database when a tenant is opened (and by `pnpm seed`).
-- **Built-in roles**: *tenant administrator* has every operation permission of the enabled admin features but no business data scope (only staff basic information); *student* is assigned automatically to student accounts. Neither can be changed or deleted.
-- **Data scope**: a role also has data-scope sets (all, own department, own department and below, own records, own classes, or a custom pick of departments). Only roles that hold the endpoint's permission take part in that request's scope; several roles and sets are combined as a union; no applicable set means no rows. Endpoints build their row filter with `withScope` (`src/data-scope/`), and writes check the target row against the same scope.
-- **Permission version**: changing roles, menus, data scopes or role assignments bumps a per-tenant counter in Redis, and cached permissions with an older version are reloaded, so a change applies on the next request. Anything that changes a person's departments must also call `AuthzService.bump`.
-- Browsers never see tokens: the web app keeps them in a server-side session (Redis) behind an httpOnly cookie and forwards API calls through `/bff/*`.
-
-## Ports (they differ from the AI module so both can run together)
-
-Postgres 5433, Redis 6380, object store 9100/9101, Keycloak 8180, Mailpit SMTP 1125 and web 8125, API 4000, web 3001.
-
-The synthetic company data in `../ai-module/sample-data/structured/` is meant to seed this module too, so both systems describe the same company.
-
-## Platform console
-
-- Address: `http://platform.localhost:3001` (host name `platform.*`). Platform accounts live in their own Keycloak realm (`platform`) and their own tables, which the tenant-facing database account cannot read; platform permissions and tenant permissions never mix.
-- First account: `pnpm realm` (once), `pnpm bootstrap:platform --username root --email you@example.test`, then either follow the invitation in Mailpit or, locally, `pnpm dev:password --platform --username root --password '...'`.
-- Tenants cannot be deleted, only suspended. Status: active, suspension notified (e-mail to the administrator), suspended (users refused, data kept), and back to active.
-- Scheduled jobs come from a fixed registry in `apps/api/src/platform/jobs/job-registry.ts`; names and schedules are validated, only one instance of a job runs at a time (Redis lock), and every run is logged. Jobs are off until you switch them on.
-- API documentation: `http://localhost:4000/api-docs`, on by default in development and off in production (`SWAGGER_ENABLED=true` to turn it on). The page itself has no sign-in, so do not expose it publicly. Grafana: set `GRAFANA_URL`; the monitoring page shows "Grafana is not running" when it does not answer.
-
-## HR records
-
-- **People**: one natural person per record (name, work e-mail), with an optional **staff profile** (employee number, hire date, status, assignments) and an optional **student profile** (student number, campus, status, program). Creating a person first checks the e-mail (any case) and ID number; a duplicate is refused with the existing person so the new profile can be added to them instead.
-- **Assignments**: many per person, one primary; they have start and end dates (the end date is the last valid day). A transfer ends the old assignment the day before and starts the new one, so history is kept. A staff member's campus is worked out from the department of the current assignments. Students are placed under their campus's department in the tree so data scopes work the same way.
-- **Employment end**: today or earlier takes effect at once (assignments end, admin permissions are withdrawn, sessions are revoked, the person is refused at the admin console); a future date is recorded and the platform job `staff.apply-effective` applies it on the day. Reinstating restores the status; assignments are added again.
-- **Two layers**: basic information (name, number, e-mail, status, campus, post) versus sensitive information (birth date, gender, ID number, phone, address) and emergency contacts. The second layer needs its own permission **and** a data scope that is not just "staff basics", so the built-in tenant administrator never sees it, nor any student. Viewing and changing emergency contacts is logged.
-- **Import / export**: CSV only (save a spreadsheet as CSV). Columns are those of the sample files; repeated imports change nothing; bad rows are reported without stopping the rest; "check only" writes nothing; bulk import needs the "all data" scope. `pnpm import:sample` loads `ai-module/sample-data` into the `hq` tenant (8 campuses, 141 staff, 60 students; the sample's `BJ` is the headquarters campus `HQ`).
-
-## Teaching
-
-- **Catalog**: terms (shared by all campuses; enrolment window and drop deadline), courses (code and credits become read-only once a section exists; prerequisites must all be passed, no cycles), majors (the category required/elective/general belongs to the major-course link). The catalog is controlled by permissions only; sections and enrollments follow the data scope.
-- **Sections**: draft → open → in progress → ended, or cancelled. Opening needs an instructor. The registrar changes the structure; an instructor can only manage the materials of their own section. A person cannot be both instructor and student in the same section (service check and a database trigger).
-- **Enrollment** (one service for students and the registrar). Always refused: section not open, term ended, student not "enrolled", the same course already being taken, instructor of the section. Students are also refused when the section is full, a prerequisite is not passed, the window is closed or the course was already passed; a schedule clash only warns (clashes are only compared between campuses in the same time zone). The registrar can confirm those situations (and a clash) with a list and a reason, which is stored and logged. **Seat counting is done under a row lock, so simultaneous requests for the last seat give exactly one winner** (tested).
-- **Dropping**: up to the drop deadline the record is voided and disappears; after it the record becomes W and stays. Cancelling a section voids its records and queues one event per student in `outbox_event` (the notification service of B9 will send them). Ending a term ends its sections and turns enrolled records into completed ones.
-- **Student portal** (`/`): course enrollment (with required/elective labels for the student's major, missing prerequisites and clashes) and a degree plan that counts only passed credits (progress, not a graduation check). Whether a course was *passed* is written by the grades milestone (B8).
+- Hands-on guide with setup, trial data, test accounts and walk-throughs: **[TRY-IT.md](TRY-IT.md)**.
+- The AI module and the repository overview: [../README.md](../README.md).
+- License: MIT (see the repository root).
