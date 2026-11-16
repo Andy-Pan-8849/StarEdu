@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B22 (role template upgrade).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B23 (demo data).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -44,6 +44,25 @@ Each company is a separate tenant with its own users, roles and data.
 pnpm dev:password --code hq --username admin --password '<10+ characters, upper and lower case, digit, special character>'
 pnpm dev:password --code riverside-franchise --username admin --password '<...>'
 ```
+
+**Demo scenario and one-click demo accounts (milestone B23).** Start here if you only want to look around. After `pnpm demo` (or `pnpm demo:reset`), open any entry's login page (`http://hq.localhost:3001/admin`, `http://hq.localhost:3001/`, `http://platform.localhost:3001/`). Under the **Sign in** button a block says *"The accounts below are for demonstration only."* and lists the demo accounts of both companies and the platform operator; click one and you are signed in, even when the account belongs to another entry or company (it takes you there first). Password for all of them: `Demo!Passw0rd2026`.
+
+| Account | Entry | What it is for |
+|---|---|---|
+| `demo.admin` | admin | The **demo superuser**: tenant administrator plus the `demo-superuser` role (every admin menu and button, data scope "all"), and assistant instructor of the Python section. Shows every feature in one account. |
+| `demo.registrar` | admin | Academic office: enrollment, batch enrollment, grade amendments, transcripts, student requests (approve appeals). |
+| `demo.teacher` | admin | Lead instructor of the three current sections: grading queue, extensions, grade book, discussions. |
+| `demo.student1`, `demo.student2` | portal | Students with history: enrolled in the current term, one graded and one ungraded assignment each, an upcoming deadline, a pending request (extension / grade appeal), a published grade still inside the 14-day appeal window, messages, a transcript. Student 1 follows the old curriculum, student 2 the new one. |
+| `demo.operator` | platform | Platform console: companies, usage and quota, jobs, announcements. |
+| `rv.admin`, `rv.registrar`, `rv.teacher`, `rv.student1`, `rv.student2` | admin / portal | The same five roles in the second company (StarIT RiverSide), with different data: sign in to both to see that companies cannot see each other. |
+
+Things to try: as `demo.student1` ask for an extension and withdraw it; as `demo.teacher` open *Sections > Homework 2 > Submissions* (ungraded work waits there) and approve the pending extension in *Student requests*; as `demo.registrar` approve the grade appeal (a new total and a note are required); as `demo.admin` open *Roles* (an old copy can show "Update from template"), *Transcripts* (a valid and a revoked copy; open their verification pages), *Majors > Curriculum* (two versions), *Batch enrollment*; as `demo.operator` open the company list and each company's usage. All dates are relative to the day the data was loaded, so run `pnpm demo:reset` before a demonstration to get fresh deadlines.
+
+The demo accounts and the `demo-superuser` role exist only in companies marked as **demo companies** (`tenant.is_demo`, set by `pnpm seed:demo` for `hq` and `riverside-franchise`); a production company is never marked, the role is not in any role template, and the login block comes from the Keycloak theme `deploy/keycloak/themes/staredu-demo` that only the demo realms use. **To remove the block from a deployment, delete the `scripts=` line in that theme's `theme.properties`** (or the theme folder). The compose file mounts the theme into Keycloak; run `make up` once to recreate Keycloak with it.
+
+Both `pnpm seed:demo` and `pnpm demo:reset` refuse to run with `NODE_ENV=production` unless `ALLOW_DEMO_SEED=1` is set (only for a public trial site). Security note: the login block puts a public password and the platform operator account on a public page; that is acceptable only on a demonstration environment that holds no real data and is not exposed beyond the people you invite. To keep the platform console out of it, remove the `demo.operator` group from `demo-accounts.js`.
+
+`pnpm demo:reset` clears every business table of the demo companies (keeping the company, its realm, built-in administrator, roles, departments and campuses), deletes their Keycloak users, re-imports the AI sample and regenerates everything; it refuses any company that is not marked as a demo company.
 
 **Demo accounts (milestone B13).** `pnpm demo` (= `pnpm seed`, `pnpm import:sample`, `pnpm seed:demo`) loads the sample company into `hq` and creates these accounts. They share one public demo password, `Demo!Passw0rd2026` (local and trial use only; change it with the `DEMO_PASSWORD` environment variable before running). Each account is linked to the same person as in the AI module's sample data, so both systems describe the same company. Running it again changes nothing.
 

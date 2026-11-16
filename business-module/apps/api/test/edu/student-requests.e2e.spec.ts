@@ -58,7 +58,8 @@ describe("student requests: grade appeals and extensions", () => {
 
     it("a student sees what they can ask for and submits a request; the instructors are notified", async () => {
       const opts = (await as("st1").get("/api/portal/requests/options")).body;
-      expect(opts.extensions.map((e: { title: string }) => e.title).sort()).toEqual(["Exam", "HW1", "HW2"]);
+      expect(opts.extensions.map((e: { title: string }) => e.title).sort()).toEqual(["HW1", "HW2"]); // 只能手工录分的（Exam）没有在线截止，不在可申请之列
+      expect((await extend("st1", exam)).status).toBe(409);
       expect(opts.appeals).toEqual([]); // 没有已发布的成绩
       expect((await extend("st1", hw1, 2, "ab")).status).toBe(400); // 原因太短
       expect((await extend("st1", hw1, 4)).status).toBe(400); // 最多 3 天

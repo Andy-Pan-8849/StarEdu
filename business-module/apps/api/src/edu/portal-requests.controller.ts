@@ -72,7 +72,7 @@ export class PortalRequestsController {
         return { enrollmentId: f.enrollmentId, section: sectionName.get(e.sectionId) ?? "", total: Number(f.total), grade: f.grade, closesAt: new Date(f.publishedAt!.getTime() + APPEAL_WINDOW_DAYS * DAY_MS) };
       });
     const active = enrollments.filter((e) => e.status === "enrolled" && sections.find((s) => s.id === e.sectionId)?.status !== "ended" && sections.find((s) => s.id === e.sectionId)?.status !== "cancelled");
-    const assignments = await this.db.assignment.findMany({ where: { sectionId: { in: active.map((e) => e.sectionId) }, published: true }, orderBy: { dueAt: "asc" } });
+    const assignments = await this.db.assignment.findMany({ where: { sectionId: { in: active.map((e) => e.sectionId) }, published: true, manualOnly: false }, orderBy: { dueAt: "asc" } });
     const [exts, subs] = await Promise.all([
       this.db.assignmentExtension.findMany({ where: { studentPersonId: personId, assignmentId: { in: assignments.map((a) => a.id) } } }),
       this.db.submission.findMany({ where: { studentPersonId: personId, assignmentId: { in: assignments.map((a) => a.id) } }, select: { assignmentId: true, status: true } }),
@@ -109,6 +109,7 @@ export class PortalRequestsController {
       const a = await this.db.assignment.findFirst({ where: { id: input.assignmentId, published: true, section: { enrollments: { some: { studentPersonId: personId, status: "enrolled" } } } }, include: { section: true } });
       if (!a) throw new NotFoundException();
       if (a.section.status === "ended" || a.section.status === "cancelled") throw new ConflictException(`The section is ${a.section.status}`);
+      if (a.manualOnly) throw new ConflictException("This assignment is not submitted online, so there is no deadline to extend");
       const ext = await this.db.assignmentExtension.findFirst({ where: { assignmentId: a.id, studentPersonId: personId } });
       if (now >= effectiveDeadline(a.dueAt, ext?.days)) throw new ConflictException({ code: "DEADLINE_PASSED", message: "The deadline has passed; ask your instructor directly" });
       if (ext && input.days <= ext.days) throw new ConflictException({ code: "ALREADY_EXTENDED", message: `You already have a ${ext.days}-day extension; request more days than that` });

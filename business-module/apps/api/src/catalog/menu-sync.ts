@@ -155,6 +155,23 @@ export async function copyMissingTemplates(owner: PrismaClient, tenantId: string
   return steps;
 }
 
+/**
+ * 把模板新增的菜单补进这个租户已复制的角色（只增不减）。和管理员在"角色"页点"从模板更新"同样的规则，
+ * 这里给升级脚本和演示数据用（用库所有者账号，不经过接口）。返回补了多少条。
+ */
+export async function addMissingTemplateMenus(owner: PrismaClient, tenantId: string): Promise<number> {
+  const granted = new Set((await owner.tenantMenuGrant.findMany({ where: { tenantId }, select: { menuId: true } })).map((g) => g.menuId));
+  let added = 0;
+  for (const role of await owner.role.findMany({ where: { tenantId, kind: "custom", templateId: { not: null }, deletedAt: null } })) {
+    const want = await owner.roleMenu.findMany({ where: { roleId: role.templateId as string } });
+    const have = new Set((await owner.roleMenu.findMany({ where: { roleId: role.id } })).map((m) => m.menuId));
+    const missing = want.map((m) => m.menuId).filter((m) => !have.has(m) && granted.has(m));
+    if (missing.length) await owner.roleMenu.createMany({ data: missing.map((menuId) => ({ tenantId, roleId: role.id, menuId })), skipDuplicates: true });
+    added += missing.length;
+  }
+  return added;
+}
+
 /** 把最新的菜单目录和角色模板应用到一个已开通的租户（升级用，seed 脚本调用）。 */
 export async function applyCatalogToTenant(owner: PrismaClient, tenantId: string): Promise<string[]> {
   await syncPlatformMenus(owner);
