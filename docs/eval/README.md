@@ -1,6 +1,6 @@
 # 检索评测记录
 
-每次运行产生一对文件（`.md` 报告和 `.json` 数据），同时在数据库的 `ai.eval_runs` / `ai.eval_results` 里每种模式一行。运行方式见 [`ai-module/README.md`](../../ai-module/README.md)。
+每次运行产生一对文件（`.md` 报告和 `.json` 数据），同时在数据库的 `ai.eval_runs` / `ai.eval_results` 里每种模式一行。运行方式见 [`ai-module/README.chn.md`](../../ai-module/README.chn.md)。
 
 ## M4 基线（2026-11-03，提交 `c264feb`）
 

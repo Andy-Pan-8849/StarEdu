@@ -60,7 +60,7 @@ make env            # 生成 .env，把 OPENAI_API_KEY 填进去
 make sync && make up && make seed
 ```
 
-打开 <http://localhost:3000>，用 `wei.stu.sh` 登录，密码 `demo-pass-123`（仅限本地的演示账号）。详情见 [`ai-module/README.md`](ai-module/README.md)。
+打开 <http://localhost:3000>，用 `wei.stu.sh` 登录，密码 `demo-pass-123`（仅限本地的演示账号）。详情见 [`ai-module/README.chn.md`](ai-module/README.chn.md)。
 
 ## 架构
 
@@ -90,7 +90,7 @@ StarEdu/
     └── eval/              评测报告、人工抽查表和验收记录
 ```
 
-AI 模块内部每个文件夹是做什么的，见 [`ai-module/README.md`](ai-module/README.md) 的"项目目录结构"一节。每个源文件开头都有一段注释，说明这个文件做什么、背后的想法。测试放在被测代码旁边（各包和各应用里的 `tests/` 文件夹）。
+AI 模块内部每个文件夹是做什么的，见 [`ai-module/README.chn.md`](ai-module/README.chn.md) 的"项目目录结构"一节。每个源文件开头都有一段注释，说明这个文件做什么、背后的想法。测试放在被测代码旁边（各包和各应用里的 `tests/` 文件夹）。
 
 ## 示例数据
 
