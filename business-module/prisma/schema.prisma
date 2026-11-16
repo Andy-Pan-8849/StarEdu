@@ -174,6 +174,8 @@ model Tenant {
   maxAccounts      Int?         @map("max_accounts")
   maxStorageMb     Int?         @map("max_storage_mb")
   suspendedAt      DateTime?    @map("suspended_at")
+  /// 演示公司（B23）：只有它才允许演示账号、演示角色和一键重置
+  isDemo           Boolean      @default(false) @map("is_demo")
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at")
 

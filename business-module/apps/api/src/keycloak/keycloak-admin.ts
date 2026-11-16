@@ -166,6 +166,12 @@ export class KeycloakAdmin {
     if (res.status !== 204) throw new KeycloakError(`update user failed: ${res.status} ${await res.text()}`, res.status);
   }
 
+  /** 删除一个用户（演示重置用）。 */
+  async deleteUser(realm: string, userId: string): Promise<void> {
+    const res = await this.request(`/realms/${realm}/users/${userId}`, { method: "DELETE" });
+    if (res.status !== 204 && res.status !== 404) throw new KeycloakError(`delete user failed: ${res.status} ${await res.text()}`, res.status);
+  }
+
   /** 设置密码；temporary=true 时用户下次登录必须改密（Required Action）。 */
   async resetPassword(realm: string, userId: string, value: string, temporary: boolean): Promise<void> {
     const res = await this.request(`/realms/${realm}/users/${userId}/reset-password`, { method: "PUT", body: JSON.stringify({ type: "password", value, temporary }) });

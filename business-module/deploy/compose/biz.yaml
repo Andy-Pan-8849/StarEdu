@@ -85,6 +85,7 @@ services:
       - "${BIZ_KEYCLOAK_PORT:-8180}:8080"
     volumes:
       - ../keycloak/password-blacklists:/opt/keycloak/data/password-blacklists:ro
+      - ../keycloak/themes/staredu-demo:/opt/keycloak/themes/staredu-demo:ro
       - bizkeycloakdata:/opt/keycloak/data
     healthcheck:
       test:
