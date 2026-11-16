@@ -1,5 +1,7 @@
 # StarIT Education Sample Data (English)
 
+[中文说明](README.chn.md)
+
 Everything here is **synthetic**. StarIT Education is a sample company; names, numbers, policies, URLs (`*.starit.example`) and the tax ID are invented. The policies are inspired by common practice in the IT training industry and do not describe any real company.
 
 This data supports three things: demonstrating RAG and hybrid search, evaluating retrieval quality, and giving the Agent structured data to query.
@@ -16,7 +18,7 @@ sample-data/
 ├── structured/           7 CSV tables (campuses, employees, expense_claims, support_tickets, students, assignments, submissions)
 ├── demo-accounts.csv     the demo users: who they are in the data, their role, campus and job level
 ├── eval/
-│   ├── qa-set.jsonl      54 questions about the documents, with expected answers and sources
+│   ├── qa-set.jsonl      114 questions about the documents, with expected answers and sources
 │   └── sql-qa.jsonl      41 questions answerable from the CSV tables, each asked by a named account,
 │                         with reference answers computed from the rows that account may see
 ├── _markdown-source/     editable Markdown sources of the documents

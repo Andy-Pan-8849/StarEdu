@@ -1,203 +1,205 @@
-# 设计文档 05：入库管线、检索与评测方案（AI 模块，第一阶段）
+# Design document 05: ingestion pipeline, search and evaluation plan (AI module, phase 1)
 
-状态：**已获用户批准（2026-11-02），第 5 节 7 个确认点接受，其中关键词排序按方案 A（见下）。** 其余设计文档批准前不写应用代码。
-依赖：01–04。标记约定：**【已定】**、**【建议】**、**【待定】**（实施时选型或实测后定）。
+[中文](05-retrieval-etl-and-evaluation.chn.md)
 
-## 1. 入库管线（ETL）
+Status: **Approved by the user (2026-11-02); the 7 confirmation points of section 5 were accepted, with keyword ranking following plan A (see below).** No application code is written before the other design documents are approved.
+Depends on: 01 to 04. Marking convention: **[Decided]**, **[Proposed]**, **[Open]** (decided at implementation time by choosing or measuring).
 
-### 1.1 阶段
+## 1. Ingestion pipeline (ETL)
+
+### 1.1 Stages
 
 ```
-上传 → [parse] → [clean] → [chunk] → [derive（可选）] → [embed] → [write]
+Upload → [parse] → [clean] → [chunk] → [derive (optional)] → [embed] → [write]
 ```
 
-每个阶段对应 `ingestion_jobs.stage`，失败时记录阶段和原因，可在文档管理页重试。worker 每个阶段结束后更新 `stage`，写入阶段在**一个事务**里完成（先删旧分块、再写新分块和向量），中途失败不会留下半成品。
+Each stage corresponds to `ingestion_jobs.stage`; on failure the stage and the reason are recorded, and the document management page can retry. The worker updates `stage` after each stage, and the write stage completes in **one transaction** (delete the old chunks first, then write the new chunks and vectors), so a failure midway leaves no half-finished result.
 
-### 1.2 解析器可插拔【已定】
+### 1.2 Pluggable parsers [Decided]
 
-接口（`core`）：
+Interface (`core`):
 
 ```
 Parser.parse(file) -> ParsedDocument(blocks=[Block(type, text, level, page)])
 Block.type ∈ heading | paragraph | list_item | table | code
 ```
 
-按文件扩展名选择解析器，注册表可扩展。**候选库**（实施时选定）【待定】：
+The parser is chosen by file extension, and the registry is extensible. **Candidate libraries** (chosen at implementation) [Open]:
 
-| 格式 | 候选 | 说明 |
+| Format | Candidate | Notes |
 |---|---|---|
-| docx | python-docx | 保留标题层级和表格 |
-| pdf | pdfplumber 或 pypdf | 避免 AGPL 许可的库，开源仓库的许可证需要兼容 MIT |
-| md / txt | markdown-it-py / 直接读取 | md 保留标题和代码块 |
+| docx | python-docx | Keeps heading levels and tables |
+| pdf | pdfplumber or pypdf | Avoid libraries under the AGPL license; the license of the open-source repository must be compatible with MIT |
+| md / txt | markdown-it-py / read directly | md keeps headings and code blocks |
 
-### 1.3 清洗
+### 1.3 Cleaning
 
-去掉页眉页脚重复行、多余空白和不可见字符；**不改写正文**。表格转成 Markdown 表格文本。
+Remove repeated headers and footers, extra whitespace and invisible characters; **never rewrite the body text**. Tables are converted to Markdown table text.
 
-### 1.4 分块【建议】
+### 1.4 Chunking [Proposed]
 
-- 按标题结构切分，同一小节尽量放在一起；单块目标 300–500 token，相邻块重叠约 50 token（用 tiktoken 计数），各项参数可在入库任务的 `config` 里改。
-- **表格按整表或按行组保留，不在行中间切开；代码块（含 md 的围栏代码）作为不可拆分的单元**（RAGFlow 试用中发现 General 分块器会丢失 md 代码围栏）。
-- 每个分块存 `heading_path`、`page`；用于向量化的文本是 `heading_path + 正文`，而存储的 `text` 是**纯原文**。
-- 从文本里用规则抽取编号（如 `ERR-PORTAL-403`、`FIN-PAY-004`、`TS-HW-006`）写入 `identifiers`，并加入 `tsv`。
+- Split by heading structure, keeping a section together where possible; a chunk targets 300 to 500 tokens with about 50 tokens of overlap between neighbours (counted with tiktoken), and all parameters can be changed in the `config` of an ingestion job.
+- **Tables are kept whole or in row groups and never cut in the middle of a row; code blocks (including fenced code in md) are indivisible units** (the General chunker was found in the RAGFlow trial to lose md code fences).
+- Each chunk stores `heading_path` and `page`; the text used for embedding is `heading_path + body`, while the stored `text` is the **pure original**.
+- Codes (such as `ERR-PORTAL-403`, `FIN-PAY-004`, `TS-HW-006`) are extracted from the text by rules into `identifiers` and added to `tsv`.
 
-### 1.5 派生内容（可选）
+### 1.5 Derived content (optional)
 
-- 每个入库任务可选开启：摘要、假设性问题（3–5 个）、关键词，写入 `ai.chunk_derived`，**不替换原文**【已定，见 02】。
-- 用较小的模型，提示词版本化；失败不影响入库（只缺少派生内容，记录告警）。
-- 它的作用要用评测证明：对比"有 / 无派生内容"的检索指标（见 4.3），效果不明显就默认关闭。
+- Each ingestion job can switch on: a summary, hypothetical questions (3 to 5), keywords, written to `ai.chunk_derived`, **without replacing the original text** [Decided, see 02].
+- A smaller model, versioned prompts; a failure does not stop ingestion (only the derived content is missing, and a warning is recorded).
+- Its value must be proved by evaluation: compare the search metrics "with / without derived content" (see 4.3), and switch it off by default if the effect is not clear.
 
-### 1.6 向量化与写入
+### 1.6 Embedding and writing
 
-- 批量调用 embedding，按配置的模型和维度（02 的 `chunk_embeddings`）；单批失败重试，超过次数则任务失败。
-- 写入时把文档上的权限、状态、版本复制到分块（02 的一致性规则）。
-- 样例数据入库脚本：读取 `manifest.csv`，`access` 按 02 的 2.3 展开表转成 `allowed_roles`，调用同一个入库接口，保证样例和真实上传走同一条路径。
+- Embeddings are called in batches, with the configured model and dimensions (`chunk_embeddings` in 02); a failed batch is retried, and the job fails after too many attempts.
+- At write time the permissions, status and version of the document are copied to the chunks (the consistency rule of 02).
+- The ingestion script for the sample data reads `manifest.csv`, expands `access` into `allowed_roles` with the expansion table of 2.3 of 02, and calls the same ingestion interface, so the sample and a real upload take the same path.
 
-## 2. 检索管线
+## 2. Search pipeline
 
-### 2.1 步骤
+### 2.1 Steps
 
 ```
-standalone_query ──┬─▶ 关键词检索（权限过滤后）top 30 ─┐
-                   │                                    ├─▶ RRF 融合 ─▶ Rerank ─▶ 上下文组装
-                   └─▶ 向量检索（权限过滤后）top 30 ───┘
+standalone_query ──┬─▶ keyword search (after permission filter) top 30 ─┐
+                   │                                                      ├─▶ RRF fusion ─▶ rerank ─▶ context assembly
+                   └─▶ vector search (after permission filter) top 30 ───┘
 ```
 
-1. **权限与版本过滤**：用 02 第 4 节的统一条件，放进两路检索各自的 `WHERE`，先过滤再排序。
-2. **关键词检索**：Postgres 全文检索，`ts_rank_cd` 排序；`identifiers` 精确命中的分块加权。注意 Postgres 自带的排序**不是 BM25**。**【已定，方案 A】** 默认用 `ts_rank_cd`，`core` 里定义 `KeywordSearcher` 接口，BM25 扩展作为可切换的第二种实现；是否引入由评测的“关键词排序”对比决定。BM25 扩展要求自建 Postgres 镜像（现成的 pgvector 镜像不含它），许可证、arm64 构建和版本兼容性需要在评测前先验证，目前都没有核实。
-3. **向量检索**：余弦距离，精确扫描（02 的 2.4）。
-4. **RRF 融合**：`score = Σ 1 / (k + rank)`，`k = 60`。
-5. **Rerank**：对融合后的前 20 个候选重排，取前 6 个。
-6. **上下文组装**：去重；同一文档相邻分块可合并；总量不超过上下文预算（约 3500 token）；每个分块带 `doc_code`、`版本`、`status`、`heading_path`，供生成阶段标注引用和版本。
+1. **Permission and version filter**: the shared condition of section 4 of 02, placed in the `WHERE` of both searches, so filtering comes before ranking.
+2. **Keyword search**: Postgres full-text search ranked by `ts_rank_cd`; chunks with an exact `identifiers` hit are boosted. Note that Postgres's own ranking **is not BM25**. **[Decided, plan A]** `ts_rank_cd` is the default, `core` defines a `KeywordSearcher` interface, and a BM25 extension is a switchable second implementation; whether to bring it in is decided by the "keyword ranking" comparison of the evaluation. A BM25 extension needs a self-built Postgres image (the ready-made pgvector image does not contain it), and its license, arm64 build and version compatibility must be verified before the evaluation; none of that has been checked yet.
+3. **Vector search**: cosine distance, exact scan (2.4 of 02).
+4. **RRF fusion**: `score = Σ 1 / (k + rank)`, `k = 60`.
+5. **Rerank**: rerank the top 20 candidates after fusion and keep the top 6.
+6. **Context assembly**: deduplicate; neighbouring chunks of the same document may be merged; the total stays within the context budget (about 3500 tokens); every chunk carries `doc_code`, `version`, `status` and `heading_path` so the generation stage can label citations and versions.
 
-所有数值（30 / 30 / 60 / 20 / 6 / 3500）都是配置项，评测时作为可调参数。
+All the numbers (30 / 30 / 60 / 20 / 6 / 3500) are configuration items and tunable parameters during evaluation.
 
-### 2.2 Rerank 方案【建议】
+### 2.2 Rerank options [Proposed]
 
-`Reranker` 是可插拔接口，第一阶段一起做（已确认）：
+`Reranker` is a pluggable interface, all built together in phase 1 (confirmed):
 
-| 实现 | 优点 | 缺点 |
+| Implementation | Pros | Cons |
 |---|---|---|
-| **LLM 列表式重排（默认）**：用较小模型对 20 个候选打分排序 | 不引入新供应商和新密钥，lite 也能用 | 多一次 LLM 调用，增加延迟和成本；要计入 04 的 LLM 调用预算 |
-| 专用重排 API（如 Cohere、Voyage 的 rerank 接口） | 延迟低、效果通常更稳 | 需要新的供应商密钥和计费 |
-| 本地 cross-encoder 模型 | 无调用费用 | 占内存，lite 部署不合适 |
+| **LLM listwise rerank (default)**: a smaller model scores and orders the 20 candidates | No new vendor or key; usable in lite too | One more LLM call, adding latency and cost; counts against the LLM call budget of 04 |
+| A dedicated rerank API (such as the rerank endpoints of Cohere or Voyage) | Low latency, usually steadier results | Needs a new vendor key and billing |
+| A local cross-encoder model | No call cost | Uses memory, not suitable for the lite deployment |
 
-默认用第一种，接口留出后两种。是否换成专用重排，由评测的"有 / 无 Rerank"对比和延迟数据决定。
+The first is the default and the interface leaves room for the other two. Whether to switch to a dedicated reranker is decided by the "with / without rerank" comparison of the evaluation and the latency data.
 
-### 2.3 `grade_retrieval` 的阈值
+### 2.3 The threshold of `grade_retrieval`
 
-用 Rerank 后的最高分和命中数判断"足够"；阈值不拍脑袋，**用评测集标定**（`unanswerable` 题的分数分布与可回答题的分布对比），先给初值，评测后调整【待定】。
+The top score after rerank and the number of hits are used to judge "enough"; the threshold is not guessed but **calibrated with the evaluation set** (comparing the score distribution of `unanswerable` questions with that of answerable ones): an initial value first, adjusted after evaluation [Open].
 
-### 2.4 可切换的检索模式
+### 2.4 Switchable search modes
 
-配置项 `retrieval_mode`：`keyword`、`vector`、`hybrid`、`hybrid_rerank`（默认）。评测时逐个运行，用来**验证并展示 hybrid search 的价值**，这是项目的学习目标之一。
+The configuration item `retrieval_mode`: `keyword`, `vector`, `hybrid`, `hybrid_rerank` (default). They are run one by one during evaluation, to **verify and show the value of hybrid search**, one of the learning goals of the project.
 
-## 3. 数据查询（SQL / MCP）
+## 3. Data queries (SQL / MCP)
 
-权限、视图、会话变量见 02 的第 5 节，流程见 04。评测对 SQL 题只看结果是否正确、是否越权，不涉及检索管线。
+Permissions, views and session variables are in section 5 of 02, and the flow in 04. For SQL questions the evaluation only checks whether the result is correct and whether it overreaches; it does not involve the search pipeline.
 
-## 4. 评测方案
+## 4. Evaluation plan
 
-### 4.1 数据集现状（已核对）
+### 4.1 State of the data sets (checked)
 
-| 数据集 | 数量 | 构成 |
+| Data set | Count | Composition |
 |---|---|---|
-| `qa-set.jsonl` | 54 | 类型：single 31、multi 7、access 7、keyword 3、unanswerable 3、version 2、paraphrase 1；提问角色：staff 35、student 15、finance 2、manager 1、hr 1；`should_answer = false` 共 6 条 |
-| `sql-qa.jsonl` | 33（M2.0 修订） | 每题指定提问账号和数据范围：应回答 26 题（全公司 16、本校区 7、仅本人 3），越权应拒绝 7 题（见 `sample-data/README.md`） |
+| `qa-set.jsonl` | 54 | Types: single 31, multi 7, access 7, keyword 3, unanswerable 3, version 2, paraphrase 1; asking roles: staff 35, student 15, finance 2, manager 1, hr 1; `should_answer = false` on 6 |
+| `sql-qa.jsonl` | 33 (M2.0 revision) | Each question names the asking account and the data scope: 26 should be answered (whole company 16, own campus 7, own records 3), 7 overreaching ones should be refused (see `sample-data/README.md`) |
 
-**问题**：`keyword`、`version`、`paraphrase`、`unanswerable` 的题目太少，`manager`、`hr` 角色的题也很少，不足以得出可靠的结论。**建议在评测运行器完成后补充**（每类至少 8–10 题，并给每个受限文档配对"有权限 / 无权限"的问题），补充内容同样是合成数据。【建议】
+**Problem**: the `keyword`, `version`, `paraphrase` and `unanswerable` types have too few questions, and so do the `manager` and `hr` roles, which is not enough for reliable conclusions. **It is proposed to add more after the evaluation runner is done** (at least 8 to 10 per type, and for every restricted document a pair of questions, "allowed / not allowed"); the additions are synthetic data too. [Proposed]
 
-### 4.2 测试身份
+### 4.2 Test identities
 
-在 Keycloak 里预置（密码仅用于本地和演示）：每个业务角色至少一个账号，加上校区账号：北京 staff、上海 staff、上海 manager；管理账号 `Admin`、`RAGETLAdmin` 各一个（用于验证 01 里的最小权限：`Admin` 查不到受限内容）。评测运行器可以**直接以合成身份调用 `core`**（不经过登录页），同时保留少量端到端用例走真实 JWT。
+Preset in Keycloak (passwords for local use and demos only): at least one account per business role, plus campus accounts: a Beijing staff, a Shanghai staff, a Shanghai manager; one `Admin` and one `RAGETLAdmin` (to verify the least privilege of 01: `Admin` cannot reach restricted content). The evaluation runner can **call `core` directly with a synthetic identity** (without the sign-in page), while a few end-to-end cases with a real JWT are kept.
 
-### 4.3 指标
+### 4.3 Metrics
 
-| 类别 | 指标 | 判定方式 |
+| Category | Metric | How it is judged |
 |---|---|---|
-| 检索 | `recall@k`（`source_docs` 是否都在前 k 个结果中）、MRR | 确定性计算，不需要 LLM |
-| 答案正确性 | 按 `expected_answer` 打分 | 数值和编号用确定性比对；其余用 LLM 判官，**人工抽查 20%** 校准 |
-| 拒绝正确性 | `should_answer = false` 的题：`end_state` 属于 `no_permission` / `not_found` / `refused` 且回答不含受限事实 | 确定性 + 关键事实不出现 |
-| **权限回归** | 对每个受限文档，用**不被允许的每个角色**提问，检查本轮检索结果里**没有**该文档的任何分块 | 确定性，**零容忍：任何泄露都是失败** |
-| SQL | 结果与 `expected_answer` 规范化后一致；越权访问被拒绝 | 确定性 |
-| End 状态 | 每次运行都有合法的 `end_state` / `end_reason` | 确定性 |
-| 运行指标 | 延迟 p50 / p95、token、估算成本 | 来自 `ai.runs` |
+| Search | `recall@k` (are all `source_docs` in the top k results), MRR | Deterministic computation, no LLM needed |
+| Answer correctness | Scored against `expected_answer` | Numbers and codes compared deterministically; the rest by an LLM judge, **with a 20% human spot check** to calibrate |
+| Refusal correctness | For questions with `should_answer = false`: `end_state` is one of `no_permission` / `not_found` / `refused` and the answer contains no restricted fact | Deterministic + the key fact does not appear |
+| **Permission regression** | For every restricted document, ask as **every role not allowed** and check that this run's search results contain **no** chunk of the document | Deterministic, **zero tolerance: any leak is a failure** |
+| SQL | The result matches `expected_answer` after normalisation; overreaching access is refused | Deterministic |
+| End state | Every run has a valid `end_state` / `end_reason` | Deterministic |
+| Run metrics | Latency p50 / p95, tokens, estimated cost | From `ai.runs` |
 
-权限回归是**第一阶段必须全部通过**的门槛；准确率等指标先建立基线，再设目标，**不事先承诺数值**。
+Permission regression is the **gate that must fully pass in phase 1**; accuracy and the other metrics first build a baseline and then get a target, **with no numbers promised in advance**.
 
-### 4.4 实验矩阵（学习与展示用）
+### 4.4 Experiment matrix (for learning and showing)
 
-| 实验 | 对比 |
+| Experiment | Comparison |
 |---|---|
-| 检索模式 | `keyword` / `vector` / `hybrid` / `hybrid_rerank` |
-| 派生内容 | 无 / 摘要 / 假设性问题 / 全部 |
-| 分块大小 | 300 / 500 / 800 token |
-| Rerank 实现 | LLM 列表式 / 专用 API（若接入） |
-| 编号查询 | 是否启用 `identifiers` 加权 |
-| 关键词排序 | `ts_rank_cd` / BM25 扩展（若已验证可用） |
+| Search mode | `keyword` / `vector` / `hybrid` / `hybrid_rerank` |
+| Derived content | none / summary / hypothetical questions / all |
+| Chunk size | 300 / 500 / 800 tokens |
+| Rerank implementation | LLM listwise / dedicated API (if connected) |
+| Code queries | `identifiers` boost on or off |
+| Keyword ranking | `ts_rank_cd` / BM25 extension (if verified usable) |
 
-每次评测运行写入 `ai.eval_runs`（含 git 提交号和全部配置）和 `ai.eval_results`，可横向对比。结果同时汇总到 `docs/` 下的报告，并与之前 RAGFlow 试用的结论对照。
+Each evaluation run is written to `ai.eval_runs` (with the git commit and the whole configuration) and `ai.eval_results`, so runs can be compared side by side. The results are also summarised in a report under `docs/` and compared with the conclusions of the earlier RAGFlow trial.
 
-### 4.5 运行方式
+### 4.5 How to run
 
-- 命令行：`uv run starit-eval --mode hybrid_rerank --roles all`，输出 JSON 和 Markdown 报告。
-- 单次运行会产生真实 LLM 调用费用，命令行先打印**估算的调用数**，需要确认后才开始（可用参数跳过确认）。
-- 单元和场景测试（04 第 10 节）使用假的 LLM，不产生费用，常规开发每次都跑；真实 LLM 的评测手动触发。
+- Command line: `uv run starit-eval --mode hybrid_rerank --roles all`, which writes a JSON and a Markdown report.
+- One run costs real LLM calls, so the command line first prints the **estimated number of calls** and only starts after confirmation (a parameter can skip the confirmation).
+- Unit and scenario tests (section 10 of 04) use a fake LLM, cost nothing and run every time in normal development; evaluations with a real LLM are triggered by hand.
 
-### 4.6 样例数据里已埋的检索挑战与对应机制
+### 4.6 The search challenges already buried in the sample data and the mechanism for each
 
-| 挑战 | 对应机制 |
+| Challenge | Mechanism |
 |---|---|
-| 旧版本政策（`superseded`） | 旧版本参与检索并标注状态，生成规则第 3 条 |
-| 精确编号（如 `ERR-PORTAL-403`） | `identifiers` 字段加权 + 全文索引保留原文 |
-| 改写问法（paraphrase） | 向量检索 + 假设性问题（若评测证明有效） |
-| 多文档推理 | 上下文组装合并多个来源 + 生成规则第 5 条先判断区间 |
-| 角色访问 | 权限过滤 + 权限回归测试 |
-| 无答案问题 | `grade_retrieval` 阈值 + `not_found` |
+| Superseded policy versions (`superseded`) | Old versions take part in search labelled with status, generation rule 3 |
+| Exact codes (such as `ERR-PORTAL-403`) | The `identifiers` field boost + the full-text index keeps the original text |
+| Paraphrased questions | Vector search + hypothetical questions (if evaluation shows they work) |
+| Multi-document reasoning | Context assembly merges several sources + generation rule 5, decide the range first |
+| Role access | Permission filter + permission regression test |
+| Unanswerable questions | The `grade_retrieval` threshold + `not_found` |
 
-## 5. 需要你确认的点
+## 5. Points for you to confirm
 
-1. 1.4 的分块策略（按标题、300–500 token、表格和代码块不拆开、向量化文本带标题路径）是否接受？
-2. 1.5 派生内容为**可选**，由评测决定是否默认开启，是否接受？
-3. 2.1 的检索步骤和默认参数是否接受？Postgres 的 `ts_rank_cd` 不是 BM25，先用它，评测后再决定是否引入 BM25 扩展，是否接受？
-4. 2.2 Rerank 默认用 LLM 列表式重排（不引入新供应商），接口预留专用 API，是否接受？
-5. 4.1 评测集的类型分布偏少，运行器完成后补充题目（合成数据），是否接受？
-6. 4.3 指标体系，尤其"权限回归零容忍、其余指标先建基线再设目标"，是否接受？
-7. 4.5 真实 LLM 评测需要先看估算再确认，是否接受？
+1. The chunking strategy of 1.4 (by heading, 300 to 500 tokens, tables and code blocks not split, the embedded text carries the heading path): accepted?
+2. Derived content in 1.5 is **optional**, with evaluation deciding whether it is on by default: accepted?
+3. The search steps and default parameters of 2.1: accepted? Postgres's `ts_rank_cd` is not BM25; use it first and decide on a BM25 extension after evaluation: accepted?
+4. Rerank in 2.2 defaults to the LLM listwise rerank (no new vendor), with the interface leaving room for a dedicated API: accepted?
+5. The type distribution of the evaluation set in 4.1 is thin, and more questions (synthetic) are added after the runner is done: accepted?
+6. The metric system of 4.3, especially "permission regression zero tolerance, the other metrics build a baseline first and then set targets": accepted?
+7. Real LLM evaluation needs a look at the estimate and a confirmation first (4.5): accepted?
 
-## 6. 确认结果（2026-11-02）
+## 6. Confirmation results (2026-11-02)
 
-7 个确认点全部接受。关于第 3 点，选择**方案 A**：默认 `ts_rank_cd`，BM25 通过 `KeywordSearcher` 接口作为可选实现，由评测决定是否引入。
+All 7 points were accepted. On point 3, **plan A** was chosen: `ts_rank_cd` by default, BM25 as an optional implementation through the `KeywordSearcher` interface, with evaluation deciding whether to bring it in.
 
-## 7. M3 实现记录（2026-11-03）
+## 7. M3 implementation record (2026-11-03)
 
-- **解析**：md（markdown-it-py）、txt（规则）、docx（python-docx，按标题样式，没有样式时用"加粗且编号开头"兜底）、pdf（pdfplumber，用字号找标题，表格单独识别）。四种格式都去掉与 `manifest.csv` 重复的元数据块；表格统一输出成 Markdown 表格文本。
-- **样例 docx 重新生成**：原来的 docx 是 macOS `textutil` 转出来的，没有标题样式，表格也被压成了普通段落。`build_documents.py` 的 docx 部分改用 python-docx 生成，内容不变。
-- **解析的核对**：28 份样例，四种格式的标题、章节、小节、表格数量与 Markdown 原稿完全一致；原稿中的每一行文字都出现在解析结果里；原稿中的每个编号都完整保留。
-- **发现并修复的问题**：pdf 里 `FIN-TAX-008` 这类编号会在连字符处换行，被拼成 `FIN- TAX-008`，精确匹配会失效；解析器现在把行尾的连字符直接接上下一行。
-- **分块**：按标题结构切分；**样例文档很短**（按章节切分得到 189 块，中位数只有 50 token），所以实现了"目标大小"：章节边界只有在当前块达到 `chunk_target_tokens`（默认 400）后才断开，短章节会合并，28 份文档得到 39 块（中位数 358，最大 453，上限 500）。`chunk_target_tokens = 0` 即一节一块。两种设置作为 M4 评测矩阵中"分块大小"的实验项。
-- **派生内容**（摘要、问题、关键词）：阶段已预留，默认不生成，等评测证明有用再实现。
-- **编号字段**：`identifiers` 记录连字符编号和长字母数字编号，并加入文档自己的 `doc_code`，全文索引里可以精确命中。
-- **向量化**：litellm 库，模型、维度由 `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` 设置（与设计 06 一致，不带 `STARIT_` 前缀）；向量列为 1536 维，配置的维度不一致时任务直接失败；向量化的输入是"文档标题 + 章节路径 + 正文"。
-- **队列与重试**：`FOR UPDATE SKIP LOCKED`；失败后按 30 秒、2 分钟、10 分钟退避，最多 3 次；损坏的文件、维度不匹配、没有文本这类失败不重试；停滞的任务（worker 被杀）会被放回队列。写入阶段在一个事务里替换旧分块，失败时旧分块保持不变。
+- **Parsing**: md (markdown-it-py), txt (rules), docx (python-docx, by heading style, with "bold and starting with a number" as the fallback when there are no styles), pdf (pdfplumber, headings found by font size, tables recognised separately). All four formats drop the metadata block that duplicates `manifest.csv`; tables are output uniformly as Markdown table text.
+- **The sample docx files were regenerated**: the original docx files were converted by macOS `textutil`, with no heading styles and with tables flattened into ordinary paragraphs. The docx part of `build_documents.py` now uses python-docx, with the same content.
+- **Checking the parsing**: for the 28 samples, the number of headings, chapters, sections and tables in all four formats matches the Markdown source exactly; every line of text of the source appears in the parsing result; every code in the source is fully kept.
+- **A problem found and fixed**: in pdf, codes such as `FIN-TAX-008` break at the hyphen at a line end and were joined as `FIN- TAX-008`, which broke exact matching; the parser now joins a trailing hyphen directly to the next line.
+- **Chunking**: split by heading structure; **the sample documents are very short** (splitting by section gives 189 chunks with a median of only 50 tokens), so a "target size" was implemented: a section boundary only breaks once the current chunk has reached `chunk_target_tokens` (default 400), short sections are merged, and the 28 documents give 39 chunks (median 358, maximum 453, limit 500). `chunk_target_tokens = 0` means one chunk per section. The two settings are an experiment item of "chunk size" in the M4 evaluation matrix.
+- **Derived content** (summary, questions, keywords): the stage is reserved, not generated by default, and implemented once evaluation shows it helps.
+- **The identifiers field**: `identifiers` records hyphenated codes and long alphanumeric codes, and also adds the document's own `doc_code`, so exact hits are possible in the full-text index.
+- **Embedding**: the litellm library, with model and dimensions set by `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` (consistent with design 06, without the `STARIT_` prefix); the vector column is 1536-dimensional, and a job fails at once if the configured dimension differs; the embedding input is "document title + section path + body".
+- **Queue and retries**: `FOR UPDATE SKIP LOCKED`; after a failure it backs off 30 seconds, 2 minutes, 10 minutes, at most 3 attempts; failures such as a broken file, a dimension mismatch or no text are not retried; stalled jobs (a killed worker) are put back in the queue. The write stage replaces the old chunks in one transaction, and the old chunks stay as they were on failure.
 
-## 8. M4 实现记录（2026-11-03）
+## 8. M4 implementation record (2026-11-03)
 
-- **入口**：`starit_core.retrieval.retrieve(conn, identity, query, mode=...)`，必须带身份；四种模式 `keyword`、`vector`、`hybrid`、`hybrid_rerank`；参数都在配置里（设计 05 的 2.1 默认值）。
-- **关键词**：`plainto_tsquery` 的 AND 换成 OR（问句里有很多虚词，AND 几乎查不到），`ts_rank_cd` 排序；问题里含有编号时，列出该编号的块加分（`identifiers` 命中），**属于被点名文档本身的块再加一份**，这样"FIN-REIM-002 说了什么"会先返回该文档，而不是只在正文里提到它的另一份文档（测试时发现的问题）。
-- **向量**：余弦距离、精确扫描；只和同一个模型生成的向量比较。
-- **融合**：RRF，`k = 60`。RRF 只看名次，不看得分，所以**向量一路和关键词一路意见不一致时，唯一的精确命中可能被压下去**（基线里 `ERR-PORTAL-429` 就是例子）。目前由重排解决；如果以后不用重排，可以考虑在融合之后给精确编号命中优先权。
-- **重排**：`LLMReranker`，聊天模型 `openai/gpt-6-luna`（`STARIT_MODEL_RERANK`）；提示词要求返回 JSON 排名，容错解析（代码围栏、漏掉的编号补在后面、重复和越界编号忽略）；模型报错或输出无法解析时保持融合顺序并标记 `rerank_failed`。聊天客户端对 `gpt-6-luna` 设置 `temperature = 0` 和 `reasoning_effort = "none"`（这个模型在推理开启时只接受 `temperature = 1`），不支持这些参数的模型由 `drop_params` 忽略。
-- **上下文组装**：去重（按块和按文本）、取前 `final_k` 个、不超过 token 预算（至少保留第一个）。
-- **探测**：`probe_restricted` 是唯一不带权限过滤的查询，只返回数字（被过滤的强匹配数量和最高分），不返回任何文本，不进提示词；用于审计和 `no_permission` / `not_found` 的区分。
-- **评测运行器**：`eval/`（`starit-eval`）。每次真实运行先打印调用数、token 数和估算费用并询问；写 `ai.eval_runs` / `ai.eval_results`（每种模式一次运行）和 `docs/eval/` 下的报告；`--leak-sweep` 做全角色的权限回归；`--dry-run` 用假模型演练整个流程。
-- **基线结果和解读**见 [`docs/eval/README.md`](../eval/README.md)。
+- **Entry**: `starit_core.retrieval.retrieve(conn, identity, query, mode=...)`, which must carry an identity; four modes `keyword`, `vector`, `hybrid`, `hybrid_rerank`; the parameters are all in configuration (the defaults of 2.1 of design 05).
+- **Keyword**: the AND of `plainto_tsquery` is replaced with OR (a question has many function words and AND finds almost nothing), ranked by `ts_rank_cd`; when the question contains a code, chunks that list that code get a boost (an `identifiers` hit), and **chunks belonging to the named document itself get one more share**, so "what does FIN-REIM-002 say" returns that document first and not another document that only mentions it in its body (a problem found in testing).
+- **Vector**: cosine distance, exact scan; only compared with vectors from the same model.
+- **Fusion**: RRF, `k = 60`. RRF looks only at rank, not at score, so **when the vector side and the keyword side disagree, the one exact hit can be pushed down** (`ERR-PORTAL-429` in the baseline is an example). For now rerank fixes it; if rerank is not used later, giving exact code hits priority after fusion could be considered.
+- **Rerank**: `LLMReranker`, the chat model `openai/gpt-6-luna` (`STARIT_MODEL_RERANK`); the prompt asks for a JSON ranking, parsed tolerantly (code fences, missing numbers appended at the end, duplicate and out-of-range numbers ignored); if the model errors or the output cannot be parsed it keeps the fusion order and marks `rerank_failed`. The chat client sets `temperature = 0` and `reasoning_effort = "none"` for `gpt-6-luna` (this model only accepts `temperature = 1` when reasoning is on); models that do not support these parameters ignore them through `drop_params`.
+- **Context assembly**: deduplicate (by chunk and by text), take the top `final_k`, stay within the token budget (keeping at least the first).
+- **Probe**: `probe_restricted` is the only query without the permission filter and returns only numbers (the count and top score of filtered strong matches) and no text, and it does not enter the prompt; it serves audit and the `no_permission` / `not_found` distinction.
+- **Evaluation runner**: `eval/` (`starit-eval`). Every real run first prints the number of calls, tokens and the estimated cost and asks; it writes `ai.eval_runs` / `ai.eval_results` (one run per mode) and the reports under `docs/eval/`; `--leak-sweep` does the permission regression for all roles; `--dry-run` rehearses the whole flow with a fake model.
+- **Baseline results and their reading** are in [`docs/eval/README.md`](../eval/README.md).
 
-## 9. M8 实现记录（2026-11-04）
+## 9. M8 implementation record (2026-11-04)
 
-- **评测题**从 54 道增加到 114 道（合成，我读文档后写）：keyword 13、paraphrase 11、version 10、unanswerable 12、access 26（含 Admin 和 RAGETLAdmin 各一道）、single 35、multi 7；manager 10、hr 5、finance 6 道。每道可回答的题带 `facts`（答案必须包含的数字、编号或词），`sample-data/tools/check_qa_facts.py` 证明每个 fact 确实出现在来源文档里（测试和 CI 都跑）。每个受限文档（HR-REC-002、FIN-PAY-005、FIN-BUD-007、TS-IT-010）至少有一道被禁角色问它的题。**样本仍然很小**，补完也不对准确率下结论。
-- **答案评分**（`starit-eval answers`）：应拒绝的题——结束状态必须是 `no_permission`/`not_found`/`refused`，且引用里没有那份受限文档；应回答的题——结束状态必须是 `answered`，有 `facts` 的做确定性比对（逗号分隔的数字视为同一个，版本号的前缀 `v` 容许），没有 `facts` 的由模型判官对照参考答案判断；每次运行的（状态，原因）必须合法。**随机抽 20% 导出成 CSV（固定种子，可重现）供人工核对，核对之前判官的结论不当作事实。**
-- **`starit-eval all`** 把检索（4 种模式 + 权限扫描）、答案、数据题合成一份报告；**权限回归是门槛**：任何越权都使整次运行失败（退出码 2）。运行写入 `ai.eval_runs` / `ai.eval_results`。
-- **派生内容**（`ingest/derive.py`）：每个块一次模型调用，产出一句摘要和 3 个"这个块能回答的问题"；写入 `ai.chunk_derived`，并**加到被嵌入的文本后面**（不替换原文）。只加强向量一侧，关键词一侧不使用它。模型失败只丢这个块的派生内容，文档照常入库。默认关闭（`STARIT_INGEST_DERIVE=none`）。
-- **`identifiers` 加权开关**（`STARIT_RETRIEVAL_IDENTIFIER_BOOST`，默认开）。关闭时问题里的编号既不加分，也不再让块无条件成为候选。
-- **实验矩阵**（`starit-eval matrix`）：每个实验把样例文档重新入库到一个**临时数据库**（开发库不受影响），在 keyword / vector / hybrid 三种模式下检索；不含重排（重排在完整评测里测）。没有做：专用重排接口（没有接入）、BM25 扩展（没有安装也没有验证，决定：第一阶段不引入）。结果和读法见 `docs/eval/README.md`。
+- **Evaluation questions** grew from 54 to 114 (synthetic, written by me after reading the documents): keyword 13, paraphrase 11, version 10, unanswerable 12, access 26 (including one each for Admin and RAGETLAdmin), single 35, multi 7; manager 10, hr 5, finance 6. Every answerable question carries `facts` (the numbers, codes or words the answer must contain), and `sample-data/tools/check_qa_facts.py` proves that every fact really appears in the source document (tests and CI both run it). Every restricted document (HR-REC-002, FIN-PAY-005, FIN-BUD-007, TS-IT-010) has at least one question from a forbidden role. **The sample is still very small**, and even after the additions no conclusion about accuracy is drawn.
+- **Answer scoring** (`starit-eval answers`): for questions that should be refused, the end state must be `no_permission`/`not_found`/`refused` and the citations must not contain that restricted document; for questions that should be answered, the end state must be `answered`, those with `facts` are compared deterministically (comma-separated numbers count as the same, and a `v` prefix on a version number is tolerated), and those without `facts` are judged by the model judge against the reference answer; the (state, reason) of every run must be valid. **A random 20% is exported as a CSV (fixed seed, reproducible) for human checking, and until it is checked the judge's conclusion is not taken as fact.**
+- **`starit-eval all`** merges search (4 modes + the permission sweep), answers and data questions into one report; **permission regression is the gate**: any overreach fails the whole run (exit code 2). Runs are written to `ai.eval_runs` / `ai.eval_results`.
+- **Derived content** (`ingest/derive.py`): one model call per chunk, producing a one-sentence summary and 3 "questions this chunk can answer"; written to `ai.chunk_derived` and **appended to the embedded text** (not replacing the original). It strengthens only the vector side, and the keyword side does not use it. If the model fails only that chunk's derived content is lost and the document is ingested as usual. Off by default (`STARIT_INGEST_DERIVE=none`).
+- **The `identifiers` boost switch** (`STARIT_RETRIEVAL_IDENTIFIER_BOOST`, on by default). When off, a code in the question neither adds score nor makes a chunk a candidate unconditionally.
+- **Experiment matrix** (`starit-eval matrix`): each experiment re-ingests the sample documents into a **temporary database** (the development database is unaffected) and searches in the keyword / vector / hybrid modes; rerank is not included (it is tested in the full evaluation). Not done: the dedicated rerank interface (not connected), the BM25 extension (not installed and not verified; decision: not brought in in phase 1). The results and how to read them are in `docs/eval/README.md`.

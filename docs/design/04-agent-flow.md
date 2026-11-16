@@ -1,45 +1,47 @@
-# 设计文档 04：Agent 流程（LangGraph）、End 状态与原因码
+# Design document 04: agent flow (LangGraph), End states and reason codes
 
-状态：**已获用户批准（2026-11-02），第 11 节 8 个确认点全部接受。** 其余设计文档批准前不写应用代码。
-依赖：01、02、03。标记约定：**【已定】**、**【建议】**、**【待定】**。
+[中文](04-agent-flow.chn.md)
 
-## 1. 设计原则
+Status: **Approved by the user (2026-11-02); all 8 confirmation points of section 11 were accepted.** No application code is written before the other design documents are approved.
+Depends on: 01, 02, 03. Marking convention: **[Decided]**, **[Proposed]**, **[Open]**.
 
-1. **外层是固定的图**：检索、权限过滤、校验、收尾都是固定节点，LLM 只在几个明确的节点里做判断或生成（RAGFlow 试用的结论）。
-2. **身份只来自 JWT**，进入图状态后只读。LLM 不判断、不询问用户的身份或角色；反问只针对"问题本身"缺少的信息。
-3. **每条路径都以显式 End 节点结束**，并带原因码【已定】。
-4. **会话状态是图状态里的显式字段**（`session_mode`），不依赖 `sys.query` 之类的隐式变量【已定】。
-5. 所有循环都有上限，超限就以 `error` 结束，不会无限运行。
+## 1. Design principles
 
-## 2. 图状态
+1. **The outer layer is a fixed graph**: search, permission filtering, verification and wrap-up are fixed nodes, and the LLM judges or generates in only a few named nodes (the conclusion of the RAGFlow trial).
+2. **Identity comes only from the JWT** and is read-only once in the graph state. The LLM neither judges nor asks for the user's identity or role; a clarifying question is only about information the question itself lacks.
+3. **Every path ends at an explicit End node** with a reason code [Decided].
+4. **The conversation state is an explicit field of the graph state** (`session_mode`) and does not rely on implicit variables such as `sys.query` [Decided].
+5. Every loop has a limit, and exceeding it ends with `error`, so nothing runs forever.
 
-| 字段 | 说明 |
+## 2. Graph state
+
+| Field | Description |
 |---|---|
-| `identity` | 来自 JWT：`user_id`、`roles`、`campus_id`、`level`；**只读** |
-| `conversation_id`、`run_id` | |
-| `messages` | 最近若干轮（**【建议】** 6 轮），更早的内容用滚动摘要 |
+| `identity` | From the JWT: `user_id`, `roles`, `campus_id`, `level`; **read-only** |
+| `conversation_id`, `run_id` | |
+| `messages` | The last few turns (**[Proposed]** 6 turns), with a rolling summary for older content |
 | `session_mode` | `answering` / `need_clarification` |
-| `pending_question` | 处于澄清中时，保存用户的原始问题 |
-| `clarify_count` | 连续澄清次数 |
+| `pending_question` | While clarifying, keeps the user's original question |
+| `clarify_count` | Consecutive clarifications |
 | `intent` | `doc_qa` / `data_query` / `action` / `chitchat` / `out_of_scope` |
-| `standalone_query` | 结合历史改写后的独立问题 |
-| `retrieved` | 检索结果（分块、状态、版本、分数） |
-| `data_result` | MCP 或 SQL 的结果 |
-| `budget` | 已用 LLM 调用数、检索重试数、SQL 重试数、开始时间 |
-| `answer`、`citations` | |
-| `end_state`、`end_reason` | |
+| `standalone_query` | The standalone question after rewriting with the history |
+| `retrieved` | Search results (chunks, status, version, score) |
+| `data_result` | The result of MCP or SQL |
+| `budget` | LLM calls used, search retries, SQL retries, start time |
+| `answer`, `citations` | |
+| `end_state`, `end_reason` | |
 
-会话级的状态（`session_mode`、`pending_question`、`clarify_count`）保存在 `ai.conversations` 的三列里（迁移 0005），不使用 LangGraph 的 Postgres checkpointer【M5 修订，2026-11-03】：第一阶段每次运行都是一次完整、没有中断的运行（"需要澄清"也是以 End 结束，下一轮再带着补充进来），checkpointer 用不上，却要多一套表、一次初始化和版本耦合。第二阶段做"写操作确认"（`interrupt`）时再启用它。
+The conversation-level state (`session_mode`, `pending_question`, `clarify_count`) is kept in three columns of `ai.conversations` (migration 0005) and the LangGraph Postgres checkpointer is not used [M5 revision, 2026-11-03]: in phase 1 every run is one complete, uninterrupted run ("needs clarification" also ends with an End, and the next turn comes in with the addition), so a checkpointer would not be used yet would add a set of tables, an initialisation and a version coupling. It is enabled in phase 2 when "write action confirmation" (`interrupt`) is built.
 
-## 3. 图
+## 3. The graph
 
 ```mermaid
 flowchart TD
-  S([开始]) --> LC[load_context]
+  S([start]) --> LC[load_context]
   LC --> GI[guard_input]
-  GI -- 拒绝 --> E_REF
+  GI -- refuse --> E_REF
   GI --> UN[understand]
-  UN -- 需要澄清且未超限 --> E_CLR
+  UN -- needs clarification, not over the limit --> E_CLR
   UN -- out_of_scope --> E_REF
   UN -- chitchat --> GEN
   UN -- action --> E_REF
@@ -47,24 +49,24 @@ flowchart TD
   UN -- data_query --> PD[plan_data_access]
 
   RD --> GR[grade_retrieval]
-  GR -- 不足且可重试 --> RW[rewrite_query] --> RD
-  GR -- 命中被权限过滤的内容 --> E_PERM
-  GR -- 无相关内容 --> E_NF
-  GR -- 足够 --> GEN
+  GR -- not enough, can retry --> RW[rewrite_query] --> RD
+  GR -- hit content filtered by permission --> E_PERM
+  GR -- nothing relevant --> E_NF
+  GR -- enough --> GEN
 
-  PD -- 参数化工具 --> MCP[call_mcp_tools]
-  PD -- 自由问法 --> SQL[sql_agent]
-  MCP --> DR{结果}
+  PD -- parameterised tool --> MCP[call_mcp_tools]
+  PD -- free-form question --> SQL[sql_agent]
+  MCP --> DR{result}
   SQL --> DR
-  DR -- 无权限 --> E_PERM
-  DR -- 无数据 --> E_NF
-  DR -- 失败 --> E_ERR
-  DR -- 有数据 --> GEN
+  DR -- no permission --> E_PERM
+  DR -- no data --> E_NF
+  DR -- failed --> E_ERR
+  DR -- has data --> GEN
 
   GEN[generate] --> VA[verify_answer]
-  VA -- 通过 --> E_ANS
-  VA -- 不通过且可重试 --> GEN
-  VA -- 不通过 --> E_ERR
+  VA -- passed --> E_ANS
+  VA -- failed, can retry --> GEN
+  VA -- failed --> E_ERR
 
   E_ANS([END_ANSWERED])
   E_CLR([END_NEED_CLARIFICATION])
@@ -74,135 +76,135 @@ flowchart TD
   E_ERR([END_ERROR])
 ```
 
-任何节点抛出异常或超时，统一进入 `END_ERROR`。
+An exception or timeout in any node goes to `END_ERROR`.
 
-## 4. 节点说明
+## 4. The nodes
 
-| 节点 | 类型 | 作用 |
+| Node | Type | What it does |
 |---|---|---|
-| `load_context` | 代码 | 读取历史、会话状态；若 `session_mode = need_clarification`，把本轮输入作为对 `pending_question` 的补充 |
-| `guard_input` | 代码 | 长度上限、明显的提示词注入特征、空输入；命中则 `refused / input_blocked` |
-| `understand` | LLM（结构化输出） | 输出 `intent`、`standalone_query`、`needs_clarification` 及反问内容、抽取的编号。**不输出身份或权限** |
-| `retrieve_docs` | 代码 | 调用 `core` 检索：权限过滤 → 全文 + 向量 → RRF → Rerank；同时返回被过滤的数量和探测结果（见 5.1） |
-| `grade_retrieval` | 代码 + 阈值 | 判断命中是否足够回答；不足时允许**一次**改写重试 |
-| `rewrite_query` | LLM | 换一种说法或补充关键词，重新检索 |
-| `plan_data_access` | LLM（结构化输出） | 优先选择 MCP 参数化工具；没有合适工具时才走 SQL Agent |
-| `call_mcp_tools` | 代码 | 调用 03 里定义的工具，转发用户 JWT，最多 3 次调用 |
-| `sql_agent` | 子图 | 生成 SQL → 语法与白名单校验 → 用 `ai_sql_ro` 执行 → 失败最多重试 2 次 |
-| `generate` | LLM | 只基于提供的上下文生成带编号引用的回答，规则见 6 |
-| `verify_answer` | 代码（第一阶段） | 引用编号都存在且对应本轮检索结果；回答非空；超长截断。LLM 事实核查作为选项，见 8 的确认点 |
+| `load_context` | code | Reads the history and the conversation state; if `session_mode = need_clarification`, treats this turn's input as an addition to `pending_question` |
+| `guard_input` | code | Length limit, obvious prompt-injection signs, empty input; on a hit, `refused / input_blocked` |
+| `understand` | LLM (structured output) | Outputs `intent`, `standalone_query`, `needs_clarification` with the clarifying question, and extracted codes. **Outputs no identity or permission** |
+| `retrieve_docs` | code | Calls the `core` search: permission filter → full text + vector → RRF → rerank; also returns the number filtered out and the probe result (see 5.1) |
+| `grade_retrieval` | code + threshold | Judges whether the hits are enough to answer; if not, allows **one** rewrite retry |
+| `rewrite_query` | LLM | Rephrases or adds keywords and searches again |
+| `plan_data_access` | LLM (structured output) | Prefers an MCP parameterised tool; only goes to the SQL agent when no tool fits |
+| `call_mcp_tools` | code | Calls the tools defined in 03, forwarding the user's JWT, at most 3 calls |
+| `sql_agent` | subgraph | Generate SQL → syntax and allow-list check → run as `ai_sql_ro` → at most 2 retries on failure |
+| `generate` | LLM | Generates an answer with numbered citations from the supplied context only; rules in section 6 |
+| `verify_answer` | code (phase 1) | Every citation number exists and matches this run's search results; the answer is not empty; over-long answers are cut. An LLM fact check is an option, see the confirmation points of section 11 |
 
-## 5. End 状态与原因码【已定，取值待确认】
+## 5. End states and reason codes [Decided, values to be confirmed]
 
-| `end_state` | `end_reason` | 触发条件 | 用户看到 |
+| `end_state` | `end_reason` | Triggered when | The user sees |
 |---|---|---|---|
-| `answered` | 空 | 正常生成并通过校验 | 带引用的回答 |
-| `need_clarification` | `ambiguous_question` | 问题含糊，无法检索 | 针对问题的反问 |
-| | `missing_parameter` | 缺少必要参数（如学员编号、校区） | 说明缺什么 |
-| `no_permission` | `restricted_document` | 过滤后无结果，但探测发现存在被过滤的高相关内容 | 固定的拒绝文案 |
-| | `restricted_data` | MCP 或 SQL 返回无权限 | 同上 |
-| `not_found` | `no_relevant_documents` | 过滤后无足够相关内容，探测也没发现 | 固定的"没有找到"文案 |
-| | `no_matching_rows` | 数据查询无结果 | 同上 |
-| | `clarification_limit` | 连续澄清 2 次仍无法定位 | 请用户换一种问法或联系支持 |
-| `refused` | `out_of_scope` | 与企业知识和数据无关 | 说明助手能做什么 |
-| | `input_blocked` | 输入被防护规则拦截 | 通用拒绝 |
-| | `write_not_enabled` | 请求写操作（第二阶段才开放，且需确认） | 说明暂不支持 |
-| `error` | `timeout` | 超过 60 秒 | 通用错误和 `request_id` |
-| | `llm_error`、`retrieval_error`、`sql_failed`、`tool_error` | 对应组件失败 | 同上 |
-| | `step_limit` | 超过步数或调用预算 | 同上 |
-| | `internal` | 未分类异常 | 同上 |
+| `answered` | empty | Generated normally and passed verification | An answer with citations |
+| `need_clarification` | `ambiguous_question` | The question is vague and cannot be searched | A clarifying question about the question |
+| | `missing_parameter` | A required parameter is missing (such as student id or campus) | What is missing |
+| `no_permission` | `restricted_document` | No result after filtering, but the probe finds highly relevant filtered content | The fixed refusal text |
+| | `restricted_data` | MCP or SQL returned no permission | Same |
+| `not_found` | `no_relevant_documents` | Not enough relevant content after filtering, and the probe found none either | The fixed "not found" text |
+| | `no_matching_rows` | The data query returned nothing | Same |
+| | `clarification_limit` | Two consecutive clarifications still cannot locate it | Asks the user to rephrase or contact support |
+| `refused` | `out_of_scope` | Unrelated to enterprise knowledge and data | Says what the assistant can do |
+| | `input_blocked` | The input was caught by a guard rule | A generic refusal |
+| | `write_not_enabled` | A write action was requested (opened only in phase 2, and with confirmation) | Says it is not supported yet |
+| `error` | `timeout` | More than 60 seconds | A generic error and the `request_id` |
+| | `llm_error`, `retrieval_error`, `sql_failed`, `tool_error` | The matching component failed | Same |
+| | `step_limit` | Over the step or call budget | Same |
+| | `internal` | An unclassified exception | Same |
 
-### 5.1 `no_permission` 与 `not_found` 的区分
+### 5.1 Telling `no_permission` and `not_found` apart
 
-- 区分只用于**审计和统计**。`retrieve_docs` 在权限过滤后无结果时，再做一次"不带权限过滤、只返回数量和最高分"的探测；**探测结果不进入提示词，也不返回前端**。
-- 面向用户的文案：**两种情况使用相同措辞**，例如"根据你当前账号可访问的资料，我没有找到相关信息。"这样不会通过回答差异泄露"受限文档存在"。评测集里"必须拒绝"的题目用这条文案通过。【待确认】
+- The distinction is **for audit and statistics only**. When `retrieve_docs` has no result after the permission filter, it makes one more probe "without the permission filter, returning only the count and the highest score"; **the probe result does not go into the prompt and is not returned to the front end**.
+- The user-facing text: **both cases use the same wording**, for example "Based on the documents available to your account, I could not find relevant information." This way a difference in the answer cannot leak that "a restricted document exists". The "must refuse" questions of the evaluation set pass with this text. [To be confirmed]
 
-### 5.2 保证"每条路径都有 End"
+### 5.2 Guaranteeing that "every path has an End"
 
-- 所有 End 节点都调用同一个 `finish_run(end_state, end_reason)`：写 `ai.runs`、`ai.messages`、`ai.audit_log`，并在 trace 上打标签。
-- 图构建完成后，用自动化测试遍历所有边，**断言每个节点都能到达某个 End 节点**，没有"断头路"。
-- 流程图（上面的 mermaid）由图定义自动导出，文档里的图和代码保持一致，不手工维护。
+- Every End node calls the same `finish_run(end_state, end_reason)`: it writes `ai.runs`, `ai.messages` and `ai.audit_log` and tags the trace.
+- Once the graph is built, an automated test walks every edge and **asserts that every node can reach some End node**, so there are no dead ends.
+- The flow chart (the mermaid above) is exported from the graph definition automatically, so the chart in the document and the code stay consistent and are not maintained by hand.
 
-## 6. 生成规则（提示词的要求）
+## 6. Generation rules (what the prompt requires)
 
-写入 `core/prompts/generate.md`，提示词版本号记录在 trace 里：
+Written to `core/prompts/generate.md`; the prompt version is recorded in the trace:
 
-1. 只使用提供的上下文；上下文没有答案就如实说没有找到，不编造。
-2. 每个事实后标注引用编号 `[n]`。
-3. 有多个版本时：优先使用 `active`，说明旧版本已被取代；被问到旧政策时，同时给出旧版本内容和当前适用版本。
-4. 引用精确数值、编号、名称，不改写。
-5. **涉及区间、阶梯、条件的计算，先说明输入落在哪个区间，再应用对应规则**（针对 RAGFlow 试用中迟交扣分算错的问题）。
-6. 回答语言与问题一致。
-7. 不透露上下文以外的信息，也不描述"有哪些内容你无权查看"。
+1. Use only the supplied context; if the context has no answer, say honestly that nothing was found and do not make anything up.
+2. Mark every fact with a citation number `[n]`.
+3. With several versions: prefer `active` and say the old version has been superseded; when asked about the old policy, give both the old version's content and the version that applies now.
+4. Quote exact values, codes and names without rewording.
+5. **For calculations involving ranges, tiers or conditions, first say which range the input falls in, then apply the matching rule** (aimed at the late-penalty miscalculation seen in the RAGFlow trial).
+6. The answer language follows the question.
+7. Reveal nothing outside the context, and do not describe "what content you may not see".
 
-## 7. 限额与超时【建议】
+## 7. Limits and timeouts [Proposed]
 
-| 项 | 上限 |
+| Item | Limit |
 |---|---|
-| 一次运行总时长 | 60 秒（与 03 一致） |
-| 图步数（`recursion_limit`） | 20 |
-| 一次运行的 LLM 调用数 | 6 |
-| 检索改写重试 | 1 |
-| SQL 重试 | 2 |
-| MCP 工具调用 | 3 |
-| 连续澄清 | 2 |
-| `generate` 校验失败重试 | 1 |
+| Total time of one run | 60 seconds (consistent with 03) |
+| Graph steps (`recursion_limit`) | 20 |
+| LLM calls in one run | 6 |
+| Search rewrite retries | 1 |
+| SQL retries | 2 |
+| MCP tool calls | 3 |
+| Consecutive clarifications | 2 |
+| `generate` retries after a failed verification | 1 |
 
-## 8. 模型与可观测性
+## 8. Models and observability
 
-- **每个 LLM 节点单独配置模型**（环境变量），代码里不写死模型名。建议：`understand`、`rewrite_query`、`plan_data_access` 用较小较便宜的模型，`generate` 用更强的模型。具体模型在实施计划里选定【待定】。
-- 每个节点是一个 span；trace 标签包括 `end_state`、`end_reason`、提示词版本、`filtered_count`、检索方式。
-- 评测运行时，评测结果写入 Langfuse 的 score（full profile）。
+- **Each LLM node has its own model setting** (an environment variable), and no model name is hard-coded. Suggested: `understand`, `rewrite_query` and `plan_data_access` use a smaller, cheaper model, and `generate` a stronger one. The specific models are chosen in the implementation plan [Open].
+- Each node is a span; trace tags include `end_state`, `end_reason`, prompt version, `filtered_count` and search mode.
+- During an evaluation run the results are written to Langfuse scores (full profile).
 
-## 9. 第二阶段预留
+## 9. Reserved for phase 2
 
-| 功能 | 在图中的位置 |
+| Feature | Place in the graph |
 |---|---|
-| 流式输出 | `generate` 节点流式产出，事件格式见 03 |
-| 写操作确认 | `action` 意图 → `confirm_action`（LangGraph `interrupt`，等待用户确认）→ 执行；第一阶段该意图直接 `refused / write_not_enabled` |
-| Memory | `load_memory`（`load_context` 之后）与 `save_memory`（End 之前）；只存稳定的用户偏好和事实，不存受限文档内容 |
-| 成本统计 | 从 `ai.runs` 汇总 |
+| Streaming output | The `generate` node streams; the event format is in 03 |
+| Write action confirmation | The `action` intent → `confirm_action` (LangGraph `interrupt`, waiting for the user's confirmation) → execute; in phase 1 that intent goes straight to `refused / write_not_enabled` |
+| Memory | `load_memory` (after `load_context`) and `save_memory` (before End); stores only stable user preferences and facts, never restricted document content |
+| Cost statistics | Summed from `ai.runs` |
 
-## 10. 测试方式
+## 10. How it is tested
 
-1. **图结构测试**：每个节点可达 End；没有未处理的分支。
-2. **场景测试**（用假的 LLM 和检索桩）：每个 End 状态各至少一个用例，包括澄清两次后的 `clarification_limit`、重试上限、超时。
-3. **评测集**：54 条文档问答 + 16 条 SQL 问答，每个角色和校区账号各跑一遍，统计准确率和权限回归；`access` 类题目必须全部通过。
+1. **Graph structure tests**: every node can reach an End; no unhandled branch.
+2. **Scenario tests** (with a fake LLM and search stubs): at least one case for every End state, including `clarification_limit` after two clarifications, the retry limits and the timeout.
+3. **Evaluation set**: 54 document questions + 16 SQL questions, each run once for every role and campus account, counting accuracy and permission regression; the `access` questions must all pass.
 
-## 11. 需要你确认的点
+## 11. Points for you to confirm
 
-1. 新增 End 状态 `refused`（越界、输入被拦截、第一阶段的写操作请求），是否接受？
-2. 5.1：`no_permission` 与 `not_found` **内部区分、对用户使用相同文案**，是否接受？
-3. `understand` 不判断身份，澄清只针对问题本身，是否接受？
-4. `data_query` 优先用 MCP 参数化工具，没有合适工具才走 SQL Agent，是否接受？
-5. 第一阶段 `verify_answer` 只做确定性检查（引用编号对应、非空），LLM 事实核查放到后面评测后再决定，是否接受？
-6. 第 7 节的各项上限（尤其连续澄清 2 次、检索改写重试 1 次），是否接受？
-7. 第 6 节生成规则（尤其第 3、5 条）是否有要增删的？
-8. 每个 LLM 节点单独配置模型、具体模型到实施计划再选，是否接受？
+1. A new End state `refused` (out of scope, input blocked, a write request in phase 1): accepted?
+2. 5.1: `no_permission` and `not_found` are **told apart internally and use the same text for the user**: accepted?
+3. `understand` does not judge identity, and clarification is only about the question itself: accepted?
+4. `data_query` prefers the MCP parameterised tools and only goes to the SQL agent when no tool fits: accepted?
+5. In phase 1 `verify_answer` only does deterministic checks (citation numbers match, not empty), and the LLM fact check is decided after the evaluation: accepted?
+6. The limits of section 7 (especially 2 consecutive clarifications, 1 search rewrite retry): accepted?
+7. Anything to add or remove in the generation rules of section 6 (especially items 3 and 5)?
+8. Each LLM node has its own model setting, with the specific models chosen in the implementation plan: accepted?
 
-## 12. 确认结果（2026-11-02）
+## 12. Confirmation results (2026-11-02)
 
-8 个确认点全部接受：新增 `refused` 状态；`no_permission` 与 `not_found` 内部区分、对用户同文案；`understand` 不判断身份；数据查询优先 MCP 参数化工具；第一阶段 `verify_answer` 只做确定性检查；各项上限；生成规则；每个 LLM 节点单独配置模型。
+All 8 points were accepted: the new `refused` state; `no_permission` and `not_found` told apart internally with the same text for the user; `understand` not judging identity; data queries preferring MCP parameterised tools; `verify_answer` doing deterministic checks only in phase 1; the limits; the generation rules; a separate model setting for each LLM node.
 
-## 13. M5 修订记录（2026-11-03）
+## 13. M5 revision record (2026-11-03)
 
-- 会话状态存在 `ai.conversations`，不用 checkpointer（见第 2 节）。
-- `finish_run` 由运行时包装层调用，而不是由每个 End 节点调用：End 节点只设置最终状态，这样异常和超时也一定会被记录。"每个节点都能到达某个 End 节点"的图结构测试不变。
-- 数据查询（`data_query`）在 M6 之前以 `refused / not_available_yet` 结束（临时原因码，已在 M6 移除，见第 14 节）。
-- 历史只截断最近 6 轮，暂不做滚动摘要。
-- `chitchat`（问候）用固定回复，不调用模型。
-- `grade_retrieval` 分两道关：重排分数阈值（可配置）和生成节点的 `sufficient` 标志。
-- **重排的截断**：重排提示词里每个片段的上限（`rerank_passage_tokens`）必须不小于块的上限（500）。截得更短会让模型看不到块尾的内容，给出很低的分数，第一道关就会拒绝作答（`ERR-PORTAL-429` 的实例见 `docs/eval/README.md`）。默认 600。
-- **`restricted` 的判定**：隐藏内容的探测得分 ≥ 0.5 才算"存在受限内容"（样例里受限问题得分 0.57–0.74，无答案问题 0.09–0.41，间隔很窄）。
-- **理解步骤的提示词**列出了技术支持的主题，避免把"工具出问题"当作越界（提示词版本 2）。
+- The conversation state is stored in `ai.conversations` and no checkpointer is used (see section 2).
+- `finish_run` is called by the runtime wrapper rather than by each End node: End nodes only set the final state, so exceptions and timeouts are always recorded. The graph structure test "every node can reach some End node" is unchanged.
+- Data queries (`data_query`) end with `refused / not_available_yet` before M6 (a temporary reason code, removed in M6, see section 14).
+- The history is only cut to the last 6 turns, with no rolling summary yet.
+- `chitchat` (greetings) uses a fixed reply and does not call the model.
+- `grade_retrieval` has two gates: a rerank score threshold (configurable) and the `sufficient` flag of the generate node.
+- **Rerank truncation**: in the rerank prompt the limit per passage (`rerank_passage_tokens`) must be no smaller than the chunk limit (500). Cutting shorter stops the model from seeing the end of the chunk, it gives a very low score, and the first gate then refuses to answer (the `ERR-PORTAL-429` case is in `docs/eval/README.md`). The default is 600.
+- **The `restricted` decision**: the hidden-content probe must score ≥ 0.5 to count as "restricted content exists" (in the sample, restricted questions score 0.57 to 0.74 and unanswerable ones 0.09 to 0.41, a narrow gap).
+- **The prompt of the understand step** lists the topics of tech support, so that "a tool is not working" is not treated as out of scope (prompt version 2).
 
-## 14. M6 修订记录（2026-11-03）：数据查询路径
+## 14. M6 revision record (2026-11-03): the data query path
 
-`understand` 判为 `data_query` 后进入新节点：
+After `understand` decides `data_query`, the new nodes are:
 
-1. `plan_data_access`：一次模型调用（`model_plan`），选择"工具"或"SQL"。可选的 5 个工具：`list_assignments`、`list_students`、`get_student_progress`、`get_expense_claim_status`、`list_my_expense_claims`。输出不可用就走 SQL。
-2. `call_data_tool`：调用工具（生产经 HTTP 转发用户自己的令牌，进程内实现用于测试和评测）。`forbidden` → `no_permission / restricted_data`；`not_found` → `not_found / no_matching_rows`；`invalid_argument` → 退到 SQL；其他 → `error / tool_error`。
-3. `run_sql`：先检索 3 个政策片段（混合模式，不重排，权限过滤照常）和结构描述一起交给 `model_sql` 写一条 SELECT；`sqlglot` 校验（单条语句、只读视图白名单、函数白名单；执行的是解析器重新生成的语句）；**执行前**两道检查：角色对这张视图有没有访问权，非全公司范围的角色写的校区是不是自己的 → 不通过则 `no_permission / restricted_data`；通过后以 `ai_sql_ro` 身份执行。语句被拒或数据库报错时带原因重试，最多 2 次，仍失败 → `error / sql_failed`。无结果 → `not_found / no_matching_rows`。
-4. `answer_from_data`：一次模型调用，只依据返回的行（最多 `data_rows_to_model` 行）回答，引用为 `kind: "data"`，答案里必须有 `[1]`（缺则补上）。
+1. `plan_data_access`: one model call (`model_plan`) that chooses "tool" or "SQL". The 5 selectable tools: `list_assignments`, `list_students`, `get_student_progress`, `get_expense_claim_status`, `list_my_expense_claims`. If the output is unusable it goes to SQL.
+2. `call_data_tool`: calls the tool (in production over HTTP, forwarding the user's own token; an in-process implementation is used for tests and evaluation). `forbidden` → `no_permission / restricted_data`; `not_found` → `not_found / no_matching_rows`; `invalid_argument` → fall back to SQL; anything else → `error / tool_error`.
+3. `run_sql`: first retrieves 3 policy passages (hybrid mode, no rerank, permission filter as usual), and hands them with the schema description to `model_sql` to write one SELECT; `sqlglot` validates it (a single statement, an allow-list of read-only views, an allow-list of functions; what is run is the statement the parser regenerates); two checks **before execution**: whether the role may access the view at all, and whether the campus written by a role without company-wide scope is its own → if either fails, `no_permission / restricted_data`; otherwise it runs as `ai_sql_ro`. If the statement is rejected or the database reports an error it retries with the reason, at most 2 times, and if it still fails → `error / sql_failed`. No result → `not_found / no_matching_rows`.
+4. `answer_from_data`: one model call that answers only from the returned rows (at most `data_rows_to_model` rows), with citations of `kind: "data"`; the answer must contain `[1]` (added if missing).
 
-用户看到的文案：`restricted_data` 和 `no_matching_rows` 用同一句话（"在您账号可见的数据里没有找到匹配的记录"），不透露数据存在与否。提示词版本：`plan_data` 1、`sql` 1、`answer_data` 1。一次运行的模型调用上限 8。
+The text the user sees: `restricted_data` and `no_matching_rows` use the same sentence ("no matching records were found in the data visible to your account"), so it does not reveal whether the data exists. Prompt versions: `plan_data` 1, `sql` 1, `answer_data` 1. The model call limit of one run is 8.

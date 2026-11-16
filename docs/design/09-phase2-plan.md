@@ -1,56 +1,58 @@
-# 设计文档 09：第二阶段（P1）规划
+# Design document 09: phase 2 (P1) plan
 
-状态：**草案，2026-11-04**，依据用户对 [架构图对照验收表](../eval/架构图对照验收表.html) 的决定。第一阶段（`v0.1.0`）的结果见 [acceptance-v0.1.0.md](../eval/acceptance-v0.1.0.md)。具体的里程碑清单写在 [08](08-milestone-checklists.md)（M9 起），这份文档只放"决定了什么、排在哪、不做什么"。
+[中文](09-phase2-plan.chn.md)
 
-## 1. 用户的决定（2026-11-04）
+Status: **Draft, 2026-11-04**, based on the user's decisions on the [architecture diagram review table](../eval/architecture-review.html). The results of phase 1 (`v0.1.0`) are in [acceptance-v0.1.0.md](../eval/acceptance-v0.1.0.md). The concrete milestone checklists are written in [08](08-milestone-checklists.md) (from M9); this document only holds "what was decided, where it is scheduled, what is not done".
 
-| 项 | 决定 |
+## 1. The user's decisions (2026-11-04)
+
+| Item | Decision |
 |---|---|
-| M8 的尾巴：20% 人工抽查、`understand` 过度反问、"没答案仍标已回答"、Anthropic 与 fallback 验证 | **做**（M9） |
-| 流式输出 | **做**（M9）。采用"先流出，校验不通过时撤回" |
-| 成本与延迟统计 | **不做自己的**：Langfuse 已经按模型和会话算出成本（full profile）。lite profile 没有 Langfuse，做 lite 时重新决定 |
-| Memory | 先不做，等企业后台有了再做 |
-| 写操作确认 | 先不做，等企业后台有了再做 |
-| 限流 3 维 | **做**（M9）：IP / 用户 / token 三个维度；token 维度定为全栈每日不超过 0.5 美元 |
-| LiteLLM 多模型 fallback | **做**（M9）：`openai/gpt-6-luna` → `openai/gpt-4o-mini` → `anthropic/claude-haiku-5-5`；只验证 Haiku 可用，不用它跑完整评测 |
-| 图上有、需求清单里没有也没规划的几项 | **列入第二阶段**（本文第 3 节），**暂不排期** |
+| The tail of M8: the 20% human spot check, `understand` asking too many clarifying questions, "no answer but still marked answered", Anthropic and fallback verification | **Do** (M9) |
+| Streaming output | **Do** (M9). Uses "stream first, withdraw if verification fails" |
+| Cost and latency statistics | **No version of our own**: Langfuse already computes cost per model and conversation (full profile). The lite profile has no Langfuse, so decide again when lite is built |
+| Memory | Not for now; wait until the enterprise back office exists |
+| Write action confirmation | Not for now; wait until the enterprise back office exists |
+| Rate limiting in 3 dimensions | **Do** (M9): IP / user / token; the token dimension is set at no more than US$0.50 per day for the whole stack |
+| LiteLLM multi-model fallback | **Do** (M9): `openai/gpt-6-luna` → `openai/gpt-4o-mini` → `anthropic/claude-haiku-5-5`; only verify that Haiku works, and do not run the full evaluation on it |
+| A few items that are on the diagram but are neither in the requirements list nor planned | **Listed under phase 2** (section 3 of this document), **not scheduled yet** |
 
-## 2. 已排期
+## 2. Scheduled
 
-| 里程碑 | 内容 |
+| Milestone | Content |
 |---|---|
-| M9 | 上面标"做"的各项：M8 收尾、流式输出、三维限流、模型 fallback |
+| M9 | The items marked "Do" above: the M8 tail, streaming output, three-dimension rate limiting, model fallback |
 
-## 3. 列入第二阶段、未排期的候选（来自架构图）
+## 3. Candidates listed under phase 2 but not scheduled (from the architecture diagram)
 
-用户点名的三项：
+The three items the user named:
 
-| 项 | 图上的位置 | 现状 |
+| Item | Place on the diagram | Current state |
 |---|---|---|
-| 输出端护栏：PII 脱敏、敏感词 | ④ Guardrail 后置检查；③ FastAPI 的 PII 脱敏 | 没有。输出没有再过一道过滤 |
-| Jailbreak 检测 | ④ Guardrail 前置检查 | 只有几条正则的 Prompt Injection 检查 |
-| MCP Resources（URI 定位的只读数据源） | ⑤ MCP Server | 只有 Tools |
+| Output guardrail: PII masking, sensitive words | ④ Guardrail post-check; ③ the PII masking of FastAPI | None. The output has no further filter |
+| Jailbreak detection | ④ Guardrail pre-check | Only a prompt-injection check of a few regular expressions |
+| MCP Resources (read-only data sources located by URI) | ⑤ MCP server | Tools only |
 
-图上其余"没规划"的项，一并列为候选（范围待用户确认）：
+The other "not planned" items on the diagram are listed as candidates as well (scope to be confirmed by the user):
 
-| 项 | 图上的位置 |
+| Item | Place on the diagram |
 |---|---|
-| Analytics Agent（数据分析、图表、报表） | ④ |
-| Web Search Agent | ④ |
-| Local vLLM（敏感数据兜底） | ⑥ |
-| Redis 的会话、JWT 黑名单、响应缓存、分布式锁、Pub/Sub | ⑦ |
-| Vault 密钥管理、Sentry 错误追踪 | ⑧ |
-| 边缘反向代理（Nginx / Cloudflare）、CDN + WAF | ② |
-| PostgreSQL 主从与 PITR 备份 | ⑦ |
+| Analytics agent (data analysis, charts, reports) | ④ |
+| Web search agent | ④ |
+| Local vLLM (fallback for sensitive data) | ⑥ |
+| Redis for sessions, a JWT blacklist, response cache, distributed locks, Pub/Sub | ⑦ |
+| Vault secret management, Sentry error tracking | ⑧ |
+| Edge reverse proxy (Nginx / Cloudflare), CDN + WAF | ② |
+| PostgreSQL primary-replica and PITR backup | ⑦ |
 
-## 4. 之前就排在后面的
+## 4. Items that were already scheduled for later
 
-| 项 | 来源 |
+| Item | Source |
 |---|---|
-| 企业后台（NestJS 业务模块）——Memory 和写操作确认等它 | 需求文档子项目 2 |
-| lite profile（Oracle k3s、Helm、身份方案） | 07 第 6 节、06 第 3 节 |
-| Auditor 角色与审计查询接口 | 03 第 2 节 |
-| 加盟店数据、中文版数据 | 07 第 6 节 |
-| BM25 扩展（评测说暂不需要） | 05 第 2.1 节 |
-| Loki 集中日志 | 06 第 6 节 |
-| 对话上下文的摘要（现在只截断最近 6 轮） | 需求清单 C |
+| The enterprise back office (the NestJS business module): memory and write action confirmation wait for it | Sub-project 2 of the requirements document |
+| The lite profile (Oracle k3s, Helm, the identity plan) | Section 6 of 07, section 3 of 06 |
+| An Auditor role and an audit query endpoint | Section 2 of 03 |
+| Franchised-campus data, Chinese-language data | Section 6 of 07 |
+| The BM25 extension (evaluation says it is not needed for now) | Section 2.1 of 05 |
+| Centralised logs with Loki | Section 6 of 06 |
+| A summary of the conversation context (currently only the last 6 turns are kept) | Item C of the requirements list |

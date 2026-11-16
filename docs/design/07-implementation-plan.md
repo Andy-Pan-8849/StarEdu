@@ -1,112 +1,114 @@
-# 实施计划：AI 模块第一阶段
+# Implementation plan: phase 1 of the AI module
 
-状态：**已获用户批准（2026-11-02），第 7 节 5 个确认点全部接受，从 M0 开始。** 每个里程碑开始前先列清单，你确认后再写代码。
-依据：设计文档 01–06（均已批准）。标记约定：**【建议】**、**【待定】**。
+[中文](07-implementation-plan.chn.md)
 
-## 1. 工作方式【建议】
+Status: **Approved by the user (2026-11-02); all 5 confirmation points of section 7 were accepted, starting from M0.** Before each milestone starts, a checklist is listed first, and code is written after you confirm.
+Basis: design documents 01 to 06 (all approved). Marking convention: **[Proposed]**, **[Open]**.
 
-- 分 9 个里程碑（M0–M8），每个里程碑**能独立验证**，完成后向你汇报：做了什么、怎么验证的、哪些没做或没验证。**你确认后才进入下一个**。
-- 每个里程碑开始前，我先列出该里程碑要新建和修改的文件、要运行的命令，等你说"开始"再写代码（你要求的"生成代码前先确认"）。
-- 一个里程碑一个分支（如 `m0-scaffold`），完成后合并回 `main`，并打 tag（如 `ai-m0`）；提交粒度小，提交信息写清原因。**是否推送到 GitHub，每次问你。**
-- 设计与实现不一致时，**先改设计文档，再改代码**，并在需求文档里记一笔。
-- 需要你提供的东西，在对应里程碑开头列出，不会中途才要。
+## 1. Way of working [Proposed]
 
-## 2. 当前环境检查（已核对）
+- 9 milestones (M0 to M8). Each milestone can be **verified on its own**, and a report follows its completion: what was done, how it was verified, and what was not done or not verified. **The next one starts only after you confirm.**
+- Before each milestone starts, I list the files to be created and changed and the commands to be run, and write code only after you say "start" (your requirement of "confirm before generating code").
+- One branch per milestone (such as `m0-scaffold`), merged back into `main` when done and tagged (such as `ai-m0`); commits are small and the messages say why. **Whether to push to GitHub is asked every time.**
+- When design and implementation differ, **change the design document first, then the code**, and make a note in the requirements document.
+- What I need from you is listed at the start of the matching milestone and is never asked for midway.
 
-| 项 | 结果 |
+## 2. Current environment check (verified)
+
+| Item | Result |
 |---|---|
-| uv | 0.12.5（Homebrew，arm64） |
-| Python 3.12 | 3.12.12 可用（系统默认 3.13.4，项目用 `.python-version` 固定 3.12） |
-| Node / pnpm | v20.19.6 / 10.33.2（满足 Next.js 15） |
-| Docker / Compose | 29.8.1 / v5.5.1；Docker Desktop 可用内存约 11.7 GB |
-| make / git | GNU Make 3.81（macOS 自带，版本较老，Makefile 只用基础功能）/ git 2.50.1 |
+| uv | 0.12.5 (Homebrew, arm64) |
+| Python 3.12 | 3.12.12 available (system default 3.13.4; the project pins 3.12 with `.python-version`) |
+| Node / pnpm | v20.19.6 / 10.33.2 (meets Next.js 15) |
+| Docker / Compose | 29.8.1 / v5.5.1; Docker Desktop has about 11.7 GB of memory available |
+| make / git | GNU Make 3.81 (bundled with macOS, an old version, so the Makefile uses only basic features) / git 2.50.1 |
 
-## 3. 里程碑
+## 3. Milestones
 
-### M0 脚手架与基础设施
+### M0 Scaffold and infrastructure
 
-**内容**：uv workspace（`core`、`api`、`worker`、`mcp-server`）；`.python-version`；Ruff、pytest、pre-commit（含密钥扫描）；GitHub Actions 的最小 CI；`deploy/compose/`（Postgres+pgvector、Redis、MinIO，带健康检查）；Alembic 初始化；`core` 的配置加载；api 的 `/healthz`；`.env.example`；Makefile。
-**你需要提供**：无。
-**验证**：`make up` 后各服务健康；`pytest` 通过；CI 在 GitHub 上绿。
+**Content**: uv workspace (`core`, `api`, `worker`, `mcp-server`); `.python-version`; Ruff, pytest, pre-commit (with secret scanning); a minimal GitHub Actions CI; `deploy/compose/` (Postgres+pgvector, Redis, MinIO, with health checks); Alembic initialisation; `core`'s configuration loading; the api's `/healthz`; `.env.example`; Makefile.
+**What you need to provide**: nothing.
+**Verification**: after `make up` every service is healthy; `pytest` passes; CI is green on GitHub.
 
-### M1 身份
+### M1 Identity
 
-**内容**：Keycloak 加入 Compose；realm 导出文件（7 个角色、测试账号、客户端与受众 `starit-api` / `starit-mcp`）；`core` 里的 JWT 校验（JWKS 缓存）；api 的 `/me`；测试用的令牌获取辅助。
-**验证**：每个测试账号能取到令牌；无效、过期令牌返回 401；`/me` 返回正确的角色和校区。
+**Content**: Keycloak added to Compose; the realm export file (7 roles, test accounts, the client and the audiences `starit-api` / `starit-mcp`); JWT verification in `core` (JWKS cache); the api's `/me`; a helper to get tokens for tests.
+**Verification**: every test account can get a token; an invalid or expired token returns 401; `/me` returns the right role and campus.
 
-### M2 数据模型与权限核心
+### M2 Data model and permission core
 
-**内容**：`ai.*` 全部迁移（02）；访问等级展开表；**统一的权限过滤函数**；文档权限与分块同步更新的服务函数（同一事务）；`biz` 种子导入、白名单视图、`ai_sql_ro` 账号和会话变量行级过滤；审计日志写入（只追加权限）。
-**验证**：权限矩阵的单元测试（每个角色 × 每个访问等级 × 校区 × 职级）；`Admin` 角色读不到受限内容；视图的行级规则按 02 第 5 节的表通过；迁移能在空库上从头运行。
+**Content**: all `ai.*` migrations (02); the access-level expansion table; **the one shared permission filter function**; the service function that updates document permissions and chunks together (same transaction); `biz` seed import, the allow-listed views, the `ai_sql_ro` account and session-variable row filtering; audit log writing (append-only rights).
+**Verification**: unit tests of the permission matrix (every role × every access level × campus × grade); the `Admin` role cannot read restricted content; the row rules of the views pass according to the table in section 5 of 02; migrations run from scratch on an empty database.
 
-### M3 入库管线
+### M3 Ingestion pipeline
 
-**内容**：`Parser` 接口和 docx / pdf / md / txt 解析器；清洗；结构化分块（表格和代码块不拆）；编号抽取；embedding 客户端（按配置）；worker 的任务领取与重试；写入事务；样例数据导入脚本（读取 `manifest.csv`）。
-**你需要提供**：**OpenAI API 密钥**（填入 `.env`，不会提交）。
-**验证**：28 份样例文档全部入库成功，数量与清单一致；分块的 `allowed_roles` 与展开表一致；重复上传同一文档是幂等的；故意放一个损坏的文件，任务应以明确的失败阶段和原因结束；入库前先给出 embedding 调用数估算，你确认后再跑（量级很小）。
+**Content**: the `Parser` interface and the docx / pdf / md / txt parsers; cleaning; structured chunking (tables and code blocks not split); code extraction; the embedding client (by configuration); the worker's job claiming and retries; the write transaction; the sample data import script (reading `manifest.csv`).
+**What you need to provide**: **an OpenAI API key** (put in `.env`, never committed).
+**Verification**: all 28 sample documents are ingested, and the number matches the manifest; the chunks' `allowed_roles` match the expansion table; uploading the same document again is idempotent; a deliberately broken file should end the job with a clear failing stage and reason; before ingestion an estimate of the number of embedding calls is given, and the run starts after you confirm (a very small amount).
 
-### M4 检索与首个评测切片
+### M4 Search and the first evaluation slice
 
-**内容**：关键词检索（`KeywordSearcher` 的 `ts_rank_cd` 实现）、向量检索、RRF、`Reranker`（LLM 列表式实现）、上下文组装、`retrieval_mode` 开关；评测运行器的**检索部分**（`recall@k`、MRR、**权限回归**）。
-**验证**：**权限回归零泄露**；四种检索模式都能跑并产出对比；用评测集得到检索基线，记录到报告。
+**Content**: keyword search (the `ts_rank_cd` implementation of `KeywordSearcher`), vector search, RRF, `Reranker` (the LLM listwise implementation), context assembly, the `retrieval_mode` switch; the **search part** of the evaluation runner (`recall@k`, MRR, **permission regression**).
+**Verification**: **zero leaks in the permission regression**; all four search modes run and produce a comparison; the evaluation set gives a search baseline, recorded in a report.
 
-### M5 Agent 图与对话 API
+### M5 Agent graph and the chat API
 
-**内容**：LLM 客户端接口（full 的代理和 lite 的进程内两种实现）；LangGraph 图（04）；`finish_run`；会话与消息接口（03）；提示词文件及版本；假 LLM 与检索桩。
-**验证**：图结构测试（每个节点可达某个 End）；每个 End 状态的场景测试；澄清两次后的 `clarification_limit`；超时、重试上限、步数上限；用真实 LLM 手动问几个问题，并先给出调用数估算。
+**Content**: the LLM client interface (two implementations: the proxy for full and in-process for lite); the LangGraph graph (04); `finish_run`; the conversation and message endpoints (03); prompt files and versions; a fake LLM and search stubs.
+**Verification**: graph structure tests (every node reaches some End); scenario tests for every End state; `clarification_limit` after two clarifications; timeout, retry limit and step limit; ask a few questions by hand with a real LLM, giving an estimate of the number of calls first.
 
-### M6 数据访问：MCP 与 SQL Agent
+### M6 Data access: MCP and the SQL agent
 
-**内容**：MCP Server 与 6 个工具（03）；SQL Agent 子图（语法与白名单校验、超时、行数限制、重试）；`plan_data_access` 节点接入图。
-**验证**：16 条 SQL 评测题；越权访问被拒绝；工具不接受身份参数；每次调用都有审计记录。
+**Content**: the MCP server with 6 tools (03); the SQL agent subgraph (syntax and allow-list checks, timeout, row limit, retries); the `plan_data_access` node connected to the graph.
+**Verification**: the 16 SQL evaluation questions; overreaching access is refused; tools accept no identity parameter; every call has an audit record.
 
-### M7 文档管理与前端
+### M7 Document management and front end
 
-**内容**：文档管理 API（03 第 5 节）；Next.js：OIDC 登录、聊天页、会话列表、引用展示（点击查看原文）、文档管理页（上传、元数据编辑、状态与失败原因、重新入库、删除）；前端只按 `/me` 决定菜单显示，后端始终校验。
-**验证**：各角色登录后看到的菜单正确；`RAGETLAdmin` 完成上传到可检索的完整流程；普通用户直接请求管理接口得到 403；Playwright 冒烟测试覆盖登录、提问、引用查看、上传。
+**Content**: the document management API (section 5 of 03); Next.js: OIDC sign-in, chat page, conversation list, citation display (click to view the original), document management page (upload, metadata editing, status and failure reasons, re-ingest, delete); the front end decides menu display from `/me` only, and the back end always checks.
+**Verification**: each role sees the right menus after signing in; `RAGETLAdmin` completes the whole flow from upload to searchable; an ordinary user requesting the management endpoints directly gets 403; Playwright smoke tests cover sign-in, asking, viewing a citation and uploading.
 
-### M8 完整评测、可观测性与收尾
+### M8 Full evaluation, observability and wrap-up
 
-**内容**：评测运行器完整版（答案正确性、拒绝正确性、SQL、实验矩阵、报告）；补充评测题（合成）；OpenTelemetry 贯穿所有服务；Prometheus、Grafana 仪表盘；Langfuse（可选 Compose 文件）；预置向量库转储和 `make seed` 的快速路径；README 与使用文档更新；对照设计文档 06 第 8 节逐条验收。
-**验证**：验收标准 1–7 逐条通过，并把结果写入报告；打 `v0.1.0`（AI 模块第一阶段）。
+**Content**: the full evaluation runner (answer correctness, refusal correctness, SQL, the experiment matrix, reports); additional evaluation questions (synthetic); OpenTelemetry through all services; Prometheus and Grafana dashboards; Langfuse (an optional Compose file); the ready-made vector store dump and the fast path of `make seed`; README and usage document updates; acceptance item by item against section 8 of design document 06.
+**Verification**: acceptance criteria 1 to 7 pass one by one, with the results written to a report; tag `v0.1.0` (phase 1 of the AI module).
 
-## 4. 依赖与顺序
+## 4. Dependencies and order
 
 ```
 M0 → M1 → M2 → M3 → M4 → M5 → M6 ─┐
                           └──────→ M7 → M8
 ```
 
-- M0–M2 **不需要 LLM 密钥**，可以先把安全基础打牢。
-- 评测在 M4 就开始（检索部分），不等到最后，这样每次改动都有数据支撑。
-- M7 的前端要等 M5 的对话 API 稳定后开始，但文档管理 API 可以在 M3 之后做。
-- 所有里程碑单人顺序进行，不并行开发同一批文件。
+- M0 to M2 **need no LLM key**, so the security foundation can be laid first.
+- Evaluation starts at M4 (the search part) and does not wait until the end, so every change has data behind it.
+- The front end of M7 waits until the chat API of M5 is stable, but the document management API can be done after M3.
+- All milestones go one person, in order, with no parallel development of the same set of files.
 
-## 5. 风险与应对
+## 5. Risks and responses
 
-| 风险 | 应对 |
+| Risk | Response |
 |---|---|
-| 向量过滤与精确扫描性能 | 样例规模下没有问题；规模变大时按 02 的 2.4 评估 HNSW 的迭代扫描 |
-| LLM 重排的延迟和成本 | 评测里记录延迟；超出预期就换专用重排接口 |
-| 全文检索对编号的分词 | `identifiers` 列保底；评测里有编号类题目 |
-| 评测题太少 | M8 补充；在补充前不对准确率下结论 |
-| 真实 LLM 调用的费用 | 每次评测先估算再确认；单元和图测试用假 LLM；lite 设每日预算上限 |
-| Keycloak 在 Mac 上的内存 | M1 记录实际占用，回填到 06 |
-| Python 与 Node 版本差异 | 用 `.python-version`、`.nvmrc` 固定；CI 使用同样的版本 |
-| 设计与实现偏离 | 先改设计文档再改代码 |
+| Vector filtering and exact-scan performance | No problem at sample scale; when the scale grows, evaluate HNSW's iterative scan as in 2.4 of 02 |
+| Latency and cost of the LLM rerank | Latency is recorded in evaluation; switch to a dedicated rerank interface if it exceeds expectations |
+| Full-text tokenisation of codes | The `identifiers` column as the fallback; the evaluation has code-type questions |
+| Too few evaluation questions | Add in M8; no conclusion about accuracy before then |
+| Cost of real LLM calls | Every evaluation estimates first and confirms; unit and graph tests use a fake LLM; lite gets a daily budget cap |
+| Keycloak's memory on the Mac | M1 records the actual use and fills it back into 06 |
+| Python and Node version differences | Pinned with `.python-version` and `.nvmrc`; CI uses the same versions |
+| Design and implementation drifting apart | Change the design document first, then the code |
 
-## 6. 不在第一阶段范围内
+## 6. Out of scope for phase 1
 
-流式输出、写操作确认、Memory、成本统计（第二阶段）；lite 的身份方案和部署（单独排期）；BM25 扩展（评测后决定）；传统业务模块（AI 部分完成之后）；加盟店和中文版数据。
+Streaming output, write action confirmation, memory, cost statistics (phase 2); the identity plan and deployment of lite (scheduled separately); the BM25 extension (decided after evaluation); the traditional business module (after the AI part is done); franchised campuses and Chinese-language data.
 
-## 7. 需要你确认的点
+## 7. Points for you to confirm
 
-1. M0–M8 的划分和顺序，是否接受？
-2. "每个里程碑开始前先列出文件和命令、你说开始再写代码"的方式，是否接受？
-3. 一个里程碑一个分支，合并后打 tag，推送每次问你，是否接受？
-4. M3 才需要 OpenAI 密钥，是否可以？
-5. 是否从 M0 开始？
+1. The split and order of M0 to M8: accepted?
+2. The way of "list the files and commands before each milestone and write code when you say start": accepted?
+3. One branch per milestone, a tag after merging, pushing asked every time: accepted?
+4. The OpenAI key is only needed from M3: is that all right?
+5. Start from M0?
 
-## 7. 第二阶段（2026-11-04）
+## 7. Phase 2 (2026-11-04)
 
-第二阶段的决定、已排期的和候选的项见 [09 第二阶段规划](09-phase2-plan.md)；M9 的清单在 [08](08-milestone-checklists.md)。第 6 节里的"不在第一阶段范围内"仍是第一阶段的边界，没有改动。
+The decisions of phase 2, and the scheduled and candidate items, are in [09 phase 2 plan](09-phase2-plan.md); the checklist of M9 is in [08](08-milestone-checklists.md). "Out of scope for phase 1" in section 6 is still the boundary of phase 1 and has not changed.
