@@ -1,275 +1,190 @@
 # Try it: a guide for learners and employers
 
-This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
+[中文版](TRY-IT.chn.md) · [What the system is and how it is built](README.md)
 
-Status: **milestone B23 (demo data).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+This guide gets the business module running on your own machine, loads a realistic company into it, and shows what to click as each kind of user. About 15 minutes once Docker has pulled its images.
 
-## 1. Start it
+## 1. What you need
 
-Requires Node 20.19+, pnpm 10 and Docker. From `business-module/`:
+| Need | Notes |
+|---|---|
+| Node.js **20.19 or newer** and **pnpm 10** | `node -v`, `pnpm -v` |
+| **Docker** with Compose | A few GB of free memory for Postgres, Redis, object storage, Keycloak and Mailpit. The AI module has its own Compose project with different ports, so both can run together. |
+| macOS, Linux or Windows | Windows works with Docker Desktop; if something misbehaves, try WSL. |
+| A modern browser | `*.localhost` names must resolve to your machine (Chrome, Edge and Firefox do this; otherwise add `hq.localhost`, `riverside-franchise.localhost` and `platform.localhost` to `/etc/hosts`). |
+| Free ports | Postgres 5433, Redis 6380, object store 9100/9101, Keycloak 8180, Mailpit 1125 and 8125, API 4000, web 3001. |
+
+No API keys are needed for the business module. (The optional AI assistant needs the AI module and an LLM key; see section 7.)
+
+## 2. Build it
+
+From `business-module/`:
 
 ```bash
-cp .env.example .env
+cp .env.example .env        # defaults are for local demos only
 pnpm install
-make up            # Postgres, Redis, object store, Keycloak, Mailpit
-pnpm migrate
-pnpm realm         # platform realm
-pnpm seed          # opens two demo companies: hq (StarIT) and riverside-franchise (StarIT-RiverSide)
-pnpm dev:api       # terminal 1
-pnpm dev:web       # terminal 2
+make up                     # Postgres, Redis, object store, Keycloak, Mailpit (wait until they are healthy)
+pnpm migrate                # create the database schema
+pnpm realm                  # create the platform sign-in realm
 ```
 
-If you started this stack with an earlier milestone, run `make reset` first, then the steps above. (Or keep your data: `pnpm migrate`, then `pnpm seed`, then `make up` so the object store is running.) Transcript PDFs use a bundled Noto Sans SC subset (the 3,755 most common hanzi); a rarer character prints as `?`. Assignment files go to the object store (`objectstore`, port 9100); the first upload creates the bucket.
-
-Open **http://hq.localhost:3001/admin** (`*.localhost` names resolve to your machine in most browsers; otherwise add them to `/etc/hosts`). Outgoing mail (invitations, password links) appears in Mailpit at http://localhost:8125.
-
-## 2. Demo companies and accounts
-
-| Company | Address | What it shows |
-|---|---|---|
-| **StarIT** (headquarters group) | http://hq.localhost:3001 | The Beijing campus ("StarIT北京总部", code `HQ`) is the headquarters and has the **fullest data**: every feature and the edge cases can be tried here. Shanghai is a branch campus with the organization structure and the basic flows. |
-| **StarIT-RiverSide** (中文名 StarIT 河岸教育) | http://riverside-franchise.localhost:3001 | A franchisee: a separate company on the same system, with basic data and the main flows. Use it to see that two companies never see each other's data. |
-
-Each company is a separate tenant with its own users, roles and data.
-
-**Accounts available today**
-
-| Account | Company | Role | Password |
-|---|---|---|---|
-| `admin` | hq | Tenant administrator (built-in) | you set it, see below |
-| `admin` | riverside-franchise | Tenant administrator (built-in) | you set it, see below |
+Then load the trial data (section 3) and start the two servers in two terminals:
 
 ```bash
-# local use only; the real flow is the invitation e-mail in Mailpit
-pnpm dev:password --code hq --username admin --password '<10+ characters, upper and lower case, digit, special character>'
-pnpm dev:password --code riverside-franchise --username admin --password '<...>'
+pnpm dev:api                # http://localhost:4000/healthz  ->  {"status":"ok", ...}
+pnpm dev:web                # http://hq.localhost:3001
 ```
 
-**Demo scenario and one-click demo accounts (milestone B23).** Start here if you only want to look around. After `pnpm demo` (or `pnpm demo:reset`), open any entry's login page (`http://hq.localhost:3001/admin`, `http://hq.localhost:3001/`, `http://platform.localhost:3001/`). Under the **Sign in** button a block says *"The accounts below are for demonstration only."* and lists the demo accounts of both companies and the platform operator; click one and you are signed in, even when the account belongs to another entry or company (it takes you there first). Password for all of them: `Demo!Passw0rd2026`.
+Outgoing mail (invitations, notifications) appears in Mailpit at <http://localhost:8125>. The Keycloak admin console is at <http://localhost:8180> (`admin` / `admin` by default in `.env`).
+
+## 3. Load the trial data
+
+```bash
+pnpm demo
+```
+
+`pnpm demo` is `pnpm seed` (opens two companies) + `pnpm import:sample` (people from the AI module's sample company) + `pnpm seed:demo` (teaching data, demo accounts, documents). It takes a minute or two and is safe to repeat.
+
+What you get:
+
+| Company | Address | What it holds |
+|---|---|---|
+| **StarIT** (`hq`) | <http://hq.localhost:3001> | The fullest data: 8 campuses, about 200 people (141 staff and 60 students from the sample company), a finished spring term with 20 sections and 198 graded submissions, a document library of 27 files, plus the **living scenario** below. |
+| **StarIT RiverSide** (`riverside-franchise`) | <http://riverside-franchise.localhost:3001> | A franchisee on the same system: a small but complete company of its own (same course codes, different people and data), to show that companies cannot see each other. |
+
+The **living scenario** (built relative to the day you load it, in both companies):
+
+- a *previous term*, ended, whose final grades were published a few days ago (so the 14-day grade-appeal window is open) and one grade amendment on record;
+- a *current term* in enrollment with three sections (the Java section is nearly full), each with Homework 1 graded and published, Homework 2 submitted but **not yet graded** (some late), Homework 3 still open, a manually scored midterm and an unpublished project draft;
+- a *next term* in planning;
+- student requests: one pending extension, one pending grade appeal, one approved and one rejected;
+- announcements (company, campus, section), discussion threads (pinned, answered, solved), notifications, one valid and one revoked official transcript, two curriculum versions (old and new), and account and storage limits so the usage page has something to show.
+
+Because dates are relative, **run `pnpm demo:reset` before a demonstration** to get fresh deadlines. It clears the demo companies' business data (keeping the companies, their sign-in realms, built-in administrators, roles, departments and campuses), deletes their demo users, re-imports the sample and regenerates everything. It refuses to touch any company that is not marked as a demo company.
+
+## 4. Sign in with the demo accounts
+
+Open any entry's login page:
+
+| Entry | Address |
+|---|---|
+| Student portal | <http://hq.localhost:3001/> |
+| Admin console | <http://hq.localhost:3001/admin> |
+| Platform console | <http://platform.localhost:3001/> |
+
+Under the **Sign in** button a block says *"The accounts below are for demonstration only."* and lists the demo accounts of both companies and of the platform. **Click one and you are signed in**, even if the account belongs to another entry or company (it takes you there first), so you never have to hop around. The password for all of them is `Demo!Passw0rd2026`.
 
 | Account | Entry | What it is for |
 |---|---|---|
-| `demo.admin` | admin | The **demo superuser**: tenant administrator plus the `demo-superuser` role (every admin menu and button, data scope "all"), and assistant instructor of the Python section. Shows every feature in one account. |
-| `demo.registrar` | admin | Academic office: enrollment, batch enrollment, grade amendments, transcripts, student requests (approve appeals). |
-| `demo.teacher` | admin | Lead instructor of the three current sections: grading queue, extensions, grade book, discussions. |
-| `demo.student1`, `demo.student2` | portal | Students with history: enrolled in the current term, one graded and one ungraded assignment each, an upcoming deadline, a pending request (extension / grade appeal), a published grade still inside the 14-day appeal window, messages, a transcript. Student 1 follows the old curriculum, student 2 the new one. |
-| `demo.operator` | platform | Platform console: companies, usage and quota, jobs, announcements. |
-| `rv.admin`, `rv.registrar`, `rv.teacher`, `rv.student1`, `rv.student2` | admin / portal | The same five roles in the second company (StarIT RiverSide), with different data: sign in to both to see that companies cannot see each other. |
+| `demo.admin` | admin | The **demo superuser**: every admin menu and button with the "all data" scope, plus assistant instructor of the Python section. Shows every feature from one account. |
+| `demo.registrar` | admin | Academic office: terms, courses, majors, sections, enrollment, batch enrollment, grade amendments, transcripts, student requests. |
+| `demo.teacher` | admin | Lead instructor of the three current sections: assignments, grading, extensions, grade book, discussions. |
+| `demo.student1`, `demo.student2` | portal | Students with history: enrolled this term, one graded and one ungraded assignment, an upcoming deadline, a pending request, a grade still inside the appeal window, messages, a transcript. Student 1 follows the old curriculum, student 2 the new one. |
+| `demo.operator` | platform | The platform operator: companies, features, usage and quota, sign-in settings, jobs, announcements. |
+| `rv.admin`, `rv.registrar`, `rv.teacher`, `rv.student1`, `rv.student2` | admin / portal | The same five roles in the second company. |
 
-Things to try: as `demo.student1` ask for an extension and withdraw it; as `demo.teacher` open *Sections > Homework 2 > Submissions* (ungraded work waits there) and approve the pending extension in *Student requests*; as `demo.registrar` approve the grade appeal (a new total and a note are required); as `demo.admin` open *Roles* (an old copy can show "Update from template"), *Transcripts* (a valid and a revoked copy; open their verification pages), *Majors > Curriculum* (two versions), *Batch enrollment*; as `demo.operator` open the company list and each company's usage. All dates are relative to the day the data was loaded, so run `pnpm demo:reset` before a demonstration to get fresh deadlines.
+The `demo.admin` account is the built-in tenant administrator **plus** a `demo-superuser` role that exists only in demo companies. The built-in administrator alone has no access to business data by design.
 
-The demo accounts and the `demo-superuser` role exist only in companies marked as **demo companies** (`tenant.is_demo`, set by `pnpm seed:demo` for `hq` and `riverside-franchise`); a production company is never marked, the role is not in any role template, and the login block comes from the Keycloak theme `deploy/keycloak/themes/staredu-demo` that only the demo realms use. **To remove the block from a deployment, delete the `scripts=` line in that theme's `theme.properties`** (or the theme folder). The compose file mounts the theme into Keycloak; run `make up` once to recreate Keycloak with it.
+There are also older accounts from the AI sample (same password): `ling.mgr.bj` and `peng.mgr.sh` (campus leads), `qing.hr.bj` (HR manager), `wei.acad.sh` (teacher), `wei.stu.sh` (student), `tao.admin.bj` (tenant administrator). Everyone is linked to the same person as in the AI module's sample data.
 
-Both `pnpm seed:demo` and `pnpm demo:reset` refuse to run with `NODE_ENV=production` unless `ALLOW_DEMO_SEED=1` is set (only for a public trial site). Security note: the login block puts a public password and the platform operator account on a public page; that is acceptable only on a demonstration environment that holds no real data and is not exposed beyond the people you invite. To keep the platform console out of it, remove the `demo.operator` group from `demo-accounts.js`.
+> **Security note.** The login block puts a public password and the platform account on a public page. That is only acceptable on a demonstration environment that holds no real data and is not exposed beyond the people you invite. The demo scripts refuse to run with `NODE_ENV=production` unless `ALLOW_DEMO_SEED=1` is set. To remove the block, delete the `scripts=` line in `deploy/keycloak/themes/staredu-demo/login/theme.properties` (or the whole theme folder).
 
-`pnpm demo:reset` clears every business table of the demo companies (keeping the company, its realm, built-in administrator, roles, departments and campuses), deletes their Keycloak users, re-imports the AI sample and regenerates everything; it refuses any company that is not marked as a demo company.
+You can also give the built-in `admin` of a company a password yourself (local use only):
 
-**Demo accounts (milestone B13).** `pnpm demo` (= `pnpm seed`, `pnpm import:sample`, `pnpm seed:demo`) loads the sample company into `hq` and creates these accounts. They share one public demo password, `Demo!Passw0rd2026` (local and trial use only; change it with the `DEMO_PASSWORD` environment variable before running). Each account is linked to the same person as in the AI module's sample data, so both systems describe the same company. Running it again changes nothing.
+```bash
+pnpm dev:password --code hq --username admin --password '<10+ characters, upper and lower case, digit, special character>'
+```
 
-| Account | Person (sample id) | Role in the business module |
-|---|---|---|
-| `ling.mgr.bj`, `peng.mgr.sh` | E0001, E0018 (campus directors) | Campus lead |
-| `qing.hr.bj` | E0137 | HR manager |
-| `wei.acad.sh` | E0025 (instructor) | Teacher |
-| `wei.stu.sh` | S0018 | Student |
-| `tao.admin.bj` | E0140 (helpdesk engineer) | Tenant administrator |
-| `ning.adm.bj`, `ning.fin.bj`, `min.ragetl.bj` | E0014, E0138, E0141 | No role yet (admissions, finance and knowledge-base staff have no module here; they sign in and see only their own pages) |
+## 5. What to try, by role
 
-What `pnpm seed:demo` adds: a spring 2026 term (ended) with three courses (Java, Python, TypeScript), one section per program and campus (20 sections, each with a lead instructor from that campus), the sample's 12 assignments per program with all 198 submissions (raw score, lateness, penalty and final score exactly as in the sample), published final grades for the 52 students who did not withdraw, and a document library with 27 current documents from the AI sample (public, internal and confidential folders; confidential ones are visible to the HR manager only). With `BIZ_EVENT_BUS=kafka` it also queues one `library.file_changed` event per file so the AI knowledge base picks them up. The franchise tenant stays empty.
+### Student (`demo.student1`, portal)
+- **My requests**: ask for an extension on Homework 3 and **withdraw** it; ask to appeal the published grade (a reason of at least 10 characters is required).
+- **My assignments**: open Homework 3 and submit text and a file (up to 10 files, 20 MB each; they go straight to object storage). Late work loses 10% up to 24 hours late, 20% up to 48, 30% up to 72, nothing after that. Scores, rubric points and feedback appear **only after the teacher publishes**.
+- **Course enrollment**: open sections with seats left, required/elective labels for your major, missing prerequisites, schedule clashes; **Enroll** and **Drop** (the screen warns when a drop becomes a "W").
+- **Degree plan** (student 1 and 2 see different curriculum versions), **My grades** (GPA by term and cumulative, download an unofficial transcript PDF), **Discussions**, **Library**, the **bell** (messages, settings per category, e-mail in Mailpit), and **AI assistant** (needs the AI module).
 
-## 3. Walk-through by role
+### Teacher (`demo.teacher`, admin console)
+- **Sections**: you only see your own three. Open one: roster, **Course materials**, **Assignments**, **Grades**, **Discussion** tabs.
+- **Assignments > Homework 2 > Submissions**: ungraded work waits here. Score each rubric item, add feedback, then **publish** one score or all fully scored ones.
+- **Extensions**: give one student 1–3 more days with a reason.
+- **Student requests**: approve the pending extension (you can change the days). You can see grade appeals and reject them, but changing a published grade needs the academic office.
+- **Grades**: set group weights (must total 100%), see the grade book (missing work counts as 0), enter the midterm scores by hand, calculate and publish final grades, export CSV. After a section ends its grades are locked.
+- **Discussion**: reply, pin, mark solved.
 
-Every flow below says when it can be tried. "Works today" means you can do it now.
+### Academic office (`demo.registrar`)
+- **Student requests**: approve the grade appeal (a new total and a note of at least 5 characters are required; the change is recorded before and after).
+- **Sections** > **Batch enrollment**: pick a term, course and major (optionally entry year and campus), **Preview**, then **Run for real**. Exceptions (over capacity, prerequisite, clash, closed window, retake) need to be ticked with a reason.
+- **Terms, Courses, Majors** (> **Curriculum**: two versions; **Add version** copies the one you are looking at), **Sections**, **Grading scale**, **Transcripts** (issue an official numbered PDF; each copy has a verification page and a **Revoke** button), **Announcements**, **Dashboard** (only for the campuses your scope allows).
 
-### Tenant administrator (`admin`)
+### Everything in one account (`demo.admin`)
+Open the menu and walk through: **Roles** (create a role, tick menus, pick data scopes; an older copy of a template role can show **Update from template**), **Accounts** (invitation, reset link, temporary password), **Online users** (force logout), **Login log / Audit log / Operation log**, **Campuses and Departments**, **Staff and Students** (HR), **Document library** (public, internal and confidential folders; confidential ones need a logged self-grant even for the administrator), **Transcripts**, **Student requests**, **Sections**.
 
-The administrator has every operation permission of the features enabled for the company, but **no access to business data** (students, grades) by design: it manages the system itself.
+### HR manager (`qing.hr.bj`)
+Add a staff member (a duplicate e-mail is refused and the existing person is shown), add a second assignment or **transfer** (history is kept), **end employment** now or on a planned date (the person loses admin access at once) and reinstate, add a student with a campus, add a student profile to an existing person, emergency contacts, **import and export CSV** (check first; repeating changes nothing).
 
-| Flow | Available |
+### Campus lead (`ling.mgr.bj`)
+Sees only their own campus's staff, students and sections.
+
+### Platform operator (`demo.operator`, <http://platform.localhost:3001/>)
+- Companies: open a new company (the administrator gets an invitation in Mailpit), **notify** a planned suspension, **suspend** (its users are refused, data kept) and **restore**, switch **features** on or off for one company.
+- **Usage & quota**: accounts and storage in use; set limits (at a limit, new accounts are refused with 409 and uploads with 413; nothing is deleted).
+- **Sign-in & security**: password rules, lockout, session time, two-step verification for everyone, optional Google sign-in (links only to existing accounts with the same verified e-mail).
+- **Scheduled jobs** (enable, change the schedule, run now, see the run log; enable "Send assignment deadline reminders"), **Monitoring**, platform announcements (API).
+
+### The "why is this safe" tour
+1. Sign in as `demo.admin`, then as `rv.admin`: different people, classes and requests. A token for one company is refused on the other's address.
+2. As `demo.teacher`, you cannot open another teacher's section; as `demo.student1`, you never see another student's submission.
+3. Two accounts with the same role but different departments see different people; "no data scope" means no rows, never everything.
+4. Force a user out in **Online users**: their next request is refused even though the sign-in token is still valid for a few minutes.
+5. Open the verification page of a transcript (**Transcripts** > *Verification page*): a valid copy and a revoked copy.
+
+## 6. Reset and troubleshooting
+
+```bash
+pnpm demo:reset     # rebuild the demo companies' data (fresh dates)
+make reset          # remove all local data of this module (not the AI module); then repeat sections 2 and 3
+```
+
+| Symptom | What to do |
 |---|---|
-| Sign in to `/admin`; the menu shows only system management and what your roles allow | Works today |
-| **Online users**: see who is signed in; **Force logout** ends a session (the person's next request is refused) | Works today |
-| **Login log** and **Audit log**: who signed in, who changed roles, permissions, menus, accounts or sessions | Works today |
-| **Accounts**: create an account (invitation e-mail), assign roles, enable or disable, resend the invitation, send a reset link, create a **temporary password** (12 characters, shown once, the person must change it at next sign-in), unlock | Works today |
-| **Roles**: create a role, tick its menus and buttons, choose its data scopes; watch an account's menu change | Works today |
-| **Data scopes**: pick departments in the tree (with or without sub-departments) | Works today |
-| **Menus** and **Entry assignment**: add a directory or an external link, assign it to the admin console or the student portal | Works today |
-| **Campuses**: add a campus (its root department is created for you); stop new intake; close it only when no students or staff assignments are left (type its name to confirm); reopen | Works today |
-| **Departments** and **Posts**: build the tree, move departments, disable or delete (departments with people, sub-departments or a campus can only be disabled) | Works today |
-| **Dictionaries** and **Parameters**: the platform's are read-only; add your own | Works today |
-| **Operation log**: who changed what (passwords and tokens are masked, responses are never stored); clearing needs its own permission | Works today |
+| `*.localhost` does not open | Add the three names to `/etc/hosts` pointing at `127.0.0.1`. |
+| The login page shows no demo accounts | Keycloak was started before the theme was mounted: run `make up` again, then `pnpm seed:demo`. |
+| A menu shows but the page says "Missing permission" (after upgrading from an older version) | Run `pnpm seed`: it adds missing menus and refreshes cached permissions. For roles you copied earlier, use **Roles > Update from template**. |
+| "No access" after signing in at the admin console | The account has no admin permissions (students and some demo staff accounts only use the portal). Use `demo.admin`. |
+| "Nothing here" in lists for a tenant administrator | By design the administrator has no business data scope; use `demo.admin` or `demo.registrar`. |
+| Deadlines look old | `pnpm demo:reset`. |
+| Port already in use | The AI module uses different ports (3000, 5432, 6379, 8080). Check that nothing else uses the ports in section 1. |
+| API refuses to start with "Invalid environment" | Run it with `pnpm dev:api` (it loads `.env`) and make sure `.env` exists. |
 
-### HR manager (`hr-manager` role; demo account `qing.hr.bj`)
+## 7. Optional extras
 
-| Flow | Available |
-|---|---|
-| **Add a staff member** (name, e-mail, hire date, department); a duplicate e-mail is refused and the existing person is shown | Works today |
-| **Assignments**: add a second department, set the primary, **transfer** (old assignment ends, history is kept) | Works today |
-| **End employment** now or on a planned date; the person loses admin access at once and is signed out; **reinstate** | Works today |
-| **Students**: add with a campus, change status (enrolled, on leave, graduated, withdrawn, completed), move to another campus | Works today |
-| One person as both staff and student: add the student profile to the existing person | Works today |
-| **Emergency contacts** and sensitive information (ID number, phone, address) | Works today (API for sensitive fields; emergency contacts have a tab) |
-| **Import CSV** (check first, then import; repeat safely) and **export CSV** | Works today |
+### The AI assistant in business mode
+The AI module (`../ai-module/`) normally runs on its own sample company. To let it answer from this module's data:
 
-Try this as the tenant administrator too: the **Staff** list shows basic information only, **Students** is empty, and emergency contacts and sensitive fields are refused. That is the minimum-data design.
+1. In `business-module/.env` set `INTERNAL_API_KEY=<a secret>`, restart `pnpm dev:api`, and create the companies again (`pnpm demo:reset`), because a company opened earlier has no `ai` sign-in client.
+2. In `ai-module/.env` set `STARIT_IDENTITY_MODE=business`, `STARIT_OIDC_TENANT_ISSUER_BASE=http://localhost:8180/realms`, `STARIT_BUSINESS_INTERNAL_KEY=<the same secret>` and `STARIT_CORS_ORIGINS=http://hq.localhost:3000` (see `ai-module/.env.example`), then `make migrate` and start the AI module (it needs an LLM API key).
+3. Sign in as `demo.teacher` or `demo.student1` and click **AI assistant**. A student asking for "all students' grades" gets only their own.
 
-To load the sample company into `hq`: `pnpm import:sample` (or `pnpm demo` for everything).
+### The Kafka event bus
+Nothing above needs Kafka. To see it: `make biz-up-kafka`, set `BIZ_EVENT_BUS=kafka` in `.env`, restart `pnpm dev:api`, then do something that sends a notification (enroll a student as the registrar). The event goes outbox table → Kafka topic `business.events` → consumer group → the bell. Stop the broker with `make biz-down-kafka` and keep working: events wait in the table and arrive afterwards. `make test-events` runs the tests against the real broker.
 
-### Academic manager (`academic-manager` role; no demo account yet; give the role to any account)
-
-| Flow | Available |
-|---|---|
-| **Terms**: create, open enrollment (window and drop deadline), start, end (sections end, enrolled records complete) | Works today |
-| **Courses** and **prerequisites**; **majors** and their **curriculum** (required / elective / general, suggested term) | Works today |
-| **Sections**: create (course, term, campus, capacity), assign instructors, open, cancel | Works today |
-| **Enroll students for them**: over capacity, missing prerequisite, clash or outside the window need a reason and are logged | Works today |
-| Remove a student: before the drop deadline the record is voided, after it W | Works today |
-| **Grading scale**: edit the grades, minimum percentages, grade points and the pass line for the whole company | Works today |
-| **Transcripts**: open a student's transcript (GPA by term and cumulative), issue the **official** PDF (numbered, recorded) | Works today |
-| **Announcements** (Messages menu): publish to the whole company (needs the all-data scope), one campus or one section; see who has read it; withdraw | Works today |
-| **Dashboard**: students, sections, assignment completion, average score and late rate per campus, only for the campuses you may see | Works today |
-
-### Teacher (`teacher` role)
-
-| Flow | Available |
-|---|---|
-| See only your own sections and their rosters; you cannot change a section's capacity or status | Works today |
-| **Course materials** (title and link; draft or published) for your own sections; read-only after the section ends | Works today |
-| **Assignments** tab on a section: create an assignment (due date, rubric of items with points, optional late-work rule), organise them in groups, publish when ready | Works today |
-| **Submissions**: see every student of the section (those who have not submitted too), open a submission (all versions, download the files), **score each rubric item**, add feedback, **publish** one score or all that are fully scored | Works today |
-| **Extensions**: give one student 1-3 more days with a reason (the deadline moves for that student only; it is logged) | Works today |
-| **Discussion** tab: start a discussion, reply, **pin**, mark as **solved**, delete anyone's post (students can delete only their own) | Works today |
-| **Grades** tab: set the weight of each assignment group (must total 100%), see the grade book (students by assignments; missing work counts as 0), enter scores for exams by hand, **calculate** and **publish** final grades, export CSV | Works today |
-| After the section ends the grades are locked; only the registrar can amend them (reason required, before and after are recorded) | Works today |
-
-### Student (portal at `/`; demo account `wei.stu.sh`)
-
-| Flow | Available |
-|---|---|
-| Sign in at the portal; **Course enrollment**: open sections with seats left, required/elective label for your major, missing prerequisites, schedule clashes | Works today |
-| **Enroll** and **Drop** (the screen warns when a drop will become a W) | Works today |
-| **Degree plan**: your major's courses as passed / in progress / not taken, credits earned | Works today |
-| Course materials of the sections you are in | Works today (API) |
-| **My assignments**: the published assignments of your sections with deadline (23:59 campus time), rubric and your status; **submit** text and files (up to 10 files, 20 MB each; files go straight to the object store), submit again before the deadline (the last one counts, earlier versions are kept) | Works today |
-| After the deadline you can still submit if the assignment accepts late work: 10% off up to 24 hours late, 20% up to 48, 30% up to 72, nothing after that (the teacher can change the table per assignment) | Works today |
-| Your score, the points per rubric item and the feedback appear **only after the teacher publishes** | Works today |
-| **Discussions** (menu): pick one of your sections, start a thread, reply, mark your own thread as solved, delete your own posts. Students on leave can read only | Works today |
-| **My grades**: published final grades by term, GPA by term and cumulative, credits earned; **download an unofficial transcript** (PDF, numbered, footer "for reference only"). Graduated or withdrawn students can still read their grades and download it | Works today |
-| **Notifications** (the bell in the top bar): new assignments, published scores and final grades, enrollment changes, announcements, and a reminder in the last 24 hours before a deadline. New ones appear at once. **Settings** in the bell: language, and per category whether you want it in the app and by e-mail. Every e-mail has an unsubscribe link (see them in Mailpit at http://localhost:8125) | Works today |
-| **AI assistant** (menu link, opens the assistant for your company): ask about your own courses, grades and, for teachers, the sections you teach; it never shows what your account may not see. See section 5 | Works today (needs the AI module in business mode) |
-
-### Campus lead
-
-Sees only their own campus's staff, students and sections (works today with the role template).
-
-### Platform operator (works today)
-
-Signs in at **http://platform.localhost:3001** (create the first account with `pnpm realm` and `pnpm bootstrap:platform`; locally set a password with `pnpm dev:password --platform --username root --password '...'`).
-
-| Flow | Available |
-|---|---|
-| See all companies with status and administrator | Works today |
-| **Open a company**: code, name, type, administrator e-mail; the administrator receives an invitation (Mailpit) | Works today |
-| **Notify** a planned suspension (e-mail to the administrator), **suspend** (the company's users are refused, data is kept), **restore** | Works today |
-| **Features**: switch features (menus) on or off for one company; its menus and permissions change at once | Works today |
-| **Sign-in & security** (button on the company row): password rules (length, character kinds, remembered passwords), lockout after failed sign-ins, idle and maximum session time, two-step verification (authenticator app) for everyone, and **Google sign-in** | Works today (milestone B14) |
-| **Administrator**: resend the invitation, send a password reset link, unlock after failed sign-ins, change the e-mail | Works today (API; resend and unlock are buttons) |
-| **Scheduled jobs**: enable a job, change its schedule, run it now, see the run log (new: **Send assignment deadline reminders**, enable it to get reminders) | Works today |
-| **Platform announcements**: a banner for every company during a time window | API today (`/api/platform/announcements`) |
-| **Monitoring**: server, cache and database health; links to API documentation and Grafana | Works today |
-| Platform accounts and roles, menus, entry assignment | API today (`/api/platform/...`); screens later |
-
-### Things to try across companies (the "why is this safe" tour)
-
-| Try | Available |
-|---|---|
-| Sign in as `admin` of hq, then of riverside-franchise: different people and roles; a token for one company is refused on the other's address | Works today |
-| Two teachers with the same role but different departments see different students | B5-B6 |
-| A teacher who does not teach a section cannot see or grade its assignments; a student never sees another student's submission | Works today |
-| The Beijing campus lead cannot find Shanghai students; the group HR manager sees both | B5 |
-
-## 4. Using the API directly (optional)
-
-The screens above call the same endpoints. A convenient way to try it is the browser's developer console on an admin page, after signing in:
+### Calling the API directly
+After signing in, in the browser's developer console:
 
 ```js
 const call = (path, method = "GET", body) =>
   fetch("/bff/" + path, { method, headers: { "x-requested-with": "staredu", "content-type": "application/json" }, body: body && JSON.stringify(body) }).then((r) => r.json());
-
-await call("roles", "POST", { code: "auditor", name: "Auditor" });   // new role
-await call("roles");                                                  // list roles
-await call("roles/menu-tree");                                        // menus and buttons you can tick
-await call("data-scope-sets");                                        // data scopes you can give a role
+await call("roles");              // list roles
+await call("roles/menu-tree");    // menus and buttons you can tick
 ```
 
-Then tick menus with `PUT roles/<id>/menus {menuIds:[...]}`, choose data scopes with `PUT roles/<id>/data-scopes {setIds:[...]}`, create a person's account with `POST accounts {username, email}` and give them the role with `PUT accounts/<id>/roles {roleIds:[...]}`. The new person receives an invitation e-mail (see Mailpit) and sets a password.
+API documentation is at <http://localhost:4000/api-docs> (development only; it has no sign-in, so do not expose it).
 
-## 5. Optional: the AI assistant in business mode
+### Scaffold your own resource
+`pnpm gen:module --name warehouse-item --group edu --fields "title:string!,qty:int,due:date,done:bool,notes:text" --label "Warehouse items" --label-zh "仓库物品"`, then `pnpm migrate && pnpm prisma:generate && pnpm --filter @staredu/shared build`. It creates the table (with row-level security), API, permissions, menu, page, tests and leak-scan entries; `--dry-run` lists the files without writing.
 
-The AI module (`ai-module/`) normally runs on its own sample company. To let it answer from this module's data:
-
-1. In `business-module/.env` set `INTERNAL_API_KEY=<a secret>`, restart `pnpm dev:api`, and **create a new company** (`pnpm seed` creates the demo ones; a company opened earlier has no `ai` sign-in client, because the realm template of earlier milestones did not have it).
-2. In `ai-module/.env` set `STARIT_IDENTITY_MODE=business`, `STARIT_OIDC_TENANT_ISSUER_BASE=http://localhost:8180/realms`, `STARIT_BUSINESS_INTERNAL_KEY=<the same secret>` and `STARIT_CORS_ORIGINS=http://hq.localhost:3000` (see `ai-module/.env.example`), then `make migrate` and start the AI module.
-3. Sign in as a teacher or student of your company and click **AI assistant**. A student asking for "all students' grades" gets only their own; an account with no rows in scope gets "nothing found".
-
-Course syllabi and published material lists enter the knowledge base through the event bus (next section), per company.
-
-## 6. Optional: the Kafka event bus
-
-Nothing in the walk-through above needs Kafka. To see it work: `make biz-up-kafka`, set `BIZ_EVENT_BUS=kafka` in `.env`, restart `pnpm dev:api`, then do anything that sends a notification (for example enroll a student as the registrar). The event goes outbox table, Kafka topic `business.events`, a consumer group, and then the bell. Stop the broker with `make biz-down-kafka` and keep working: events wait in the table and arrive after you start it again. Messages that cannot be handled land in `business.events.dlq`. `make test-events` runs the tests against the real broker.
-
-## 7. What to notice when you evaluate
-
-- **Menus follow permissions.** Give an account a role with one menu ticked and sign in as that account: only that menu appears. Remove the role and the menu disappears on the next request.
-- **Data scope.** Two people with the same role but different departments see different people. "No data scope" means no rows, never "everything".
-- **Isolation.** Two companies share one system but not one row. The test suite proves this for every endpoint (`pnpm test:leak`).
-- **Sessions.** Force logout works at once, even though the sign-in token is still valid for a few minutes.
-
-## 8. Reset
-
+### Checks
 ```bash
-make reset         # removes the local data of this module (not the AI module)
+pnpm lint && pnpm typecheck && pnpm test   # needs the Docker services from `make up`
+pnpm test:leak                             # the cross-tenant leak scan only
 ```
-
-Then repeat section 1.
-
-### Role template upgrade (tenant administrator, milestone B22)
-
-Roles that were created from a platform template (Teacher, Academic manager, ...) are copies, so menus the platform adds to a template later (for example "Student requests" in B19) do not appear in a company's existing copy. Open **Roles**: a copy that is missing template menus has an **Update from template (n)** button. It lists the new menus; **Add these menus** adds only those. Nothing is removed, and menus the company ticked on its own stay. Only menus the company has been granted can be added, and you cannot add a permission you do not hold yourself. The change is written to the audit log and applies to everyone holding the role at once. Built-in roles (tenant administrator, student) and roles you created yourself have no template and no button. API: `GET /api/roles/:id/template-diff` (preview), `POST /api/roles/:id/template-upgrade`.
-
-### Module generator (developers, milestone B20)
-
-For a plain "list of records inside one company" (a catalog, a register, a checklist) you do not have to wire eleven places by hand:
-
-```bash
-pnpm gen:module --name warehouse-item --group edu --fields "title:string!,qty:int,due:date,done:bool,notes:text" --label "Warehouse items" --label-zh "仓库物品"
-pnpm migrate && pnpm prisma:generate && pnpm --filter @staredu/shared build
-```
-
-Field types: `string`, `text`, `int`, `bool`, `date` (`!` after the type = required). `--group` is an existing menu directory (`edu`, `hr`, `msg`, `doc`, `system`); `--plural` overrides the default `<name>s`; `--dry-run` lists the files without writing. It creates the table (with row-level security) and its migration, the API controller (list, get, create, edit, delete; four permissions; audit entries), the menu with its buttons, the admin page, English and Chinese labels, an end-to-end test, and the cross-tenant leak-scan entries; it also registers the controller and the model. All edits are computed first, and if any anchor in an existing file is missing, nothing is written. The built-in administrator sees the new menu at once; give it to other roles in **Roles** or in `role-templates.ts`. The output is a starting point: rules between records, status flows, imports and exports are written by hand on top of it.
-
-### Student requests (students and instructors / academic office, milestone B19)
-
-Students open **My requests** in the portal, choose either a published final grade (appeal; open for 14 days after publication, at most 2 per course, reason of at least 10 characters) or an assignment whose deadline has not passed (extension of 1–3 days, not shorter than one already granted, not once the work is being graded) and submit; one pending request per grade or assignment, and the student can **Withdraw** it until it is handled. The section's instructors get a notification. Instructors and the academic office open **Student requests** (within their own data scope): **Approve** or **Reject** with a note the student sees. Approving an extension sets it exactly like the manual one (the days can be changed, late flags are recomputed). Approving a grade appeal needs the "amend locked grades" permission (the academic office), a new total and a note; it goes through the normal amendment (before/after kept in the grade change record). Instructors can see appeals and reject them but cannot change the grade. A handled request cannot be handled again; every step is in the audit log and the student is notified of the decision.
-
-### Transcript verification (academic office and anyone holding a transcript, milestone B18)
-
-Every transcript PDF (student download = unofficial, academic office = official) now has a watermark on every page ("UNOFFICIAL COPY", or "OFFICIAL" with the document number), a QR code and a short **fingerprint** (the first 16 characters of a SHA-256 of the transcript content). Scanning the QR code opens `<institution address>/verify/<token>` with no sign-in: it says whether the document was issued by the institution, official or unofficial, the issue date, the student's name, a mostly hidden student number, major, campus, cumulative GPA and credits as they were **when the document was issued**, and the fingerprint to compare with the printed one. The page never shows course-by-course results. In **Transcripts** (admin), each issued copy lists its verification page and a **Revoke** button (asks for a reason, cannot be undone); a revoked document shows "revoked" on the verification page at once. Copies issued before this milestone can be confirmed to exist but have no details. The address in the QR code comes from `TENANT_ORIGIN_TEMPLATE` (default `http://{code}.localhost:3001`), so set it to the public address in a real deployment. Lookups are limited to 30 per minute per address.
-
-### Batch enrollment (academic office, milestone B17)
-
-Open **Sections**, press **Batch enrollment**. Choose a term, a course and a major; optionally narrow by entry year and campus. **Preview** lists every selected student with the section they would go into (the open section of that course at the student's own campus with the most free seats) and what would stop them (not an enrolled student, already taking the course, no open section at the campus, and so on). Nothing is saved until **Run for real**. Over capacity, a missing prerequisite, a time conflict, being outside the enrollment window and a retake need to be ticked under "Confirm exceptions" with a reason, exactly as for a single registrar enrollment; each person gets their own enrollment record and audit entry, plus one summary entry for the batch. One person failing never stops the others, and running it again adds nobody twice. A batch holds at most 500 students.
-
-### Curriculum versions (academic office, milestone B16)
-
-Open **Majors**, press **Curriculum**. A major has one or more versions; a version applies to students who entered from its first year until the next version starts (the first version also covers earlier years). Pick a version to edit its courses and credit requirements. **Add version** copies the one you are looking at, so you only change what differs. A student's entry year is set when the major is declared (default: this year; the declare call accepts `entryYear`) and decides which version the student sees in "My plan" and for the credits required. Removing a version moves its students to the previous one; the last version cannot be removed.
-
-### Usage and quota (platform operator, milestone B15)
-
-Open **Tenants**, press **Usage & quota** on a company. You see the number of accounts (service accounts do not count) and the storage in use (document library files plus submitted assignment files), and you can set an account limit and a storage limit in MB; leave a box empty for no limit. When a limit is reached, creating an account is refused (409) and asking to upload a file is refused (413) with a message that names the limit; people can still sign in, read and download, and nothing is deleted. Lowering a limit below current use keeps the existing data and refuses only new additions. Changes are in the platform audit log. Not measured yet: AI assistant calls (they are counted in the AI module, not here).
-
-### Sign-in and security, and Google sign-in (platform operator, milestone B14)
-
-Open **Tenants**, press **Sign-in & security** on a company. Changes are written to that company's identity realm at once (they affect the next sign-in or password change) and are recorded in the platform audit log. Numbers are checked (for example the character kinds must fit in the length, idle time cannot exceed the longest session). Two-step verification set to "Required for everyone" makes everyone set up an authenticator app at their next sign-in.
-
-**Google sign-in** is optional and per company. The page shows the redirect address to register in the Google console; paste the client ID and secret (the secret is never shown again; leave it empty later to keep it). Rules: a person can sign in with Google only if an account with the same verified e-mail already exists in that company (it links automatically); if none exists, the sign-in is refused and nothing is created. Accounts with made-up e-mails (the demo accounts) keep using passwords. Removing the provider returns everyone to password sign-in.

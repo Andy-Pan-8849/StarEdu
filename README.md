@@ -9,7 +9,7 @@ An open-source blueprint for adding AI to a traditional business system. It pair
 | Module | Folder | Status |
 |---|---|---|
 | AI module: RAG, agents, API, web chat | [`ai-module/`](ai-module/) | Runs locally with Docker Compose |
-| Business module: back office in TypeScript (modeled on an open-source competitor) | [`business-module/`](business-module/) | Not started |
+| Business module: multi-tenant back office in TypeScript (modeled on an open-source competitor) | [`business-module/`](business-module/) ([try it](business-module/TRY-IT.md), [中文](business-module/README.chn.md)) | Runs locally with Docker Compose; demo companies, accounts and one-command reset included |
 
 ## What the AI module does
 
