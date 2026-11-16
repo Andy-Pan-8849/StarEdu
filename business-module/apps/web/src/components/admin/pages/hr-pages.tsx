@@ -58,6 +58,74 @@ function ImportPanel({ path, onDone, columns }: { path: string; onDone: () => vo
   );
 }
 
+// ---------------------------------------------------------------- 人员目录（所有自然人：教职员工和学生）
+interface PersonRow { id: string; type: string; fullName: string; workEmail: string | null }
+interface PersonDetail extends PersonRow { sensitive?: { birthDate: string | null; gender: string | null; idNumber: string | null; phone: string | null; address: string | null } }
+
+export function PeoplePage() {
+  const t = useTranslations("pages.hr");
+  const tt = useTable();
+  const perms = usePermissions();
+  const list = useList<PersonRow>("persons");
+  const [q, setQ] = React.useState("");
+  const [type, setType] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const [open, setOpen] = React.useState<string | null>(null);
+  const filtered = list.rows.filter((r) => (!type || r.type === type) && (!q || `${r.fullName} ${r.workEmail ?? ""}`.toLowerCase().includes(q.toLowerCase())));
+  const shown = filtered.slice((page - 1) * 20, page * 20);
+  const columns: Column<PersonRow>[] = [
+    { key: "name", header: t("name"), cell: (r) => r.fullName },
+    { key: "type", header: t("personType"), cell: (r) => t(`person_${r.type}`) },
+    { key: "email", header: t("email"), cell: (r) => r.workEmail ?? "" },
+    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button> },
+  ];
+  return (
+    <section>
+      <H2>{t("peopleTitle")}</H2>
+      <p className="mb-3 text-sm text-muted">{t("peopleHint")}</p>
+      <Err error={list.error} />
+      <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
+        <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
+        <label className="flex flex-col gap-1">{t("personType")}
+          <select className="rounded-md border border-border bg-transparent px-2 py-1" value={type} onChange={(e) => { setPage(1); setType(e.target.value); }}>
+            <option value="">{t("allTypes")}</option><option value="staff">{t("person_staff")}</option><option value="student">{t("person_student")}</option>
+          </select>
+        </label>
+      </div>
+      <DataTable columns={columns} rows={shown} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: filtered.length > page * 20, onPageChange: setPage }} />
+      {open ? <PersonDetailPanel id={open} canEmergency={perms.has(PERMS.hrEmergencyView)} onClose={() => setOpen(null)} /> : null}
+    </section>
+  );
+}
+
+function PersonDetailPanel({ id, canEmergency, onClose }: { id: string; canEmergency: boolean; onClose: () => void }) {
+  const t = useTranslations("pages.hr");
+  const c = useTranslations("crud");
+  const [d, setD] = React.useState<PersonDetail | null>(null);
+  React.useEffect(() => { void bff<PersonDetail>(`persons/${id}`).then(setD); }, [id]);
+  if (!d) return <p className="mt-3 text-sm text-muted">…</p>;
+  return (
+    <div className="mt-4 rounded-md border border-border p-3 text-sm">
+      <h3 className="mb-2 font-medium">{d.fullName} <span className="text-muted">({t(`person_${d.type}`)})</span></h3>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <dt className="text-muted">{t("email")}</dt><dd>{d.workEmail ?? ""}</dd>
+        {d.sensitive ? (
+          <>
+            <dt className="text-muted">{t("birthDate")}</dt><dd>{d.sensitive.birthDate ?? ""}</dd>
+            <dt className="text-muted">{t("gender")}</dt><dd>{d.sensitive.gender ?? ""}</dd>
+            <dt className="text-muted">{t("idNumber")}</dt><dd>{d.sensitive.idNumber ?? ""}</dd>
+            <dt className="text-muted">{t("phone")}</dt><dd>{d.sensitive.phone ?? ""}</dd>
+            <dt className="text-muted">{t("address")}</dt><dd>{d.sensitive.address ?? ""}</dd>
+          </>
+        ) : null}
+      </dl>
+      {!d.sensitive ? <p className="mt-2 text-muted">{t("noSensitive")}</p> : null}
+      {canEmergency ? <div className="mt-3"><h4 className="mb-1 font-medium">{t("tab_emergency")}</h4><EmergencyTab personId={id} /></div> : null}
+      <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- 教职员工
 interface Assignment { id: string; deptId: string; deptName: string | null; postName: string | null; isPrimary: boolean; startDate: string; endDate: string | null; current: boolean }
 interface StaffRow { id: string; fullName: string; workEmail: string | null; employeeNo: string | null; status: string | null; hireDate: string | null; campuses: string[] }

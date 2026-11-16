@@ -180,6 +180,12 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       const second = await h.call(a.token).post("/api/portal/enrollments", { sectionId: clash2 });
       expect(second.status).toBe(201); // 只提示不阻止
       expect(second.body.conflicts).toEqual([expect.objectContaining({ name: expect.stringContaining("CS101-20") })]);
+      // 门户的开放班级列表：已选的班只和"别的"班冲突，不会提示和自己冲突
+      const listed = (await h.call(a.token).get("/api/portal/sections")).body.sections as Array<{ id: string; name: string; conflicts: string[] }>;
+      const own = listed.find((s) => s.id === clash1)!;
+      expect(own.conflicts).toHaveLength(1);
+      expect(own.conflicts).not.toContain(own.name);
+      expect(own.conflicts[0]).toContain("CL200");
     });
 
     it("the portal lists open sections with my requirement, missing prerequisites and clashes; no major means no label", async () => {
