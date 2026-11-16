@@ -60,11 +60,29 @@ export class RolesController {
     return role;
   }
 
+  /**
+   * 角色模板新增的菜单：模板里有、这个角色副本里没有、并且本公司已开通（管理后台入口下）的。
+   * 只比"缺什么"，不比"多什么"——公司自己加的、删的都不算差异（删掉的会再出现在"缺"里，由管理员决定要不要补）。
+   */
+  private async templateMissing(role: { id: string; templateId: string | null }, graph: Awaited<ReturnType<AuthzService["graph"]>>) {
+    if (!role.templateId) return null;
+    const db = this.tenantDb.db;
+    const template = await db.role.findFirst({ where: { id: role.templateId, tenantId: null, deletedAt: null } });
+    if (!template) return null;
+    const [have, want] = await Promise.all([db.roleMenu.findMany({ where: { roleId: role.id } }), db.roleMenu.findMany({ where: { roleId: template.id } })]);
+    const haveIds = new Set(have.map((m) => m.menuId));
+    const allowed = new Set(graph.menusOfEntry("admin").map((m) => m.id));
+    const missing = want.map((m) => m.menuId).filter((m) => !haveIds.has(m) && allowed.has(m));
+    return { template, missing };
+  }
+
   @Get()
   @RequirePermissions(PERMS.roleList)
   async list() {
     const tenant = requireTenant("list roles");
-    return this.tenantDb.db.role.findMany({ where: { tenantId: tenant.tenantId }, orderBy: [{ sort: "asc" }, { code: "asc" }] });
+    const roles = await this.tenantDb.db.role.findMany({ where: { tenantId: tenant.tenantId }, orderBy: [{ sort: "asc" }, { code: "asc" }] });
+    const graph = await this.authz.graph();
+    return Promise.all(roles.map(async (r) => ({ ...r, templateMissingCount: (await this.templateMissing(r, graph))?.missing.length ?? 0 })));
   }
 
   /** 角色编辑页的菜单树：本租户已开通的、管理后台入口下的全部目录/菜单/按钮。 */
@@ -154,6 +172,42 @@ export class RolesController {
       removed: removed.map((m) => graph.byId.get(m)?.code ?? graph.byId.get(m)?.name ?? m),
     });
     return { id, menuIds: wanted };
+  }
+
+  /** 这个角色和它的模板比，缺哪些新菜单（预览，不改任何东西）。 */
+  @Get(":id/template-diff")
+  @RequirePermissions(PERMS.roleList)
+  async templateDiff(@Param("id", ParseUUIDPipe) id: string) {
+    const role = await this.own(id);
+    const graph = await this.authz.graph();
+    const diff = await this.templateMissing(role, graph);
+    if (!diff) throw new NotFoundException("This role has no template");
+    return {
+      template: { code: diff.template.code, name: diff.template.name },
+      missing: diff.missing.map((m) => ({ menuId: m, code: graph.byId.get(m)?.code ?? null, name: graph.byId.get(m)?.name ?? "", type: graph.byId.get(m)?.type ?? "menu" })),
+    };
+  }
+
+  /**
+   * 把模板里新增的菜单补进这个角色（只增不减，公司自己调过的勾选不动）。
+   * 和手动勾选同样的限制：只能是本公司已开通的菜单，且不能给出操作者自己没有的权限。
+   */
+  @Post(":id/template-upgrade")
+  @RequirePermissions(PERMS.roleAuthorize)
+  async templateUpgrade(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    await this.customOwn(id);
+    const graph = await this.authz.graph();
+    const diff = await this.templateMissing(await this.own(id), graph);
+    if (!diff) throw new NotFoundException("This role has no template");
+    const mine = new Set(auth.authz.perms);
+    const escalating = diff.missing.map((m) => graph.byId.get(m)?.perms).filter((p): p is string => !!p && !mine.has(p));
+    if (escalating.length > 0) throw new ForbiddenException("You cannot grant permissions you do not have");
+    if (diff.missing.length === 0) return { id, added: [] };
+    await this.tenantDb.db.roleMenu.createMany({ data: diff.missing.map((menuId) => ({ tenantId: auth.tenantId, roleId: id, menuId })), skipDuplicates: true });
+    await this.authz.bump(auth.tenantId);
+    const added = diff.missing.map((m) => graph.byId.get(m)?.code ?? graph.byId.get(m)?.name ?? m);
+    await this.audit.record(auth.accountId, "role.templateUpgrade", "role", id, { template: diff.template.code, added });
+    return { id, added };
   }
 
   @Put(":id/data-scopes")

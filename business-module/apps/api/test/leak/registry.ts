@@ -49,6 +49,7 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/requests", kind: "other" },
   { method: "GET", path: "/api/library/folders", kind: "list" },
   { method: "GET", path: "/api/library/folders/:id", kind: "detail", fixture: "folderId" },
+  { method: "GET", path: "/api/roles/:id/template-diff", kind: "detail", fixture: "roleId" },
   { method: "GET", path: "/api/campuses/:id", kind: "detail", fixture: "campusId" },
   { method: "GET", path: "/api/campuses/:id/closure-check", kind: "detail", fixture: "campusId" },
   { method: "GET", path: "/api/dict-types", kind: "other" },
@@ -106,6 +107,7 @@ export interface MutationEntry {
 
 export const MUTATION_REGISTRY: MutationEntry[] = [
   // 目标行是 B 的
+  { method: "POST", path: "/api/roles/:id/template-upgrade", fixture: "roleId", target: "foreign", note: "apply template menus to another tenant's role" },
   { method: "PATCH", path: "/api/roles/:id", fixture: "roleId", target: "foreign", body: { name: "hacked" }, note: "rename another tenant's role" },
   { method: "DELETE", path: "/api/roles/:id", fixture: "roleId", target: "foreign", note: "delete another tenant's role" },
   { method: "PUT", path: "/api/roles/:id/menus", fixture: "roleId", target: "foreign", body: { menuIds: [] }, note: "clear another tenant's role menus" },

@@ -2,7 +2,7 @@
 
 This guide shows how to start the business module, which accounts to sign in with, and what each kind of user can do. **It grows with every milestone**: each section says what works today and what is still to come, so you never have to guess.
 
-Status: **milestone B21 (browser check and polish).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
+Status: **milestone B22 (role template upgrade).** Sign-in, the document library (admin: Library; portal: Library), the platform console, system management, people, teaching, assignments, grades, notifications, class discussion and the AI assistant link work; their menus show "This page is not available yet."
 
 ## 1. Start it
 
@@ -213,6 +213,10 @@ make reset         # removes the local data of this module (not the AI module)
 ```
 
 Then repeat section 1.
+
+### Role template upgrade (tenant administrator, milestone B22)
+
+Roles that were created from a platform template (Teacher, Academic manager, ...) are copies, so menus the platform adds to a template later (for example "Student requests" in B19) do not appear in a company's existing copy. Open **Roles**: a copy that is missing template menus has an **Update from template (n)** button. It lists the new menus; **Add these menus** adds only those. Nothing is removed, and menus the company ticked on its own stay. Only menus the company has been granted can be added, and you cannot add a permission you do not hold yourself. The change is written to the audit log and applies to everyone holding the role at once. Built-in roles (tenant administrator, student) and roles you created yourself have no template and no button. API: `GET /api/roles/:id/template-diff` (preview), `POST /api/roles/:id/template-upgrade`.
 
 ### Module generator (developers, milestone B20)
 
