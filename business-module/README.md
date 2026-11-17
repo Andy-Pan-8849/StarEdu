@@ -90,6 +90,19 @@ Foreign keys are not covered by row-level security, so any endpoint that accepts
 - Work is delivered in numbered milestones (`B1`, `B2`, ...): one branch per milestone, a pull-request-sized change with its tests and docs, merged with `--no-ff` and tagged `biz-b<N>` once CI is green.
 - English first for code, messages and documents; Chinese is a second language in the UI and in `*.chn.md` documents.
 
+## Addresses: one address per entry
+
+Every entry has its own address, and the company is told by the host name (`{code}` is the company code):
+
+| Entry | Address | Sign-in realm |
+|---|---|---|
+| Student portal | `{code}.<domain>/` | the company's realm, client `portal` |
+| Admin console | `{code}.<domain>/admin` | the company's realm, client `admin` |
+| Platform console | `platform.<domain>/` | the `platform` realm |
+| AI assistant (optional) | `{code}.<domain>:3000` in development; its own address when hosted | the company's realm, client `ai` (same sign-in, so no second password prompt) |
+
+Portal and admin console are one web app; the platform console is the same app on the `platform.` host. A token for one company is refused on another company's address. Locally `*.localhost` resolves to your machine. The address scheme for a public host (domain, wildcard or per-host certificates, where the AI assistant sits) is **not decided yet**: it is being planned together with the Oracle deployment, and this section will be updated when it is.
+
 ## Architecture and technology
 
 | Part | Technology |
