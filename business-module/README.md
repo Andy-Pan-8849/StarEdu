@@ -2,7 +2,7 @@
 
 [中文说明](README.chn.md) · **[Try it: setup, trial data, accounts](TRY-IT.md)** ([中文](TRY-IT.chn.md))
 
-The traditional business system of StarEdu: a **multi-tenant SaaS back office for a training or education company**. It manages organizations and people, teaching and enrollment, assignments and grades, transcripts, notifications and a document library, and it is the system the [AI module](../ai-module/) plugs into. It is built as an open-source reference: the interesting part is not any single screen but the way tenant isolation, permissions, data scope, auditing and testing are done end to end.
+The traditional business system of StarEdu: a **multi-tenant SaaS back office for a training or education company**. It manages organizations and people, teaching and enrollment, assignments and grades, transcripts, notifications and a document library, and it is the system the [AI module](../ai-module/) plugs into. It is designed as an open-source project for universities to learn from and use: the interesting part is not any single screen but the way tenant isolation, permissions, data scope, auditing and testing are done end to end.
 
 Built with NestJS, Prisma and PostgreSQL on the server, Next.js 15 with Tailwind and shadcn/ui-style components in the browser, and Keycloak for sign-in. English first, Chinese as a second language.
 
