@@ -1,6 +1,6 @@
 # StarEdu 业务模块
 
-[English](README.chn.md) · **[试用指南：环境、搭建、试用数据、账号](TRY-IT.chn.md)**（[English](TRY-IT.chn.md)）
+[English](README.md) · **[试用指南：环境、搭建、试用数据、账号](TRY-IT.chn.md)**（[English](TRY-IT.md)）
 
 StarEdu 的传统业务系统：一套面向**培训或教育公司的多租户 SaaS 后台**。它管理组织和人员、教学和选课、作业和成绩、成绩单、通知和文档库，也是 [AI 模块](../ai-module/)接入的那个业务系统。它的目的是设计为一个开源项目供大学学习和使用：值得看的不是某一个页面，而是租户隔离、权限、数据范围、审计和测试是怎么从头到尾做完整的。
 

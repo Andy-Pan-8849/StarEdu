@@ -2,6 +2,8 @@
 
 [中文版](TRY-IT.chn.md) · [What the system is and how it is built](README.md)
 
+> New here? Start with the [root TRY-IT](../TRY-IT.md): it covers Docker setup, the commands, the accounts table and running both modules together. This page goes deeper on the business module.
+
 This guide gets the business module running on your own machine, loads a realistic company into it, and shows what to click as each kind of user. About 15 minutes once Docker has pulled its images.
 
 ## 1. What you need

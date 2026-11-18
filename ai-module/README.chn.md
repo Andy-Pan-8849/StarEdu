@@ -4,7 +4,7 @@
 
 # AI 模块
 
-[English](README.chn.md) · [试用整个项目](../TRY-IT.chn.md)
+[English](README.md) · [试用整个项目](../TRY-IT.chn.md)
 
 公司 StarIT Education 的企业知识助手。里程碑 M2–M9 已完成（tag `ai-m2` … `ai-m9`、`v0.1.0`），全部可在本机用 Docker Compose 跑起来。
 
