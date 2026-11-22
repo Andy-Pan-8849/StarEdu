@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export interface Column<T> {
   key: string;
@@ -40,6 +41,8 @@ export function DataTable<T>({
   pagination?: Pagination;
   labels?: { previous: string; next: string; page: (page: number, pages: number) => string };
 }) {
+  // 点哪一行，哪一行高亮（只在本表内记着；换页或数据刷新后，该行不在了就自然没有高亮）
+  const [selected, setSelected] = React.useState<string | null>(null);
   const pages = pagination && pagination.total !== undefined ? pageCount(pagination.total, pagination.size) : null;
   const lastPage = pagination ? (pages !== null ? pagination.page >= pages : !pagination.hasMore) : true;
   return (
@@ -69,15 +72,25 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={rowKey(row)} className="border-t border-border">
+              rows.map((row) => {
+                const key = rowKey(row);
+                const isSelected = key === selected;
+                return (
+                <tr
+                  key={key}
+                  aria-selected={isSelected}
+                  data-selected={isSelected ? "true" : undefined}
+                  onClick={() => setSelected(key)}
+                  className={cn("border-t border-border hover:bg-border/20", isSelected && "bg-primary/15 outline outline-1 -outline-offset-1 outline-primary/60")}
+                >
                   {columns.map((c) => (
                     <td key={c.key} className="px-3 py-2">
                       {c.cell(row)}
                     </td>
                   ))}
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

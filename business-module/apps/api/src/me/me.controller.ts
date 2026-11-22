@@ -25,6 +25,7 @@ export class MeController {
     const account = await this.tenantDb.db.account.findUnique({ where: { id: auth.accountId } });
     if (!account) throw new NotFoundException("Account not found in this tenant");
     return {
+      brand: await this.brand(auth.tenantId),
       id: account.id,
       tenantId: account.tenantId,
       username: account.username,
@@ -32,6 +33,19 @@ export class MeController {
       roles: auth.authz.roles.map((r) => ({ id: r.id, code: r.code, kind: r.kind })),
       permissions: auth.authz.perms,
     };
+  }
+
+  /**
+   * 左上角的品牌：名称取公司简称（没有就用公司名）；Logo 取本公司的参数 brand.logoUrl（一个图片网址，
+   * 只接受 http(s) 或以 / 开头的地址），没有或不合规就是 null，前端显示默认 Logo。
+   */
+  private async brand(tenantId: string): Promise<{ name: string; logoUrl: string | null }> {
+    const db = this.tenantDb.db;
+    const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { name: true, shortName: true } });
+    const params = await db.sysParam.findMany({ where: { key: "brand.logoUrl", deletedAt: null }, select: { value: true, tenantId: true } });
+    const own = params.find((p) => p.tenantId === tenantId) ?? params[0];
+    const url = own?.value.trim() ?? "";
+    return { name: tenant?.shortName?.trim() || tenant?.name || "StarIT", logoUrl: /^(https?:\/\/|\/(?!\/))\S+$/i.test(url) ? url : null };
   }
 
   /** 某入口下我能看到的菜单树（后台：按角色勾选；门户：学生全部）。 */

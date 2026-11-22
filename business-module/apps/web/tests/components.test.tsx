@@ -90,6 +90,19 @@ describe("DataTable", () => {
     expect(screen.queryByText("Nothing")).toBeNull();
   });
 
+  it("highlights the clicked row and moves the highlight to the next click", async () => {
+    const user = userEvent.setup();
+    render(<DataTable columns={columns} rows={[{ n: "alice" }, { n: "bob" }]} rowKey={(r) => r.n} emptyText="-" />);
+    const row = (name: string) => screen.getByText(name).closest("tr")!;
+    expect(row("alice").getAttribute("aria-selected")).toBe("false");
+    await user.click(screen.getByText("alice"));
+    expect(row("alice").getAttribute("aria-selected")).toBe("true");
+    expect(row("bob").getAttribute("aria-selected")).toBe("false");
+    await user.click(screen.getByText("bob"));
+    expect(row("alice").getAttribute("aria-selected")).toBe("false");
+    expect(row("bob").getAttribute("aria-selected")).toBe("true");
+  });
+
   it("pages forwards and backwards within bounds (known total)", async () => {
     const user = userEvent.setup();
     const onPageChange = vi.fn();
@@ -117,6 +130,21 @@ describe("DataTable", () => {
 });
 
 describe("MenuTreeShell", () => {
+  it("shows the company brand at the top of the menu: custom logo and short name, or the default logo", () => {
+    const labels0: ShellLabels = { closeTab: "Close", noMenus: "No menus", pageNotBuilt: "Not built", signedInAs: "Signed in as", signOut: "Sign out" };
+    const shell = (brand?: { name: string; logoUrl: string | null }) => (
+      <MenuTreeShell menus={[]} pages={{}} label={(n) => n.name} userName="a" brand={brand} signOutAction="/x" labels={labels0} />
+    );
+    const { container, rerender } = render(shell({ name: "RiverSide", logoUrl: "https://example.test/logo.png" }));
+    expect(screen.getByText("RiverSide")).toBeTruthy();
+    expect(container.querySelector("nav img")?.getAttribute("src")).toBe("https://example.test/logo.png");
+    rerender(shell({ name: "RiverSide", logoUrl: null }));
+    expect(container.querySelector("nav img")).toBeNull();
+    expect(container.querySelector("nav svg")).toBeTruthy(); // default logo
+    rerender(shell());
+    expect(screen.getByText("StarIT")).toBeTruthy();
+  });
+
   const menus: MenuNode[] = [
     { id: "d1", code: "system", name: "System", nameKey: null, type: "directory", route: "system", component: null, icon: null, children: [
       { id: "m1", code: "system:online", name: "Online users", nameKey: null, type: "menu", route: "online", component: "system/online/index", icon: null, children: [] },

@@ -29,6 +29,18 @@ describe("sessions, force logout and entry qualification", () => {
     expect(c.exp as number - (c.iat as number)).toBe(900);
   });
 
+  it("/api/me carries the brand: the company's short name (or name) and an optional, validated logo URL", async () => {
+    const me = async () => (await h.call(bossToken).get("/api/me")).body.brand as { name: string; logoUrl: string | null };
+    const tenant = await h.owner.tenant.findUniqueOrThrow({ where: { id: h.tenant.tenantId } });
+    expect(await me()).toEqual({ name: tenant.name, logoUrl: null });
+    await h.owner.tenant.update({ where: { id: tenant.id }, data: { shortName: "RiverSide" } });
+    const param = (value: string) => h.owner.sysParam.upsert({ where: { tenantId_key: { tenantId: tenant.id, key: "brand.logoUrl" } }, update: { value }, create: { tenantId: tenant.id, key: "brand.logoUrl", value, name: "Logo" } });
+    await param("https://cdn.example.test/logo.png");
+    expect(await me()).toEqual({ name: "RiverSide", logoUrl: "https://cdn.example.test/logo.png" });
+    await param("javascript:alert(1)"); // 不合规的地址被忽略，回到默认 Logo
+    expect((await me()).logoUrl).toBeNull();
+  });
+
   it("a signed-in user shows up as online, and an administrator can force them out", async () => {
     const victim = await h.user("victim", { roles: ["tenant-admin"], person: "staff" });
     const victimToken = await victim.token();
