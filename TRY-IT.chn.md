@@ -10,7 +10,7 @@
 |---|---|---|
 | **B：业务模块**（从这里开始） | 一个培训公司的多租户后台，带演示公司和账号。免费。 | Docker、Node.js 20.19+、pnpm 10。**不需要 API key。** |
 | **A：AI 模块** | 一个知识助手：在聊天页提问，得到带引用的回答，结果按提问的人过滤。问几个问题大约花几分钱的模型调用费。 | Docker、uv、make、OpenAI API key |
-| **C：两个一起用** | 助手从后台打开，用后台的数据回答，以同一个人的身份登录。 | B 和 A，再加几项设置 |
+| **C：两个一起用** | 助手从后台打开，用后台的数据回答，以同一个人的身份登录。 | B 和 A，再加几项设置；或者直接 `make start-all`（第 5 节） |
 
 ## 2. 你需要什么
 
@@ -75,6 +75,25 @@ make sync && make up && make seed
 
 ## 5. 路径 C：两个一起用
 
+### 一条命令
+
+在项目根目录，Docker 已运行，并装好 `uv`、`node`、`pnpm`：
+
+```bash
+make start-all
+```
+
+它会替你做下面所有的事：缺少 `.env` 就创建两份，为两个模块生成同一个共享密钥并在 AI 模块里打开业务模式，启动两边的容器，建表和平台登录域，装入演示数据和样本知识库，然后在后台启动业务 API、业务网页和 AI 网页（日志在 `.run/`）。等它们都响应了就打印地址。第一次运行很慢（要拉镜像、装依赖），之后会快很多。先把 `OPENAI_API_KEY` 填进 `ai-module/.env`，否则一切都能启动，只是助手没法回答。
+
+```bash
+make status      # 看进程、端口、容器
+make stop-all    # 停掉后台进程和两边的容器（数据保留）
+```
+
+注意：这会把 AI 模块切到业务模式——你从后台里进入助手，3000 端口上单独的 AI 账号（`wei.stu.sh` 等）就不能用了。想改回去，删掉 `ai-module/.env` 里的 `STARIT_IDENTITY_MODE` 一行并重启 AI 模块。脚本是 [`scripts/dev-all.sh`](scripts/dev-all.sh)；`make wire` 只执行它的配置步骤。
+
+### 分步操作
+
 在*业务模式*下，你用公司自己的登录进入，助手向后台询问这个人可以看哪些数据行和文件夹，并且只通过按这个范围过滤的视图读取。学生问“所有学生的成绩”，只会得到自己的。
 
 1. 先完成路径 B 和路径 A（AI 模块要有可用的 `.env` 并已 `make up`）。
@@ -104,6 +123,8 @@ docker ps --format '{{.Names}} {{.Status}}'      # 每个容器都应是 Up / he
 cd business-module && pnpm demo:reset            # 用新日期重建演示数据
 cd business-module && make down                  # 停止（保留数据）；make reset 会删除本模块的数据
 cd ai-module && make down                        # 停止（保留数据）；make clean 连数据一起删
+make status                                      # （项目根目录）make start-all 之后：看进程和端口
+make stop-all                                    # （项目根目录）停掉 make start-all 启动的一切
 ```
 
 ## 7. 出问题时

@@ -162,6 +162,8 @@ make reset          # 删除本模块的全部本地数据（不含 AI 模块）
 ## 7. 可选的扩展
 
 ### 业务模式下的 AI 助手
+> 想一条命令全部配好并启动：在项目根目录运行 `make start-all`（见根目录 [TRY-IT.chn.md](../TRY-IT.chn.md#5-路径-c两个一起用)）。下面是手动步骤。
+
 AI 模块（`../ai-module/`）平时在它自己的样本公司上运行。要让它根据本模块的数据回答：
 
 1. 在 `business-module/.env` 里设置 `INTERNAL_API_KEY=<一个密钥>`，重启 `pnpm dev:api`，并重新建公司（`pnpm demo:reset`），因为之前开通的公司没有 `ai` 登录客户端。

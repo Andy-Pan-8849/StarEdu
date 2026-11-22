@@ -32,3 +32,6 @@ Design.md
 
 # Private notes, not uploaded to GitHub
 docs/private/
+
+# local run state of scripts/dev-all.sh (pids and logs)
+.run/
