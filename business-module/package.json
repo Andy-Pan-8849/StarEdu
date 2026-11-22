@@ -12,7 +12,7 @@
     "typecheck": "pnpm -r typecheck && tsc -p scripts/tsconfig.json",
     "test": "pnpm -r test",
     "prisma:generate": "pnpm --filter @staredu/api prisma:generate",
-    "migrate": "pnpm --filter @staredu/api prisma:migrate",
+    "migrate": "node scripts/with-env.mjs pnpm --filter @staredu/api prisma:migrate",
     "dev:api": "node scripts/with-env.mjs pnpm --filter @staredu/api dev",
     "dev:web": "node scripts/with-env.mjs pnpm --filter @staredu/web dev",
     "realm": "tsx scripts/create-realm.ts",
