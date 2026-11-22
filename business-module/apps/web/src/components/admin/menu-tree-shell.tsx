@@ -5,6 +5,7 @@
 //   - 页面组件是构建时打包的：按菜单的"组件路径"在 pages 里找；还没有的显示占位说明，不报错。
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { LogoMark } from "../logo-mark";
 import { firstOpenable, findMenu, type MenuNode } from "./menu-nav";
 import { TabBar } from "./tab-bar";
 import { closeTab, emptyTabs, openTab, type TabsState } from "./tabs-state";
@@ -101,6 +102,10 @@ export function MenuTreeShell({
   return (
     <div className="flex min-h-screen">
       <nav aria-label="Menu" className="w-60 shrink-0 border-r border-border py-3">
+        <div className="mb-2 flex items-center gap-2 px-3 pb-3 font-semibold">
+          <LogoMark size={36} />
+          <span>StarIT</span>
+        </div>
         {menus.length === 0 ? <p className="px-3 text-sm text-muted">{labels.noMenus}</p> : <ul>{menus.map((m) => renderNode(m, 0))}</ul>}
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
