@@ -162,6 +162,8 @@ make reset          # remove all local data of this module (not the AI module); 
 ## 7. Optional extras
 
 ### The AI assistant in business mode
+> To have all of this configured and started with one command, run `make start-all` from the project root (see the root [TRY-IT.md](../TRY-IT.md#5-path-c-both-together)). The manual steps follow.
+
 The AI module (`../ai-module/`) normally runs on its own sample company. To let it answer from this module's data:
 
 1. In `business-module/.env` set `INTERNAL_API_KEY=<a secret>`, restart `pnpm dev:api`, and create the companies again (`pnpm demo:reset`), because a company opened earlier has no `ai` sign-in client.

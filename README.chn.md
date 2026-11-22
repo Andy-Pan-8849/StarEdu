@@ -30,6 +30,8 @@ pnpm dev:web        # 另一个终端
 
 然后打开 <http://hq.localhost:3001>，在登录页点一个演示账号即可。
 
+想用一条命令同时启动两个模块（业务后台加 AI 助手），在本目录运行 `make start-all`；`make status` 查看，`make stop-all` 停止。详见 [TRY-IT.chn.md 第 5 节](TRY-IT.chn.md#5-路径-c两个一起用)。
+
 ## 想看什么，去哪里
 
 | 想看 | 去哪里 |

@@ -10,7 +10,7 @@ This is the one place to start. It says what to install, how to set up Docker, h
 |---|---|---|
 | **B: business module** (start here) | A multi-tenant back office for a training company, with demo companies and accounts. Free. | Docker, Node.js 20.19+, pnpm 10. **No API key.** |
 | **A: AI module** | A knowledge assistant: ask in a chat page, get answers with citations filtered by who is asking. A handful of questions costs a few cents of model calls. | Docker, uv, make, an OpenAI API key |
-| **C: both together** | The assistant opens from the back office and answers from its data, signed in as the same person. | B and A, plus a few settings |
+| **C: both together** | The assistant opens from the back office and answers from its data, signed in as the same person. | B and A, plus a few settings, or just `make start-all` (section 5) |
 
 ## 2. What you need
 
@@ -75,6 +75,25 @@ All eight demo accounts, with three normal and two restricted questions for each
 
 ## 5. Path C: both together
 
+### One command
+
+From the project root, with Docker running and `uv`, `node` and `pnpm` installed:
+
+```bash
+make start-all
+```
+
+It does everything below for you: creates both `.env` files if missing, makes up one shared secret for the two modules and turns on business mode in the AI module, starts both sets of containers, creates the tables and the platform login realm, loads the demo data and the sample knowledge base, then starts the business API, the business web and the AI web in the background (logs in `.run/`). It prints the addresses when they answer. The first run is slow (images, dependencies); later runs are quicker. Put your `OPENAI_API_KEY` in `ai-module/.env` first, or everything starts but the assistant cannot answer.
+
+```bash
+make status      # processes, ports, containers
+make stop-all    # stop the background processes and both sets of containers (data is kept)
+```
+
+Note that this switches the AI module to business mode: you sign in to the assistant from the back office, and the standalone AI accounts (`wei.stu.sh` and so on) no longer work on port 3000. To go back, remove the `STARIT_IDENTITY_MODE` line from `ai-module/.env` and restart the AI module. The script is [`scripts/dev-all.sh`](scripts/dev-all.sh); `make wire` runs only its configuration step.
+
+### Step by step
+
 In *business mode* you sign in with the company's own login, the assistant asks the back office which data rows and folders that person may see, and reads only through views filtered by that scope. A student who asks for "all students' grades" gets only their own.
 
 1. Finish Path B and Path A (the AI module needs a working `.env` and `make up`).
@@ -104,6 +123,8 @@ docker ps --format '{{.Names}} {{.Status}}'      # every container should be Up 
 cd business-module && pnpm demo:reset            # rebuild the demo data with fresh dates
 cd business-module && make down                  # stop (keeps data); make reset deletes this module's data
 cd ai-module && make down                        # stop (keeps data); make clean also deletes the data
+make status                                      # (project root) after make start-all: processes and ports
+make stop-all                                    # (project root) stop everything that make start-all started
 ```
 
 ## 7. When something is wrong

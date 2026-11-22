@@ -30,6 +30,8 @@ pnpm dev:web        # another terminal
 
 Then open <http://hq.localhost:3001> and click a demo account on the sign-in page.
 
+To start both modules together (business back office plus the AI assistant) with one command, run `make start-all` from this directory; `make status` and `make stop-all` check and stop it. Details in [TRY-IT.md, section 5](TRY-IT.md#5-path-c-both-together).
+
 ## Where to read what
 
 | Looking for | Go to |
