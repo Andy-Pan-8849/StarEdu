@@ -189,6 +189,9 @@ API documentation is at <http://localhost:4000/api-docs> (development only; it h
 
 To put the demo on a server for others to try, turn on the trial protection and schedule the daily reset. Visitors can still create, edit and delete almost everything; only account creation, sign-in changes and the platform's company administration are turned off, and the data is rebuilt every day. Settings, proxy rules and the cron or timer files are in [`deploy/trial/`](deploy/trial/README.md).
 
+### Company name and logo in the menu
+The top of the admin menu shows the company's short name (the company name if it has no short name; the short name is set in the platform console, under companies) and a logo. The default logo is StarIT's. A company shows its own logo by adding a system parameter named `brand.logoUrl` (System management > Parameters) whose value is the address of an image, starting with `https://`, `http://` or `/`. If the parameter is missing, invalid or the image cannot be loaded, the default logo is shown.
+
 ### Scaffold your own resource
 `pnpm gen:module --name warehouse-item --group edu --fields "title:string!,qty:int,due:date,done:bool,notes:text" --label "Warehouse items" --label-zh "仓库物品"`, then `pnpm migrate && pnpm prisma:generate && pnpm --filter @staredu/shared build`. It creates the table (with row-level security), API, permissions, menu, page, tests and leak-scan entries; `--dry-run` lists the files without writing.
 
