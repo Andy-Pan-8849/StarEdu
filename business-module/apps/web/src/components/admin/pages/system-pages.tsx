@@ -2,14 +2,16 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Ban, Eraser, List, Pencil, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, Building2, Check, ChevronDown, ChevronRight, ChevronsUpDown, Eraser, Landmark, List, Pencil, Play, Plus, RotateCcw, School, Trash2, Users } from "lucide-react";
 import { IconButton, PermIconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
 import { usePromptDialog } from "../prompt-dialog";
+import { BrandNameContext } from "../brand-context";
 import { DataTable, type Column } from "../data-table";
+import { buildOrgTree, ROOT_ID, type CampusRow as OrgCampus, type DeptRow, type OrgNode } from "../org-tree";
 import { Can } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
@@ -163,71 +165,126 @@ export function CampusesPage() {
 }
 
 // ---------------------------------------------------------------- 部门（组织树）
-interface DeptRow { id: string; name: string; parentId: string | null; sort: number; status: boolean; ancestors: string[] }
+const KIND_ICON = { root: Building2, hq: Landmark, campus: School, dept: Users } as const;
+interface OrgRow { node: OrgNode; depth: number; dept?: DeptRow }
 
+/** 部门管理：一棵树形表格，每一行都能单独改（竞品式）：展开/折叠、行内改排序、修改、新增下级、删除。 */
 export function DeptsPage() {
   const t = useTranslations("pages.depts");
   const c = useTranslations("crud");
   const tt = useTable();
-  const { rows, loading, error, reload } = useList<DeptRow>("depts");
+  const depts = useList<DeptRow>("depts");
+  const campuses = useList<OrgCampus>("campuses");
+  const { rows, loading, error, reload } = depts;
   const { run, message } = useAct(reload);
-  const [form, setForm] = React.useState<{ row?: DeptRow } | null>(null);
-  // 按树的顺序排好：先父后子，同级按排序
-  const ordered = React.useMemo(() => {
-    const byParent = new Map<string | null, DeptRow[]>();
-    for (const r of rows) byParent.set(r.parentId, [...(byParent.get(r.parentId) ?? []), r]);
-    const out: Array<DeptRow & { depth: number }> = [];
-    const walk = (parent: string | null, depth: number) => {
-      for (const r of (byParent.get(parent) ?? []).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))) {
-        out.push({ ...r, depth });
-        walk(r.id, depth + 1);
-      }
+  const brand = React.useContext(BrandNameContext);
+  const [form, setForm] = React.useState<{ row?: DeptRow; parentId?: string } | null>(null);
+  const [folded, setFolded] = React.useState<ReadonlySet<string>>(new Set());
+  const [sortEdits, setSortEdits] = React.useState<Record<string, string>>({});
+  const root = React.useMemo(() => buildOrgTree(rows, campuses.rows, brand || "StarIT"), [rows, campuses.rows, brand]);
+  const byId = React.useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
+  const campusDeptIds = React.useMemo(() => new Set(campuses.rows.map((x) => x.deptId)), [campuses.rows]);
+  const hqDept = root.children[0];
+  // 树按展开状态摊平成可见的行
+  const visible = React.useMemo(() => {
+    const out: OrgRow[] = [];
+    const walk = (n: OrgNode, depth: number) => {
+      out.push({ node: n, depth, dept: byId.get(n.id) });
+      if (!folded.has(n.id)) for (const ch of n.children) walk(ch, depth + 1);
     };
-    walk(null, 0);
+    walk(root, 0);
     return out;
-  }, [rows]);
-  const parentOptions = ordered.filter((r) => !form?.row || !r.ancestors.includes(form.row.id)).map((r) => ({ value: r.id, label: `${"— ".repeat(r.depth)}${r.name}` }));
+  }, [root, byId, folded]);
+  const expandable = React.useMemo(() => { const ids: string[] = []; const walk = (n: OrgNode) => { if (n.children.length) ids.push(n.id); n.children.forEach(walk); }; walk(root); return ids; }, [root]);
+  const allFolded = expandable.length > 0 && expandable.every((id) => folded.has(id));
+  const dirty = Object.entries(sortEdits).filter(([id, v]) => byId.get(id) && String(byId.get(id)!.sort) !== v);
+
+  const parentOptions = rows.filter((r) => !form?.row || !r.ancestors.includes(form.row.id)).map((r) => ({ value: r.id, label: r.name }));
   const fields: Field[] = [
     { name: "name", label: t("name"), required: true },
     { name: "parentId", label: t("parent"), type: "select", options: parentOptions, required: !form?.row },
     { name: "sort", label: c("sort"), type: "number" },
     ...(form?.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : []),
   ];
-  const columns: Column<DeptRow & { depth: number }>[] = [
-    { key: "name", header: t("name"), cell: (r) => <span style={{ paddingLeft: r.depth * 16 }}>{r.name}</span> },
-    { key: "sort", header: c("sort"), cell: (r) => r.sort },
-    { key: "status", header: c("status"), cell: (r) => (r.status ? c("enabled") : c("disabled")) },
+  const remove = (r: DeptRow) => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"));
+  const saveSort = () => run(async () => { for (const [id, v] of dirty) await bff(`depts/${id}`, { method: "PATCH", body: { sort: Number(v) } }); }, c("saved")).then(() => setSortEdits({}));
+
+  const columns: Column<OrgRow>[] = [
+    {
+      key: "name",
+      header: t("name"),
+      cell: (r) => {
+        const Icon = KIND_ICON[r.node.kind];
+        const has = r.node.children.length > 0;
+        const isFolded = folded.has(r.node.id);
+        return (
+          <span className="flex items-center gap-1" style={{ paddingLeft: r.depth * 22 }}>
+            {has ? (
+              <button type="button" aria-label={`${isFolded ? t("expand") : t("collapse")} ${r.node.label}`} aria-expanded={!isFolded} className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-border/50" onClick={() => setFolded((f) => { const n = new Set(f); if (isFolded) n.delete(r.node.id); else n.add(r.node.id); return n; })}>
+                {isFolded ? <ChevronRight aria-hidden className="h-4 w-4" /> : <ChevronDown aria-hidden className="h-4 w-4" />}
+              </button>
+            ) : <span aria-hidden className="w-6" />}
+            <Icon aria-hidden className="h-4 w-4 shrink-0 text-muted" />
+            <span className={r.node.kind === "dept" ? "" : "font-medium"}>{r.node.label}</span>
+            {r.node.kind === "hq" ? <span className="ml-1 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">{t("hq")}</span> : null}
+          </span>
+        );
+      },
+    },
+    {
+      key: "sort",
+      header: c("sort"),
+      cell: (r) => (r.dept && !campusDeptIds.has(r.dept.id) ? (
+        <input type="number" aria-label={`${c("sort")} ${r.node.label}`} className="w-20 rounded-md border border-border bg-transparent px-2 py-1" value={sortEdits[r.dept.id] ?? String(r.dept.sort)} onChange={(e) => setSortEdits((m) => ({ ...m, [r.dept!.id]: e.target.value }))} onClick={(e) => e.stopPropagation()} />
+      ) : <span className="text-muted">—</span>),
+    },
+    {
+      key: "status",
+      header: c("status"),
+      cell: (r) => (r.dept ? <span className={r.dept.status ? "rounded bg-green-50 px-2 py-0.5 text-xs text-green-700 dark:bg-green-950 dark:text-green-300" : "rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800"}>{r.dept.status ? c("enabled") : c("disabled")}</span> : null),
+    },
+    { key: "created", header: t("createdAt"), cell: (r) => (r.dept?.createdAt ? new Date(r.dept.createdAt).toLocaleString() : "") },
     {
       key: "actions",
       header: "",
-      cell: (r) => (
-        <div className="flex gap-1">
-          <PermIconButton perm={PERMS.deptAdd} icon={Plus} label={c("add")} variant="outline" onClick={() => setForm({ row: undefined })}/>
-          <PermRowAction perm={PERMS.deptEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
-          <PermRowAction perm={PERMS.deptRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
-        </div>
-      ),
+      cell: (r) => {
+        if (r.node.kind === "root") return null; // 公司只是最上面的名字，不是部门
+        const d = r.dept;
+        const campus = d ? campusDeptIds.has(d.id) : false;
+        return (
+          <>
+            {d && !campus ? <PermRowAction perm={PERMS.deptEdit} onClick={() => setForm({ row: d })} icon={Pencil}>{c("edit")}</PermRowAction> : null}
+            {d ? <PermRowAction perm={PERMS.deptAdd} onClick={() => setForm({ parentId: d.id })} icon={Plus}>{c("add")}</PermRowAction> : null}
+            {d && !campus ? <PermRowAction perm={PERMS.deptRemove} onClick={() => remove(d)} icon={Trash2} danger>{c("delete")}</PermRowAction> : null}
+          </>
+        );
+      },
     },
   ];
   return (
     <section>
       <H2>{t("title")}</H2>
-      <p className="mb-2 text-sm text-muted">{t("hint")}</p>
+      <p className="mb-3 text-sm text-muted">{t("hint")}</p>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
+      <div className="mb-3 flex items-center gap-2">
+        <PermIconButton perm={PERMS.deptAdd} icon={Plus} label={c("add")} onClick={() => setForm({ parentId: hqDept?.id })} />
+        <PermIconButton perm={PERMS.deptEdit} icon={Check} label={t("saveSort")} variant="outline" disabled={dirty.length === 0} onClick={() => void saveSort()} />
+        <IconButton icon={ChevronsUpDown} label={allFolded ? t("expandAll") : t("collapseAll")} variant="outline" onClick={() => setFolded(allFolded ? new Set() : new Set(expandable.filter((id) => id !== ROOT_ID)))} />
+      </div>
       {form ? (
         <FormPanel
           key={form.row?.id ?? "new"}
           title={form.row ? c("edit") : c("add")}
           fields={fields}
-          initial={form.row ? { name: form.row.name, parentId: form.row.parentId ?? "", sort: String(form.row.sort), status: form.row.status } : {}}
+          initial={form.row ? { name: form.row.name, parentId: form.row.parentId ?? "", sort: String(form.row.sort), status: form.row.status } : { parentId: form.parentId ?? "" }}
           submitLabel={c("save")}
           cancelLabel={c("cancel")}
           onCancel={() => setForm(null)}
           onSubmit={async (p) => { if (await run(() => (form.row ? bff(`depts/${form.row.id}`, { method: "PATCH", body: p }) : bff("depts", { method: "POST", body: p })), c("saved"))) setForm(null); }}
         />
       ) : null}
-      <DataTable columns={columns} rows={ordered} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
+      <DataTable columns={columns} rows={visible} rowKey={(r) => r.node.id} selectable={false} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
     </section>
   );
 }

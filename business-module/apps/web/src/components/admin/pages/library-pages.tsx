@@ -301,7 +301,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
             {!portal ? (
               <div className="mt-2 flex flex-wrap gap-1">
                 <Can perm={PERMS.docFolderAdd}>
-                  <IconButton icon={FolderPlus} label={t("addSub")} variant="outline" disabled={!cur} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })} />
+                  <IconButton icon={FolderPlus} label={t("addSub")} variant="outline" disabled={!folder || folder.level !== "manage"} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })} />
                   <IconButton icon={FolderRoot} label={t("add")} variant="outline" onClick={() => void ask(t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(null, v.name.trim()); })} />
                 </Can>
                 {folder ? (
