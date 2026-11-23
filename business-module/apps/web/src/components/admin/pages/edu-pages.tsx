@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Plus } from "lucide-react";
+import { IconButton } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -66,7 +68,7 @@ export function TermsPage() {
       <H2>{t("termsTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduTermAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduTermAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
           initial={form.row ? { code: form.row.code, name: form.row.name, startDate: form.row.startDate, endDate: form.row.endDate, enrollOpenDate: form.row.enrollOpenDate ?? "", enrollCloseDate: form.row.enrollCloseDate ?? "", dropDeadline: form.row.dropDeadline ?? "" } : {}}
@@ -117,7 +119,7 @@ export function CoursesPage() {
       <H2>{t("coursesTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduCourseAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduCourseAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
           initial={form.row ? { code: form.row.code, name: form.row.name, credits: String(form.row.credits), status: form.row.status } : {}}
@@ -196,7 +198,7 @@ export function MajorsPage() {
       <H2>{t("majorsTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduMajorAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduMajorAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel title={c("add")} fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType") }, { name: "totalCredits", label: t("totalCredits"), type: "number" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { if (await run(() => bff("majors", { method: "POST", body: p }), c("saved"))) setForm(false); }} />
@@ -287,7 +289,7 @@ export function SectionsPage() {
       <H2>{t("sectionsTitle")}</H2>
       <Err error={sections.error} />
       {message}
-      <Can perm={PERMS.eduSectionAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduSectionAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
       <Can perm={PERMS.eduEnrollmentAdd}>{!batchOpen ? <Button size="sm" variant="outline" className="mb-3 ml-2" onClick={() => setBatchOpen(true)}>{t("batchEnroll")}</Button> : null}</Can>
       {batchOpen ? <BatchEnrollPanel onClose={() => { setBatchOpen(false); sections.reload(); }} /> : null}
       {form ? (
@@ -457,7 +459,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
             {matForm ? (
               <FormPanel inline title={c("add")} fields={[{ name: "title", label: t("name"), required: true }, { name: "url", label: t("url"), required: true }, { name: "published", label: t("published"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setMatForm(false)}
                 onSubmit={async (p) => { if (await run(() => bff(`sections/${id}/materials`, { method: "POST", body: p }), c("saved"))) setMatForm(false); }} />
-            ) : <Button size="sm" onClick={() => setMatForm(true)}>{c("add")}</Button>}
+            ) : <IconButton icon={Plus} label={c("add")} onClick={() => setMatForm(true)}/>}
           </Can>
         </div>
       ) : null}

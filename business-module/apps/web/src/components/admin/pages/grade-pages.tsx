@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Download } from "lucide-react";
+import { IconLink } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
 import { usePromptDialog } from "../prompt-dialog";
@@ -89,7 +91,7 @@ export function GradesPanel({ sectionId }: { sectionId: string }) {
         <PermButton perm={PERMS.eduGradeEdit} size="sm" onClick={() => void run(() => bff(`${base}/final-grades/calculate`, { method: "POST" }), c("done"))}>{t("calculate")}</PermButton>
         <PermButton perm={PERMS.eduGradeEdit} size="sm" variant="outline" onClick={() => window.confirm(t("confirmPublish")) && void run(() => bff(`${base}/final-grades/publish`, { method: "POST" }), c("done"))}>{t("publishFinal")}</PermButton>
         <PermButton perm={PERMS.eduGradeAmend} size="sm" variant="outline" onClick={() => void ask(t("recalculate"), [{ name: "reason", label: t("reasonPrompt"), type: "textarea" }]).then((v) => { if (v && v.reason.trim().length >= 5) void run(() => bff(`${base}/final-grades/recalculate`, { method: "POST", body: { reason: v.reason } }), c("done")); })}>{t("recalculate")}</PermButton>
-        <Can perm={PERMS.eduGradeList}><a className="self-center underline" href={`/bff/${base}/gradebook.csv`}>{t("exportCsv")}</a></Can>
+        <Can perm={PERMS.eduGradeList}><IconLink icon={Download} label={t("exportCsv")} href={`/bff/${base}/gradebook.csv`}/></Can>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left">

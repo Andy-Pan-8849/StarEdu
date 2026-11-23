@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Download, Plus, Upload } from "lucide-react";
+import { IconButton, IconLink } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -174,9 +176,9 @@ export function StaffPage() {
       <Err error={list.error} />
       {message}
       <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
-        <Can perm={PERMS.hrStaffAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
-        <Can perm={PERMS.hrStaffImport}><Button size="sm" variant="outline" onClick={() => setImporting(!importing)}>{t("importCsv")}</Button></Can>
-        <a className="text-sm underline" href="/bff/staff/export">{t("exportCsv")}</a>
+        <Can perm={PERMS.hrStaffAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can>
+        <Can perm={PERMS.hrStaffImport}><IconButton icon={Upload} label={t("importCsv")} variant="outline" onClick={() => setImporting(!importing)}/></Can>
+        <IconLink icon={Download} label={t("exportCsv")} href="/bff/staff/export"/>
         <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
       </div>
       {importing ? <ImportPanel path="import/staff" columns="employee_id, name, campus_id, department, title, hire_date, status" onDone={list.reload} onClose={() => setImporting(false)} /> : null}
@@ -282,7 +284,7 @@ function EmergencyTab({ personId }: { personId: string }) {
       <p className="mb-2 text-muted">{t("emergencyNote")}</p>
       <Err error={list.error} />
       {message}
-      <Can perm={PERMS.hrEmergencyEdit}>{!form ? <Button size="sm" className="mb-2" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.hrEmergencyEdit}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-2"/> : null}</Can>
       {form ? (
         <FormPanel inline title={c("add")} fields={[{ name: "name", label: t("name"), required: true }, { name: "relationship", label: t("relationship"), required: true }, { name: "phone", label: t("phone"), required: true }, { name: "isGuardian", label: t("guardian"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { if (await run(() => bff(`persons/${personId}/emergency-contacts`, { method: "POST", body: p }), c("saved"))) setForm(false); }} />
@@ -361,9 +363,9 @@ export function StudentsPage() {
       <Err error={list.error} />
       {message}
       <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
-        <Can perm={PERMS.hrStudentAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
-        <Can perm={PERMS.hrStudentImport}><Button size="sm" variant="outline" onClick={() => setImporting(!importing)}>{t("importCsv")}</Button></Can>
-        <a className="text-sm underline" href="/bff/students/export">{t("exportCsv")}</a>
+        <Can perm={PERMS.hrStudentAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can>
+        <Can perm={PERMS.hrStudentImport}><IconButton icon={Upload} label={t("importCsv")} variant="outline" onClick={() => setImporting(!importing)}/></Can>
+        <IconLink icon={Download} label={t("exportCsv")} href="/bff/students/export"/>
         <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
         <label className="flex flex-col gap-1">{c("status")}
           <select className="rounded-md border border-border bg-transparent px-2 py-1" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>

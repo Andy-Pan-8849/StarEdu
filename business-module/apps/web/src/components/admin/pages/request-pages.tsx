@@ -3,6 +3,8 @@
 // 学生申请：学生门户（提交、撤回）和管理后台（看、批准、驳回）。
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Plus } from "lucide-react";
+import { IconButton } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
 import { Button } from "@/components/ui/button";
@@ -47,7 +49,7 @@ export function PortalRequestsPage() {
     <section className="text-sm">
       <H2>{t("myTitle")}</H2>
       <Can perm={PERMS.portalRequestSubmit}>
-        {!creating ? <Button size="sm" className="mb-3" onClick={() => setCreating(true)}>{c("add")}</Button> : null}
+        {!creating ? <IconButton icon={Plus} label={c("add")} onClick={() => setCreating(true)} className="mb-3"/> : null}
       </Can>
       {creating ? (
         <Modal title={t("myTitle")} onClose={() => setCreating(false)}>

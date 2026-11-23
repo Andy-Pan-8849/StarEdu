@@ -4,7 +4,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
-import { FolderPlus, FolderTree, Lock, Folder as FolderIcon, Pencil, Trash2, Upload } from "lucide-react";
+import { Copy, Download, Eye, FolderInput, FolderPlus, FolderRoot, FolderTree, Lock, Folder as FolderIcon, Pencil, Trash2, Upload } from "lucide-react";
+import { IconButton, Tip } from "../icon-button";
 import { DataTable, type Column } from "../data-table";
 import { useFitHeight } from "../fit-height";
 import { NavTree, type NavNode } from "../nav-tree";
@@ -255,7 +256,6 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
     if (tree.length > 0 && (cur === null || !folders.rows.some((f) => f.id === cur))) setCur(tree[0]!.id);
   }, [tree, cur, folders.rows]);
   const { ref: treeRef, maxHeight: treeMax } = useFitHeight<HTMLDivElement>();
-  const act = "rounded px-2 py-1 text-xs text-primary hover:bg-primary/10";
   const columns: Column<LibFile>[] = [
     { key: "name", header: t("file"), cell: (f) => f.name },
     { key: "size", header: t("size"), cell: (f) => fmtSize(f.size) },
@@ -266,17 +266,19 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
       header: "",
       cell: (f) => (
         <>
-          {f.canPreview ? <button type="button" className={act} onClick={() => void run(async () => setViewer(await bff<Preview>(`library/files/${f.id}/preview`)))}>{t("preview")}</button> : null}
-          {f.canDownload ? <button type="button" className={act} onClick={() => void open(`library/files/${f.id}/download`)}>{t("download")}</button> : null}
+          {f.canPreview ? <IconButton icon={Eye} label={t("preview")} variant="outline" onClick={() => void run(async () => setViewer(await bff<Preview>(`library/files/${f.id}/preview`)))} /> : null}
+          {f.canDownload ? <IconButton icon={Download} label={t("download")} variant="outline" onClick={() => void open(`library/files/${f.id}/download`)} /> : null}
           {!portal && f.canEdit ? (
             <>
-              <button type="button" className={act} onClick={() => void ask(t("rename"), [{ name: "name", label: t("rename"), initial: f.name }]).then((v) => { if (v) void run(() => bff(`library/files/${f.id}`, { method: "PATCH", body: { name: v.name } }), () => void loadFiles(cur as string)); })}>{t("rename")}</button>
-              <label className={`${act} cursor-pointer`}>{t("newVersion")}<input type="file" className="hidden" onChange={(e) => { void upload(e.target.files, f.id); e.target.value = ""; }} /></label>
-              <button type="button" className={act} onClick={() => void moveOrCopy(f, "move")}>{t("move")}</button>
+              <IconButton icon={Pencil} label={t("rename")} variant="outline" onClick={() => void ask(t("rename"), [{ name: "name", label: t("rename"), initial: f.name }]).then((v) => { if (v) void run(() => bff(`library/files/${f.id}`, { method: "PATCH", body: { name: v.name } }), () => void loadFiles(cur as string)); })} />
+              <Tip label={t("newVersion")}>
+                <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border px-2 hover:bg-border/40"><Upload aria-hidden className="h-4 w-4" /><span className="sr-only">{t("newVersion")}</span><input type="file" className="hidden" onChange={(e) => { void upload(e.target.files, f.id); e.target.value = ""; }} /></label>
+              </Tip>
+              <IconButton icon={FolderInput} label={t("move")} variant="outline" onClick={() => void moveOrCopy(f, "move")} />
             </>
           ) : null}
-          {!portal && f.canDownload ? <button type="button" className={act} onClick={() => void moveOrCopy(f, "copy")}>{t("copy")}</button> : null}
-          {!portal && f.canDelete ? <button type="button" className={`${act} text-red-600 hover:bg-red-50`} onClick={() => window.confirm(t("confirmDeleteFile")) && void run(() => bff(`library/files/${f.id}`, { method: "DELETE" }), () => { void loadFiles(cur as string); folders.reload(); })}>{t("delete")}</button> : null}
+          {!portal && f.canDownload ? <IconButton icon={Copy} label={t("copy")} variant="outline" onClick={() => void moveOrCopy(f, "copy")} /> : null}
+          {!portal && f.canDelete ? <IconButton icon={Trash2} label={t("delete")} variant="outline" onClick={() => window.confirm(t("confirmDeleteFile")) && void run(() => bff(`library/files/${f.id}`, { method: "DELETE" }), () => { void loadFiles(cur as string); folders.reload(); })} /> : null}
         </>
       ),
     },
@@ -299,16 +301,16 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
             {!portal ? (
               <div className="mt-2 flex flex-wrap gap-1">
                 <Can perm={PERMS.docFolderAdd}>
-                  <Button size="sm" variant="outline" disabled={!cur} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })}><FolderPlus aria-hidden className="mr-1 h-4 w-4" />{t("addSub")}</Button>
-                  <Button size="sm" variant="outline" onClick={() => void ask(t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(null, v.name.trim()); })}>{t("add")}</Button>
+                  <IconButton icon={FolderPlus} label={t("addSub")} variant="outline" disabled={!cur} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })} />
+                  <IconButton icon={FolderRoot} label={t("add")} variant="outline" onClick={() => void ask(t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(null, v.name.trim()); })} />
                 </Can>
                 {folder ? (
                   <>
                     <Can perm={PERMS.docFolderEdit}>
-                      <Button size="sm" variant="outline" disabled={folder.level !== "manage"} onClick={() => setManaging(true)}><Pencil aria-hidden className="mr-1 h-4 w-4" />{t("edit")}</Button>
+                      <IconButton icon={Pencil} label={t("edit")} variant="outline" disabled={folder.level !== "manage"} onClick={() => setManaging(true)} />
                     </Can>
                     <Can perm={PERMS.docFolderRemove}>
-                      <Button size="sm" variant="outline" disabled={folder.level !== "manage"} onClick={() => window.confirm(t("confirmDeleteFolder")) && void run(() => bff(`library/folders/${folder.id}`, { method: "DELETE" }), () => { setCur(null); folders.reload(); })}><Trash2 aria-hidden className="mr-1 h-4 w-4" />{t("deleteFolder")}</Button>
+                      <IconButton icon={Trash2} label={t("deleteFolder")} variant="outline" disabled={folder.level !== "manage"} onClick={() => window.confirm(t("confirmDeleteFolder")) && void run(() => bff(`library/folders/${folder.id}`, { method: "DELETE" }), () => { setCur(null); folders.reload(); })} />
                     </Can>
                   </>
                 ) : null}
@@ -328,7 +330,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
                 <span className="ml-auto flex items-center gap-2">
                   {canUpload ? (
                     <Can perm={PERMS.docFileUpload}>
-                      <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 py-1 text-primary-foreground"><Upload aria-hidden className="h-4 w-4" />{t("upload")}<input type="file" multiple className="hidden" aria-label={t("upload")} onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label>
+                      <Tip label={t("upload")}><label className="inline-flex h-8 cursor-pointer items-center rounded-md bg-primary px-2 text-primary-foreground hover:opacity-90"><Upload aria-hidden className="h-4 w-4" /><span className="sr-only">{t("upload")}</span><input type="file" multiple className="hidden" onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label></Tip>
                     </Can>
                   ) : null}
                 </span>
@@ -343,7 +345,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
             emptyText={folder ? t("empty") : t("noFolders")}
             selectable={!portal}
             labels={tableLabels}
-            bulkActions={(ids) => (!portal && files.filter((f) => ids.includes(f.id)).every((f) => f.canDelete) ? <Button size="sm" variant="outline" onClick={() => void deleteMany(ids)}>{t("deleteSelected")}</Button> : null)}
+            bulkActions={(ids) => (!portal && files.filter((f) => ids.includes(f.id)).every((f) => f.canDelete) ? <IconButton icon={Trash2} label={t("deleteSelected")} variant="outline" onClick={() => void deleteMany(ids)} /> : null)}
           />
         </div>
       </div>

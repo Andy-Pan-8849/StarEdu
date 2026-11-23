@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Plus } from "lucide-react";
+import { IconButton } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -82,7 +84,7 @@ export function UsersPage() {
         </Modal>
       ) : null}
       <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
-        <Can perm={PERMS.userAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+        <Can perm={PERMS.userAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can>
         <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
       </div>
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("accounts", { method: "POST", body: p }), t("created"))) setForm(false); }} /> : null}
@@ -150,7 +152,7 @@ export function RolesPage() {
       <H2>{t("title")}</H2>
       <Err error={roles.error} />
       {message}
-      <Can perm={PERMS.roleAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.roleAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
           fields={[{ name: "code", label: t("code"), required: true, readOnly: !!form.row }, { name: "name", label: t("name"), required: true }]}
@@ -272,7 +274,7 @@ export function MenusPage() {
       <p className="mb-2 text-sm text-muted">{t("hint")}</p>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.menuAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.menuAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
           initial={form.row ? { name: form.row.name, route: form.row.route ?? "", sort: String(form.row.sort), visible: form.row.visible, status: form.row.status } : {}}
@@ -382,7 +384,7 @@ export function DataScopesPage() {
       <H2>{t("title")}</H2>
       <Err error={sets.error} />
       {message}
-      <Can perm={PERMS.dataScopeAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => { setForm({}); setName(""); setPicked([]); setWithChildren(true); }}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.dataScopeAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => { setForm({}); setName(""); setPicked([]); setWithChildren(true); }} className="mb-3"/> : null}</Can>
       {form ? (
         <Modal title={form.row ? c("edit") : c("add")} onClose={() => setForm(null)}>
         <form className="text-sm" onSubmit={async (e) => {

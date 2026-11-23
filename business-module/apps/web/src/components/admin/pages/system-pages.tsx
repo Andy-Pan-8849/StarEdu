@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Plus } from "lucide-react";
+import { IconButton, PermIconButton } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -57,7 +59,7 @@ export function PostsPage() {
       <H2>{t("title")}</H2>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
-      <Can perm={PERMS.postAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.postAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel
           title={form.row ? c("edit") : c("add")}
@@ -124,7 +126,7 @@ export function CampusesPage() {
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
       {dialog}
-      <Can perm={PERMS.campusAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.campusAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel
           title={form.row ? c("edit") : c("add")}
@@ -200,7 +202,7 @@ export function DeptsPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.deptAdd} size="sm" variant="outline" onClick={() => setForm({ row: undefined })}>{c("add")}</PermButton>
+          <PermIconButton perm={PERMS.deptAdd} icon={Plus} label={c("add")} variant="outline" onClick={() => setForm({ row: undefined })}/>
           <PermButton perm={PERMS.deptEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
           <PermButton perm={PERMS.deptRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
         </div>
@@ -267,7 +269,7 @@ export function ParamsPage() {
       <H2>{t("title")}</H2>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
-      <Can perm={PERMS.paramAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.paramAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel
           title={form.row ? c("edit") : c("add")}
@@ -318,7 +320,7 @@ export function DictsPage() {
       <H2>{t("title")}</H2>
       {types.error ? <p role="alert" className="mb-2 text-sm text-red-600">{types.error}</p> : null}
       {message}
-      <Can perm={PERMS.dictAdd}>{!newType ? <Button size="sm" className="mb-3" onClick={() => setNewType(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.dictAdd}>{!newType ? <IconButton icon={Plus} label={c("add")} onClick={() => setNewType(true)} className="mb-3"/> : null}</Can>
       {newType ? (
         <FormPanel title={c("add")} fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setNewType(false)}
           onSubmit={async (p) => { if (await run(() => bff("dict-types", { method: "POST", body: p }), c("saved"))) setNewType(false); }} />
@@ -357,7 +359,7 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
     <Modal title={t("itemsOf", { name: type.name })} onClose={onClose}>
     <div>
       {message}
-      {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
+      {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
           fields={[{ name: "value", label: t("value"), required: true, readOnly: !!form.row }, { name: "label", label: t("label"), required: true }, { name: "sort", label: c("sort"), type: "number" }, ...(form.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : [])]}

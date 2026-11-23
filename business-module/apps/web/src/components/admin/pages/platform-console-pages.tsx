@@ -3,6 +3,8 @@
 // 平台控制台的 5 个页面：平台账号、平台角色、菜单、入口分配、平台公告。接口在 B3/B17 已有，这里只补页面。
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Plus } from "lucide-react";
+import { IconButton } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -60,7 +62,7 @@ export function PlatformAccountsPage() {
       <H2>{t("title")}</H2>
       <Err error={accounts.error} />
       {message}
-      <div className="mb-3 text-sm"><Can perm={PERMS.platformAccountAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can></div>
+      <div className="mb-3 text-sm"><Can perm={PERMS.platformAccountAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can></div>
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("accounts", { method: "POST", body: p }), t("created"))) setForm(false); }} /> : null}
       {rolesFor ? (
         <Modal title={t("rolesOf", { name: rolesFor.username })} onClose={() => setRolesFor(null)}>
@@ -122,7 +124,7 @@ export function PlatformRolesPage() {
       <H2>{t("title")}</H2>
       <Err error={roles.error} />
       {message}
-      <div className="mb-3 text-sm"><Can perm={PERMS.platformRoleAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can></div>
+      <div className="mb-3 text-sm"><Can perm={PERMS.platformRoleAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can></div>
       {form ? (
         <FormPanel
           title={c("add")}
@@ -279,7 +281,7 @@ export function PlatformAnnouncementsPage() {
       <H2>{t("title")}</H2>
       <Err error={list.error} />
       {message}
-      <div className="mb-3 text-sm"><Can perm={PERMS.platformAnnouncementEdit}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can></div>
+      <div className="mb-3 text-sm"><Can perm={PERMS.platformAnnouncementEdit}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can></div>
       {form ? (
         <FormPanel
           title={c("add")}
