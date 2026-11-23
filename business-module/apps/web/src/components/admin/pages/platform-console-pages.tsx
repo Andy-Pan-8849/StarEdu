@@ -6,6 +6,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
@@ -62,8 +63,9 @@ export function PlatformAccountsPage() {
       <div className="mb-3 text-sm"><Can perm={PERMS.platformAccountAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can></div>
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("accounts", { method: "POST", body: p }), t("created"))) setForm(false); }} /> : null}
       {rolesFor ? (
-        <div className="mb-3 rounded-md border border-border p-3 text-sm">
-          <h3 className="mb-2 font-medium">{t("rolesOf", { name: rolesFor.username })}</h3>
+        <Modal title={t("rolesOf", { name: rolesFor.username })} onClose={() => setRolesFor(null)}>
+        <div className="text-sm">
+          <h3 className="mb-3 text-base font-semibold">{t("rolesOf", { name: rolesFor.username })}</h3>
           <div className="flex flex-wrap gap-3">
             {custom.map((r) => (
               <label key={r.id} className="flex items-center gap-1">
@@ -72,11 +74,12 @@ export function PlatformAccountsPage() {
               </label>
             ))}
           </div>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-4 flex gap-2 border-t border-border pt-3">
             <Button size="sm" onClick={async () => { if (await run(() => bff(`accounts/${rolesFor.id}/roles`, { method: "PUT", body: { roleIds: picked } }), c("saved"))) setRolesFor(null); }}>{c("save")}</Button>
             <Button size="sm" variant="outline" onClick={() => setRolesFor(null)}>{c("cancel")}</Button>
           </div>
         </div>
+        </Modal>
       ) : null}
       <DataTable columns={columns} rows={accounts.rows} rowKey={(r) => r.id} loading={accounts.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
     </section>
@@ -132,8 +135,9 @@ export function PlatformRolesPage() {
         />
       ) : null}
       {authFor ? (
-        <div className="mb-3 rounded-md border border-border p-3 text-sm">
-          <h3 className="mb-2 font-medium">{t("permissionsOf", { name: authFor.name })}</h3>
+        <Modal title={t("permissionsOf", { name: authFor.name })} onClose={() => setAuthFor(null)}>
+        <div className="text-sm">
+          <h3 className="mb-3 text-base font-semibold">{t("permissionsOf", { name: authFor.name })}</h3>
           <ul className="max-h-72 overflow-auto">
             {items.map((m) => (
               <li key={m.id} style={{ paddingLeft: m.depth * 16 }}>
@@ -144,11 +148,12 @@ export function PlatformRolesPage() {
               </li>
             ))}
           </ul>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-4 flex gap-2 border-t border-border pt-3">
             <Button size="sm" onClick={async () => { if (await run(() => bff(`roles/${authFor.id}/menus`, { method: "PUT", body: { menuIds: picked } }), c("saved"))) setAuthFor(null); }}>{c("save")}</Button>
             <Button size="sm" variant="outline" onClick={() => setAuthFor(null)}>{c("cancel")}</Button>
           </div>
         </div>
+        </Modal>
       ) : null}
       <DataTable columns={columns} rows={roles.rows} rowKey={(r) => r.id} loading={roles.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
     </section>

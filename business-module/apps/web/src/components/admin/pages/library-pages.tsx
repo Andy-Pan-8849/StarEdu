@@ -4,6 +4,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
+import { Modal } from "../modal";
+import { usePromptDialog } from "../prompt-dialog";
 import { Can } from "../permissions";
 import { bff, BffError } from "@/lib/bff";
 import { useList } from "./use-api";
@@ -84,7 +86,7 @@ function GrantForm({ folder, base, run, reload }: { folder: Folder; base: string
 }
 
 /** 文件夹管理：基本信息 / 访问授权 / 访问日志。 */
-function FolderManager({ folder, onChanged }: { folder: Folder; onChanged: () => void }) {
+function FolderManager({ folder, onChanged, onClose }: { folder: Folder; onChanged: () => void; onClose: () => void }) {
   const t = useTranslations("pages.library");
   const [tab, setTab] = React.useState<"info" | "acl" | "log">("info");
   const [name, setName] = React.useState(folder.name);
@@ -115,7 +117,9 @@ function FolderManager({ folder, onChanged }: { folder: Folder; onChanged: () =>
     }
   };
   return (
-    <div className="mt-3 rounded-md border border-border p-3 text-sm">
+    <Modal wide title={folder.name} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{folder.name}</h3>
       {err ? <p role="alert" className="mb-2 text-red-600">{err}</p> : null}
       <div className="mb-2 flex gap-2">
         {(["info", "acl", "log"] as const).map((k) => (
@@ -171,6 +175,7 @@ function FolderManager({ folder, onChanged }: { folder: Folder; onChanged: () =>
         </table>
       ) : null}
     </div>
+    </Modal>
   );
 }
 
@@ -183,7 +188,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
   const [viewer, setViewer] = React.useState<Preview | null>(null);
   const [managing, setManaging] = React.useState(false);
   const [msg, setMsg] = React.useState<string | null>(null);
-  const [newName, setNewName] = React.useState("");
+  const { ask, dialog } = usePromptDialog();
   const tree = React.useMemo(() => flatten(folders.rows), [folders.rows]);
   const folder = folders.rows.find((f) => f.id === cur) ?? null;
   const loadFiles = React.useCallback((id: string) => bff<LibFile[]>(`library/folders/${id}/files`).then(setFiles).catch((e: Error) => setMsg(e.message)), []);
@@ -206,13 +211,13 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
     folders.reload();
   };
   const open = (path: string) => run(async () => { const r = await bff<{ url: string }>(path); window.open(r.url, "_blank", "noopener"); });
-  const pickTarget = (): string | null => {
-    const names = tree.filter((f) => f.id !== cur && ["edit", "manage"].includes(f.level)).map((f, i) => `${i + 1}. ${f.name}`).join("\n");
-    const n = Number(window.prompt(`${t("targetPrompt")}\n${names}`));
-    return n >= 1 ? (tree.filter((f) => f.id !== cur && ["edit", "manage"].includes(f.level))[n - 1]?.id ?? null) : null;
+  const pickTarget = async (title: string): Promise<string | null> => {
+    const options = tree.filter((f) => f.id !== cur && ["edit", "manage"].includes(f.level)).map((f) => ({ value: f.id, label: `${"— ".repeat(f.depth)}${f.name}` }));
+    const v = await ask(title, [{ name: "target", label: t("targetPrompt"), type: "select", options }]);
+    return v?.target || null;
   };
   const moveOrCopy = async (f: LibFile, kind: "move" | "copy") => {
-    const targetId = pickTarget();
+    const targetId = await pickTarget(f.name);
     if (!targetId) return;
     try {
       await bff(`library/files/${f.id}/${kind}`, { method: "POST", body: { targetId } });
@@ -223,12 +228,13 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
     void loadFiles(cur as string);
     folders.reload();
   };
-  const createFolder = (parentId: string | null) => run(() => bff("library/folders", { method: "POST", body: { name: newName, parentId } }), () => { setNewName(""); folders.reload(); });
+  const createFolder = (parentId: string | null, name: string) => run(() => bff("library/folders", { method: "POST", body: { name, parentId } }), () => { folders.reload(); });
 
   return (
     <section className="text-sm">
       <h2 className="mb-3 text-lg font-semibold">{t("title")}</h2>
       {msg ? <p role="alert" className="mb-2 text-red-600">{msg}</p> : null}
+      {dialog}
       <div className="flex gap-4">
         <aside className="w-64 shrink-0">
           <ul className="mb-2 space-y-1">
@@ -244,8 +250,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
           {!portal ? (
             <Can perm={PERMS.docFolderAdd}>
               <div className="flex gap-1">
-                <input aria-label={t("newFolder")} placeholder={t("newFolder")} className={`${input} w-40`} value={newName} onChange={(e) => setNewName(e.target.value)} />
-                <Button size="sm" disabled={!newName.trim()} onClick={() => void createFolder(cur)}>{cur ? t("addSub") : t("add")}</Button>
+                <Button size="sm" onClick={() => void ask(cur ? t("addSub") : t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })}>{cur ? t("addSub") : t("add")}</Button>
               </div>
             </Can>
           ) : null}
@@ -263,7 +268,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
                   </Can>
                 ) : null}
               </div>
-              {managing ? <FolderManager key={folder.id} folder={folder} onChanged={() => { setManaging(false); folders.reload(); setCur(null); }} /> : null}
+              {managing ? <FolderManager key={folder.id} folder={folder} onClose={() => setManaging(false)} onChanged={() => { setManaging(false); folders.reload(); setCur(null); }} /> : null}
               <table className="w-full">
                 <thead><tr className="text-left text-muted"><th>{t("file")}</th><th>{t("size")}</th><th>{t("version")}</th><th>{t("uploadedBy")}</th><th /></tr></thead>
                 <tbody>
@@ -275,7 +280,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
                         {f.canDownload ? <button type="button" className="underline" onClick={() => void open(`library/files/${f.id}/download`)}>{t("download")}</button> : null}
                         {!portal && f.canEdit ? (
                           <>
-                            <button type="button" className="underline" onClick={() => { const n = window.prompt(t("rename"), f.name); if (n) void run(() => bff(`library/files/${f.id}`, { method: "PATCH", body: { name: n } }), () => void loadFiles(cur as string)); }}>{t("rename")}</button>
+                            <button type="button" className="underline" onClick={() => void ask(t("rename"), [{ name: "name", label: t("rename"), initial: f.name }]).then((v) => { if (v) void run(() => bff(`library/files/${f.id}`, { method: "PATCH", body: { name: v.name } }), () => void loadFiles(cur as string)); })}>{t("rename")}</button>
                             <label className="cursor-pointer underline">{t("newVersion")}<input type="file" className="hidden" onChange={(e) => { void upload(e.target.files, f.id); e.target.value = ""; }} /></label>
                             <button type="button" className="underline" onClick={() => void moveOrCopy(f, "move")}>{t("move")}</button>
                           </>

@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
+import { usePromptDialog } from "../prompt-dialog";
 import { Can, PermButton } from "../permissions";
 import { useAct } from "./crud";
 import { useList } from "./use-api";
@@ -51,24 +52,29 @@ export function GradesPanel({ sectionId }: { sectionId: string }) {
   const load = React.useCallback(() => { void bff<Book>(`sections/${sectionId}/gradebook`).then(setBook); }, [sectionId]);
   React.useEffect(load, [load]);
   const { run, message } = useAct(load);
+  const { ask, dialog } = usePromptDialog();
   const [weights, setWeights] = React.useState<Record<string, string>>({});
   React.useEffect(() => { if (book) setWeights(Object.fromEntries(book.groups.map((g) => [g.id, String(g.weight)]))); }, [book]);
   if (!book) return <p className="text-muted">…</p>;
   const base = `sections/${sectionId}`;
   async function manual(assignmentId: string, studentId: string) {
-    const v = window.prompt(t("enterScore"));
-    if (v === null) return;
+    const r = await ask(t("enterScore"), [{ name: "points", label: t("enterScore"), type: "number" }]);
+    if (r === null) return;
+    const v = r.points;
     await run(() => bff(`${base}/assignments/${assignmentId}/manual-scores/${studentId}`, { method: "PUT", body: { points: v.trim() === "" ? null : Number(v) } }), c("saved"));
   }
   async function amend(enrollmentId: string) {
-    const total = Number(window.prompt(t("newTotal")) ?? "");
-    const reason = window.prompt(t("reasonPrompt")) ?? "";
+    const v = await ask(t("newTotal"), [{ name: "total", label: t("newTotal"), type: "number" }, { name: "reason", label: t("reasonPrompt"), type: "textarea" }]);
+    if (!v) return;
+    const total = Number(v.total);
+    const reason = v.reason;
     if (Number.isNaN(total) || reason.trim().length < 5) return;
     await run(() => bff(`${base}/final-grades/${enrollmentId}`, { method: "PUT", body: { total, reason } }), c("saved"));
   }
   return (
     <div>
       {message}
+      {dialog}
       <h4 className="mb-1 font-medium">{t("policy")}</h4>
       <div className="mb-2 flex flex-wrap items-center gap-3">
         {book.groups.map((g) => (
@@ -82,7 +88,7 @@ export function GradesPanel({ sectionId }: { sectionId: string }) {
       <div className="mb-2 flex flex-wrap gap-2">
         <PermButton perm={PERMS.eduGradeEdit} size="sm" onClick={() => void run(() => bff(`${base}/final-grades/calculate`, { method: "POST" }), c("done"))}>{t("calculate")}</PermButton>
         <PermButton perm={PERMS.eduGradeEdit} size="sm" variant="outline" onClick={() => window.confirm(t("confirmPublish")) && void run(() => bff(`${base}/final-grades/publish`, { method: "POST" }), c("done"))}>{t("publishFinal")}</PermButton>
-        <PermButton perm={PERMS.eduGradeAmend} size="sm" variant="outline" onClick={() => { const reason = window.prompt(t("reasonPrompt")) ?? ""; if (reason.trim().length >= 5) void run(() => bff(`${base}/final-grades/recalculate`, { method: "POST", body: { reason } }), c("done")); }}>{t("recalculate")}</PermButton>
+        <PermButton perm={PERMS.eduGradeAmend} size="sm" variant="outline" onClick={() => void ask(t("recalculate"), [{ name: "reason", label: t("reasonPrompt"), type: "textarea" }]).then((v) => { if (v && v.reason.trim().length >= 5) void run(() => bff(`${base}/final-grades/recalculate`, { method: "POST", body: { reason: v.reason } }), c("done")); })}>{t("recalculate")}</PermButton>
         <Can perm={PERMS.eduGradeList}><a className="self-center underline" href={`/bff/${base}/gradebook.csv`}>{t("exportCsv")}</a></Can>
       </div>
       <div className="overflow-x-auto">

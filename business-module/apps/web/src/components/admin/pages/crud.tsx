@@ -3,6 +3,7 @@
 // 管理页面共用的小零件：表单面板、操作提示。
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { ACT_ERROR_EVENT, Modal } from "../modal";
 
 export interface Field {
   name: string;
@@ -36,6 +37,7 @@ export function FormPanel({
   cancelLabel,
   onSubmit,
   onCancel,
+  inline = false,
 }: {
   title: string;
   fields: Field[];
@@ -44,41 +46,46 @@ export function FormPanel({
   cancelLabel: string;
   onSubmit: (payload: Record<string, unknown>) => void | Promise<void>;
   onCancel: () => void;
+  /** 默认以弹窗显示；已经在弹窗里面时用 inline，直接在原位显示。 */
+  inline?: boolean;
 }) {
   const [values, setValues] = React.useState<Values>(() => Object.fromEntries(fields.map((f) => [f.name, initial[f.name] ?? (f.type === "checkbox" ? false : "")])));
   const set = (name: string, v: string | boolean) => setValues((s) => ({ ...s, [name]: v }));
   const cls = "rounded-md border border-border bg-transparent px-2 py-1";
-  return (
+  const form = (
     <form
-      className="mb-3 flex flex-wrap items-end gap-3 rounded-md border border-border p-3 text-sm"
+      className={inline ? "mb-3 flex flex-col gap-3 rounded-md border border-border p-3 text-sm" : "flex flex-col gap-3 text-sm"}
       aria-label={title}
       onSubmit={(e) => {
         e.preventDefault();
         void onSubmit(toPayload(fields, values));
       }}
     >
-      <h3 className="w-full font-medium">{title}</h3>
+      <h3 className="text-base font-semibold">{title}</h3>
       {fields.map((f) => (
-        <label key={f.name} className="flex flex-col gap-1">
-          {f.label}
+        <label key={f.name} className={f.type === "checkbox" ? "flex items-center gap-2" : "flex flex-col gap-1"}>
+          {f.type === "checkbox" ? null : f.label}
           {f.type === "select" ? (
             <select className={cls} required={f.required} disabled={f.readOnly} value={String(values[f.name])} onChange={(e) => set(f.name, e.target.value)}>
               <option value="" />
               {f.options?.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
             </select>
           ) : f.type === "checkbox" ? (
-            <input type="checkbox" disabled={f.readOnly} checked={Boolean(values[f.name])} onChange={(e) => set(f.name, e.target.checked)} />
+            <><input type="checkbox" disabled={f.readOnly} checked={Boolean(values[f.name])} onChange={(e) => set(f.name, e.target.checked)} />{f.label}</>
           ) : f.type === "textarea" ? (
-            <textarea className={cls} required={f.required} readOnly={f.readOnly} value={String(values[f.name])} onChange={(e) => set(f.name, e.target.value)} />
+            <textarea className={cls} rows={4} required={f.required} readOnly={f.readOnly} value={String(values[f.name])} onChange={(e) => set(f.name, e.target.value)} />
           ) : (
             <input className={cls} type={f.type ?? "text"} required={f.required} readOnly={f.readOnly} value={String(values[f.name])} onChange={(e) => set(f.name, e.target.value)} />
           )}
         </label>
       ))}
-      <Button type="submit" size="sm">{submitLabel}</Button>
-      <Button type="button" size="sm" variant="outline" onClick={onCancel}>{cancelLabel}</Button>
+      <div className="mt-2 flex justify-start gap-2 border-t border-border pt-3">
+        <Button type="submit" size="sm">{submitLabel}</Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>{cancelLabel}</Button>
+      </div>
     </form>
   );
+  return inline ? form : <Modal title={title} onClose={onCancel}>{form}</Modal>;
 }
 
 /** 操作结果提示 + 统一的"执行并刷新"。 */
@@ -93,6 +100,7 @@ export function useAct(reload: () => void) {
         return true;
       } catch (e) {
         setMessage({ text: (e as Error).message, error: true });
+        window.dispatchEvent(new CustomEvent(ACT_ERROR_EVENT, { detail: (e as Error).message }));
         return false;
       }
     },
