@@ -8,7 +8,7 @@ import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
-import { Can, PermButton } from "../permissions";
+import { Can } from "../permissions";
 import { FormPanel, useAct } from "./crud";
 import { useList } from "./use-api";
 

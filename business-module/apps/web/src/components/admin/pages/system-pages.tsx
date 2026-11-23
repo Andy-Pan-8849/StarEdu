@@ -10,7 +10,7 @@ import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
 import { usePromptDialog } from "../prompt-dialog";
 import { DataTable, type Column } from "../data-table";
-import { Can, PermButton } from "../permissions";
+import { Can } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
 

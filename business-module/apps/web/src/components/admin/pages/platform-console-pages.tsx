@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
-import { Can, PermButton } from "../permissions";
+import { Can } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
 
