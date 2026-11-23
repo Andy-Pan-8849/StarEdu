@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { PermRowAction, RowAction } from "../icon-button";
+import { CalendarPlus, ExternalLink, Inbox, Send } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -52,8 +54,8 @@ export function AssignmentsPanel({ sectionId }: { sectionId: string }) {
                 <span className="font-medium">{a.title}</span>
                 <span className="text-muted">{t("due", { date: a.dueDate })} · {t("maxScore", { n: a.maxScore })}{a.group ? ` · ${a.group.name}` : ""}</span>
                 <span className="text-muted">{a.published ? t("published") : t("draft")} · {t("counts", { s: a.counts.submitted, g: a.counts.grading, p: a.counts.published })}</span>
-                <Button size="sm" variant="outline" onClick={() => setOpenId(a.id)}>{t("submissions")}</Button>
-                <PermButton perm={PERMS.eduAssignmentEdit} size="sm" variant="outline" onClick={() => void run(() => bff(`sections/${sectionId}/assignments/${a.id}/publish`, { method: "POST", body: { published: !a.published } }), c("done"))}>{a.published ? t("unpublish") : t("publish")}</PermButton>
+                <RowAction onClick={() => setOpenId(a.id)} icon={Inbox}>{t("submissions")}</RowAction>
+                <PermRowAction perm={PERMS.eduAssignmentEdit} onClick={() => void run(() => bff(`sections/${sectionId}/assignments/${a.id}/publish`, { method: "POST", body: { published: !a.published } }), c("done"))} icon={Send}>{a.published ? t("unpublish") : t("publish")}</PermRowAction>
               </li>
             ))}
             {list.rows.length === 0 ? <li className="text-muted">—</li> : null}
@@ -133,8 +135,8 @@ function SubmissionsView({ sectionId, assignment, onBack }: { sectionId: string;
               <td>{r.submissionId && r.isLate ? t("lateInfo", { h: r.hoursLate, p: r.latePenaltyPct ?? 0 }) : ""}{r.extension ? ` ${t("extended", { d: r.extension.days })}` : ""}</td>
               <td>{r.finalScore ?? ""}</td>
               <td className="flex gap-1 py-1">
-                {r.submissionId ? <PermButton perm={PERMS.eduSubmissionList} size="sm" variant="outline" onClick={() => void openSub(r.submissionId!)}>{t("open")}</PermButton> : null}
-                <PermButton perm={PERMS.eduExtensionEdit} size="sm" variant="outline" onClick={() => void extend(r)}>{t("extend")}</PermButton>
+                {r.submissionId ? <PermRowAction perm={PERMS.eduSubmissionList} onClick={() => void openSub(r.submissionId!)} icon={ExternalLink}>{t("open")}</PermRowAction> : null}
+                <PermRowAction perm={PERMS.eduExtensionEdit} onClick={() => void extend(r)} icon={CalendarPlus}>{t("extend")}</PermRowAction>
               </td>
             </tr>
           ))}
@@ -160,7 +162,7 @@ function SubmissionsView({ sectionId, assignment, onBack }: { sectionId: string;
                 <label className="flex flex-col gap-1">{t("feedback")}<textarea className={input} value={feedback} onChange={(e) => setFeedback(e.target.value)} /></label>
                 <div className="flex gap-2">
                   <PermButton perm={PERMS.eduSubmissionGrade} size="sm" onClick={() => void run(() => bff(`${base}/submissions/${detail.id}/grade`, { method: "PUT", body: { scores: scores(), feedback: feedback || null } }), c("saved")).then(() => openSub(detail.id))}>{t("saveScores")}</PermButton>
-                  <PermButton perm={PERMS.eduSubmissionGrade} size="sm" variant="outline" onClick={() => void run(() => bff(`${base}/submissions/${detail.id}/publish`, { method: "POST" }), c("done")).then(() => openSub(detail.id))}>{t("publishScore")}</PermButton>
+                  <PermRowAction perm={PERMS.eduSubmissionGrade} onClick={() => void run(() => bff(`${base}/submissions/${detail.id}/publish`, { method: "POST" }), c("done")).then(() => openSub(detail.id))} icon={Send}>{t("publishScore")}</PermRowAction>
                 </div>
               </div>
             ) : <p className="mt-2">{t("finalScore")}: {detail.finalScore} ({t("raw")} {detail.rawScore}, {t("penalty")} {detail.latePenaltyPct ?? 0}%)</p>}

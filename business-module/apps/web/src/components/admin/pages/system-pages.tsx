@@ -2,13 +2,15 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Ban, Eraser, List, Pencil, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { IconButton, PermIconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
 import { usePromptDialog } from "../prompt-dialog";
 import { DataTable, type Column } from "../data-table";
-import { Can, PermButton } from "../permissions";
+import { Can } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
 
@@ -46,8 +48,8 @@ export function PostsPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.postEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.postRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`posts/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.postEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.postRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`posts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       ),
     },
@@ -57,7 +59,7 @@ export function PostsPage() {
       <H2>{t("title")}</H2>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
-      <Can perm={PERMS.postAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.postAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel
           title={form.row ? c("edit") : c("add")}
@@ -109,11 +111,11 @@ export function CampusesPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.campusEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          {r.type !== "hq" && r.status === "normal" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "stop_new")}>{t("stopNew")}</PermButton> : null}
-          {r.type !== "hq" && r.status === "stop_new" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "normal")}>{t("resume")}</PermButton> : null}
-          {r.type !== "hq" && r.status === "stop_new" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void startClose(r)}>{t("close")}</PermButton> : null}
-          {r.status === "closed" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "normal")}>{t("reopen")}</PermButton> : null}
+          <PermRowAction perm={PERMS.campusEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          {r.type !== "hq" && r.status === "normal" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void setStatus(r, "stop_new")} icon={Ban}>{t("stopNew")}</PermRowAction> : null}
+          {r.type !== "hq" && r.status === "stop_new" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void setStatus(r, "normal")} icon={Play}>{t("resume")}</PermRowAction> : null}
+          {r.type !== "hq" && r.status === "stop_new" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void startClose(r)} icon={Ban}>{t("close")}</PermRowAction> : null}
+          {r.status === "closed" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void setStatus(r, "normal")} icon={RotateCcw}>{t("reopen")}</PermRowAction> : null}
         </div>
       ),
     },
@@ -124,7 +126,7 @@ export function CampusesPage() {
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
       {dialog}
-      <Can perm={PERMS.campusAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.campusAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel
           title={form.row ? c("edit") : c("add")}
@@ -200,9 +202,9 @@ export function DeptsPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.deptAdd} size="sm" variant="outline" onClick={() => setForm({ row: undefined })}>{c("add")}</PermButton>
-          <PermButton perm={PERMS.deptEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.deptRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermIconButton perm={PERMS.deptAdd} icon={Plus} label={c("add")} variant="outline" onClick={() => setForm({ row: undefined })}/>
+          <PermRowAction perm={PERMS.deptEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.deptRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       ),
     },
@@ -256,8 +258,8 @@ export function ParamsPage() {
       header: "",
       cell: (r) => (r.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.paramEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.paramRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`params/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.paramEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.paramRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`params/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -267,7 +269,7 @@ export function ParamsPage() {
       <H2>{t("title")}</H2>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
-      <Can perm={PERMS.paramAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.paramAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel
           title={form.row ? c("edit") : c("add")}
@@ -307,8 +309,8 @@ export function DictsPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline" onClick={() => setOpen(r)}>{t("items")}</Button>
-          {!r.platformProvided ? <PermButton perm={PERMS.dictRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`dict-types/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton> : null}
+          <RowAction onClick={() => setOpen(r)} icon={List}>{t("items")}</RowAction>
+          {!r.platformProvided ? <PermRowAction perm={PERMS.dictRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`dict-types/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> : null}
         </div>
       ),
     },
@@ -318,7 +320,7 @@ export function DictsPage() {
       <H2>{t("title")}</H2>
       {types.error ? <p role="alert" className="mb-2 text-sm text-red-600">{types.error}</p> : null}
       {message}
-      <Can perm={PERMS.dictAdd}>{!newType ? <Button size="sm" className="mb-3" onClick={() => setNewType(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.dictAdd}>{!newType ? <IconButton icon={Plus} label={c("add")} onClick={() => setNewType(true)} className="mb-3"/> : null}</Can>
       {newType ? (
         <FormPanel title={c("add")} fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setNewType(false)}
           onSubmit={async (p) => { if (await run(() => bff("dict-types", { method: "POST", body: p }), c("saved"))) setNewType(false); }} />
@@ -347,8 +349,8 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
       header: "",
       cell: (r) => (type.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.dictEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.dictRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.label })) && void run(() => bff(`dict-items/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.dictEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.dictRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.label })) && void run(() => bff(`dict-items/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -357,7 +359,7 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
     <Modal title={t("itemsOf", { name: type.name })} onClose={onClose}>
     <div>
       {message}
-      {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
+      {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
           fields={[{ name: "value", label: t("value"), required: true, readOnly: !!form.row }, { name: "label", label: t("label"), required: true }, { name: "sort", label: c("sort"), type: "number" }, ...(form.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : [])]}
@@ -404,7 +406,7 @@ export function OperationLogPage() {
             <option value="" />{["POST", "PUT", "PATCH", "DELETE"].map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </label>
-        <PermButton perm={PERMS.operationLogClear} size="sm" variant="outline" onClick={() => window.confirm(t("confirmClear")) && void run(() => bff("operation-logs", { method: "DELETE" }), c("done"))}>{t("clear")}</PermButton>
+        <PermRowAction perm={PERMS.operationLogClear} onClick={() => window.confirm(t("confirmClear")) && void run(() => bff("operation-logs", { method: "DELETE" }), c("done"))} icon={Eraser}>{t("clear")}</PermRowAction>
       </div>
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: rows.length === 20, onPageChange: setPage }} />
     </section>

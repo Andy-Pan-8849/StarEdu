@@ -10,6 +10,9 @@ import { usePromptDialog } from "../src/components/admin/prompt-dialog";
 import { MenuTreeShell, type ShellLabels } from "../src/components/admin/menu-tree-shell";
 import type { MenuNode } from "../src/components/admin/menu-nav";
 import { Can, PermButton, PermissionProvider } from "../src/components/admin/permissions";
+import { IconButton } from "../src/components/admin/icon-button";
+import { Plus } from "lucide-react";
+import { NavTree, type NavNode } from "../src/components/admin/nav-tree";
 import { TreeSelect } from "../src/components/admin/tree-select";
 import type { TreeNode } from "../src/components/admin/tree";
 
@@ -269,5 +272,39 @@ describe("usePromptDialog", () => {
     await user.click(screen.getByRole("button", { name: "go" }));
     await user.keyboard("{Escape}");
     expect(onResult).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe("NavTree", () => {
+  const nodes: NavNode[] = [
+    { id: "root", label: "Root", children: [{ id: "kid", label: "Kid", children: [] }] },
+    { id: "other", label: "Other", children: [] },
+  ];
+  it("selects a node, and folds and unfolds the children of a node", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<NavTree label="Tree" nodes={nodes} selectedId="kid" onSelect={onSelect} />);
+    expect(screen.getByRole("treeitem", { name: /Kid/, selected: true })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Other" }));
+    expect(onSelect).toHaveBeenCalledWith("other");
+    await user.click(screen.getByRole("button", { name: "Collapse Root" }));
+    expect(screen.queryByRole("button", { name: "Kid" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Expand Root" }));
+    expect(screen.getByRole("button", { name: "Kid" })).toBeTruthy();
+  });
+});
+
+describe("IconButton", () => {
+  it("has the label as its accessible name and shows it as a tooltip on hover", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(<IconButton icon={Plus} label="Add" onClick={onClick} />);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    await user.hover(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getByRole("tooltip").textContent).toBe("Add");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(onClick).toHaveBeenCalled();
+    await user.unhover(screen.getByRole("button", { name: "Add" }));
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 });

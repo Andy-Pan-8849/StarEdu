@@ -2,13 +2,15 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { ArrowRightLeft, CircleCheck, Download, Eye, LogOut, Plus, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
+import { IconButton, IconLink, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { usePromptDialog } from "../prompt-dialog";
 import { DataTable, type Column } from "../data-table";
 import { Modal } from "../modal";
-import { Can, PermButton, usePermissions } from "../permissions";
+import { Can, usePermissions } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
 
@@ -48,7 +50,7 @@ function ImportPanel({ path, onDone, onClose, columns }: { path: string; onDone:
       <input type="file" accept=".csv,text/csv" aria-label={t("chooseFile")} onChange={async (e) => { const f = e.target.files?.[0]; setCsv(f ? await f.text() : null); setResult(null); }} />
       <label className="my-2 flex flex-col gap-1">{t("aliases")}<input className="rounded-md border border-border bg-transparent px-2 py-1" placeholder="BJ=HQ" value={aliases} onChange={(e) => setAliases(e.target.value)} /></label>
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={!csv} onClick={() => void send(true)}>{t("check")}</Button>
+        <RowAction disabled={!csv} onClick={() => void send(true)} icon={CircleCheck}>{t("check")}</RowAction>
         <Button size="sm" disabled={!csv} onClick={() => void send(false)}>{t("import")}</Button>
       </div>
       <Err error={error} />
@@ -83,7 +85,7 @@ export function PeoplePage() {
     { key: "name", header: t("name"), cell: (r) => r.fullName },
     { key: "type", header: t("personType"), cell: (r) => t(`person_${r.type}`) },
     { key: "email", header: t("email"), cell: (r) => r.workEmail ?? "" },
-    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button> },
+    { key: "actions", header: "", cell: (r) => <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction> },
   ];
   return (
     <section>
@@ -166,7 +168,7 @@ export function StaffPage() {
     { key: "name", header: t("name"), cell: (r) => r.fullName },
     { key: "campus", header: t("campus"), cell: (r) => r.campuses.join(", ") },
     { key: "status", header: c("status"), cell: (r) => (r.status ? t(`staff_${r.status}`) : "") },
-    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button> },
+    { key: "actions", header: "", cell: (r) => <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction> },
   ];
   return (
     <section>
@@ -174,9 +176,9 @@ export function StaffPage() {
       <Err error={list.error} />
       {message}
       <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
-        <Can perm={PERMS.hrStaffAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
-        <Can perm={PERMS.hrStaffImport}><Button size="sm" variant="outline" onClick={() => setImporting(!importing)}>{t("importCsv")}</Button></Can>
-        <a className="text-sm underline" href="/bff/staff/export">{t("exportCsv")}</a>
+        <Can perm={PERMS.hrStaffAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can>
+        <Can perm={PERMS.hrStaffImport}><IconButton icon={Upload} label={t("importCsv")} variant="outline" onClick={() => setImporting(!importing)}/></Can>
+        <IconLink icon={Download} label={t("exportCsv")} href="/bff/staff/export"/>
         <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
       </div>
       {importing ? <ImportPanel path="import/staff" columns="employee_id, name, campus_id, department, title, hire_date, status" onDone={list.reload} onClose={() => setImporting(false)} /> : null}
@@ -227,9 +229,9 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
       {tab === "basic" && d.staff ? (
         <div className="mt-3 flex gap-2">
           {d.staff.status === "active" ? (
-            <PermButton perm={PERMS.hrStaffEnd} size="sm" variant="outline" onClick={() => void ask(t("endEmployment"), [{ name: "date", label: t("endPrompt"), type: "date", initial: new Date().toISOString().slice(0, 10) }]).then((v) => { if (v) void run(() => bff(`staff/${id}/end`, { method: "POST", body: { status: "left", effectiveDate: v.date } }), c("done")); })}>{t("endEmployment")}</PermButton>
+            <PermRowAction perm={PERMS.hrStaffEnd} onClick={() => void ask(t("endEmployment"), [{ name: "date", label: t("endPrompt"), type: "date", initial: new Date().toISOString().slice(0, 10) }]).then((v) => { if (v) void run(() => bff(`staff/${id}/end`, { method: "POST", body: { status: "left", effectiveDate: v.date } }), c("done")); })} icon={LogOut}>{t("endEmployment")}</PermRowAction>
           ) : (
-            <PermButton perm={PERMS.hrStaffEnd} size="sm" variant="outline" onClick={() => void run(() => bff(`staff/${id}/reinstate`, { method: "POST" }), c("done"))}>{t("reinstate")}</PermButton>
+            <PermRowAction perm={PERMS.hrStaffEnd} onClick={() => void run(() => bff(`staff/${id}/reinstate`, { method: "POST" }), c("done"))} icon={RotateCcw}>{t("reinstate")}</PermRowAction>
           )}
         </div>
       ) : null}
@@ -239,8 +241,8 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
             {d.assignments.map((a) => (
               <li key={a.id} className={a.current ? "" : "text-muted"}>
                 {a.deptName}{a.postName ? ` · ${a.postName}` : ""}{a.isPrimary ? ` (${t("primary")})` : ""} — {a.startDate} → {a.endDate ?? t("present")}
-                {a.current ? <PermButton perm={PERMS.hrStaffAssign} size="sm" variant="outline" className="ml-2" onClick={() => setTransfer(a)}>{t("transfer")}</PermButton> : null}
-                {a.current ? <PermButton perm={PERMS.hrStaffAssign} size="sm" variant="outline" className="ml-1" onClick={() => void run(() => bff(`staff/${id}/assignments/${a.id}`, { method: "DELETE" }), c("done"))}>{t("endAssignment")}</PermButton> : null}
+                {a.current ? <PermRowAction perm={PERMS.hrStaffAssign} className="ml-2" onClick={() => setTransfer(a)} icon={ArrowRightLeft}>{t("transfer")}</PermRowAction> : null}
+                {a.current ? <PermRowAction perm={PERMS.hrStaffAssign} className="ml-1" onClick={() => void run(() => bff(`staff/${id}/assignments/${a.id}`, { method: "DELETE" }), c("done"))} icon={LogOut}>{t("endAssignment")}</PermRowAction> : null}
               </li>
             ))}
           </ul>
@@ -275,14 +277,14 @@ function EmergencyTab({ personId }: { personId: string }) {
     { key: "rel", header: t("relationship"), cell: (r) => r.relationship },
     { key: "phone", header: t("phone"), cell: (r) => r.phone },
     { key: "g", header: t("guardian"), cell: (r) => (r.isGuardian ? c("enabled") : "") },
-    { key: "a", header: "", cell: (r) => <PermButton perm={PERMS.hrEmergencyEdit} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`persons/${personId}/emergency-contacts/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton> },
+    { key: "a", header: "", cell: (r) => <PermRowAction perm={PERMS.hrEmergencyEdit} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`persons/${personId}/emergency-contacts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> },
   ];
   return (
     <div>
       <p className="mb-2 text-muted">{t("emergencyNote")}</p>
       <Err error={list.error} />
       {message}
-      <Can perm={PERMS.hrEmergencyEdit}>{!form ? <Button size="sm" className="mb-2" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.hrEmergencyEdit}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-2"/> : null}</Can>
       {form ? (
         <FormPanel inline title={c("add")} fields={[{ name: "name", label: t("name"), required: true }, { name: "relationship", label: t("relationship"), required: true }, { name: "phone", label: t("phone"), required: true }, { name: "isGuardian", label: t("guardian"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { if (await run(() => bff(`persons/${personId}/emergency-contacts`, { method: "POST", body: p }), c("saved"))) setForm(false); }} />
@@ -351,7 +353,7 @@ export function StudentsPage() {
       key: "actions",
       header: "",
       cell: (r) => (
-        <PermButton perm={PERMS.hrStudentEdit} size="sm" variant="outline" onClick={() => setEditing(r)}>{t("changeStatus")}</PermButton>
+        <PermRowAction perm={PERMS.hrStudentEdit} onClick={() => setEditing(r)} icon={RefreshCw}>{t("changeStatus")}</PermRowAction>
       ),
     },
   ];
@@ -361,9 +363,9 @@ export function StudentsPage() {
       <Err error={list.error} />
       {message}
       <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
-        <Can perm={PERMS.hrStudentAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
-        <Can perm={PERMS.hrStudentImport}><Button size="sm" variant="outline" onClick={() => setImporting(!importing)}>{t("importCsv")}</Button></Can>
-        <a className="text-sm underline" href="/bff/students/export">{t("exportCsv")}</a>
+        <Can perm={PERMS.hrStudentAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can>
+        <Can perm={PERMS.hrStudentImport}><IconButton icon={Upload} label={t("importCsv")} variant="outline" onClick={() => setImporting(!importing)}/></Can>
+        <IconLink icon={Download} label={t("exportCsv")} href="/bff/students/export"/>
         <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
         <label className="flex flex-col gap-1">{c("status")}
           <select className="rounded-md border border-border bg-transparent px-2 py-1" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>

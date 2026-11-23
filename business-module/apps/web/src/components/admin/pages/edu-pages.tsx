@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserMinus, UsersRound } from "lucide-react";
+import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -53,9 +55,9 @@ export function TermsPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          {r.status !== "ended" ? <PermButton perm={PERMS.eduTermEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton> : null}
+          {r.status !== "ended" ? <PermRowAction perm={PERMS.eduTermEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction> : null}
           {TERM_NEXT[r.status].map((next) => (
-            <PermButton key={next} perm={PERMS.eduTermEdit} size="sm" variant="outline" onClick={() => (next !== "ended" || window.confirm(t("confirmEnd", { name: r.name }))) && void run(() => bff(`terms/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))}>{t(`to_${next}`)}</PermButton>
+            <PermRowAction key={next} perm={PERMS.eduTermEdit} onClick={() => (next !== "ended" || window.confirm(t("confirmEnd", { name: r.name }))) && void run(() => bff(`terms/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))} icon={RefreshCw}>{t(`to_${next}`)}</PermRowAction>
           ))}
         </div>
       ),
@@ -66,7 +68,7 @@ export function TermsPage() {
       <H2>{t("termsTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduTermAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduTermAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
           initial={form.row ? { code: form.row.code, name: form.row.name, startDate: form.row.startDate, endDate: form.row.endDate, enrollOpenDate: form.row.enrollOpenDate ?? "", enrollCloseDate: form.row.enrollCloseDate ?? "", dropDeadline: form.row.dropDeadline ?? "" } : {}}
@@ -106,8 +108,8 @@ export function CoursesPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button>
-          <PermButton perm={PERMS.eduCourseEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
+          <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction>
+          <PermRowAction perm={PERMS.eduCourseEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
         </div>
       ),
     },
@@ -117,7 +119,7 @@ export function CoursesPage() {
       <H2>{t("coursesTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduCourseAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduCourseAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
           initial={form.row ? { code: form.row.code, name: form.row.name, credits: String(form.row.credits), status: form.row.status } : {}}
@@ -189,14 +191,14 @@ export function MajorsPage() {
     { key: "name", header: t("name"), cell: (r) => r.name },
     { key: "degree", header: t("degreeType"), cell: (r) => r.degreeType ?? "" },
     { key: "credits", header: t("totalCredits"), cell: (r) => r.totalCredits },
-    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => { setVersionId(null); setOpen(r.id); }}>{t("curriculum")}</Button> },
+    { key: "actions", header: "", cell: (r) => <RowAction onClick={() => { setVersionId(null); setOpen(r.id); }} icon={BookOpen}>{t("curriculum")}</RowAction> },
   ];
   return (
     <section>
       <H2>{t("majorsTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduMajorAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.eduMajorAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel title={c("add")} fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType") }, { name: "totalCredits", label: t("totalCredits"), type: "number" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { if (await run(() => bff("majors", { method: "POST", body: p }), c("saved"))) setForm(false); }} />
@@ -213,8 +215,8 @@ export function MajorsPage() {
             </label>
             <label className="flex flex-col gap-1">{t("versionYear")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={newYear} onChange={(e) => setNewYear(e.target.value)} /></label>
             <label className="flex flex-col gap-1">{t("versionLabel")}<input className="w-32 rounded-md border border-border bg-transparent px-2 py-1" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} /></label>
-            <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => void run(async () => { const r = await bff<{ id: string }>(`majors/${open}/versions`, { method: "POST", body: { effectiveYear: Number(newYear), ...(newLabel ? { label: newLabel } : {}), copyFromVersionId: detail.versionId } }); setNewYear(""); setNewLabel(""); setVersionId(r.id); setReloadKey((k) => k + 1); }, c("saved"))}>{t("versionAdd")}</PermButton>
-            {detail.versions.length > 1 ? <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => window.confirm(t("versionConfirmRemove")) && void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "DELETE" }); setVersionId(null); setReloadKey((k) => k + 1); }, c("done"))}>{t("versionRemove")}</PermButton> : null}
+            <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => void run(async () => { const r = await bff<{ id: string }>(`majors/${open}/versions`, { method: "POST", body: { effectiveYear: Number(newYear), ...(newLabel ? { label: newLabel } : {}), copyFromVersionId: detail.versionId } }); setNewYear(""); setNewLabel(""); setVersionId(r.id); setReloadKey((k) => k + 1); }, c("saved"))} icon={Plus}>{t("versionAdd")}</PermRowAction>
+            {detail.versions.length > 1 ? <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => window.confirm(t("versionConfirmRemove")) && void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "DELETE" }); setVersionId(null); setReloadKey((k) => k + 1); }, c("done"))} icon={Trash2} danger>{t("versionRemove")}</PermRowAction> : null}
           </div>
           <p className="mb-2 text-xs text-muted">{t("versionHelp")}</p>
           <div className="mb-3 flex flex-wrap items-end gap-3">
@@ -274,9 +276,9 @@ export function SectionsPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button>
+          <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction>
           {SEC_NEXT[r.status].map((next) => (
-            <PermButton key={next} perm={PERMS.eduSectionStatus} size="sm" variant="outline" onClick={() => (next !== "cancelled" || window.confirm(t("confirmCancel", { name: r.name }))) && void run(() => bff(`sections/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))}>{t(`to_sec_${next}`)}</PermButton>
+            <PermRowAction key={next} perm={PERMS.eduSectionStatus} onClick={() => (next !== "cancelled" || window.confirm(t("confirmCancel", { name: r.name }))) && void run(() => bff(`sections/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))} icon={RefreshCw}>{t(`to_sec_${next}`)}</PermRowAction>
           ))}
         </div>
       ),
@@ -287,8 +289,8 @@ export function SectionsPage() {
       <H2>{t("sectionsTitle")}</H2>
       <Err error={sections.error} />
       {message}
-      <Can perm={PERMS.eduSectionAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
-      <Can perm={PERMS.eduEnrollmentAdd}>{!batchOpen ? <Button size="sm" variant="outline" className="mb-3 ml-2" onClick={() => setBatchOpen(true)}>{t("batchEnroll")}</Button> : null}</Can>
+      <Can perm={PERMS.eduSectionAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
+      <Can perm={PERMS.eduEnrollmentAdd}>{!batchOpen ? <RowAction className="mb-3 ml-2" onClick={() => setBatchOpen(true)} icon={UsersRound}>{t("batchEnroll")}</RowAction> : null}</Can>
       {batchOpen ? <BatchEnrollPanel onClose={() => { setBatchOpen(false); sections.reload(); }} /> : null}
       {form ? (
         <FormPanel title={c("add")} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
@@ -354,7 +356,7 @@ function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
         <input aria-label={t("reason")} placeholder={t("reason")} className="w-64 rounded-md border border-border bg-transparent px-2 py-1" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} />
       </div>
       <div className="mb-3 flex items-center gap-2">
-        <Button size="sm" variant="outline" disabled={!ready} onClick={() => void go(true)}>{t("preview")}</Button>
+        <RowAction disabled={!ready} onClick={() => void go(true)} icon={Eye}>{t("preview")}</RowAction>
         <PermButton perm={PERMS.eduEnrollmentAdd} size="sm" disabled={!ready || !result?.dryRun || result.summary.ok + result.summary.needConfirmation === 0} onClick={() => window.confirm(t("batchConfirm", { n: result?.summary.ok ?? 0 })) && void go(false)}>{t("batchRun")}</PermButton>
         <Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button>
         {msg ? <span role="alert" className="text-red-600">{msg}</span> : null}
@@ -413,7 +415,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
     { key: "name", header: t("name"), cell: (r) => r.fullName ?? "" },
     { key: "status", header: c("status"), cell: (r) => t(`enr_${r.status}`) },
     { key: "method", header: t("method"), cell: (r) => (r.method === "registrar" ? t("byRegistrar") : t("bySelf")) },
-    { key: "a", header: "", cell: (r) => (r.status === "enrolled" ? <PermButton perm={PERMS.eduEnrollmentRemove} size="sm" variant="outline" onClick={() => void run(() => bff(`sections/${id}/enrollments/${r.id}`, { method: "DELETE" }), c("done"))}>{t("remove")}</PermButton> : null) },
+    { key: "a", header: "", cell: (r) => (r.status === "enrolled" ? <PermRowAction perm={PERMS.eduEnrollmentRemove} onClick={() => void run(() => bff(`sections/${id}/enrollments/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{t("remove")}</PermRowAction> : null) },
   ];
   return (
     <Modal wide title={`${s.name} — ${s.seated}/${s.capacity}`} onClose={onClose}>
@@ -451,13 +453,13 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
         <div>
           <ul className="mb-2 list-disc pl-5">{materials.rows.map((m) => (
             <li key={m.id}><a className="underline" href={m.url} target="_blank" rel="noopener noreferrer">{m.title}</a> {m.published ? "" : `(${t("draft")})`}
-              <PermButton perm={PERMS.eduMaterialEdit} size="sm" variant="outline" className="ml-2" onClick={() => void run(() => bff(`sections/${id}/materials/${m.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton></li>
+              <PermRowAction perm={PERMS.eduMaterialEdit} className="ml-2" onClick={() => void run(() => bff(`sections/${id}/materials/${m.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction></li>
           ))}</ul>
           <Can perm={PERMS.eduMaterialEdit}>
             {matForm ? (
               <FormPanel inline title={c("add")} fields={[{ name: "title", label: t("name"), required: true }, { name: "url", label: t("url"), required: true }, { name: "published", label: t("published"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setMatForm(false)}
                 onSubmit={async (p) => { if (await run(() => bff(`sections/${id}/materials`, { method: "POST", body: p }), c("saved"))) setMatForm(false); }} />
-            ) : <Button size="sm" onClick={() => setMatForm(true)}>{c("add")}</Button>}
+            ) : <IconButton icon={Plus} label={c("add")} onClick={() => setMatForm(true)}/>}
           </Can>
         </div>
       ) : null}
@@ -500,7 +502,7 @@ export function PortalEnrollPage() {
       <ul className="mb-4 list-disc pl-5 text-sm">
         {enrolled.length === 0 ? <li className="text-muted">—</li> : enrolled.map((e) => (
           <li key={e.id}>{e.course.code} · {e.course.name} ({e.term}) — {t(`enr_${e.status}`)}
-            {e.canDrop ? <PermButton perm={PERMS.portalEnrollDrop} size="sm" variant="outline" className="ml-2" onClick={() => window.confirm(e.willBeW ? t("confirmDropW") : t("confirmDrop")) && void act(() => bff(`enrollments/${e.id}`, { method: "DELETE" }), c("done"))}>{t("drop")}</PermButton> : null}</li>
+            {e.canDrop ? <PermRowAction perm={PERMS.portalEnrollDrop} className="ml-2" onClick={() => window.confirm(e.willBeW ? t("confirmDropW") : t("confirmDrop")) && void act(() => bff(`enrollments/${e.id}`, { method: "DELETE" }), c("done"))} icon={UserMinus} danger>{t("drop")}</PermRowAction> : null}</li>
         ))}
       </ul>
       <div className="mb-2 flex items-center gap-2 text-sm">

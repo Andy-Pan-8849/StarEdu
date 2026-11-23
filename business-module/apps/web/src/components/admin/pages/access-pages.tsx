@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { KeyRound, Link, Mail, Pencil, Plus, Power, ShieldCheck, Trash2, Unlock, UserCog } from "lucide-react";
+import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -57,12 +59,12 @@ export function UsersPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userAssignRole} size="sm" variant="outline" onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }}>{t("assignRoles")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userEdit} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))}>{r.status === "disabled" ? t("enable") : t("disable")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userResetPwd} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/invite`, { method: "POST" }), t("sent"))}>{t("resendInvite")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userResetPwd} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/reset-link`, { method: "POST" }), t("sent"))}>{t("resetLink")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userResetPwd} size="sm" variant="outline" onClick={() => window.confirm(t("confirmTemp", { name: r.username })) && void bff<{ password: string }>(`accounts/${r.id}/temp-password`, { method: "POST" }).then((x) => setTemp({ username: r.username, password: x.password }))}>{t("tempPassword")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userEdit} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/unlock`, { method: "POST" }), t("unlocked"))}>{t("unlock")}</PermButton> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userAssignRole} onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }} icon={UserCog}>{t("assignRoles")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userEdit} onClick={() => act(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))} icon={Power}>{r.status === "disabled" ? t("enable") : t("disable")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userResetPwd} onClick={() => act(() => bff(`accounts/${r.id}/invite`, { method: "POST" }), t("sent"))} icon={Mail}>{t("resendInvite")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userResetPwd} onClick={() => act(() => bff(`accounts/${r.id}/reset-link`, { method: "POST" }), t("sent"))} icon={Link}>{t("resetLink")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userResetPwd} onClick={() => window.confirm(t("confirmTemp", { name: r.username })) && void bff<{ password: string }>(`accounts/${r.id}/temp-password`, { method: "POST" }).then((x) => setTemp({ username: r.username, password: x.password }))} icon={KeyRound}>{t("tempPassword")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userEdit} onClick={() => act(() => bff(`accounts/${r.id}/unlock`, { method: "POST" }), t("unlocked"))} icon={Unlock}>{t("unlock")}</PermRowAction> : null}
         </div>
       ),
     },
@@ -82,7 +84,7 @@ export function UsersPage() {
         </Modal>
       ) : null}
       <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
-        <Can perm={PERMS.userAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
+        <Can perm={PERMS.userAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can>
         <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
       </div>
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("accounts", { method: "POST", body: p }), t("created"))) setForm(false); }} /> : null}
@@ -137,9 +139,9 @@ export function RolesPage() {
       header: "",
       cell: (r) => (r.kind !== "custom" ? null : (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.roleEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.roleAuthorize} size="sm" variant="outline" onClick={() => setEditing(r)}>{t("permissions")}</PermButton>
-          <PermButton perm={PERMS.roleRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.roleEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.roleAuthorize} onClick={() => setEditing(r)} icon={ShieldCheck}>{t("permissions")}</PermRowAction>
+          <PermRowAction perm={PERMS.roleRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
           {r.templateMissingCount ? <PermButton perm={PERMS.roleAuthorize} size="sm" onClick={() => openUpgrade(r)}>{t("templateUpdate", { n: r.templateMissingCount })}</PermButton> : null}
         </div>
       )),
@@ -150,7 +152,7 @@ export function RolesPage() {
       <H2>{t("title")}</H2>
       <Err error={roles.error} />
       {message}
-      <Can perm={PERMS.roleAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.roleAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
           fields={[{ name: "code", label: t("code"), required: true, readOnly: !!form.row }, { name: "name", label: t("name"), required: true }]}
@@ -260,8 +262,8 @@ export function MenusPage() {
       header: "",
       cell: (r) => (r.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.menuEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.menuRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`menus/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.menuEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.menuRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`menus/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -272,7 +274,7 @@ export function MenusPage() {
       <p className="mb-2 text-sm text-muted">{t("hint")}</p>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.menuAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.menuAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
           initial={form.row ? { name: form.row.name, route: form.row.route ?? "", sort: String(form.row.sort), visible: form.row.visible, status: form.row.status } : {}}
@@ -311,7 +313,7 @@ export function EntriesPage() {
           <h3 className="mb-2 font-medium">{t(`entry_${e.code}`)}</h3>
           <p className="mb-2 text-muted">{t("platformAssigned")}: {e.menus.filter((m) => m.platformProvided).map(label).join(", ") || "—"}</p>
           <p className="mb-2">{t("yourMenus")}: {topOwn.filter((m) => (sel[e.code] ?? []).includes(m.id)).map((m) => m.name).join(", ") || "—"}</p>
-          <PermButton perm={PERMS.entryEdit} size="sm" variant="outline" onClick={() => setEditing(e.code)}>{c("edit")}</PermButton>
+          <PermRowAction perm={PERMS.entryEdit} onClick={() => setEditing(e.code)} icon={Pencil}>{c("edit")}</PermRowAction>
           {editing === e.code ? (
           <Modal title={t(`entry_${e.code}`)} onClose={() => { setEditing(null); load(); }}>
           <div className="text-sm">
@@ -371,8 +373,8 @@ export function DataScopesPage() {
       header: "",
       cell: (r) => (r.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.dataScopeEdit} size="sm" variant="outline" onClick={() => { setForm({ row: r }); setName(r.name); setPicked(r.nodes.map((n) => n.deptId)); setWithChildren(r.nodes.every((n) => n.includeChildren)); }}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.dataScopeRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`data-scope-sets/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.dataScopeEdit} onClick={() => { setForm({ row: r }); setName(r.name); setPicked(r.nodes.map((n) => n.deptId)); setWithChildren(r.nodes.every((n) => n.includeChildren)); }} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.dataScopeRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`data-scope-sets/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -382,7 +384,7 @@ export function DataScopesPage() {
       <H2>{t("title")}</H2>
       <Err error={sets.error} />
       {message}
-      <Can perm={PERMS.dataScopeAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => { setForm({}); setName(""); setPicked([]); setWithChildren(true); }}>{c("add")}</Button> : null}</Can>
+      <Can perm={PERMS.dataScopeAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => { setForm({}); setName(""); setPicked([]); setWithChildren(true); }} className="mb-3"/> : null}</Can>
       {form ? (
         <Modal title={form.row ? c("edit") : c("add")} onClose={() => setForm(null)}>
         <form className="text-sm" onSubmit={async (e) => {

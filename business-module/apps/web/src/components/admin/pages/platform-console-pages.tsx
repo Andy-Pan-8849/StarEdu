@@ -3,12 +3,14 @@
 // 平台控制台的 5 个页面：平台账号、平台角色、菜单、入口分配、平台公告。接口在 B3/B17 已有，这里只补页面。
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { EyeOff, Plus, Power, ShieldCheck, Trash2, UserCog, UserPlus } from "lucide-react";
+import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
-import { Can, PermButton } from "../permissions";
+import { Can } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
 
@@ -49,8 +51,8 @@ export function PlatformAccountsPage() {
       header: "",
       cell: (r) => (r.isBuiltin ? null : (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.platformAccountAssignRole} size="sm" variant="outline" onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }}>{t("assignRoles")}</PermButton>
-          <PermButton perm={PERMS.platformAccountEdit} size="sm" variant="outline" onClick={() => void run(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))}>{r.status === "disabled" ? t("enable") : t("disable")}</PermButton>
+          <PermRowAction perm={PERMS.platformAccountAssignRole} onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }} icon={UserCog}>{t("assignRoles")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformAccountEdit} onClick={() => void run(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))} icon={Power}>{r.status === "disabled" ? t("enable") : t("disable")}</PermRowAction>
         </div>
       )),
     },
@@ -60,7 +62,7 @@ export function PlatformAccountsPage() {
       <H2>{t("title")}</H2>
       <Err error={accounts.error} />
       {message}
-      <div className="mb-3 text-sm"><Can perm={PERMS.platformAccountAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can></div>
+      <div className="mb-3 text-sm"><Can perm={PERMS.platformAccountAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can></div>
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("accounts", { method: "POST", body: p }), t("created"))) setForm(false); }} /> : null}
       {rolesFor ? (
         <Modal title={t("rolesOf", { name: rolesFor.username })} onClose={() => setRolesFor(null)}>
@@ -111,8 +113,8 @@ export function PlatformRolesPage() {
       header: "",
       cell: (r) => (r.kind !== "custom" ? null : (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.platformRoleAuthorize} size="sm" variant="outline" onClick={() => open(r)}>{t("permissions")}</PermButton>
-          <PermButton perm={PERMS.platformRoleRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.platformRoleAuthorize} onClick={() => open(r)} icon={ShieldCheck}>{t("permissions")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformRoleRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -122,7 +124,7 @@ export function PlatformRolesPage() {
       <H2>{t("title")}</H2>
       <Err error={roles.error} />
       {message}
-      <div className="mb-3 text-sm"><Can perm={PERMS.platformRoleAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can></div>
+      <div className="mb-3 text-sm"><Can perm={PERMS.platformRoleAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can></div>
       {form ? (
         <FormPanel
           title={c("add")}
@@ -181,8 +183,8 @@ export function PlatformMenusPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.platformMenuEdit} size="sm" variant="outline" onClick={() => patch(r, { visible: !r.visible })}>{r.visible ? t("hide") : t("show")}</PermButton>
-          <PermButton perm={PERMS.platformMenuEdit} size="sm" variant="outline" onClick={() => patch(r, { status: !r.status })}>{r.status ? t("disable") : t("enable")}</PermButton>
+          <PermRowAction perm={PERMS.platformMenuEdit} onClick={() => patch(r, { visible: !r.visible })} icon={EyeOff}>{r.visible ? t("hide") : t("show")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformMenuEdit} onClick={() => patch(r, { status: !r.status })} icon={Power}>{r.status ? t("disable") : t("enable")}</PermRowAction>
         </div>
       ),
     },
@@ -240,7 +242,7 @@ export function PlatformEntriesPage() {
             ) : (
               <div className="mt-1 flex items-center gap-3">
                 <span>{e.menus.length ? e.menus.map((m) => m.name ?? m.menuId).join(", ") : t("none")}</span>
-                <PermButton perm={PERMS.platformEntryEdit} size="sm" variant="outline" onClick={() => setEditing({ code: e.code, picked: e.menus.map((m) => m.menuId) })}>{t("assign")}</PermButton>
+                <PermRowAction perm={PERMS.platformEntryEdit} onClick={() => setEditing({ code: e.code, picked: e.menus.map((m) => m.menuId) })} icon={UserPlus}>{t("assign")}</PermRowAction>
               </div>
             )}
           </li>
@@ -272,14 +274,14 @@ export function PlatformAnnouncementsPage() {
     { key: "body", header: t("bodyField"), cell: (r) => r.body },
     { key: "severity", header: t("severity"), cell: (r) => t(`sev_${r.severity}`) },
     { key: "period", header: t("period"), cell: (r) => `${when(r.startsAt)} → ${when(r.endsAt)}` },
-    { key: "actions", header: "", cell: (r) => <PermButton perm={PERMS.platformAnnouncementEdit} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.title })) && void run(() => bff(`announcements/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton> },
+    { key: "actions", header: "", cell: (r) => <PermRowAction perm={PERMS.platformAnnouncementEdit} onClick={() => window.confirm(c("confirmDelete", { name: r.title })) && void run(() => bff(`announcements/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> },
   ];
   return (
     <section>
       <H2>{t("title")}</H2>
       <Err error={list.error} />
       {message}
-      <div className="mb-3 text-sm"><Can perm={PERMS.platformAnnouncementEdit}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can></div>
+      <div className="mb-3 text-sm"><Can perm={PERMS.platformAnnouncementEdit}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)}/> : null}</Can></div>
       {form ? (
         <FormPanel
           title={c("add")}

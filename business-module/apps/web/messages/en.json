@@ -736,6 +736,10 @@
       "instructor": "instructor"
     },
     "library": {
+      "edit": "Edit folder",
+      "folders": "Folders",
+      "deleteSelected": "Delete selected",
+      "confirmDeleteMany": "Delete {n} selected files?",
       "title": "Document library",
       "noFolders": "No folders you can see yet.",
       "newFolder": "New folder name",
