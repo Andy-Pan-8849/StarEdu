@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useFitHeight } from "./fit-height";
 import { InDialogContext } from "./modal";
 
 export interface Column<T> {
@@ -35,8 +36,7 @@ export interface TableLabels {
 
 export const pageCount = (total: number, size: number): number => Math.max(1, Math.ceil(total / Math.max(1, size)));
 
-/** 表格下沿要留给分页条和页面底边的高度（px） */
-const BOTTOM_GAP = 24;
+/** 表格下沿要留给分页条的高度（px） */
 const PAGER_HEIGHT = 40;
 
 /**
@@ -84,19 +84,7 @@ export function DataTable<T>({
   const toggleOne = (k: string) => setChecked((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
   // 表格区高度：从它顶部到屏幕底边，减去分页条；弹窗里不限制（弹窗自己滚动）
-  const scrollRef = React.useRef<HTMLDivElement>(null);
-  const [maxHeight, setMaxHeight] = React.useState<number | undefined>(undefined);
-  const fit = React.useCallback(() => {
-    const el = scrollRef.current;
-    if (!el || inDialog) return;
-    const top = el.getBoundingClientRect().top;
-    setMaxHeight(Math.max(180, Math.floor(window.innerHeight - top - BOTTOM_GAP - (pagination ? PAGER_HEIGHT : 0))));
-  }, [inDialog, pagination]);
-  React.useLayoutEffect(() => { fit(); });
-  React.useEffect(() => {
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [fit]);
+  const { ref: scrollRef, maxHeight } = useFitHeight<HTMLDivElement>(pagination ? PAGER_HEIGHT : 0);
 
   const pages = pagination && pagination.total !== undefined ? pageCount(pagination.total, pagination.size) : null;
   const lastPage = pagination ? (pages !== null ? pagination.page >= pages : !pagination.hasMore) : true;

@@ -736,6 +736,9 @@
       "instructor": "老师"
     },
     "library": {
+      "folders": "文件夹",
+      "deleteSelected": "删除所选",
+      "confirmDeleteMany": "确定删除所选的 {n} 个文件吗？",
       "title": "文档库",
       "noFolders": "还没有你能看到的文件夹。",
       "newFolder": "新文件夹名称",

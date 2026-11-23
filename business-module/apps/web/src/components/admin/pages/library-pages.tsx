@@ -4,6 +4,10 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
+import { FolderPlus, Lock, Folder as FolderIcon, FolderTree, Upload } from "lucide-react";
+import { DataTable, type Column } from "../data-table";
+import { useFitHeight } from "../fit-height";
+import { NavTree, type NavNode } from "../nav-tree";
 import { Modal } from "../modal";
 import { usePromptDialog } from "../prompt-dialog";
 import { Can } from "../permissions";
@@ -30,6 +34,21 @@ export function flatten(rows: Folder[]): Array<Folder & { depth: number }> {
   };
   walk(null, 0);
   return out;
+}
+
+/** 文件夹按父子关系嵌套成树（看不到的父级，子文件夹就当作顶层）。 */
+export function nest(rows: Folder[]): NavNode[] {
+  const byParent = new Map<string | null, Folder[]>();
+  for (const f of rows) byParent.set(f.parentId, [...(byParent.get(f.parentId) ?? []), f]);
+  const build = (parent: string | null): NavNode[] =>
+    (byParent.get(parent) ?? []).map((f) => ({
+      id: f.id,
+      label: f.name,
+      icon: f.classification === "confidential" ? <Lock aria-hidden className="h-4 w-4" /> : <FolderIcon aria-hidden className="h-4 w-4" />,
+      hint: f.files > 0 ? String(f.files) : undefined,
+      children: build(f.id),
+    }));
+  return build(null);
 }
 
 const fmtSize = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n > 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
@@ -229,71 +248,95 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
   };
   const createFolder = (parentId: string | null, name: string) => run(() => bff("library/folders", { method: "POST", body: { name, parentId } }), () => { folders.reload(); });
 
+  const tt = useTranslations("table");
+  const tableLabels = { actions: tt("actions"), selectAll: tt("selectAll"), selectRow: tt("selectRow"), clearSelection: tt("clearSelection"), selected: (n: number) => tt("selected", { n }), previous: tt("previous"), next: tt("next"), page: (p: number, n: number) => tt("page", { page: p, pages: n }) };
+  const nodes = React.useMemo(() => nest(folders.rows), [folders.rows]);
+  // 默认选中第一个文件夹；当前文件夹没了（删除、权限变化）就回到第一个
+  React.useEffect(() => {
+    if (tree.length > 0 && (cur === null || !folders.rows.some((f) => f.id === cur))) setCur(tree[0]!.id);
+  }, [tree, cur, folders.rows]);
+  const { ref: treeRef, maxHeight: treeMax } = useFitHeight<HTMLDivElement>();
+  const act = "rounded px-2 py-1 text-xs text-primary hover:bg-primary/10";
+  const columns: Column<LibFile>[] = [
+    { key: "name", header: t("file"), cell: (f) => f.name },
+    { key: "size", header: t("size"), cell: (f) => fmtSize(f.size) },
+    { key: "version", header: t("version"), cell: (f) => `v${f.version}` },
+    { key: "by", header: t("uploadedBy"), cell: (f) => f.uploadedBy ?? "" },
+    {
+      key: "actions",
+      header: "",
+      cell: (f) => (
+        <>
+          {f.canPreview ? <button type="button" className={act} onClick={() => void run(async () => setViewer(await bff<Preview>(`library/files/${f.id}/preview`)))}>{t("preview")}</button> : null}
+          {f.canDownload ? <button type="button" className={act} onClick={() => void open(`library/files/${f.id}/download`)}>{t("download")}</button> : null}
+          {!portal && f.canEdit ? (
+            <>
+              <button type="button" className={act} onClick={() => void ask(t("rename"), [{ name: "name", label: t("rename"), initial: f.name }]).then((v) => { if (v) void run(() => bff(`library/files/${f.id}`, { method: "PATCH", body: { name: v.name } }), () => void loadFiles(cur as string)); })}>{t("rename")}</button>
+              <label className={`${act} cursor-pointer`}>{t("newVersion")}<input type="file" className="hidden" onChange={(e) => { void upload(e.target.files, f.id); e.target.value = ""; }} /></label>
+              <button type="button" className={act} onClick={() => void moveOrCopy(f, "move")}>{t("move")}</button>
+            </>
+          ) : null}
+          {!portal && f.canDownload ? <button type="button" className={act} onClick={() => void moveOrCopy(f, "copy")}>{t("copy")}</button> : null}
+          {!portal && f.canDelete ? <button type="button" className={`${act} text-red-600 hover:bg-red-50`} onClick={() => window.confirm(t("confirmDeleteFile")) && void run(() => bff(`library/files/${f.id}`, { method: "DELETE" }), () => { void loadFiles(cur as string); folders.reload(); })}>{t("delete")}</button> : null}
+        </>
+      ),
+    },
+  ];
+  const canUpload = !portal && folder !== null && ["edit", "manage"].includes(folder.level);
+  const deleteMany = async (ids: string[]) => {
+    if (!window.confirm(t("confirmDeleteMany", { n: ids.length }))) return;
+    await run(async () => { for (const id of ids) await bff(`library/files/${id}`, { method: "DELETE" }); }, () => { void loadFiles(cur as string); folders.reload(); });
+  };
+
   return (
     <section className="text-sm">
       <h2 className="mb-3 text-lg font-semibold">{t("title")}</h2>
       {msg ? <p role="alert" className="mb-2 text-red-600">{msg}</p> : null}
       {dialog}
       <div className="flex gap-4">
-        <aside className="w-64 shrink-0">
-          <ul className="mb-2 space-y-1">
-            {tree.map((f) => (
-              <li key={f.id} style={{ paddingLeft: f.depth * 14 }}>
-                <button type="button" className={`text-left ${f.id === cur ? "font-semibold underline" : ""}`} onClick={() => { setCur(f.id); setManaging(false); }}>
-                  {f.classification === "confidential" ? "🔒 " : "📁 "}{f.name}
-                </button>
-              </li>
-            ))}
-            {tree.length === 0 ? <li className="text-muted">{t("noFolders")}</li> : null}
-          </ul>
-          {!portal ? (
-            <Can perm={PERMS.docFolderAdd}>
-              <div className="flex gap-1">
-                <Button size="sm" onClick={() => void ask(cur ? t("addSub") : t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })}>{cur ? t("addSub") : t("add")}</Button>
-              </div>
-            </Can>
-          ) : null}
+        <aside className="w-72 shrink-0 overflow-hidden rounded-md border border-border">
+          <div className="flex items-center justify-between gap-2 border-b border-border bg-slate-100 px-3 py-2 dark:bg-slate-800">
+            <span className="flex items-center gap-2 font-medium"><FolderTree aria-hidden className="h-4 w-4 text-muted" />{t("folders")}</span>
+            {!portal ? (
+              <Can perm={PERMS.docFolderAdd}>
+                <span className="flex gap-1">
+                  <Button size="sm" variant="outline" title={t("add")} aria-label={t("add")} onClick={() => void ask(t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(null, v.name.trim()); })}><FolderPlus aria-hidden className="h-4 w-4" /></Button>
+                  <Button size="sm" variant="outline" disabled={!cur} title={t("addSub")} aria-label={t("addSub")} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })}><FolderPlus aria-hidden className="h-4 w-4" />+</Button>
+                </span>
+              </Can>
+            ) : null}
+          </div>
+          <div ref={treeRef} className="overflow-y-auto p-2" style={treeMax ? { maxHeight: treeMax } : undefined}>
+            {nodes.length === 0 ? <p className="px-2 py-3 text-muted">{t("noFolders")}</p> : <NavTree label={t("folders")} nodes={nodes} selectedId={cur} onSelect={(id) => { setCur(id); setManaging(false); }} />}
+          </div>
         </aside>
         <div className="min-w-0 flex-1">
-          {folder ? (
-            <>
-              <div className="mb-2 flex items-center gap-2">
-                <h3 className="font-medium">{folder.name}</h3>
+          <div className="mb-3 flex min-h-8 items-center gap-2">
+            {folder ? (
+              <>
+                <h3 className="text-base font-semibold">{folder.name}</h3>
                 <span className="text-muted">{t(`class_${folder.classification}`)}{folder.previewOnly ? ` · ${t("viewOnly")}` : ""}</span>
-                {!portal && folder.level === "manage" ? <Button size="sm" variant="outline" onClick={() => setManaging(!managing)}>{t("manage")}</Button> : null}
-                {!portal && ["edit", "manage"].includes(folder.level) ? (
-                  <Can perm={PERMS.docFileUpload}>
-                    <label className="cursor-pointer rounded-md border border-border px-2 py-1">{t("upload")}<input type="file" multiple className="hidden" aria-label={t("upload")} onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label>
-                  </Can>
-                ) : null}
-              </div>
-              {managing ? <FolderManager key={folder.id} folder={folder} onClose={() => setManaging(false)} onChanged={() => { setManaging(false); folders.reload(); setCur(null); }} /> : null}
-              <table className="w-full">
-                <thead><tr className="text-left text-muted"><th>{t("file")}</th><th>{t("size")}</th><th>{t("version")}</th><th>{t("uploadedBy")}</th><th /></tr></thead>
-                <tbody>
-                  {files.map((f) => (
-                    <tr key={f.id} className="border-t border-border">
-                      <td>{f.name}</td><td>{fmtSize(f.size)}</td><td>v{f.version}</td><td>{f.uploadedBy}</td>
-                      <td className="space-x-2 whitespace-nowrap">
-                        {f.canPreview ? <button type="button" className="underline" onClick={() => void run(async () => setViewer(await bff<Preview>(`library/files/${f.id}/preview`)))}>{t("preview")}</button> : null}
-                        {f.canDownload ? <button type="button" className="underline" onClick={() => void open(`library/files/${f.id}/download`)}>{t("download")}</button> : null}
-                        {!portal && f.canEdit ? (
-                          <>
-                            <button type="button" className="underline" onClick={() => void ask(t("rename"), [{ name: "name", label: t("rename"), initial: f.name }]).then((v) => { if (v) void run(() => bff(`library/files/${f.id}`, { method: "PATCH", body: { name: v.name } }), () => void loadFiles(cur as string)); })}>{t("rename")}</button>
-                            <label className="cursor-pointer underline">{t("newVersion")}<input type="file" className="hidden" onChange={(e) => { void upload(e.target.files, f.id); e.target.value = ""; }} /></label>
-                            <button type="button" className="underline" onClick={() => void moveOrCopy(f, "move")}>{t("move")}</button>
-                          </>
-                        ) : null}
-                        {!portal && f.canDownload ? <button type="button" className="underline" onClick={() => void moveOrCopy(f, "copy")}>{t("copy")}</button> : null}
-                        {!portal && f.canDelete ? <button type="button" className="underline" onClick={() => window.confirm(t("confirmDeleteFile")) && void run(() => bff(`library/files/${f.id}`, { method: "DELETE" }), () => { void loadFiles(cur as string); folders.reload(); })}>{t("delete")}</button> : null}
-                      </td>
-                    </tr>
-                  ))}
-                  {files.length === 0 ? <tr><td colSpan={5} className="text-muted">{t("empty")}</td></tr> : null}
-                </tbody>
-              </table>
-            </>
-          ) : <p className="text-muted">{t("pickFolder")}</p>}
+                <span className="ml-auto flex items-center gap-2">
+                  {!portal && folder.level === "manage" ? <Button size="sm" variant="outline" onClick={() => setManaging(!managing)}>{t("manage")}</Button> : null}
+                  {canUpload ? (
+                    <Can perm={PERMS.docFileUpload}>
+                      <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 py-1 text-primary-foreground"><Upload aria-hidden className="h-4 w-4" />{t("upload")}<input type="file" multiple className="hidden" aria-label={t("upload")} onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label>
+                    </Can>
+                  ) : null}
+                </span>
+              </>
+            ) : <span className="text-muted">{t("pickFolder")}</span>}
+          </div>
+          {folder && managing ? <FolderManager key={folder.id} folder={folder} onClose={() => setManaging(false)} onChanged={() => { setManaging(false); folders.reload(); setCur(null); }} /> : null}
+          <DataTable
+            columns={columns}
+            rows={folder ? files : []}
+            rowKey={(f) => f.id}
+            emptyText={folder ? t("empty") : t("noFolders")}
+            selectable={!portal}
+            labels={tableLabels}
+            bulkActions={(ids) => (!portal && files.filter((f) => ids.includes(f.id)).every((f) => f.canDelete) ? <Button size="sm" variant="outline" onClick={() => void deleteMany(ids)}>{t("deleteSelected")}</Button> : null)}
+          />
         </div>
       </div>
       {viewer ? <Viewer p={viewer} onClose={() => setViewer(null)} /> : null}
