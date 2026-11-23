@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { Tabs } from "../tabs";
 import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserMinus, UsersRound } from "lucide-react";
 import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
@@ -20,7 +21,7 @@ const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
 function useTable() {
   const t = useTranslations("table");
-  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
+  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), more: t("more"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
 }
 
 // ---------------------------------------------------------------- 学期
@@ -420,9 +421,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
   return (
     <Modal wide title={`${s.name} — ${s.seated}/${s.capacity}`} onClose={onClose}>
     <div className="text-sm">
-      <div role="tablist" className="mb-3 flex gap-2">
-        {(["roster", "instructors", "materials", "assignments", "grades", "discussion"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList)) && (k !== "discussion" || perms.has(PERMS.eduDiscussionList))).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "font-medium underline" : "text-muted"} onClick={() => setTab(k)}>{t(`tab_${k}`)}</button>)}
-      </div>
+      <Tabs value={tab} onChange={setTab} items={(["roster", "instructors", "materials", "assignments", "grades", "discussion"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList)) && (k !== "discussion" || perms.has(PERMS.eduDiscussionList))).map((k) => ({ key: k, label: t(`tab_${k}`) }))} />
       {message}
       {tab === "roster" ? (
         <div>

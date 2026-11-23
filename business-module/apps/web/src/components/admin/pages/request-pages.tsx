@@ -3,11 +3,13 @@
 // 学生申请：学生门户（提交、撤回）和管理后台（看、批准、驳回）。
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Plus, Undo2, X } from "lucide-react";
+import { Tabs } from "../tabs";
+import { Check, Plus, Undo2, X } from "lucide-react";
 import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
 import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "../data-table";
 import { Modal } from "../modal";
 import { Can, PermButton } from "../permissions";
 import { useAct } from "./crud";
@@ -121,33 +123,55 @@ export function RequestsPage() {
     return !(deciding.decision === "approve" && r.kind === "grade_appeal" && (total.trim() === "" || Number.isNaN(Number(total)) || Number(total) < 0 || Number(total) > 100));
   };
 
+  const tt = useTranslations("table");
+  const columns: Column<StaffRequest>[] = [
+    { key: "student", header: t("colStudent"), cell: (r) => r.student },
+    { key: "section", header: t("colSection"), cell: (r) => r.section },
+    { key: "kind", header: t("colKind"), cell: (r) => t(`kind_${r.kind}`) },
+    {
+      key: "detail",
+      header: t("colDetail"),
+      cell: (r) => (
+        <div className="max-w-md space-y-0.5">
+          {r.kind === "extension" && r.assignment ? <div>{r.assignment.title} · {t("due", { at: new Date(r.assignment.dueAt).toLocaleString() })} · {t("daysN", { n: r.days ?? 0 })}</div> : null}
+          {r.kind === "grade_appeal" && r.currentGrade ? <div>{t("currentGrade", { grade: r.currentGrade.grade, total: r.currentGrade.total })}</div> : null}
+          <div>{r.reason}</div>
+          {r.decisionNote ? <div className="text-muted">{t("note")}: {r.decisionNote}</div> : null}
+          {r.result?.before ? <div className="text-muted">{t("changed", { a: r.result.before.total, b: r.result.after?.total ?? "-" })}</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      cell: (r) => (r.status === "pending" ? (
+        <>
+          <PermRowAction perm={PERMS.eduRequestDecide} onClick={() => open(r, "approve")} icon={Check}>{t("approve")}</PermRowAction>
+          <PermRowAction perm={PERMS.eduRequestDecide} onClick={() => open(r, "reject")} icon={X}>{t("reject")}</PermRowAction>
+        </>
+      ) : null),
+    },
+  ];
+
   return (
     <section className="text-sm">
       <H2>{t("staffTitle")}</H2>
-      <div role="tablist" className="mb-3 flex gap-3">
-        {["pending", "approved", "rejected", "withdrawn"].map((s) => <button key={s} role="tab" aria-selected={status === s} className={status === s ? "font-medium underline" : "text-muted"} onClick={() => setStatus(s)}>{t(`status_${s}`)}</button>)}
-      </div>
+      <Tabs value={status} onChange={setStatus} items={["pending", "approved", "rejected", "withdrawn"].map((s) => ({ key: s, label: t(`status_${s}`) }))} />
       {message}
-      {list.rows.length === 0 ? <p className="text-muted">{t("none")}</p> : (
-        <ul className="flex flex-col gap-2">
-          {list.rows.map((r) => (
-            <li key={r.id} className="rounded-md border border-border p-2">
-              <div className="font-medium">{r.student} · {r.section} · {t(`kind_${r.kind}`)}</div>
-              {r.kind === "extension" && r.assignment ? <div>{r.assignment.title} · {t("due", { at: new Date(r.assignment.dueAt).toLocaleString() })} · {t("daysN", { n: r.days ?? 0 })}</div> : null}
-              {r.kind === "grade_appeal" && r.currentGrade ? <div>{t("currentGrade", { grade: r.currentGrade.grade, total: r.currentGrade.total })}</div> : null}
-              <div>{r.reason}</div>
-              {r.decisionNote ? <div className="text-muted">{t("note")}: {r.decisionNote}</div> : null}
-              {r.result?.before ? <div className="text-muted">{t("changed", { a: r.result.before.total, b: r.result.after?.total ?? "-" })}</div> : null}
-              {r.status === "pending" && deciding?.id !== r.id ? (
-                <div className="mt-1 flex gap-2">
-                  <PermButton perm={PERMS.eduRequestDecide} size="sm" onClick={() => open(r, "approve")}>{t("approve")}</PermButton>
-                  <PermRowAction perm={PERMS.eduRequestDecide} onClick={() => open(r, "reject")} icon={X}>{t("reject")}</PermRowAction>
-                </div>
-              ) : null}
-              {deciding?.id === r.id ? (
-                <Modal title={t(deciding.decision === "approve" ? "approve" : "reject")} onClose={() => setDeciding(null)}>
+      <DataTable
+        columns={columns}
+        rows={list.rows}
+        rowKey={(r) => r.id}
+        loading={list.loading}
+        emptyText={t("none")}
+        selectable={false}
+        labels={{ actions: tt("actions"), more: tt("more"), previous: tt("previous"), next: tt("next"), page: (p: number, n: number) => tt("page", { page: p, pages: n }) }}
+      />
+      {(() => {
+        const r = deciding ? list.rows.find((x) => x.id === deciding.id) : undefined;
+        return deciding && r ? (
+          <Modal title={t(deciding.decision === "approve" ? "approve" : "reject")} onClose={() => setDeciding(null)}>
                 <div className="flex flex-col gap-3 text-sm">
-                  <div className="text-base font-semibold">{t(deciding.decision === "approve" ? "approve" : "reject")}</div>
                   <div className="text-muted">{r.student} · {r.section} · {t(`kind_${r.kind}`)}</div>
                   {deciding.decision === "approve" && r.kind === "grade_appeal" ? <input aria-label={t("newTotalLabel")} placeholder={t("newTotal", { current: r.currentGrade?.total ?? "-" })} inputMode="decimal" className="rounded-md border border-border bg-transparent px-2 py-1" value={total} onChange={(e) => setTotal(e.target.value)} /> : null}
                   {deciding.decision === "approve" && r.kind === "extension" ? (
@@ -162,11 +186,8 @@ export function RequestsPage() {
                   </div>
                 </div>
                 </Modal>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
+        ) : null;
+      })()}
     </section>
   );
 }

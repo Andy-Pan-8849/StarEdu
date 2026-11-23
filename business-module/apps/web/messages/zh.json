@@ -33,6 +33,7 @@
     "expandMenu": "展开菜单"
   },
   "table": {
+    "more": "更多",
     "actions": "操作",
     "selectAll": "全选",
     "selectRow": "选择此行",
@@ -617,6 +618,10 @@
       "uploadFailed": "上传 {name} 失败"
     },
     "requests": {
+      "colStudent": "学生",
+      "colSection": "班级",
+      "colKind": "类型",
+      "colDetail": "详情",
       "myTitle": "我的申请",
       "staffTitle": "学生申请",
       "pick": "选择要申请的事项",
@@ -707,6 +712,10 @@
       "revokeReason": "为什么作废这份文档？扫码的人会看到它已作废。"
     },
     "announcements": {
+      "recipientsCol": "接收人数",
+      "createdCol": "发布时间",
+      "stateCol": "状态",
+      "published": "已发布",
       "title": "公告",
       "new": "发布公告",
       "titleField": "标题",

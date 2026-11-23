@@ -249,7 +249,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
   const createFolder = (parentId: string | null, name: string) => run(() => bff("library/folders", { method: "POST", body: { name, parentId } }), () => { folders.reload(); });
 
   const tt = useTranslations("table");
-  const tableLabels = { actions: tt("actions"), selectAll: tt("selectAll"), selectRow: tt("selectRow"), clearSelection: tt("clearSelection"), selected: (n: number) => tt("selected", { n }), previous: tt("previous"), next: tt("next"), page: (p: number, n: number) => tt("page", { page: p, pages: n }) };
+  const tableLabels = { actions: tt("actions"), more: tt("more"), selectAll: tt("selectAll"), selectRow: tt("selectRow"), clearSelection: tt("clearSelection"), selected: (n: number) => tt("selected", { n }), previous: tt("previous"), next: tt("next"), page: (p: number, n: number) => tt("page", { page: p, pages: n }) };
   const nodes = React.useMemo(() => nest(folders.rows), [folders.rows]);
   // 默认选中第一个文件夹；当前文件夹没了（删除、权限变化）就回到第一个
   React.useEffect(() => {
@@ -344,6 +344,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
             rowKey={(f) => f.id}
             emptyText={folder ? t("empty") : t("noFolders")}
             selectable={!portal}
+            maxActions={8}
             labels={tableLabels}
             bulkActions={(ids) => (!portal && files.filter((f) => ids.includes(f.id)).every((f) => f.canDelete) ? <IconButton icon={Trash2} label={t("deleteSelected")} variant="outline" onClick={() => void deleteMany(ids)} /> : null)}
           />

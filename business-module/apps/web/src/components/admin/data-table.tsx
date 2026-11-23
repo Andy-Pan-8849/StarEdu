@@ -4,6 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useFitHeight } from "./fit-height";
+import { RowActions } from "./icon-button";
 import { InDialogContext } from "./modal";
 
 export interface Column<T> {
@@ -32,6 +33,8 @@ export interface TableLabels {
   selectRow?: string;
   selected?: (n: number) => string;
   clearSelection?: string;
+  /** 操作列放不下时的"更多"菜单按钮 */
+  more?: string;
 }
 
 export const pageCount = (total: number, size: number): number => Math.max(1, Math.ceil(total / Math.max(1, size)));
@@ -54,6 +57,7 @@ export function DataTable<T>({
   loadingText = "Loading…",
   pagination,
   selectable,
+  maxActions = 3,
   bulkActions,
   labels = { previous: "Previous", next: "Next", page: (p: number, n: number) => `Page ${p} of ${n}` },
 }: {
@@ -66,6 +70,8 @@ export function DataTable<T>({
   pagination?: Pagination;
   /** 是否有复选列；默认：页面上的列表有，弹窗里的没有 */
   selectable?: boolean;
+  /** 操作列直接显示的个数，多出来的收进"更多"菜单；默认 3 */
+  maxActions?: number;
   /** 选中了记录时显示在表格上方的批量操作按钮 */
   bulkActions?: (selectedKeys: string[]) => React.ReactNode;
   labels?: TableLabels;
@@ -159,7 +165,7 @@ export function DataTable<T>({
                     ) : null}
                     {ordered.map((c) => (
                       <td key={c.key} className={cn("px-3 py-2", c.key === "actions" && "whitespace-nowrap text-right")}>
-                        {c.key === "actions" ? <div className="flex flex-wrap items-center justify-end gap-x-1 gap-y-0.5 [&_button:hover]:bg-primary/10 [&_button]:h-auto [&_button]:whitespace-nowrap [&_button]:border-0 [&_button]:bg-transparent [&_button]:px-1.5 [&_button]:py-1 [&_button]:text-primary">{c.cell(row)}</div> : c.cell(row)}
+                        {c.key === "actions" ? <div className="flex flex-nowrap items-center justify-end gap-x-1.5 [&_button:hover]:bg-primary/10 [&_button]:h-auto [&_button]:whitespace-nowrap [&_button]:border-0 [&_button]:bg-transparent [&_button]:px-1.5 [&_button]:py-1 [&_button]:text-primary"><RowActions moreLabel={labels.more} max={maxActions}>{c.cell(row)}</RowActions></div> : c.cell(row)}
                       </td>
                     ))}
                   </tr>

@@ -19,7 +19,7 @@ const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" cl
 const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : "");
 function useTable() {
   const t = useTranslations("table");
-  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
+  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), more: t("more"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
 }
 
 interface PRole { id: string; code: string; name: string; kind: string; sort: number }

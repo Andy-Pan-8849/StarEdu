@@ -33,6 +33,7 @@
     "expandMenu": "Expand menu"
   },
   "table": {
+    "more": "More",
     "actions": "Actions",
     "selectAll": "Select all",
     "selectRow": "Select row",
@@ -617,6 +618,10 @@
       "uploadFailed": "Upload of {name} failed"
     },
     "requests": {
+      "colStudent": "Student",
+      "colSection": "Section",
+      "colKind": "Type",
+      "colDetail": "Details",
       "myTitle": "My requests",
       "staffTitle": "Student requests",
       "pick": "Choose what to ask for",
@@ -707,6 +712,10 @@
       "revokeReason": "Why is this document being revoked? Anyone who scans it will see it as revoked."
     },
     "announcements": {
+      "recipientsCol": "Recipients",
+      "createdCol": "Created",
+      "stateCol": "Status",
+      "published": "Published",
       "title": "Announcements",
       "new": "New announcement",
       "titleField": "Title",
