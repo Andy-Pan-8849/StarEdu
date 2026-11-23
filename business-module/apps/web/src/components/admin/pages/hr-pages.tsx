@@ -289,6 +289,30 @@ function EmergencyTab({ personId }: { personId: string }) {
 interface StudentRow { id: string; fullName: string; studentNo: string | null; campusId: string | null; campusName: string | null; academicStatus: string | null; enrollTerm: string | null; program: string | null }
 interface CampusRow { id: string; name: string; code: string; status: string }
 
+/** 变更学生状态的弹窗：下拉选择，保存和取消在左下角。 */
+function StatusDialog({ student, statuses, onSave, onCancel }: { student: StudentRow; statuses: string[]; onSave: (next: string) => void | Promise<void>; onCancel: () => void }) {
+  const t = useTranslations("pages.hr");
+  const c = useTranslations("crud");
+  const [next, setNext] = React.useState(student.academicStatus ?? statuses[0] ?? "");
+  return (
+    <Modal title={t("changeStatus")} onClose={onCancel}>
+      <form className="text-sm" onSubmit={(e) => { e.preventDefault(); void onSave(next); }}>
+        <h3 className="mb-1 text-base font-semibold">{t("changeStatus")}</h3>
+        <p className="mb-4 text-muted">{student.fullName}{student.studentNo ? ` (${student.studentNo})` : ""}</p>
+        <label className="mb-6 flex flex-col gap-1">{c("status")}
+          <select className="w-56 rounded-md border border-border bg-transparent px-2 py-1" value={next} onChange={(e) => setNext(e.target.value)}>
+            {statuses.map((s) => <option key={s} value={s}>{t(`student_${s}`)}</option>)}
+          </select>
+        </label>
+        <div className="flex justify-start gap-2 border-t border-border pt-3">
+          <Button type="submit" size="sm">{c("save")}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={onCancel}>{c("cancel")}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function StudentsPage() {
   const t = useTranslations("pages.hr");
   const c = useTranslations("crud");
@@ -342,11 +366,8 @@ export function StudentsPage() {
         </label>
       </div>
       {editing ? (
-        <Modal title={t("changeStatus")} onClose={() => setEditing(null)}>
-          <p className="mb-2 text-sm">{editing.fullName}{editing.studentNo ? ` (${editing.studentNo})` : ""}</p>
-          <FormPanel title={t("changeStatus")} fields={[{ name: "academicStatus", label: c("status"), type: "select", required: true, options: statuses.map((s) => ({ value: s, label: t(`student_${s}`) })) }]} initial={{ academicStatus: editing.academicStatus ?? "" }} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setEditing(null)}
-            onSubmit={async (p) => { if (await run(() => bff(`students/${editing.id}`, { method: "PATCH", body: { academicStatus: p.academicStatus } }), c("saved"))) setEditing(null); }} />
-        </Modal>
+        <StatusDialog student={editing} statuses={statuses} onCancel={() => setEditing(null)}
+          onSave={async (next) => { if (await run(() => bff(`students/${editing.id}`, { method: "PATCH", body: { academicStatus: next } }), c("saved"))) setEditing(null); }} />
       ) : null}
       {importing ? <ImportPanel path="import/students" columns="student_id, name, campus_id, program, cohort, status" onDone={list.reload} /> : null}
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("students", { method: "POST", body: p }), c("saved"))) setForm(false); }} /> : null}
