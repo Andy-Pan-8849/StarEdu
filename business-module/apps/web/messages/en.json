@@ -223,8 +223,16 @@
       "closeNow": "Close campus"
     },
     "depts": {
+      "hq": "HQ",
+      "campus": "Campus",
+      "dept": "Department",
+      "kind": "Type",
+      "structure": "Organization",
+      "company": "Company",
+      "addChild": "Add sub-department",
+      "campusManaged": "Campuses are added, renamed and closed under System management → Campuses. Departments are added under a campus or another department.",
+      "hint": "The company is at the top, then the headquarters campus, then the branch campuses in the order they were set up. Departments with people, sub-departments or a campus can only be disabled.",
       "title": "Departments",
-      "hint": "A campus is the root of its own tree. Departments with people, sub-departments or a campus can only be disabled.",
       "name": "Name",
       "parent": "Parent department"
     },

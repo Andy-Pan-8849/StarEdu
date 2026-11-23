@@ -5,12 +5,14 @@ import { MenuTreeShell } from "./menu-tree-shell";
 import type { MenuNode } from "./menu-nav";
 import { PAGES } from "./page-registry";
 import { BannerStrip, NotificationBell } from "./notification-bell";
+import { BrandNameContext } from "./brand-context";
 import { PermissionProvider } from "./permissions";
 
 export function AdminShell({ menus, permissions, userName, brand, signOutAction = "/admin/auth/logout", wsPort }: { menus: MenuNode[]; permissions: string[]; userName: string; brand?: { name: string; logoUrl: string | null }; signOutAction?: string; wsPort?: string }) {
   const t = useTranslations();
   return (
     <PermissionProvider permissions={permissions}>
+      <BrandNameContext.Provider value={brand?.name ?? ""}>
       <MenuTreeShell
         menus={menus}
         pages={PAGES}
@@ -32,6 +34,7 @@ export function AdminShell({ menus, permissions, userName, brand, signOutAction 
           expandMenu: t("shell.expandMenu"),
         }}
       />
+      </BrandNameContext.Provider>
     </PermissionProvider>
   );
 }

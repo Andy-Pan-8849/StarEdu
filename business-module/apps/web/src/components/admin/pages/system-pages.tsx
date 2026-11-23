@@ -2,14 +2,18 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Ban, Eraser, List, Pencil, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, Building2, Eraser, Landmark, List, Network, Pencil, Play, Plus, RotateCcw, School, Trash2, Users } from "lucide-react";
 import { IconButton, PermIconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
 import { usePromptDialog } from "../prompt-dialog";
+import { BrandNameContext } from "../brand-context";
 import { DataTable, type Column } from "../data-table";
+import { useFitHeight } from "../fit-height";
+import { NavTree, type NavNode } from "../nav-tree";
+import { buildOrgTree, childDepts, findOrg, orderTop, ROOT_ID, type CampusRow as OrgCampus, type DeptRow, type OrgNode } from "../org-tree";
 import { Can } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
@@ -163,56 +167,65 @@ export function CampusesPage() {
 }
 
 // ---------------------------------------------------------------- 部门（组织树）
-interface DeptRow { id: string; name: string; parentId: string | null; sort: number; status: boolean; ancestors: string[] }
+const KIND_ICON = { root: Building2, hq: Landmark, campus: School, dept: Users } as const;
 
 export function DeptsPage() {
   const t = useTranslations("pages.depts");
   const c = useTranslations("crud");
   const tt = useTable();
-  const { rows, loading, error, reload } = useList<DeptRow>("depts");
+  const depts = useList<DeptRow>("depts");
+  const campuses = useList<OrgCampus>("campuses");
+  const { rows, loading, error, reload } = depts;
   const { run, message } = useAct(reload);
-  const [form, setForm] = React.useState<{ row?: DeptRow } | null>(null);
-  // 按树的顺序排好：先父后子，同级按排序
-  const ordered = React.useMemo(() => {
-    const byParent = new Map<string | null, DeptRow[]>();
-    for (const r of rows) byParent.set(r.parentId, [...(byParent.get(r.parentId) ?? []), r]);
-    const out: Array<DeptRow & { depth: number }> = [];
-    const walk = (parent: string | null, depth: number) => {
-      for (const r of (byParent.get(parent) ?? []).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))) {
-        out.push({ ...r, depth });
-        walk(r.id, depth + 1);
-      }
+  const brand = React.useContext(BrandNameContext);
+  const [form, setForm] = React.useState<{ row?: DeptRow; parentId?: string } | null>(null);
+  const [sel, setSel] = React.useState<string | null>(null);
+  const root = React.useMemo(() => buildOrgTree(rows, campuses.rows, brand || "StarIT"), [rows, campuses.rows, brand]);
+  // 默认选中总部；选中的部门没了（删除后）也回到总部
+  const current = (sel && findOrg(root, sel)) || root.children[0] || root;
+  const campusDeptIds = React.useMemo(() => new Set(campuses.rows.map((x) => x.deptId)), [campuses.rows]);
+  const nav = React.useMemo(() => {
+    const toNav = (n: OrgNode): NavNode => {
+      const Icon = KIND_ICON[n.kind];
+      return { id: n.id, label: n.label, icon: <Icon aria-hidden className="h-4 w-4" />, hint: n.kind === "hq" ? t("hq") : n.disabled ? c("disabled") : undefined, children: n.children.map(toNav) };
     };
-    walk(null, 0);
-    return out;
-  }, [rows]);
-  const parentOptions = ordered.filter((r) => !form?.row || !r.ancestors.includes(form.row.id)).map((r) => ({ value: r.id, label: `${"— ".repeat(r.depth)}${r.name}` }));
+    return [toNav(root)];
+  }, [root, t, c]);
+  const { ref: treeRef, maxHeight: treeMax } = useFitHeight<HTMLDivElement>();
+  const rowOf = (id: string) => rows.find((r) => r.id === id);
+  const children: DeptRow[] = current.id === ROOT_ID ? orderTop(rows, campuses.rows) : childDepts(current.id, rows);
+  const selectedRow = current.id === ROOT_ID ? undefined : rowOf(current.id);
+  const isCampusDept = (id: string) => campusDeptIds.has(id);
+  const parentOptions = rows.filter((r) => !form?.row || !r.ancestors.includes(form.row.id)).map((r) => ({ value: r.id, label: r.name }));
   const fields: Field[] = [
     { name: "name", label: t("name"), required: true },
     { name: "parentId", label: t("parent"), type: "select", options: parentOptions, required: !form?.row },
     { name: "sort", label: c("sort"), type: "number" },
     ...(form?.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : []),
   ];
-  const columns: Column<DeptRow & { depth: number }>[] = [
-    { key: "name", header: t("name"), cell: (r) => <span style={{ paddingLeft: r.depth * 16 }}>{r.name}</span> },
+  const kindLabel = (id: string) => (isCampusDept(id) ? (campuses.rows.find((x) => x.deptId === id)?.type === "hq" ? t("hq") : t("campus")) : t("dept"));
+  const remove = (r: DeptRow) => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done")).then(() => setSel(null));
+  const columns: Column<DeptRow>[] = [
+    { key: "name", header: t("name"), cell: (r) => <button type="button" className="text-left hover:underline" onClick={() => setSel(r.id)}>{r.name}</button> },
+    { key: "kind", header: t("kind"), cell: (r) => kindLabel(r.id) },
     { key: "sort", header: c("sort"), cell: (r) => r.sort },
     { key: "status", header: c("status"), cell: (r) => (r.status ? c("enabled") : c("disabled")) },
     {
       key: "actions",
       header: "",
-      cell: (r) => (
-        <div className="flex gap-1">
-          <PermIconButton perm={PERMS.deptAdd} icon={Plus} label={c("add")} variant="outline" onClick={() => setForm({ row: undefined })}/>
+      cell: (r) => (isCampusDept(r.id) ? null : (
+        <>
           <PermRowAction perm={PERMS.deptEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
-          <PermRowAction perm={PERMS.deptRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
-        </div>
-      ),
+          <PermRowAction perm={PERMS.deptRemove} onClick={() => remove(r)} icon={Trash2} danger>{c("delete")}</PermRowAction>
+        </>
+      )),
     },
   ];
+  const canChange = selectedRow !== undefined && !isCampusDept(selectedRow.id);
   return (
     <section>
       <H2>{t("title")}</H2>
-      <p className="mb-2 text-sm text-muted">{t("hint")}</p>
+      <p className="mb-3 text-sm text-muted">{t("hint")}</p>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
       {form ? (
@@ -220,14 +233,36 @@ export function DeptsPage() {
           key={form.row?.id ?? "new"}
           title={form.row ? c("edit") : c("add")}
           fields={fields}
-          initial={form.row ? { name: form.row.name, parentId: form.row.parentId ?? "", sort: String(form.row.sort), status: form.row.status } : {}}
+          initial={form.row ? { name: form.row.name, parentId: form.row.parentId ?? "", sort: String(form.row.sort), status: form.row.status } : { parentId: form.parentId ?? "" }}
           submitLabel={c("save")}
           cancelLabel={c("cancel")}
           onCancel={() => setForm(null)}
           onSubmit={async (p) => { if (await run(() => (form.row ? bff(`depts/${form.row.id}`, { method: "PATCH", body: p }) : bff("depts", { method: "POST", body: p })), c("saved"))) setForm(null); }}
         />
       ) : null}
-      <DataTable columns={columns} rows={ordered} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
+      <div className="flex gap-4">
+        <aside className="w-72 shrink-0 overflow-hidden rounded-md border border-border">
+          <div className="border-b border-border bg-slate-100 px-3 py-2 dark:bg-slate-800">
+            <span className="flex items-center gap-2 font-medium"><Network aria-hidden className="h-4 w-4 text-muted" />{t("structure")}</span>
+            <div className="mt-2 flex gap-1">
+              <PermIconButton perm={PERMS.deptAdd} icon={Plus} label={t("addChild")} variant="outline" disabled={current.id === ROOT_ID} onClick={() => setForm({ parentId: current.id })} />
+              <PermIconButton perm={PERMS.deptEdit} icon={Pencil} label={c("edit")} variant="outline" disabled={!canChange} onClick={() => selectedRow && setForm({ row: selectedRow })} />
+              <PermIconButton perm={PERMS.deptRemove} icon={Trash2} label={c("delete")} variant="outline" disabled={!canChange} onClick={() => selectedRow && remove(selectedRow)} />
+            </div>
+          </div>
+          <div ref={treeRef} className="overflow-y-auto p-2" style={treeMax ? { maxHeight: treeMax } : undefined}>
+            <NavTree label={t("structure")} nodes={nav} selectedId={current.id} onSelect={setSel} />
+          </div>
+        </aside>
+        <div className="min-w-0 flex-1">
+          <div className="mb-3 flex min-h-8 items-center gap-2">
+            <h3 className="text-base font-semibold">{current.label}</h3>
+            <span className="text-muted">{current.kind === "root" ? t("company") : kindLabel(current.id)}</span>
+          </div>
+          {current.id === ROOT_ID || isCampusDept(current.id) ? <p className="mb-2 text-sm text-muted">{t("campusManaged")}</p> : null}
+          <DataTable columns={columns} rows={children} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
+        </div>
+      </div>
     </section>
   );
 }
