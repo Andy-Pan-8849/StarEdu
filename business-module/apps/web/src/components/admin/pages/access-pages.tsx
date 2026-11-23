@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { KeyRound, Link, Mail, Pencil, Plus, Power, ShieldCheck, Trash2, Unlock, UserCog } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsUpDown, ExternalLink, FileText, Folder, KeyRound, Link, Mail, Pencil, Plus, Power, ShieldCheck, Trash2, Unlock, UserCog } from "lucide-react";
 import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { useList } from "./use-api";
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 function useTable() {
   const t = useTranslations("table");
-  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
+  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), more: t("more"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
 }
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
 
@@ -232,7 +232,8 @@ export function MenusPage() {
   const tt = useTable();
   const { rows, loading, error, reload } = useList<MenuRow>("menus");
   const { run, message } = useAct(reload);
-  const [form, setForm] = React.useState<{ row?: MenuRow } | null>(null);
+  const [form, setForm] = React.useState<{ row?: MenuRow; parentId?: string } | null>(null);
+  const [folded, setFolded] = React.useState<ReadonlySet<string>>(new Set());
   const ordered = React.useMemo(() => {
     const byParent = new Map<string | null, MenuRow[]>();
     for (const r of rows) byParent.set(r.parentId, [...(byParent.get(r.parentId) ?? []), r]);
@@ -242,6 +243,21 @@ export function MenusPage() {
     return out.filter((r) => r.type !== "button");
   }, [rows]);
   const label = (r: MenuRow) => (r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name);
+  const hasKids = React.useMemo(() => new Set(ordered.filter((r) => r.parentId).map((r) => r.parentId as string)), [ordered]);
+  // 折叠的目录，它下面的行不显示（ordered 是先父后子的顺序）
+  const visible = React.useMemo(() => {
+    const out: Array<MenuRow & { depth: number }> = [];
+    let hideBelow: number | null = null;
+    for (const r of ordered) {
+      if (hideBelow !== null && r.depth > hideBelow) continue;
+      hideBelow = null;
+      out.push(r);
+      if (folded.has(r.id)) hideBelow = r.depth;
+    }
+    return out;
+  }, [ordered, folded]);
+  const foldable = [...hasKids];
+  const allFolded = foldable.length > 0 && foldable.every((id) => folded.has(id));
   const fields: Field[] = form?.row
     ? [{ name: "name", label: t("name"), required: true }, { name: "route", label: t("route") }, { name: "sort", label: c("sort"), type: "number" }, { name: "visible", label: t("visible"), type: "checkbox" }, { name: "status", label: c("enabled"), type: "checkbox" }]
     : [
@@ -252,7 +268,26 @@ export function MenusPage() {
         { name: "sort", label: c("sort"), type: "number" },
       ];
   const columns: Column<MenuRow & { depth: number }>[] = [
-    { key: "name", header: t("name"), cell: (r) => <span style={{ paddingLeft: r.depth * 16 }}>{label(r)}</span> },
+    {
+      key: "name",
+      header: t("name"),
+      cell: (r) => {
+        const Icon = r.type === "directory" ? Folder : r.type === "link" ? ExternalLink : FileText;
+        const kids = hasKids.has(r.id);
+        const isFolded = folded.has(r.id);
+        return (
+          <span className="flex items-center gap-1" style={{ paddingLeft: r.depth * 22 }}>
+            {kids ? (
+              <button type="button" aria-label={`${isFolded ? t("expand") : t("collapse")} ${label(r)}`} aria-expanded={!isFolded} className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-border/50" onClick={() => setFolded((f) => { const n = new Set(f); if (isFolded) n.delete(r.id); else n.add(r.id); return n; })}>
+                {isFolded ? <ChevronRight aria-hidden className="h-4 w-4" /> : <ChevronDown aria-hidden className="h-4 w-4" />}
+              </button>
+            ) : <span aria-hidden className="w-6" />}
+            <Icon aria-hidden className="h-4 w-4 shrink-0 text-muted" />
+            <span className={r.type === "directory" ? "font-medium" : ""}>{label(r)}</span>
+          </span>
+        );
+      },
+    },
     { key: "type", header: t("type"), cell: (r) => t(r.type) },
     { key: "route", header: t("route"), cell: (r) => r.route ?? "" },
     { key: "source", header: t("source"), cell: (r) => (r.platformProvided ? t("platform") : t("own")) },
@@ -263,6 +298,7 @@ export function MenusPage() {
       cell: (r) => (r.platformProvided ? null : (
         <div className="flex gap-1">
           <PermRowAction perm={PERMS.menuEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          {r.type === "directory" ? <PermRowAction perm={PERMS.menuAdd} onClick={() => setForm({ parentId: r.id })} icon={Plus}>{c("add")}</PermRowAction> : null}
           <PermRowAction perm={PERMS.menuRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`menus/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
@@ -274,14 +310,17 @@ export function MenusPage() {
       <p className="mb-2 text-sm text-muted">{t("hint")}</p>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.menuAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
+      <div className="mb-3 flex items-center gap-2">
+        <Can perm={PERMS.menuAdd}><IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} /></Can>
+        <IconButton icon={ChevronsUpDown} label={allFolded ? t("expandAll") : t("collapseAll")} variant="outline" onClick={() => setFolded(allFolded ? new Set() : new Set(foldable))} />
+      </div>
       {form ? (
-        <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
-          initial={form.row ? { name: form.row.name, route: form.row.route ?? "", sort: String(form.row.sort), visible: form.row.visible, status: form.row.status } : {}}
+        <FormPanel key={form.row?.id ?? `new-${form.parentId ?? ""}`} title={form.row ? c("edit") : c("add")} fields={fields}
+          initial={form.row ? { name: form.row.name, route: form.row.route ?? "", sort: String(form.row.sort), visible: form.row.visible, status: form.row.status } : { parentId: form.parentId ?? "" }}
           submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(null)}
           onSubmit={async (p) => { if (await run(() => (form.row ? bff(`menus/${form.row.id}`, { method: "PATCH", body: p }) : bff("menus", { method: "POST", body: p })), c("saved"))) setForm(null); }} />
       ) : null}
-      <DataTable columns={columns} rows={ordered} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
+      <DataTable columns={columns} rows={visible} rowKey={(r) => r.id} selectable={false} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
     </section>
   );
 }

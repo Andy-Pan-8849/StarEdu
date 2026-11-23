@@ -10,7 +10,7 @@ import { usePromptDialog } from "../src/components/admin/prompt-dialog";
 import { MenuTreeShell, type ShellLabels } from "../src/components/admin/menu-tree-shell";
 import type { MenuNode } from "../src/components/admin/menu-nav";
 import { Can, PermButton, PermissionProvider } from "../src/components/admin/permissions";
-import { IconButton } from "../src/components/admin/icon-button";
+import { IconButton, PermRowAction, RowAction } from "../src/components/admin/icon-button";
 import { Plus } from "lucide-react";
 import { NavTree, type NavNode } from "../src/components/admin/nav-tree";
 import { TreeSelect } from "../src/components/admin/tree-select";
@@ -306,5 +306,29 @@ describe("IconButton", () => {
     expect(onClick).toHaveBeenCalled();
     await user.unhover(screen.getByRole("button", { name: "Add" }));
     expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+});
+
+describe("table row actions overflow", () => {
+  const act = (name: string) => <RowAction key={name} icon={Plus} onClick={() => {}}>{name}</RowAction>;
+  it("shows up to three actions directly and puts the rest in a More menu", async () => {
+    const user = userEvent.setup();
+    const cols = [{ key: "n", header: "Name", cell: (r: { n: string }) => r.n }, { key: "actions", header: "", cell: () => <>{act("One")}{act("Two")}{act("Three")}{act("Four")}{act("Five")}</> }];
+    render(<DataTable columns={cols} rows={[{ n: "a" }]} rowKey={(r) => r.n} emptyText="-" labels={{ previous: "P", next: "N", page: () => "", more: "More" }} />);
+    expect(screen.getByRole("button", { name: "One" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Two" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Three" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("button", { name: "Three" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Five" })).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: "Three" })).toBeNull();
+  });
+  it("does not count actions the user has no permission for, and shows no More menu when three or fewer remain", () => {
+    const cols = [{ key: "actions", header: "", cell: () => <>{act("One")}<PermRowAction perm="x:y" icon={Plus}>Hidden</PermRowAction>{act("Two")}{act("Three")}</> }];
+    render(<DataTable columns={cols} rows={[{ n: "a" }]} rowKey={(r) => r.n} emptyText="-" />);
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Three" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Hidden" })).toBeNull();
   });
 });
