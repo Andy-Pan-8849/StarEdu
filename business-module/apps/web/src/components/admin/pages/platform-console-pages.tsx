@@ -65,7 +65,6 @@ export function PlatformAccountsPage() {
       {rolesFor ? (
         <Modal title={t("rolesOf", { name: rolesFor.username })} onClose={() => setRolesFor(null)}>
         <div className="text-sm">
-          <h3 className="mb-3 text-base font-semibold">{t("rolesOf", { name: rolesFor.username })}</h3>
           <div className="flex flex-wrap gap-3">
             {custom.map((r) => (
               <label key={r.id} className="flex items-center gap-1">
@@ -137,7 +136,6 @@ export function PlatformRolesPage() {
       {authFor ? (
         <Modal title={t("permissionsOf", { name: authFor.name })} onClose={() => setAuthFor(null)}>
         <div className="text-sm">
-          <h3 className="mb-3 text-base font-semibold">{t("permissionsOf", { name: authFor.name })}</h3>
           <ul className="max-h-72 overflow-auto">
             {items.map((m) => (
               <li key={m.id} style={{ paddingLeft: m.depth * 16 }}>

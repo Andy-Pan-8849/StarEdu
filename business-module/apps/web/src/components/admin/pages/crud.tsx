@@ -61,7 +61,7 @@ export function FormPanel({
         void onSubmit(toPayload(fields, values));
       }}
     >
-      <h3 className="text-base font-semibold">{title}</h3>
+      {inline ? <h3 className="text-base font-semibold">{title}</h3> : null}
       {fields.map((f) => (
         <label key={f.name} className={f.type === "checkbox" ? "flex items-center gap-2" : "flex flex-col gap-1"}>
           {f.type === "checkbox" ? null : f.label}

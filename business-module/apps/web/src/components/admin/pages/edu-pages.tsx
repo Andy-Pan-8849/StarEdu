@@ -141,7 +141,6 @@ function CourseDetailPanel({ id, all, onClose }: { id: string; all: CourseRow[];
   return (
     <Modal title={`${d.code} · ${d.name}`} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{d.code} · {d.name}</h3>
       <p className="mb-1 text-muted">{t("prerequisites")}</p>
       <div className="mb-2 flex flex-wrap gap-3">
         {all.filter((x) => x.id !== id).map((x) => (
@@ -206,7 +205,6 @@ export function MajorsPage() {
       {open && detail ? (
         <Modal wide title={t("curriculumOf", { name: detail.name })} onClose={() => { setOpen(null); setDetail(null); setVersionId(null); }}>
         <div className="text-sm">
-          <h3 className="mb-3 text-base font-semibold">{t("curriculumOf", { name: detail.name })}</h3>
           <div className="mb-3 flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1">{t("version")}
               <select className="rounded-md border border-border bg-transparent px-2 py-1" value={detail.versionId} onChange={(e) => setVersionId(e.target.value)}>
@@ -340,7 +338,6 @@ function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
   return (
     <Modal wide title={t("batchEnroll")} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{t("batchEnroll")}</h3>
       <p className="mb-2 text-xs text-muted">{t("batchHelp")}</p>
       <div className="mb-3 flex flex-wrap items-end gap-3">
         {sel(t("term"), "termId", terms.rows.filter((x) => x.status !== "ended").map((x) => ({ value: x.id, label: x.name })))}
@@ -419,9 +416,8 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
     { key: "a", header: "", cell: (r) => (r.status === "enrolled" ? <PermButton perm={PERMS.eduEnrollmentRemove} size="sm" variant="outline" onClick={() => void run(() => bff(`sections/${id}/enrollments/${r.id}`, { method: "DELETE" }), c("done"))}>{t("remove")}</PermButton> : null) },
   ];
   return (
-    <Modal wide title={s.name} onClose={onClose}>
+    <Modal wide title={`${s.name} — ${s.seated}/${s.capacity}`} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{s.name} — {s.seated}/{s.capacity}</h3>
       <div role="tablist" className="mb-3 flex gap-2">
         {(["roster", "instructors", "materials", "assignments", "grades", "discussion"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList)) && (k !== "discussion" || perms.has(PERMS.eduDiscussionList))).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "font-medium underline" : "text-muted"} onClick={() => setTab(k)}>{t(`tab_${k}`)}</button>)}
       </div>

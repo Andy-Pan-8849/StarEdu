@@ -89,7 +89,6 @@ export function UsersPage() {
       {rolesFor ? (
         <Modal title={t("rolesOf", { name: rolesFor.username })} onClose={() => setRolesFor(null)}>
         <div className="text-sm">
-          <h3 className="mb-3 text-base font-semibold">{t("rolesOf", { name: rolesFor.username })}</h3>
           <div className="flex flex-wrap gap-3">
             {custom.map((r) => (
               <label key={r.id} className="flex items-center gap-1">
@@ -162,7 +161,6 @@ export function RolesPage() {
       {upgrade ? (
         <Modal title={t("templateTitle", { name: upgrade.role.name })} onClose={() => setUpgrade(null)}>
         <div className="text-sm">
-          <h3 className="mb-3 text-base font-semibold">{t("templateTitle", { name: upgrade.role.name })}</h3>
           <ul className="mb-2 list-disc pl-5">{upgrade.missing.map((m) => <li key={m.menuId}>{m.name}</li>)}</ul>
           <p className="mb-2 text-muted">{t("templateNote")}</p>
           <div className="flex gap-2 border-t border-border pt-3">
@@ -193,7 +191,6 @@ function RolePermissions({ role, label, onClose }: { role: RoleRow; label: (n: M
   return (
     <Modal title={t("permissionsOf", { name: role.name })} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{t("permissionsOf", { name: role.name })}</h3>
       <h4 className="mb-1 text-muted">{t("operations")}</h4>
       <TreeSelect label={t("operations")} nodes={nodes} value={menus} onChange={setMenus} />
       <h4 className="mb-1 mt-3 text-muted">{t("dataScope")}</h4>
@@ -318,7 +315,6 @@ export function EntriesPage() {
           {editing === e.code ? (
           <Modal title={t(`entry_${e.code}`)} onClose={() => { setEditing(null); load(); }}>
           <div className="text-sm">
-          <h3 className="mb-3 text-base font-semibold">{t(`entry_${e.code}`)}</h3>
           <p className="mb-1">{t("yourMenus")}</p>
           <div className="mb-2 flex flex-wrap gap-3">
             {topOwn.length === 0 ? <span className="text-muted">{t("noOwnMenus")}</span> : topOwn.map((m) => (
@@ -394,7 +390,6 @@ export function DataScopesPage() {
           const body = { name, nodes: picked.map((deptId) => ({ deptId, includeChildren: withChildren })) };
           if (await run(() => (form.row ? bff(`data-scope-sets/${form.row.id}`, { method: "PUT", body }) : bff("data-scope-sets", { method: "POST", body })), c("saved"))) setForm(null);
         }}>
-          <h3 className="mb-3 text-base font-semibold">{form.row ? c("edit") : c("add")}</h3>
           <label className="mb-2 flex flex-col gap-1">{t("name")}<input required className="rounded-md border border-border bg-transparent px-2 py-1" value={name} onChange={(e) => setName(e.target.value)} /></label>
           <p className="mb-1 text-muted">{t("pick")}</p>
           <TreeSelect label={t("pick")} nodes={tree} value={picked} onChange={setPicked} cascade={false} />

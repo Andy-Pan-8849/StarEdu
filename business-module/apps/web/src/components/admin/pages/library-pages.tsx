@@ -119,7 +119,6 @@ function FolderManager({ folder, onChanged, onClose }: { folder: Folder; onChang
   return (
     <Modal wide title={folder.name} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{folder.name}</h3>
       {err ? <p role="alert" className="mb-2 text-red-600">{err}</p> : null}
       <div className="mb-2 flex gap-2">
         {(["info", "acl", "log"] as const).map((k) => (

@@ -27,6 +27,9 @@ export function AdminShell({ menus, permissions, userName, brand, signOutAction 
           pageNotBuilt: t("shell.pageNotBuilt"),
           signedInAs: t("shell.signedInAs"),
           signOut: t("shell.signOut"),
+          searchMenus: t("shell.searchMenus"),
+          collapseMenu: t("shell.collapseMenu"),
+          expandMenu: t("shell.expandMenu"),
         }}
       />
     </PermissionProvider>

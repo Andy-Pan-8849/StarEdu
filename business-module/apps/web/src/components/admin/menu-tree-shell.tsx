@@ -4,9 +4,11 @@
 //   - 目录可展开；"菜单"点击在标签页打开；"外链"在新窗口打开（租户自己的网址）；
 //   - 页面组件是构建时打包的：按菜单的"组件路径"在 pages 里找；还没有的显示占位说明，不报错。
 import * as React from "react";
+import { ChevronDown, ChevronRight, ExternalLink, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "../logo-mark";
-import { firstOpenable, findMenu, type MenuNode } from "./menu-nav";
+import { MenuIcon } from "./menu-icon";
+import { filterMenus, firstOpenable, findMenu, type MenuNode } from "./menu-nav";
 import { TabBar } from "./tab-bar";
 import { closeTab, emptyTabs, openTab, type TabsState } from "./tabs-state";
 
@@ -16,6 +18,10 @@ export interface ShellLabels {
   pageNotBuilt: string;
   signedInAs: string;
   signOut: string;
+  /** 以下三项是菜单搜索框和折叠按钮的文字；不给就用英文 */
+  searchMenus?: string;
+  collapseMenu?: string;
+  expandMenu?: string;
 }
 
 /** 外链里的 {code} 换成当前租户代码（域名第一段）：AI 助手的地址随租户变。 */
@@ -66,41 +72,57 @@ export function MenuTreeShell({
   const active = tabs.activeId ? findMenu(menus, tabs.activeId) : undefined;
   const Page = active?.component ? pages[active.component] : undefined;
 
+  const [query, setQuery] = React.useState("");
+  const [mini, setMini] = React.useState(false); // 只显示图标的窄菜单
+  const shown = React.useMemo(() => filterMenus(menus, query, label), [menus, query, label]);
+  const searching = query.trim() !== "";
+
+  const toggleDir = (id: string, isCollapsed: boolean) =>
+    setCollapsed((c) => { const n = new Set(c); if (isCollapsed) n.delete(id); else n.add(id); return n; });
+
   const renderNode = (node: MenuNode, depth: number): React.ReactNode => {
-    const pad = { paddingLeft: 12 + depth * 14 };
     if (node.type === "directory") {
-      const isCollapsed = collapsed.has(node.id);
+      const isCollapsed = !searching && collapsed.has(node.id);
+      // 目录：一级目录带图标；子目录缩进
       return (
         <li key={node.id}>
           <button
             type="button"
-            className="flex w-full items-center justify-between py-1.5 pr-3 text-left text-sm font-medium"
-            style={pad}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-border/40"
+            style={{ paddingLeft: 12 + depth * 12 }}
             aria-expanded={!isCollapsed}
-            onClick={() => setCollapsed((c) => { const n = new Set(c); if (isCollapsed) n.delete(node.id); else n.add(node.id); return n; })}
+            onClick={() => toggleDir(node.id, isCollapsed)}
           >
-            {label(node)}
-            <span aria-hidden className="text-xs text-muted">{isCollapsed ? "▸" : "▾"}</span>
+            {depth === 0 ? <MenuIcon name={node.icon} /> : null}
+            <span className="flex-1 truncate">{label(node)}</span>
+            {isCollapsed ? <ChevronRight aria-hidden className="h-4 w-4 text-muted" /> : <ChevronDown aria-hidden className="h-4 w-4 text-muted" />}
           </button>
-          {!isCollapsed ? <ul>{node.children.map((c) => renderNode(c, depth + 1))}</ul> : null}
+          {!isCollapsed ? (
+            <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-border pl-1">{node.children.map((c) => renderNode(c, depth + 1))}</ul>
+          ) : null}
         </li>
       );
     }
     if (node.type === "link") {
       return (
         <li key={node.id}>
-          <a className="block py-1.5 pr-3 text-sm text-muted hover:text-foreground" style={pad} href={host === null ? "#" : linkFor(node.route, host)} target="_blank" rel="noopener noreferrer">
-            {label(node)} ↗
+          <a className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-muted hover:bg-border/40 hover:text-foreground" href={host === null ? "#" : linkFor(node.route, host)} target="_blank" rel="noopener noreferrer">
+            <span className="flex-1 truncate">{label(node)}</span>
+            <ExternalLink aria-hidden className="h-3.5 w-3.5" />
           </a>
         </li>
       );
     }
+    const isActive = tabs.activeId === node.id;
     return (
       <li key={node.id}>
         <button
           type="button"
-          className={cn("block w-full py-1.5 pr-3 text-left text-sm hover:bg-border/40", tabs.activeId === node.id && "bg-border/40 font-medium text-primary")}
-          style={pad}
+          aria-current={isActive ? "page" : undefined}
+          className={cn(
+            "block w-full truncate rounded-md px-3 py-1.5 text-left text-sm text-muted hover:bg-border/40 hover:text-foreground",
+            isActive && "bg-primary/10 font-medium text-primary hover:bg-primary/10 hover:text-primary",
+          )}
           onClick={() => setTabs((t) => openTab(t, { id: node.id, title: label(node) }))}
         >
           {label(node)}
@@ -110,17 +132,54 @@ export function MenuTreeShell({
   };
 
   return (
-    <div className="flex min-h-screen">
-      <nav aria-label="Menu" className="w-60 shrink-0 border-r border-border py-3">
-        <div className="mb-2 flex items-center gap-2 px-3 pb-3 font-semibold">
+    <div className="flex h-screen overflow-hidden">
+      {/* 左侧菜单：整列固定在屏幕高度内，菜单自己滚动，不带着右边的内容走 */}
+      <nav aria-label="Menu" className={cn("flex shrink-0 flex-col border-r border-border bg-border/10 transition-[width]", mini ? "w-14" : "w-64")}>
+        <div className={cn("flex h-14 shrink-0 items-center gap-2 border-b border-border font-semibold", mini ? "justify-center px-2" : "px-4")}>
           <BrandLogo logoUrl={brand?.logoUrl ?? null} />
-          <span className="truncate">{brand?.name ?? "StarIT"}</span>
+          {mini ? null : <span className="truncate">{brand?.name ?? "StarIT"}</span>}
         </div>
-        {menus.length === 0 ? <p className="px-3 text-sm text-muted">{labels.noMenus}</p> : <ul>{menus.map((m) => renderNode(m, 0))}</ul>}
+        {mini ? (
+          <ul className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
+            {menus.map((m) => (
+              <li key={m.id}>
+                <button type="button" title={label(m)} aria-label={label(m)} className="flex w-full justify-center rounded-md p-2 text-muted hover:bg-border/40 hover:text-foreground" onClick={() => setMini(false)}>
+                  <MenuIcon name={m.icon} className="h-5 w-5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <>
+            <div className="relative shrink-0 px-3 pt-3">
+              <Search aria-hidden className="pointer-events-none absolute left-5 top-1/2 mt-1.5 h-4 w-4 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={labels.searchMenus ?? "Search menu"}
+                aria-label={labels.searchMenus ?? "Search menu"}
+                className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-3">
+              {menus.length === 0 ? <p className="text-sm text-muted">{labels.noMenus}</p> : <ul className="space-y-0.5">{shown.map((m) => renderNode(m, 0))}</ul>}
+            </div>
+          </>
+        )}
+        <button
+          type="button"
+          aria-label={mini ? (labels.expandMenu ?? "Expand menu") : (labels.collapseMenu ?? "Collapse menu")}
+          title={mini ? (labels.expandMenu ?? "Expand menu") : (labels.collapseMenu ?? "Collapse menu")}
+          className="flex shrink-0 items-center justify-center gap-2 border-t border-border py-2 text-sm text-muted hover:text-foreground"
+          onClick={() => setMini((v) => !v)}
+        >
+          {mini ? <PanelLeftOpen aria-hidden className="h-4 w-4" /> : <><PanelLeftClose aria-hidden className="h-4 w-4" />{labels.collapseMenu ?? "Collapse menu"}</>}
+        </button>
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
         {topExtra}
-        <header className="flex items-center justify-end gap-3 border-b border-border px-4 py-2 text-sm text-muted">
+        <header className="flex h-14 shrink-0 items-center justify-end gap-3 border-b border-border px-4 text-sm text-muted">
           {headerExtra}
           <span>
             {labels.signedInAs} <strong className="text-foreground">{userName}</strong>
@@ -137,7 +196,7 @@ export function MenuTreeShell({
           onActivate={(id) => setTabs((t) => ({ ...t, activeId: id }))}
           onClose={(id) => setTabs((t) => closeTab(t, id))}
         />
-        <main className="flex-1 p-4">
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
           {active ? (Page ? <Page /> : <p className="text-sm text-muted">{labels.pageNotBuilt}</p>) : null}
         </main>
       </div>

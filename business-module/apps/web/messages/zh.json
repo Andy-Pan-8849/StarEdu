@@ -27,7 +27,10 @@
     "noMenus": "没有给你的账号分配任何菜单。",
     "pageNotBuilt": "这个页面还没有提供。",
     "signedInAs": "当前账号",
-    "signOut": "退出登录"
+    "signOut": "退出登录",
+    "searchMenus": "搜索菜单",
+    "collapseMenu": "收起菜单",
+    "expandMenu": "展开菜单"
   },
   "table": {
     "empty": "没有数据。",

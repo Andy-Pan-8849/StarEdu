@@ -173,6 +173,20 @@ describe("MenuTreeShell", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(1);
   });
 
+  it("filters the menu by the search box and collapses to an icon-only column", async () => {
+    const user = userEvent.setup();
+    render(shell(menus));
+    await user.type(screen.getByRole("searchbox", { name: "Search menu" }), "role");
+    expect(screen.getByRole("button", { name: "Roles" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Online users" })).toBeNull();
+    await user.clear(screen.getByRole("searchbox", { name: "Search menu" }));
+    await user.click(screen.getByRole("button", { name: "Collapse menu" }));
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.getByRole("button", { name: "System" })).toBeTruthy(); // 只剩目录图标
+    await user.click(screen.getByRole("button", { name: "Expand menu" }));
+    expect(screen.getByRole("searchbox")).toBeTruthy();
+  });
+
   it("opens external links in a new window without opener access, and folds directories", async () => {
     const user = userEvent.setup();
     render(shell(menus));

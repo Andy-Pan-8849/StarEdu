@@ -44,7 +44,6 @@ function ImportPanel({ path, onDone, onClose, columns }: { path: string; onDone:
   return (
     <Modal title={t("importCsv")} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-2 text-base font-semibold">{t("importCsv")}</h3>
       <p className="mb-2 text-muted">{t("importHint", { columns })}</p>
       <input type="file" accept=".csv,text/csv" aria-label={t("chooseFile")} onChange={async (e) => { const f = e.target.files?.[0]; setCsv(f ? await f.text() : null); setResult(null); }} />
       <label className="my-2 flex flex-col gap-1">{t("aliases")}<input className="rounded-md border border-border bg-transparent px-2 py-1" placeholder="BJ=HQ" value={aliases} onChange={(e) => setAliases(e.target.value)} /></label>
@@ -114,7 +113,7 @@ function PersonDetailPanel({ id, canEmergency, onClose }: { id: string; canEmerg
   return (
     <Modal title={d.fullName} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-2 font-medium">{d.fullName} <span className="text-muted">({t(`person_${d.type}`)})</span></h3>
+      <p className="mb-2 text-muted">{t(`person_${d.type}`)}</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt className="text-muted">{t("email")}</dt><dd>{d.workEmail ?? ""}</dd>
         {d.sensitive ? (
@@ -208,7 +207,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
   return (
     <Modal title={d.fullName} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-2 font-medium">{d.fullName} {d.staff ? `(${d.staff.employeeNo})` : ""}</h3>
+      {d.staff ? <p className="mb-2 text-muted">{d.staff.employeeNo}</p> : null}
       <div role="tablist" className="mb-3 flex gap-2">
         {(["basic", "assign", ...(canEmergency ? (["emergency"] as const) : [])] as const).map((k) => (
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "font-medium underline" : "text-muted"} onClick={() => setTab(k)}>{t(`tab_${k}`)}</button>
@@ -305,7 +304,6 @@ function StatusDialog({ student, statuses, onSave, onCancel }: { student: Studen
   return (
     <Modal title={t("changeStatus")} onClose={onCancel}>
       <form className="text-sm" onSubmit={(e) => { e.preventDefault(); void onSave(next); }}>
-        <h3 className="mb-1 text-base font-semibold">{t("changeStatus")}</h3>
         <p className="mb-4 text-muted">{student.fullName}{student.studentNo ? ` (${student.studentNo})` : ""}</p>
         <label className="mb-6 flex flex-col gap-1">{c("status")}
           <select className="w-56 rounded-md border border-border bg-transparent px-2 py-1" value={next} onChange={(e) => setNext(e.target.value)}>

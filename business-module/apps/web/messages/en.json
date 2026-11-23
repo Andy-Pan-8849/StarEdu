@@ -27,7 +27,10 @@
     "noMenus": "No menus are assigned to your account.",
     "pageNotBuilt": "This page is not available yet.",
     "signedInAs": "Signed in as",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "searchMenus": "Search menu",
+    "collapseMenu": "Collapse menu",
+    "expandMenu": "Expand menu"
   },
   "table": {
     "empty": "Nothing to show.",
