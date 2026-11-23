@@ -325,6 +325,10 @@
       "scope_own_classes": "本人任教/就读的班级"
     },
     "menus": {
+      "expandAll": "展开全部",
+      "collapseAll": "折叠全部",
+      "expand": "展开",
+      "collapse": "折叠",
       "title": "菜单管理",
       "hint": "平台提供的菜单只读；你可以新增目录和外链。",
       "name": "名称",

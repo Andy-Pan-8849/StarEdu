@@ -325,6 +325,10 @@
       "scope_own_classes": "Classes I teach or attend"
     },
     "menus": {
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "expand": "Expand",
+      "collapse": "Collapse",
       "title": "Menus",
       "hint": "Platform menus are read-only. You can add directories and external links.",
       "name": "Name",
