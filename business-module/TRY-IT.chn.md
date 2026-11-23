@@ -189,6 +189,9 @@ await call("roles/menu-tree");    // 你能勾选的菜单和按钮
 
 想把演示放到服务器上让别人试用，打开试用保护并安排每天重置。访客仍然可以新建、编辑、删除几乎所有内容；只有新建账号、改登录方式、平台的公司管理这几类被关掉，数据每天重建一次。配置、代理规则和定时任务文件见 [`deploy/trial/`](deploy/trial/README.md)（英文）。
 
+### 菜单顶部的公司名称和 Logo
+管理后台菜单最上面显示公司简称（没有简称就显示公司名；简称在平台控制台的公司管理里设置）和 Logo，默认是 StarIT 的 Logo。公司想显示自己的 Logo，在"系统管理 > 参数"里新增一个名为 `brand.logoUrl` 的参数，值填图片的地址，以 `https://`、`http://` 或 `/` 开头。没有这个参数、地址不合规或图片打不开时，显示默认 Logo。
+
 ### 生成你自己的资源
 `pnpm gen:module --name warehouse-item --group edu --fields "title:string!,qty:int,due:date,done:bool,notes:text" --label "Warehouse items" --label-zh "仓库物品"`，然后 `pnpm migrate && pnpm prisma:generate && pnpm --filter @staredu/shared build`。它会生成表（带行级安全）、接口、权限、菜单、页面、测试和泄露扫描登记；加 `--dry-run` 只列出文件、不写入。
 

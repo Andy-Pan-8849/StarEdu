@@ -5,6 +5,7 @@
 //   - 页面组件是构建时打包的：按菜单的"组件路径"在 pages 里找；还没有的显示占位说明，不报错。
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { LogoMark } from "../logo-mark";
 import { firstOpenable, findMenu, type MenuNode } from "./menu-nav";
 import { TabBar } from "./tab-bar";
 import { closeTab, emptyTabs, openTab, type TabsState } from "./tabs-state";
@@ -22,11 +23,19 @@ export function linkFor(route: string | null | undefined, hostname: string = typ
   return (route ?? "#").replace("{code}", hostname.split(".")[0] ?? "");
 }
 
+/** 公司自己的 Logo；没有、或图片打不开时显示默认 Logo。 */
+function BrandLogo({ logoUrl }: { logoUrl: string | null }) {
+  const [failed, setFailed] = React.useState(false);
+  if (!logoUrl || failed) return <LogoMark size={36} />;
+  return <img src={logoUrl} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-md object-contain" onError={() => setFailed(true)} />;
+}
+
 export function MenuTreeShell({
   menus,
   pages,
   label,
   userName,
+  brand,
   signOutAction,
   labels,
   headerExtra,
@@ -36,6 +45,8 @@ export function MenuTreeShell({
   pages: Record<string, React.ComponentType>;
   label: (node: MenuNode) => string;
   userName: string;
+  /** 菜单顶部的品牌：公司简称和 Logo（没有 Logo 用默认的） */
+  brand?: { name: string; logoUrl: string | null };
   signOutAction: string;
   /** 顶栏里用户名旁边的内容（消息铃铛） */
   headerExtra?: React.ReactNode;
@@ -101,6 +112,10 @@ export function MenuTreeShell({
   return (
     <div className="flex min-h-screen">
       <nav aria-label="Menu" className="w-60 shrink-0 border-r border-border py-3">
+        <div className="mb-2 flex items-center gap-2 px-3 pb-3 font-semibold">
+          <BrandLogo logoUrl={brand?.logoUrl ?? null} />
+          <span className="truncate">{brand?.name ?? "StarIT"}</span>
+        </div>
         {menus.length === 0 ? <p className="px-3 text-sm text-muted">{labels.noMenus}</p> : <ul>{menus.map((m) => renderNode(m, 0))}</ul>}
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
