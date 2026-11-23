@@ -5,6 +5,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { Modal } from "../modal";
 import { Can, PermButton } from "../permissions";
 import { FormPanel, useAct } from "./crud";
 import { useList } from "./use-api";
@@ -43,8 +44,9 @@ export function AnnouncementsPage() {
       </ul>
       <Can perm={PERMS.msgAnnouncementAdd}>
         {creating ? (
+          <Modal title={t("new")} onClose={() => setCreating(false)}>
           <div>
-            <div className="mb-2 flex items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
               <label className="flex items-center gap-1">{t("audience")}
                 <select className="rounded-md border border-border bg-transparent px-2 py-1" value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); setPick(""); }}>
                   <option value="tenant">{t("aud_tenant")}</option><option value="campus">{t("aud_campus")}</option><option value="section">{t("aud_section")}</option>
@@ -52,6 +54,7 @@ export function AnnouncementsPage() {
               {kind !== "tenant" ? <select aria-label={t("pick")} className="rounded-md border border-border bg-transparent px-2 py-1" value={pick} onChange={(e) => setPick(e.target.value)}><option value="">{t("pick")}</option>{options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select> : null}
             </div>
             <FormPanel
+              inline
               title={t("new")}
               fields={[{ name: "title", label: t("titleField"), required: true }, { name: "body", label: t("bodyField"), type: "textarea", required: true }]}
               submitLabel={t("publish")}
@@ -63,6 +66,7 @@ export function AnnouncementsPage() {
               }}
             />
           </div>
+          </Modal>
         ) : <Button size="sm" onClick={() => setCreating(true)}>{t("new")}</Button>}
       </Can>
     </section>

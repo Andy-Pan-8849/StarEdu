@@ -5,6 +5,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton } from "../permissions";
 import { submitIds, type TreeNode } from "../tree";
@@ -72,11 +73,13 @@ export function UsersPage() {
       <Err error={accounts.error} />
       {message}
       {temp ? (
-        <div role="alert" className="mb-3 rounded-md border border-border p-3 text-sm">
-          <p>{t("tempShown", { name: temp.username })}</p>
-          <p className="my-2 font-mono text-base" data-testid="temp-password">{temp.password}</p>
-          <Button size="sm" variant="outline" onClick={() => setTemp(null)}>{t("tempDone")}</Button>
-        </div>
+        <Modal title={t("tempShown", { name: temp.username })} onClose={() => setTemp(null)}>
+          <div role="alert" className="text-sm">
+            <p>{t("tempShown", { name: temp.username })}</p>
+            <p className="my-3 font-mono text-base" data-testid="temp-password">{temp.password}</p>
+            <div className="border-t border-border pt-3"><Button size="sm" variant="outline" onClick={() => setTemp(null)}>{t("tempDone")}</Button></div>
+          </div>
+        </Modal>
       ) : null}
       <div className="mb-3 flex flex-wrap items-end gap-2 text-sm">
         <Can perm={PERMS.userAdd}>{!form ? <Button size="sm" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
@@ -84,8 +87,9 @@ export function UsersPage() {
       </div>
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("accounts", { method: "POST", body: p }), t("created"))) setForm(false); }} /> : null}
       {rolesFor ? (
-        <div className="mb-3 rounded-md border border-border p-3 text-sm">
-          <h3 className="mb-2 font-medium">{t("rolesOf", { name: rolesFor.username })}</h3>
+        <Modal title={t("rolesOf", { name: rolesFor.username })} onClose={() => setRolesFor(null)}>
+        <div className="text-sm">
+          <h3 className="mb-3 text-base font-semibold">{t("rolesOf", { name: rolesFor.username })}</h3>
           <div className="flex flex-wrap gap-3">
             {custom.map((r) => (
               <label key={r.id} className="flex items-center gap-1">
@@ -94,11 +98,12 @@ export function UsersPage() {
               </label>
             ))}
           </div>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-4 flex gap-2 border-t border-border pt-3">
             <Button size="sm" onClick={async () => { if (await run(() => bff(`accounts/${rolesFor.id}/roles`, { method: "PUT", body: { roleIds: picked } }), c("saved"))) setRolesFor(null); }}>{c("save")}</Button>
             <Button size="sm" variant="outline" onClick={() => setRolesFor(null)}>{c("cancel")}</Button>
           </div>
         </div>
+        </Modal>
       ) : null}
       <DataTable columns={columns} rows={accounts.rows} rowKey={(r) => r.id} loading={accounts.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: accounts.rows.length === 20, onPageChange: setPage }} />
     </section>
@@ -155,15 +160,17 @@ export function RolesPage() {
       ) : null}
       <DataTable columns={columns} rows={roles.rows} rowKey={(r) => r.id} loading={roles.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {upgrade ? (
-        <div className="mt-4 rounded-md border border-border p-3 text-sm">
-          <h3 className="mb-2 font-medium">{t("templateTitle", { name: upgrade.role.name })}</h3>
+        <Modal title={t("templateTitle", { name: upgrade.role.name })} onClose={() => setUpgrade(null)}>
+        <div className="text-sm">
+          <h3 className="mb-3 text-base font-semibold">{t("templateTitle", { name: upgrade.role.name })}</h3>
           <ul className="mb-2 list-disc pl-5">{upgrade.missing.map((m) => <li key={m.menuId}>{m.name}</li>)}</ul>
           <p className="mb-2 text-muted">{t("templateNote")}</p>
-          <div className="flex gap-2">
+          <div className="flex gap-2 border-t border-border pt-3">
             <PermButton perm={PERMS.roleAuthorize} size="sm" onClick={() => void run(() => bff(`roles/${upgrade.role.id}/template-upgrade`, { method: "POST" }), t("templateDone")).then(() => setUpgrade(null))}>{t("templateApply")}</PermButton>
             <Button size="sm" variant="outline" onClick={() => setUpgrade(null)}>{c("cancel")}</Button>
           </div>
         </div>
+        </Modal>
       ) : null}
       {editing ? <RolePermissions role={editing} label={(n) => (n.nameKey && tm.has(n.nameKey) ? tm(n.nameKey) : n.name)} onClose={() => setEditing(null)} /> : null}
     </section>
@@ -181,11 +188,12 @@ function RolePermissions({ role, label, onClose }: { role: RoleRow; label: (n: M
   React.useEffect(() => {
     void bff<{ menuIds: string[]; dataScopeSetIds: string[] }>(`roles/${role.id}`).then((r) => { setMenus(r.menuIds); setScopes(r.dataScopeSetIds); });
   }, [role.id]);
-  if (menus === null) return <p className="mt-3 text-sm text-muted">…</p>;
+  if (menus === null) return <Modal title={t("permissions")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   const nodes = toTree(tree.rows, label);
   return (
-    <div className="mt-4 rounded-md border border-border p-3 text-sm">
-      <h3 className="mb-2 font-medium">{t("permissionsOf", { name: role.name })}</h3>
+    <Modal title={t("permissionsOf", { name: role.name })} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{t("permissionsOf", { name: role.name })}</h3>
       <h4 className="mb-1 text-muted">{t("operations")}</h4>
       <TreeSelect label={t("operations")} nodes={nodes} value={menus} onChange={setMenus} />
       <h4 className="mb-1 mt-3 text-muted">{t("dataScope")}</h4>
@@ -197,7 +205,7 @@ function RolePermissions({ role, label, onClose }: { role: RoleRow; label: (n: M
           </label>
         ))}
       </div>
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
         <PermButton perm={PERMS.roleAuthorize} size="sm" onClick={async () => {
           try {
             await bff(`roles/${role.id}/menus`, { method: "PUT", body: { menuIds: submitIds(nodes, new Set(menus)) } });
@@ -211,6 +219,7 @@ function RolePermissions({ role, label, onClose }: { role: RoleRow; label: (n: M
         {msg ? <span role={msg.error ? "alert" : "status"} className={msg.error ? "text-red-600" : "text-muted"}>{msg.text}</span> : null}
       </div>
     </div>
+    </Modal>
   );
 }
 
@@ -366,17 +375,20 @@ export function DataScopesPage() {
       {message}
       <Can perm={PERMS.dataScopeAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => { setForm({}); setName(""); setPicked([]); setWithChildren(true); }}>{c("add")}</Button> : null}</Can>
       {form ? (
-        <form className="mb-3 rounded-md border border-border p-3 text-sm" onSubmit={async (e) => {
+        <Modal title={form.row ? c("edit") : c("add")} onClose={() => setForm(null)}>
+        <form className="text-sm" onSubmit={async (e) => {
           e.preventDefault();
           const body = { name, nodes: picked.map((deptId) => ({ deptId, includeChildren: withChildren })) };
           if (await run(() => (form.row ? bff(`data-scope-sets/${form.row.id}`, { method: "PUT", body }) : bff("data-scope-sets", { method: "POST", body })), c("saved"))) setForm(null);
         }}>
+          <h3 className="mb-3 text-base font-semibold">{form.row ? c("edit") : c("add")}</h3>
           <label className="mb-2 flex flex-col gap-1">{t("name")}<input required className="rounded-md border border-border bg-transparent px-2 py-1" value={name} onChange={(e) => setName(e.target.value)} /></label>
           <p className="mb-1 text-muted">{t("pick")}</p>
           <TreeSelect label={t("pick")} nodes={tree} value={picked} onChange={setPicked} cascade={false} />
           <label className="my-2 flex items-center gap-1"><input type="checkbox" checked={withChildren} onChange={(e) => setWithChildren(e.target.checked)} />{t("includeChildren")}</label>
-          <div className="flex gap-2"><Button type="submit" size="sm" disabled={picked.length === 0}>{c("save")}</Button><Button type="button" size="sm" variant="outline" onClick={() => setForm(null)}>{c("cancel")}</Button></div>
+          <div className="mt-3 flex gap-2 border-t border-border pt-3"><Button type="submit" size="sm" disabled={picked.length === 0}>{c("save")}</Button><Button type="button" size="sm" variant="outline" onClick={() => setForm(null)}>{c("cancel")}</Button></div>
         </form>
+        </Modal>
       ) : null}
       <DataTable columns={columns} rows={sets.rows} rowKey={(r) => r.id} loading={sets.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
     </section>

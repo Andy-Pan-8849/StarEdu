@@ -19,8 +19,9 @@ function useTable() {
 }
 
 /** 导入面板：选一个 CSV 文件，先"只检查"，再"导入"；显示新增/更新/未变和出错的行。 */
-function ImportPanel({ path, onDone, columns }: { path: string; onDone: () => void; columns: string }) {
+function ImportPanel({ path, onDone, onClose, columns }: { path: string; onDone: () => void; onClose: () => void; columns: string }) {
   const t = useTranslations("pages.hr");
+  const c = useTranslations("crud");
   const [csv, setCsv] = React.useState<string | null>(null);
   const [aliases, setAliases] = React.useState("");
   const [result, setResult] = React.useState<{ created: number; updated: number; unchanged: number; errorCount: number; errors: Array<{ row: number; message: string }>; dryRun: boolean } | null>(null);
@@ -40,7 +41,9 @@ function ImportPanel({ path, onDone, columns }: { path: string; onDone: () => vo
     }
   }
   return (
-    <div className="mb-3 rounded-md border border-border p-3 text-sm">
+    <Modal title={t("importCsv")} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-2 text-base font-semibold">{t("importCsv")}</h3>
       <p className="mb-2 text-muted">{t("importHint", { columns })}</p>
       <input type="file" accept=".csv,text/csv" aria-label={t("chooseFile")} onChange={async (e) => { const f = e.target.files?.[0]; setCsv(f ? await f.text() : null); setResult(null); }} />
       <label className="my-2 flex flex-col gap-1">{t("aliases")}<input className="rounded-md border border-border bg-transparent px-2 py-1" placeholder="BJ=HQ" value={aliases} onChange={(e) => setAliases(e.target.value)} /></label>
@@ -55,7 +58,9 @@ function ImportPanel({ path, onDone, columns }: { path: string; onDone: () => vo
           {result.errors.length ? <ul className="mt-1 list-disc pl-5 text-red-600">{result.errors.map((x) => <li key={x.row}>{t("row", { row: x.row })}: {x.message}</li>)}</ul> : null}
         </div>
       ) : null}
+      <div className="mt-3 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button></div>
     </div>
+    </Modal>
   );
 }
 
@@ -174,7 +179,7 @@ export function StaffPage() {
         <a className="text-sm underline" href="/bff/staff/export">{t("exportCsv")}</a>
         <label className="flex flex-col gap-1">{t("search")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} /></label>
       </div>
-      {importing ? <ImportPanel path="import/staff" columns="employee_id, name, campus_id, department, title, hire_date, status" onDone={list.reload} /> : null}
+      {importing ? <ImportPanel path="import/staff" columns="employee_id, name, campus_id, department, title, hire_date, status" onDone={list.reload} onClose={() => setImporting(false)} /> : null}
       {form ? (
         <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { const { deptId, ...rest } = p; if (await run(() => bff("staff", { method: "POST", body: { ...rest, assignments: deptId ? [{ deptId }] : undefined } }), c("saved"))) setForm(false); }} />
@@ -238,11 +243,11 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
             ))}
           </ul>
           {transfer ? (
-            <FormPanel title={t("transfer")} fields={[{ name: "deptId", label: t("department"), type: "select", required: true, options: deptOptions }, { name: "effectiveDate", label: t("effectiveDate") }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setTransfer(null)}
+            <FormPanel inline title={t("transfer")} fields={[{ name: "deptId", label: t("department"), type: "select", required: true, options: deptOptions }, { name: "effectiveDate", label: t("effectiveDate") }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setTransfer(null)}
               onSubmit={async (p) => { if (await run(() => bff(`staff/${id}/transfer`, { method: "POST", body: { fromAssignmentId: transfer.id, ...p } }), c("saved"))) setTransfer(null); }} />
           ) : (
             <Can perm={PERMS.hrStaffAssign}>
-              <FormPanel title={t("addAssignment")} fields={[{ name: "deptId", label: t("department"), type: "select", required: true, options: deptOptions }, { name: "isPrimary", label: t("primary"), type: "checkbox" }]} submitLabel={c("add")} cancelLabel={c("cancel")} onCancel={() => undefined}
+              <FormPanel inline title={t("addAssignment")} fields={[{ name: "deptId", label: t("department"), type: "select", required: true, options: deptOptions }, { name: "isPrimary", label: t("primary"), type: "checkbox" }]} submitLabel={c("add")} cancelLabel={c("cancel")} onCancel={() => undefined}
                 onSubmit={async (p) => { await run(() => bff(`staff/${id}/assignments`, { method: "POST", body: p }), c("saved")); }} />
             </Can>
           )}
@@ -277,7 +282,7 @@ function EmergencyTab({ personId }: { personId: string }) {
       {message}
       <Can perm={PERMS.hrEmergencyEdit}>{!form ? <Button size="sm" className="mb-2" onClick={() => setForm(true)}>{c("add")}</Button> : null}</Can>
       {form ? (
-        <FormPanel title={c("add")} fields={[{ name: "name", label: t("name"), required: true }, { name: "relationship", label: t("relationship"), required: true }, { name: "phone", label: t("phone"), required: true }, { name: "isGuardian", label: t("guardian"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
+        <FormPanel inline title={c("add")} fields={[{ name: "name", label: t("name"), required: true }, { name: "relationship", label: t("relationship"), required: true }, { name: "phone", label: t("phone"), required: true }, { name: "isGuardian", label: t("guardian"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { if (await run(() => bff(`persons/${personId}/emergency-contacts`, { method: "POST", body: p }), c("saved"))) setForm(false); }} />
       ) : null}
       <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
@@ -369,7 +374,7 @@ export function StudentsPage() {
         <StatusDialog student={editing} statuses={statuses} onCancel={() => setEditing(null)}
           onSave={async (next) => { if (await run(() => bff(`students/${editing.id}`, { method: "PATCH", body: { academicStatus: next } }), c("saved"))) setEditing(null); }} />
       ) : null}
-      {importing ? <ImportPanel path="import/students" columns="student_id, name, campus_id, program, cohort, status" onDone={list.reload} /> : null}
+      {importing ? <ImportPanel path="import/students" columns="student_id, name, campus_id, program, cohort, status" onDone={list.reload} onClose={() => setImporting(false)} /> : null}
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("students", { method: "POST", body: p }), c("saved"))) setForm(false); }} /> : null}
       <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: list.rows.length === 20, onPageChange: setPage }} />
     </section>

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
+import { Modal } from "../modal";
 import { Can, PermButton } from "../permissions";
 import { useAct } from "./crud";
 import { useList } from "./use-api";
@@ -131,8 +132,10 @@ export function RequestsPage() {
                 </div>
               ) : null}
               {deciding?.id === r.id ? (
-                <div className="mt-2 flex flex-col gap-2 rounded-md border border-border p-2">
-                  <div className="font-medium">{t(deciding.decision === "approve" ? "approve" : "reject")}</div>
+                <Modal title={t(deciding.decision === "approve" ? "approve" : "reject")} onClose={() => setDeciding(null)}>
+                <div className="flex flex-col gap-3 text-sm">
+                  <div className="text-base font-semibold">{t(deciding.decision === "approve" ? "approve" : "reject")}</div>
+                  <div className="text-muted">{r.student} · {r.section} · {t(`kind_${r.kind}`)}</div>
                   {deciding.decision === "approve" && r.kind === "grade_appeal" ? <input aria-label={t("newTotalLabel")} placeholder={t("newTotal", { current: r.currentGrade?.total ?? "-" })} inputMode="decimal" className="rounded-md border border-border bg-transparent px-2 py-1" value={total} onChange={(e) => setTotal(e.target.value)} /> : null}
                   {deciding.decision === "approve" && r.kind === "extension" ? (
                     <label className="flex items-center gap-2">{t("approveDays")}
@@ -140,11 +143,12 @@ export function RequestsPage() {
                     </label>
                   ) : null}
                   <textarea aria-label={t("noteLabel")} placeholder={t(deciding.decision === "approve" ? "approveNote" : "rejectNote")} rows={2} className="rounded-md border border-border bg-transparent px-2 py-1" value={note} onChange={(e) => setNote(e.target.value)} />
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 border-t border-border pt-3">
                     <PermButton perm={PERMS.eduRequestDecide} size="sm" disabled={!ready(r)} onClick={() => void send(r)}>{c("save")}</PermButton>
                     <PermButton perm={PERMS.eduRequestDecide} size="sm" variant="outline" onClick={() => setDeciding(null)}>{c("cancel")}</PermButton>
                   </div>
                 </div>
+                </Modal>
               ) : null}
             </li>
           ))}

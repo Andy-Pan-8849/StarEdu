@@ -5,6 +5,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
@@ -134,14 +135,15 @@ export function CampusesPage() {
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {closure ? (
-        <div className="mt-4 rounded-md border border-border p-3 text-sm" role="dialog" aria-label={t("closeCheck")}>
-          <h3 className="mb-2 font-medium">{t("closeCheckFor", { name: closure.campus.name })}</h3>
+        <Modal title={t("closeCheck")} onClose={() => setClosure(null)}>
+        <div className="text-sm">
+          <h3 className="mb-3 text-base font-semibold">{t("closeCheckFor", { name: closure.campus.name })}</h3>
           <ul className="mb-2 list-disc pl-5">
             <li>{t("students", { n: closure.data.students.count })}</li>
             <li>{t("staff", { n: closure.data.staffAssignments.count })}</li>
             <li>{closure.data.classes.implemented ? t("classes", { n: closure.data.classes.count }) : t("classesLater")}</li>
           </ul>
-          <div className="flex gap-2">
+          <div className="flex gap-2 border-t border-border pt-3">
             <Button size="sm" disabled={closure.data.students.count + closure.data.staffAssignments.count + closure.data.classes.count > 0} onClick={async () => {
               const typed = window.prompt(t("typeName", { name: closure.campus.name }));
               if (typed === null) return;
@@ -150,6 +152,7 @@ export function CampusesPage() {
             <Button size="sm" variant="outline" onClick={() => setClosure(null)}>{c("cancel")}</Button>
           </div>
         </div>
+        </Modal>
       ) : null}
     </section>
   );
@@ -349,8 +352,9 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
     },
   ];
   return (
-    <div className="mt-4 rounded-md border border-border p-3">
-      <h3 className="mb-2 font-medium">{t("itemsOf", { name: type.name })}</h3>
+    <Modal title={t("itemsOf", { name: type.name })} onClose={onClose}>
+    <div>
+      <h3 className="mb-3 text-base font-semibold">{t("itemsOf", { name: type.name })}</h3>
       {message}
       {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
       {form ? (
@@ -361,8 +365,9 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
           onSubmit={async (p) => { if (await run(() => (form.row ? bff(`dict-items/${form.row.id}`, { method: "PATCH", body: p }) : bff(`dict-types/${type.id}/items`, { method: "POST", body: p })), c("saved"))) setForm(null); }} />
       ) : null}
       <DataTable columns={columns} rows={items.rows} rowKey={(r) => r.id} loading={items.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
-      <Button size="sm" variant="outline" className="mt-2" onClick={onClose}>{c("close")}</Button>
+      <div className="mt-3 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button></div>
     </div>
+    </Modal>
   );
 }
 

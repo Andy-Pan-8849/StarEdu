@@ -5,6 +5,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton } from "../permissions";
 import { TreeSelect } from "../tree-select";
@@ -100,10 +101,12 @@ export function TenantsPage() {
       <Can perm={PERMS.platformTenantAdd}>
         <div className="mb-3">
           {creating ? (
+            <Modal title={t("new")} onClose={() => setCreating(false)}>
             <form
-              className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3 text-sm"
+              className="flex flex-col gap-3 text-sm"
               onSubmit={(e) => { e.preventDefault(); void act(() => bff("tenants", { method: "POST", body: form }), t("created")).then(() => setCreating(false)); }}
             >
+              <h3 className="text-base font-semibold">{t("new")}</h3>
               {(["code", "name", "adminEmail"] as const).map((k) => (
                 <label key={k} className="flex flex-col gap-1">
                   {t(k === "adminEmail" ? "adminEmail" : k)}
@@ -117,9 +120,12 @@ export function TenantsPage() {
                   <option value="franchise">{t("type_franchise")}</option>
                 </select>
               </label>
-              <Button type="submit" size="sm">{t("create")}</Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setCreating(false)}>{t("cancel")}</Button>
+              <div className="mt-2 flex gap-2 border-t border-border pt-3">
+                <Button type="submit" size="sm">{t("create")}</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setCreating(false)}>{t("cancel")}</Button>
+              </div>
             </form>
+            </Modal>
           ) : (
             <Button size="sm" onClick={() => setCreating(true)}>{t("new")}</Button>
           )}
@@ -172,8 +178,9 @@ function SecurityPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => 
   const pw = form.password;
   const setPw = (k: keyof typeof pw, n: number) => setForm({ ...form, password: { ...pw, [k]: n } });
   return (
-    <div className="mt-4 rounded-md border border-border p-3">
-      <h3 className="mb-2 font-medium">{t("securityOf", { name: tenant.name })}</h3>
+    <Modal wide title={t("securityOf", { name: tenant.name })} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{t("securityOf", { name: tenant.name })}</h3>
       <fieldset className="mb-3 flex flex-wrap gap-3"><legend className="mb-1 text-sm font-medium">{t("passwordRules")}</legend>
         {field(t("pwLength"), pw.length, (n) => setPw("length", n))}
         {field(t("pwUpper"), pw.upperCase, (n) => setPw("upperCase", n))}
@@ -217,6 +224,7 @@ function SecurityPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => 
         {msg ? <span role="status" className="text-muted">{msg}</span> : null}
       </div>
     </div>
+    </Modal>
   );
 }
 
@@ -233,12 +241,13 @@ function GrantsPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => vo
   React.useEffect(() => {
     void bff<{ tree: { admin: MenuApiNode[]; portal: MenuApiNode[] }; granted: string[] }>(`tenants/${tenant.id}/grants`).then((d) => { setData(d); setValue(d.granted); });
   }, [tenant.id]);
-  if (!data) return <p className="mt-3 text-sm text-muted">…</p>;
+  if (!data) return <Modal title={t("features")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   const label = (n: MenuApiNode) => (n.nameKey && tm.has(n.nameKey) ? tm(n.nameKey) : n.name);
   const tree = [...toTree(data.tree.admin, label), ...toTree(data.tree.portal, label)];
   return (
-    <div className="mt-4 rounded-md border border-border p-3">
-      <h3 className="mb-2 font-medium">{t("featuresOf", { name: tenant.name })}</h3>
+    <Modal title={t("featuresOf", { name: tenant.name })} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{t("featuresOf", { name: tenant.name })}</h3>
       <TreeSelect label={t("features")} nodes={tree} value={value} onChange={setValue} />
       <div className="mt-3 flex items-center gap-2 text-sm">
         <PermButton perm={PERMS.platformTenantGrant} size="sm" onClick={async () => { try { await bff(`tenants/${tenant.id}/grants`, { method: "PUT", body: { menuIds: submitIds(tree, new Set(value)) } }); setMsg(t("saved")); } catch (e) { setMsg((e as Error).message); } }}>{t("save")}</PermButton>
@@ -246,6 +255,7 @@ function GrantsPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => vo
         {msg ? <span role="status" className="text-muted">{msg}</span> : null}
       </div>
     </div>
+    </Modal>
   );
 }
 
@@ -403,7 +413,7 @@ function QuotaPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => voi
     setStorage(d.limits.maxStorageMb === null ? "" : String(d.limits.maxStorageMb));
   }, [tenant.id]);
   React.useEffect(() => { void load().catch((e) => setMsg((e as Error).message)); }, [load]);
-  if (!data) return <p className="mt-3 text-sm text-muted">{msg ?? "…"}</p>;
+  if (!data) return <Modal title={t("quota")} onClose={onClose}><p className="text-sm text-muted">{msg ?? "…"}</p></Modal>;
   const num = (v: string) => (v.trim() === "" ? null : Number(v));
   async function save() {
     try {
@@ -419,8 +429,9 @@ function QuotaPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => voi
   );
   const u = data.usage;
   return (
-    <div className="mt-4 rounded-md border border-border p-3">
-      <h3 className="mb-2 font-medium">{t("quotaOf", { name: tenant.name })}</h3>
+    <Modal title={t("quotaOf", { name: tenant.name })} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{t("quotaOf", { name: tenant.name })}</h3>
       <div className="mb-3 grid gap-3 text-sm sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <span className="font-medium">{t("accountsUsed", { used: u.accounts, active: u.activeAccounts })}</span>
@@ -444,5 +455,6 @@ function QuotaPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => voi
         {msg ? <span role="status" className="text-muted">{msg}</span> : null}
       </div>
     </div>
+    </Modal>
   );
 }

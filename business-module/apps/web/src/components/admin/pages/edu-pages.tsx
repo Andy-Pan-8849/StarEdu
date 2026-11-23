@@ -5,6 +5,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton, usePermissions } from "../permissions";
 import { AssignmentsPanel } from "./assignment-pages";
@@ -136,10 +137,11 @@ function CourseDetailPanel({ id, all, onClose }: { id: string; all: CourseRow[];
   const [picked, setPicked] = React.useState<string[]>([]);
   const [msg, setMsg] = React.useState<{ text: string; error: boolean } | null>(null);
   React.useEffect(() => { void bff<CourseDetail>(`courses/${id}`).then((x) => { setD(x); setPicked(x.prerequisites.map((p) => p.id)); }); }, [id]);
-  if (!d) return <p className="mt-3 text-sm text-muted">…</p>;
+  if (!d) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   return (
-    <div className="mt-4 rounded-md border border-border p-3 text-sm">
-      <h3 className="mb-2 font-medium">{d.code} · {d.name}</h3>
+    <Modal title={`${d.code} · ${d.name}`} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{d.code} · {d.name}</h3>
       <p className="mb-1 text-muted">{t("prerequisites")}</p>
       <div className="mb-2 flex flex-wrap gap-3">
         {all.filter((x) => x.id !== id).map((x) => (
@@ -152,8 +154,9 @@ function CourseDetailPanel({ id, all, onClose }: { id: string; all: CourseRow[];
       <p>{d.majors.map((m) => `${m.name} (${t(`cat_${m.category}`)})`).join(", ") || "—"}</p>
       <p className="mb-1 mt-3 text-muted">{t("history")}</p>
       <p>{d.sections.map((s) => s.name).join(", ") || "—"}</p>
-      <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
+      <div className="mt-4 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button></div>
     </div>
+    </Modal>
   );
 }
 
@@ -201,8 +204,9 @@ export function MajorsPage() {
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {open && detail ? (
-        <div className="mt-4 rounded-md border border-border p-3 text-sm">
-          <h3 className="mb-2 font-medium">{t("curriculumOf", { name: detail.name })}</h3>
+        <Modal wide title={t("curriculumOf", { name: detail.name })} onClose={() => { setOpen(null); setDetail(null); setVersionId(null); }}>
+        <div className="text-sm">
+          <h3 className="mb-3 text-base font-semibold">{t("curriculumOf", { name: detail.name })}</h3>
           <div className="mb-3 flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1">{t("version")}
               <select className="rounded-md border border-border bg-transparent px-2 py-1" value={detail.versionId} onChange={(e) => setVersionId(e.target.value)}>
@@ -235,6 +239,7 @@ export function MajorsPage() {
           <PermButton perm={PERMS.eduMajorEdit} size="sm" onClick={() => void run(() => bff(`majors/${open}/courses?version=${detail.versionId}`, { method: "PUT", body: { items: Object.entries(items).map(([courseId, v]) => ({ courseId, category: v.category, suggestedTerm: v.suggestedTerm ? Number(v.suggestedTerm) : null })) } }), c("saved"))}>{c("save")}</PermButton>
           <Button size="sm" variant="outline" className="ml-2" onClick={() => { setOpen(null); setDetail(null); setVersionId(null); }}>{c("close")}</Button>
         </div>
+        </Modal>
       ) : null}
     </section>
   );
@@ -333,8 +338,9 @@ function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
     </label>
   );
   return (
-    <div className="mb-4 rounded-md border border-border p-3 text-sm">
-      <h3 className="mb-2 font-medium">{t("batchEnroll")}</h3>
+    <Modal wide title={t("batchEnroll")} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{t("batchEnroll")}</h3>
       <p className="mb-2 text-xs text-muted">{t("batchHelp")}</p>
       <div className="mb-3 flex flex-wrap items-end gap-3">
         {sel(t("term"), "termId", terms.rows.filter((x) => x.status !== "ended").map((x) => ({ value: x.id, label: x.name })))}
@@ -371,6 +377,7 @@ function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
         </div>
       ) : null}
     </div>
+    </Modal>
   );
 }
 
@@ -393,7 +400,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const [needs, setNeeds] = React.useState<string[] | null>(null);
   const [teacher, setTeacher] = React.useState("");
   const [matForm, setMatForm] = React.useState(false);
-  if (!s) return <p className="mt-3 text-sm text-muted">…</p>;
+  if (!s) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   async function enroll(confirm?: string[]) {
     const r = await bff<{ results: Array<{ ok: boolean; code?: string; violations?: string[]; message?: string }> }>(`sections/${id}/enrollments`, { method: "POST", body: { studentIds: pickedStudents, confirm, reason: reason || undefined } });
     const need = [...new Set(r.results.flatMap((x) => (x.code === "CONFIRMATION_REQUIRED" ? (x.violations ?? []) : [])))];
@@ -412,8 +419,9 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
     { key: "a", header: "", cell: (r) => (r.status === "enrolled" ? <PermButton perm={PERMS.eduEnrollmentRemove} size="sm" variant="outline" onClick={() => void run(() => bff(`sections/${id}/enrollments/${r.id}`, { method: "DELETE" }), c("done"))}>{t("remove")}</PermButton> : null) },
   ];
   return (
-    <div className="mt-4 rounded-md border border-border p-3 text-sm">
-      <h3 className="mb-2 font-medium">{s.name} — {s.seated}/{s.capacity}</h3>
+    <Modal wide title={s.name} onClose={onClose}>
+    <div className="text-sm">
+      <h3 className="mb-3 text-base font-semibold">{s.name} — {s.seated}/{s.capacity}</h3>
       <div role="tablist" className="mb-3 flex gap-2">
         {(["roster", "instructors", "materials", "assignments", "grades", "discussion"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList)) && (k !== "discussion" || perms.has(PERMS.eduDiscussionList))).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "font-medium underline" : "text-muted"} onClick={() => setTab(k)}>{t(`tab_${k}`)}</button>)}
       </div>
@@ -451,7 +459,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
           ))}</ul>
           <Can perm={PERMS.eduMaterialEdit}>
             {matForm ? (
-              <FormPanel title={c("add")} fields={[{ name: "title", label: t("name"), required: true }, { name: "url", label: t("url"), required: true }, { name: "published", label: t("published"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setMatForm(false)}
+              <FormPanel inline title={c("add")} fields={[{ name: "title", label: t("name"), required: true }, { name: "url", label: t("url"), required: true }, { name: "published", label: t("published"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setMatForm(false)}
                 onSubmit={async (p) => { if (await run(() => bff(`sections/${id}/materials`, { method: "POST", body: p }), c("saved"))) setMatForm(false); }} />
             ) : <Button size="sm" onClick={() => setMatForm(true)}>{c("add")}</Button>}
           </Can>
@@ -460,8 +468,9 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
       {tab === "assignments" ? <AssignmentsPanel sectionId={id} /> : null}
       {tab === "grades" ? <GradesPanel sectionId={id} /> : null}
       {tab === "discussion" ? <DiscussionPanel sectionId={id} /> : null}
-      <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
+      <div className="mt-4 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button></div>
     </div>
+    </Modal>
   );
 }
 
