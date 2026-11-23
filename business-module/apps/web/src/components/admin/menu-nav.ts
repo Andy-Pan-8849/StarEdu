@@ -29,3 +29,19 @@ export function firstOpenable(nodes: readonly MenuNode[]): MenuNode | undefined 
   }
   return undefined;
 }
+
+/** 按名字过滤菜单树：目录名命中保留整个目录，否则只保留命中的子项；空关键字原样返回。 */
+export function filterMenus(nodes: readonly MenuNode[], query: string, label: (n: MenuNode) => string): MenuNode[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...nodes];
+  const out: MenuNode[] = [];
+  for (const n of nodes) {
+    if (label(n).toLowerCase().includes(q)) {
+      out.push(n);
+    } else if (n.type === "directory") {
+      const children = filterMenus(n.children, query, label);
+      if (children.length > 0) out.push({ ...n, children });
+    }
+  }
+  return out;
+}
