@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Plus } from "lucide-react";
-import { IconButton, PermIconButton } from "../icon-button";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { IconButton, PermIconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -48,8 +48,8 @@ export function PostsPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.postEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.postRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`posts/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.postEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.postRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`posts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       ),
     },
@@ -111,7 +111,7 @@ export function CampusesPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.campusEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
+          <PermRowAction perm={PERMS.campusEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
           {r.type !== "hq" && r.status === "normal" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "stop_new")}>{t("stopNew")}</PermButton> : null}
           {r.type !== "hq" && r.status === "stop_new" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "normal")}>{t("resume")}</PermButton> : null}
           {r.type !== "hq" && r.status === "stop_new" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void startClose(r)}>{t("close")}</PermButton> : null}
@@ -203,8 +203,8 @@ export function DeptsPage() {
       cell: (r) => (
         <div className="flex gap-1">
           <PermIconButton perm={PERMS.deptAdd} icon={Plus} label={c("add")} variant="outline" onClick={() => setForm({ row: undefined })}/>
-          <PermButton perm={PERMS.deptEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.deptRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.deptEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.deptRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`depts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       ),
     },
@@ -258,8 +258,8 @@ export function ParamsPage() {
       header: "",
       cell: (r) => (r.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.paramEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.paramRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`params/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.paramEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.paramRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`params/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -310,7 +310,7 @@ export function DictsPage() {
       cell: (r) => (
         <div className="flex gap-1">
           <Button size="sm" variant="outline" onClick={() => setOpen(r)}>{t("items")}</Button>
-          {!r.platformProvided ? <PermButton perm={PERMS.dictRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`dict-types/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton> : null}
+          {!r.platformProvided ? <PermRowAction perm={PERMS.dictRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`dict-types/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> : null}
         </div>
       ),
     },
@@ -349,8 +349,8 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
       header: "",
       cell: (r) => (type.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.dictEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.dictRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.label })) && void run(() => bff(`dict-items/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.dictEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.dictRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.label })) && void run(() => bff(`dict-items/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },

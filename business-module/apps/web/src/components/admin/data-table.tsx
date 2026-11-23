@@ -159,7 +159,7 @@ export function DataTable<T>({
                     ) : null}
                     {ordered.map((c) => (
                       <td key={c.key} className={cn("px-3 py-2", c.key === "actions" && "whitespace-nowrap text-right")}>
-                        {c.key === "actions" ? <div className="flex flex-wrap justify-end gap-1.5">{c.cell(row)}</div> : c.cell(row)}
+                        {c.key === "actions" ? <div className="flex flex-wrap items-center justify-end gap-x-1 gap-y-0.5 [&_button:hover]:bg-primary/10 [&_button]:h-auto [&_button]:whitespace-nowrap [&_button]:border-0 [&_button]:bg-transparent [&_button]:px-1.5 [&_button]:py-1 [&_button]:text-primary">{c.cell(row)}</div> : c.cell(row)}
                       </td>
                     ))}
                   </tr>

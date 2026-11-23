@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Download, Plus, Upload } from "lucide-react";
-import { IconButton, IconLink } from "../icon-button";
+import { Download, Eye, Plus, Trash2, Upload } from "lucide-react";
+import { IconButton, IconLink, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -85,7 +85,7 @@ export function PeoplePage() {
     { key: "name", header: t("name"), cell: (r) => r.fullName },
     { key: "type", header: t("personType"), cell: (r) => t(`person_${r.type}`) },
     { key: "email", header: t("email"), cell: (r) => r.workEmail ?? "" },
-    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button> },
+    { key: "actions", header: "", cell: (r) => <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction> },
   ];
   return (
     <section>
@@ -168,7 +168,7 @@ export function StaffPage() {
     { key: "name", header: t("name"), cell: (r) => r.fullName },
     { key: "campus", header: t("campus"), cell: (r) => r.campuses.join(", ") },
     { key: "status", header: c("status"), cell: (r) => (r.status ? t(`staff_${r.status}`) : "") },
-    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button> },
+    { key: "actions", header: "", cell: (r) => <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction> },
   ];
   return (
     <section>
@@ -277,7 +277,7 @@ function EmergencyTab({ personId }: { personId: string }) {
     { key: "rel", header: t("relationship"), cell: (r) => r.relationship },
     { key: "phone", header: t("phone"), cell: (r) => r.phone },
     { key: "g", header: t("guardian"), cell: (r) => (r.isGuardian ? c("enabled") : "") },
-    { key: "a", header: "", cell: (r) => <PermButton perm={PERMS.hrEmergencyEdit} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`persons/${personId}/emergency-contacts/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton> },
+    { key: "a", header: "", cell: (r) => <PermRowAction perm={PERMS.hrEmergencyEdit} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`persons/${personId}/emergency-contacts/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> },
   ];
   return (
     <div>

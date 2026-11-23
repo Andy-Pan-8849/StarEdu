@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Plus } from "lucide-react";
-import { IconButton } from "../icon-button";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -139,9 +139,9 @@ export function RolesPage() {
       header: "",
       cell: (r) => (r.kind !== "custom" ? null : (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.roleEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
+          <PermRowAction perm={PERMS.roleEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
           <PermButton perm={PERMS.roleAuthorize} size="sm" variant="outline" onClick={() => setEditing(r)}>{t("permissions")}</PermButton>
-          <PermButton perm={PERMS.roleRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.roleRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
           {r.templateMissingCount ? <PermButton perm={PERMS.roleAuthorize} size="sm" onClick={() => openUpgrade(r)}>{t("templateUpdate", { n: r.templateMissingCount })}</PermButton> : null}
         </div>
       )),
@@ -262,8 +262,8 @@ export function MenusPage() {
       header: "",
       cell: (r) => (r.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.menuEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.menuRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`menus/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.menuEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.menuRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`menus/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -313,7 +313,7 @@ export function EntriesPage() {
           <h3 className="mb-2 font-medium">{t(`entry_${e.code}`)}</h3>
           <p className="mb-2 text-muted">{t("platformAssigned")}: {e.menus.filter((m) => m.platformProvided).map(label).join(", ") || "—"}</p>
           <p className="mb-2">{t("yourMenus")}: {topOwn.filter((m) => (sel[e.code] ?? []).includes(m.id)).map((m) => m.name).join(", ") || "—"}</p>
-          <PermButton perm={PERMS.entryEdit} size="sm" variant="outline" onClick={() => setEditing(e.code)}>{c("edit")}</PermButton>
+          <PermRowAction perm={PERMS.entryEdit} onClick={() => setEditing(e.code)} icon={Pencil}>{c("edit")}</PermRowAction>
           {editing === e.code ? (
           <Modal title={t(`entry_${e.code}`)} onClose={() => { setEditing(null); load(); }}>
           <div className="text-sm">
@@ -373,8 +373,8 @@ export function DataScopesPage() {
       header: "",
       cell: (r) => (r.platformProvided ? null : (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.dataScopeEdit} size="sm" variant="outline" onClick={() => { setForm({ row: r }); setName(r.name); setPicked(r.nodes.map((n) => n.deptId)); setWithChildren(r.nodes.every((n) => n.includeChildren)); }}>{c("edit")}</PermButton>
-          <PermButton perm={PERMS.dataScopeRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`data-scope-sets/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.dataScopeEdit} onClick={() => { setForm({ row: r }); setName(r.name); setPicked(r.nodes.map((n) => n.deptId)); setWithChildren(r.nodes.every((n) => n.includeChildren)); }} icon={Pencil}>{c("edit")}</PermRowAction>
+          <PermRowAction perm={PERMS.dataScopeRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`data-scope-sets/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },

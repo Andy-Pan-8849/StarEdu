@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Plus } from "lucide-react";
-import { IconButton } from "../icon-button";
+import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -55,7 +55,7 @@ export function TermsPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          {r.status !== "ended" ? <PermButton perm={PERMS.eduTermEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton> : null}
+          {r.status !== "ended" ? <PermRowAction perm={PERMS.eduTermEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction> : null}
           {TERM_NEXT[r.status].map((next) => (
             <PermButton key={next} perm={PERMS.eduTermEdit} size="sm" variant="outline" onClick={() => (next !== "ended" || window.confirm(t("confirmEnd", { name: r.name }))) && void run(() => bff(`terms/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))}>{t(`to_${next}`)}</PermButton>
           ))}
@@ -108,8 +108,8 @@ export function CoursesPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button>
-          <PermButton perm={PERMS.eduCourseEdit} size="sm" variant="outline" onClick={() => setForm({ row: r })}>{c("edit")}</PermButton>
+          <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction>
+          <PermRowAction perm={PERMS.eduCourseEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
         </div>
       ),
     },
@@ -276,7 +276,7 @@ export function SectionsPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          <Button size="sm" variant="outline" onClick={() => setOpen(r.id)}>{t("details")}</Button>
+          <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction>
           {SEC_NEXT[r.status].map((next) => (
             <PermButton key={next} perm={PERMS.eduSectionStatus} size="sm" variant="outline" onClick={() => (next !== "cancelled" || window.confirm(t("confirmCancel", { name: r.name }))) && void run(() => bff(`sections/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))}>{t(`to_sec_${next}`)}</PermButton>
           ))}
@@ -453,7 +453,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
         <div>
           <ul className="mb-2 list-disc pl-5">{materials.rows.map((m) => (
             <li key={m.id}><a className="underline" href={m.url} target="_blank" rel="noopener noreferrer">{m.title}</a> {m.published ? "" : `(${t("draft")})`}
-              <PermButton perm={PERMS.eduMaterialEdit} size="sm" variant="outline" className="ml-2" onClick={() => void run(() => bff(`sections/${id}/materials/${m.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton></li>
+              <PermRowAction perm={PERMS.eduMaterialEdit} className="ml-2" onClick={() => void run(() => bff(`sections/${id}/materials/${m.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction></li>
           ))}</ul>
           <Can perm={PERMS.eduMaterialEdit}>
             {matForm ? (

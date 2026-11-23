@@ -3,8 +3,8 @@
 // 平台控制台的 5 个页面：平台账号、平台角色、菜单、入口分配、平台公告。接口在 B3/B17 已有，这里只补页面。
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Plus } from "lucide-react";
-import { IconButton } from "../icon-button";
+import { Plus, Trash2 } from "lucide-react";
+import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -114,7 +114,7 @@ export function PlatformRolesPage() {
       cell: (r) => (r.kind !== "custom" ? null : (
         <div className="flex flex-wrap gap-1">
           <PermButton perm={PERMS.platformRoleAuthorize} size="sm" variant="outline" onClick={() => open(r)}>{t("permissions")}</PermButton>
-          <PermButton perm={PERMS.platformRoleRemove} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton>
+          <PermRowAction perm={PERMS.platformRoleRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
     },
@@ -274,7 +274,7 @@ export function PlatformAnnouncementsPage() {
     { key: "body", header: t("bodyField"), cell: (r) => r.body },
     { key: "severity", header: t("severity"), cell: (r) => t(`sev_${r.severity}`) },
     { key: "period", header: t("period"), cell: (r) => `${when(r.startsAt)} → ${when(r.endsAt)}` },
-    { key: "actions", header: "", cell: (r) => <PermButton perm={PERMS.platformAnnouncementEdit} size="sm" variant="outline" onClick={() => window.confirm(c("confirmDelete", { name: r.title })) && void run(() => bff(`announcements/${r.id}`, { method: "DELETE" }), c("done"))}>{c("delete")}</PermButton> },
+    { key: "actions", header: "", cell: (r) => <PermRowAction perm={PERMS.platformAnnouncementEdit} onClick={() => window.confirm(c("confirmDelete", { name: r.title })) && void run(() => bff(`announcements/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> },
   ];
   return (
     <section>
