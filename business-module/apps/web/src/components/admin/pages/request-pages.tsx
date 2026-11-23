@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
+import { Button } from "@/components/ui/button";
 import { Modal } from "../modal";
 import { Can, PermButton } from "../permissions";
 import { useAct } from "./crud";
@@ -32,19 +33,26 @@ export function PortalRequestsPage() {
   const [target, setTarget] = React.useState("");
   const [days, setDays] = React.useState("1");
   const [reason, setReason] = React.useState("");
+  const [creating, setCreating] = React.useState(false);
+  const c = useTranslations("crud");
 
   const submit = async () => {
     const [kind, id] = target.split(":");
     if (!id) return;
     const body = kind === "appeal" ? { kind: "grade_appeal", enrollmentId: id, reason } : { kind: "extension", assignmentId: id, days: Number(days), reason };
-    if (await run(() => bff("requests", { method: "POST", body }), t("submitted"))) { setTarget(""); setReason(""); }
+    if (await run(() => bff("requests", { method: "POST", body }), t("submitted"))) { setTarget(""); setReason(""); setCreating(false); }
   };
 
   return (
     <section className="text-sm">
       <H2>{t("myTitle")}</H2>
       <Can perm={PERMS.portalRequestSubmit}>
-        <div className="mb-4 flex flex-col gap-2 rounded-md border border-border p-3">
+        {!creating ? <Button size="sm" className="mb-3" onClick={() => setCreating(true)}>{c("add")}</Button> : null}
+      </Can>
+      {creating ? (
+        <Modal title={t("myTitle")} onClose={() => setCreating(false)}>
+        <div className="flex flex-col gap-3">
+          <h3 className="text-base font-semibold">{t("myTitle")}</h3>
           <select aria-label={t("pick")} className={input} value={target} onChange={(e) => setTarget(e.target.value)}>
             <option value="">{t("pick")}</option>
             {opts?.appeals.map((a) => <option key={a.enrollmentId} value={`appeal:${a.enrollmentId}`}>{t("appealOption", { section: a.section, grade: a.grade, total: a.total })}</option>)}
@@ -57,9 +65,13 @@ export function PortalRequestsPage() {
           ) : null}
           <textarea aria-label={t("reason")} placeholder={t("reason")} className={input} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
           <p className="text-xs text-muted">{t("windowNote", { days: opts?.appealWindowDays ?? 14 })}</p>
-          <div><PermButton perm={PERMS.portalRequestSubmit} size="sm" disabled={!target || reason.trim().length < 3} onClick={() => void submit()}>{t("submit")}</PermButton></div>
+          <div className="flex gap-2 border-t border-border pt-3">
+            <PermButton perm={PERMS.portalRequestSubmit} size="sm" disabled={!target || reason.trim().length < 3} onClick={() => void submit()}>{t("submit")}</PermButton>
+            <Button size="sm" variant="outline" onClick={() => setCreating(false)}>{c("cancel")}</Button>
+          </div>
         </div>
-      </Can>
+        </Modal>
+      ) : null}
       {message}
       {list.rows.length === 0 ? <p className="text-muted">{t("none")}</p> : (
         <ul className="flex flex-col gap-2">

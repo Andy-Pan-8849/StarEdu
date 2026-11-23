@@ -6,6 +6,7 @@ import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
+import { usePromptDialog } from "../prompt-dialog";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
@@ -92,6 +93,7 @@ export function CampusesPage() {
     { name: "address", label: t("address") },
     { name: "timezone", label: t("timezone") },
   ];
+  const { ask, dialog } = usePromptDialog();
   const setStatus = (r: CampusRow, status: string, confirmName?: string) => run(() => bff(`campuses/${r.id}/status`, { method: "POST", body: { status, confirmName } }), c("done"));
   async function startClose(r: CampusRow) {
     const data = await bff<Closure>(`campuses/${r.id}/closure-check`);
@@ -121,6 +123,7 @@ export function CampusesPage() {
       <H2>{t("title")}</H2>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message}
+      {dialog}
       <Can perm={PERMS.campusAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can>
       {form ? (
         <FormPanel
@@ -145,9 +148,9 @@ export function CampusesPage() {
           </ul>
           <div className="flex gap-2 border-t border-border pt-3">
             <Button size="sm" disabled={closure.data.students.count + closure.data.staffAssignments.count + closure.data.classes.count > 0} onClick={async () => {
-              const typed = window.prompt(t("typeName", { name: closure.campus.name }));
-              if (typed === null) return;
-              if (await setStatus(closure.campus, "closed", typed)) setClosure(null); else setMessage((m) => m);
+              const v = await ask(t("closeNow"), [{ name: "typed", label: t("typeName", { name: closure.campus.name }) }]);
+              if (v === null) return;
+              if (await setStatus(closure.campus, "closed", v.typed)) setClosure(null); else setMessage((m) => m);
             }}>{t("closeNow")}</Button>
             <Button size="sm" variant="outline" onClick={() => setClosure(null)}>{c("cancel")}</Button>
           </div>

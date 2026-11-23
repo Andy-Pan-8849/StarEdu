@@ -753,7 +753,7 @@
       "confirmDeleteFolder": "删除这个文件夹吗？只有空文件夹可以删除。",
       "deleteFolder": "删除文件夹",
       "confirmContinue": "仍要继续吗？",
-      "targetPrompt": "输入目标文件夹的序号：",
+      "targetPrompt": "目标文件夹",
       "viewOnly": "仅在线查看",
       "close": "关闭",
       "tab_info": "基本信息",

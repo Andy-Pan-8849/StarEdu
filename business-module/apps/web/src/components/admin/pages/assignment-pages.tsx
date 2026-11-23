@@ -5,6 +5,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { usePromptDialog } from "../prompt-dialog";
 import { Can, PermButton } from "../permissions";
 import { FormPanel, useAct } from "./crud";
 import { useList } from "./use-api";
@@ -94,6 +95,7 @@ function SubmissionsView({ sectionId, assignment, onBack }: { sectionId: string;
   const load = React.useCallback(() => { void bff<{ rows: SubRow[] }>(`${base}/submissions`).then(setData); }, [base]);
   React.useEffect(load, [load]);
   const { run, message } = useAct(() => { load(); });
+  const { ask, dialog } = usePromptDialog();
   const [points, setPoints] = React.useState<Record<string, string>>({});
   const [feedback, setFeedback] = React.useState("");
   async function openSub(id: string) {
@@ -104,15 +106,17 @@ function SubmissionsView({ sectionId, assignment, onBack }: { sectionId: string;
   }
   const scores = () => assignment.rubric.filter((r) => points[r.id] !== undefined && points[r.id] !== "").map((r) => ({ rubricItemId: r.id, points: Number(points[r.id]) }));
   async function extend(r: SubRow) {
-    const days = Number(window.prompt(t("extDays")) ?? "");
-    if (!days) return;
-    const reason = window.prompt(t("extReason")) ?? "";
-    if (reason.trim().length < 3) return;
+    const v = await ask(t("extDays"), [{ name: "days", label: t("extDays"), type: "number" }, { name: "reason", label: t("extReason"), type: "textarea" }]);
+    if (!v) return;
+    const days = Number(v.days);
+    const reason = v.reason;
+    if (!days || reason.trim().length < 3) return;
     await run(() => bff(`${base}/extensions/${r.studentPersonId}`, { method: "PUT", body: { days, reason } }), c("done"));
   }
   return (
     <div>
       {message}
+      {dialog}
       <div className="mb-2 flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={onBack}>{t("back")}</Button>
         <span className="font-medium">{assignment.title}</span>

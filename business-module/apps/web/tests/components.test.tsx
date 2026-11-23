@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { DataTable, pageCount } from "../src/components/admin/data-table";
+import { NextIntlClientProvider } from "next-intl";
 import { Modal } from "../src/components/admin/modal";
+import { usePromptDialog } from "../src/components/admin/prompt-dialog";
 import { MenuTreeShell, type ShellLabels } from "../src/components/admin/menu-tree-shell";
 import type { MenuNode } from "../src/components/admin/menu-nav";
 import { Can, PermButton, PermissionProvider } from "../src/components/admin/permissions";
@@ -204,5 +206,31 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     await user.click(dialog.parentElement as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("usePromptDialog", () => {
+  function Demo({ onResult }: { onResult: (v: Record<string, string> | null) => void }) {
+    const { ask, dialog } = usePromptDialog();
+    return (
+      <>
+        <button onClick={() => void ask("Ask", [{ name: "x", label: "X", initial: "a" }]).then(onResult)}>go</button>
+        {dialog}
+      </>
+    );
+  }
+  it("returns the typed values on save and null on cancel", async () => {
+    const user = userEvent.setup();
+    const onResult = vi.fn();
+    render(<NextIntlClientProvider locale="en" messages={{ crud: { save: "save", cancel: "cancel" } }}><Demo onResult={onResult} /></NextIntlClientProvider>);
+    await user.click(screen.getByRole("button", { name: "go" }));
+    const box = screen.getByLabelText("X") as HTMLInputElement;
+    expect(box.value).toBe("a");
+    await user.type(box, "b");
+    await user.click(screen.getByRole("button", { name: "save" }));
+    expect(onResult).toHaveBeenLastCalledWith({ x: "ab" });
+    await user.click(screen.getByRole("button", { name: "go" }));
+    await user.keyboard("{Escape}");
+    expect(onResult).toHaveBeenLastCalledWith(null);
   });
 });

@@ -753,7 +753,7 @@
       "confirmDeleteFolder": "Delete this folder? It must be empty.",
       "deleteFolder": "Delete folder",
       "confirmContinue": "Continue anyway?",
-      "targetPrompt": "Type the number of the target folder:",
+      "targetPrompt": "Target folder",
       "viewOnly": "view only",
       "close": "Close",
       "tab_info": "Basic info",

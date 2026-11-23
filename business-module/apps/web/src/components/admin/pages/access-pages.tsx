@@ -298,6 +298,7 @@ export function EntriesPage() {
   const own = useList<MenuRow>("menus");
   const [sel, setSel] = React.useState<Record<string, string[]>>({});
   const [msg, setMsg] = React.useState<{ text: string; error: boolean } | null>(null);
+  const [editing, setEditing] = React.useState<string | null>(null);
   const load = React.useCallback(() => { void bff<EntriesData>("entries").then((x) => { setD(x); setSel(Object.fromEntries(x.entries.map((e) => [e.code, e.menus.filter((m) => !m.platformProvided).map((m) => m.menuId)]))); }); }, []);
   React.useEffect(load, [load]);
   if (!d) return <p className="text-sm text-muted">…</p>;
@@ -312,6 +313,12 @@ export function EntriesPage() {
         <div key={e.code} className="mb-4 rounded-md border border-border p-3 text-sm">
           <h3 className="mb-2 font-medium">{t(`entry_${e.code}`)}</h3>
           <p className="mb-2 text-muted">{t("platformAssigned")}: {e.menus.filter((m) => m.platformProvided).map(label).join(", ") || "—"}</p>
+          <p className="mb-2">{t("yourMenus")}: {topOwn.filter((m) => (sel[e.code] ?? []).includes(m.id)).map((m) => m.name).join(", ") || "—"}</p>
+          <PermButton perm={PERMS.entryEdit} size="sm" variant="outline" onClick={() => setEditing(e.code)}>{c("edit")}</PermButton>
+          {editing === e.code ? (
+          <Modal title={t(`entry_${e.code}`)} onClose={() => { setEditing(null); load(); }}>
+          <div className="text-sm">
+          <h3 className="mb-3 text-base font-semibold">{t(`entry_${e.code}`)}</h3>
           <p className="mb-1">{t("yourMenus")}</p>
           <div className="mb-2 flex flex-wrap gap-3">
             {topOwn.length === 0 ? <span className="text-muted">{t("noOwnMenus")}</span> : topOwn.map((m) => (
@@ -321,10 +328,16 @@ export function EntriesPage() {
               </label>
             ))}
           </div>
+          <div className="mt-4 flex gap-2 border-t border-border pt-3">
           <PermButton perm={PERMS.entryEdit} size="sm" onClick={async () => {
-            try { await bff(`entries/${e.code}/menus`, { method: "PUT", body: { menus: (sel[e.code] ?? []).map((menuId, i) => ({ menuId, sort: i })) } }); setMsg({ text: c("saved"), error: false }); load(); }
+            try { await bff(`entries/${e.code}/menus`, { method: "PUT", body: { menus: (sel[e.code] ?? []).map((menuId, i) => ({ menuId, sort: i })) } }); setMsg({ text: c("saved"), error: false }); setEditing(null); load(); }
             catch (err) { setMsg({ text: (err as Error).message, error: true }); }
           }}>{c("save")}</PermButton>
+          <Button size="sm" variant="outline" onClick={() => { setEditing(null); load(); }}>{c("cancel")}</Button>
+          </div>
+          </div>
+          </Modal>
+          ) : null}
         </div>
       ))}
       <p className="text-sm text-muted">{t("unassignedList")}: {d.unassigned.map((m) => m.name).join(", ") || "—"}</p>

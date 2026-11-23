@@ -6,6 +6,7 @@ import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { Modal } from "../modal";
+import { usePromptDialog } from "../prompt-dialog";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton } from "../permissions";
 import { TreeSelect } from "../tree-select";
@@ -40,6 +41,7 @@ interface MenuApiNode {
 
 export function TenantsPage() {
   const t = useTranslations("pages.tenants");
+  const { ask, dialog } = usePromptDialog();
   const tt = useTable();
   const { rows, loading, error, reload } = useList<TenantRow>("tenants");
   const [message, setMessage] = React.useState<string | null>(null);
@@ -72,7 +74,7 @@ export function TenantsPage() {
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
           {r.status === "active" ? (
-            <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => { const text = window.prompt(t("noticePrompt")); if (text) void act(() => status(r, "notify", { noticeText: text }), t("notified")); }}>{t("notify")}</PermButton>
+            <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => void ask(t("notify"), [{ name: "text", label: t("noticePrompt"), type: "textarea" }]).then((v) => { if (v) void act(() => status(r, "notify", { noticeText: v.text }), t("notified")); })}>{t("notify")}</PermButton>
           ) : null}
           {r.status === "notified" ? (
             <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => void act(() => status(r, "cancel-notice"), t("done"))}>{t("cancelNotice")}</PermButton>
@@ -95,6 +97,7 @@ export function TenantsPage() {
 
   return (
     <section>
+      {dialog}
       <H2>{t("title")}</H2>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message ? <p role="status" className="mb-2 text-sm text-muted">{message}</p> : null}
@@ -271,6 +274,7 @@ interface JobRow {
 
 export function JobsPage() {
   const t = useTranslations("pages.jobs");
+  const { ask, dialog } = usePromptDialog();
   const tt = useTable();
   const { rows, loading, error, reload } = useList<JobRow>("jobs");
   const [message, setMessage] = React.useState<string | null>(null);
@@ -295,7 +299,7 @@ export function JobsPage() {
       cell: (r) => (
         <div className="flex gap-1">
           <PermButton perm={PERMS.platformJobEdit} size="sm" variant="outline" onClick={() => void act(() => bff(`jobs/${r.code}`, { method: "PATCH", body: { enabled: !r.enabled } }))}>{r.enabled ? t("disable") : t("enable")}</PermButton>
-          <PermButton perm={PERMS.platformJobEdit} size="sm" variant="outline" onClick={() => { const cron = window.prompt(t("cronPrompt"), r.cron); if (cron) void act(() => bff(`jobs/${r.code}`, { method: "PATCH", body: { cron } })); }}>{t("editCron")}</PermButton>
+          <PermButton perm={PERMS.platformJobEdit} size="sm" variant="outline" onClick={() => void ask(t("editCron"), [{ name: "cron", label: t("cronPrompt"), initial: r.cron }]).then((v) => { if (v) void act(() => bff(`jobs/${r.code}`, { method: "PATCH", body: { cron: v.cron } })); })}>{t("editCron")}</PermButton>
           <PermButton perm={PERMS.platformJobRun} size="sm" onClick={() => void act(() => bff(`jobs/${r.code}/run`, { method: "POST" }))}>{t("runNow")}</PermButton>
         </div>
       ),
@@ -303,6 +307,7 @@ export function JobsPage() {
   ];
   return (
     <section>
+      {dialog}
       <H2>{t("title")}</H2>
       {error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null}
       {message ? <p role="alert" className="mb-2 text-sm text-red-600">{message}</p> : null}

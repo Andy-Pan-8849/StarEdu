@@ -5,6 +5,7 @@ import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
+import { usePromptDialog } from "../prompt-dialog";
 import { DataTable, type Column } from "../data-table";
 import { Modal } from "../modal";
 import { Can, PermButton, usePermissions } from "../permissions";
@@ -200,6 +201,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
   React.useEffect(reload, [reload]);
   void detail;
   const { run, message } = useAct(reload);
+  const { ask, dialog } = usePromptDialog();
   const [transfer, setTransfer] = React.useState<Assignment | null>(null);
   if (!d) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   const deptOptions = depts.filter((x) => x.status !== false).map((x) => ({ value: x.id, label: x.name }));
@@ -213,6 +215,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
         ))}
       </div>
       {message}
+      {dialog}
       {tab === "basic" ? (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt className="text-muted">{t("email")}</dt><dd>{d.workEmail ?? ""}</dd>
@@ -225,7 +228,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
       {tab === "basic" && d.staff ? (
         <div className="mt-3 flex gap-2">
           {d.staff.status === "active" ? (
-            <PermButton perm={PERMS.hrStaffEnd} size="sm" variant="outline" onClick={() => { const date = window.prompt(t("endPrompt"), new Date().toISOString().slice(0, 10)); if (date) void run(() => bff(`staff/${id}/end`, { method: "POST", body: { status: "left", effectiveDate: date } }), c("done")); }}>{t("endEmployment")}</PermButton>
+            <PermButton perm={PERMS.hrStaffEnd} size="sm" variant="outline" onClick={() => void ask(t("endEmployment"), [{ name: "date", label: t("endPrompt"), type: "date", initial: new Date().toISOString().slice(0, 10) }]).then((v) => { if (v) void run(() => bff(`staff/${id}/end`, { method: "POST", body: { status: "left", effectiveDate: v.date } }), c("done")); })}>{t("endEmployment")}</PermButton>
           ) : (
             <PermButton perm={PERMS.hrStaffEnd} size="sm" variant="outline" onClick={() => void run(() => bff(`staff/${id}/reinstate`, { method: "POST" }), c("done"))}>{t("reinstate")}</PermButton>
           )}
