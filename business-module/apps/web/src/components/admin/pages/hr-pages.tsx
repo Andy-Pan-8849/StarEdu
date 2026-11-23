@@ -6,6 +6,7 @@ import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
 import { DataTable, type Column } from "../data-table";
+import { Modal } from "../modal";
 import { Can, PermButton, usePermissions } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
@@ -103,9 +104,10 @@ function PersonDetailPanel({ id, canEmergency, onClose }: { id: string; canEmerg
   const c = useTranslations("crud");
   const [d, setD] = React.useState<PersonDetail | null>(null);
   React.useEffect(() => { void bff<PersonDetail>(`persons/${id}`).then(setD); }, [id]);
-  if (!d) return <p className="mt-3 text-sm text-muted">…</p>;
+  if (!d) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   return (
-    <div className="mt-4 rounded-md border border-border p-3 text-sm">
+    <Modal title={d.fullName} onClose={onClose}>
+    <div className="text-sm">
       <h3 className="mb-2 font-medium">{d.fullName} <span className="text-muted">({t(`person_${d.type}`)})</span></h3>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt className="text-muted">{t("email")}</dt><dd>{d.workEmail ?? ""}</dd>
@@ -123,6 +125,7 @@ function PersonDetailPanel({ id, canEmergency, onClose }: { id: string; canEmerg
       {canEmergency ? <div className="mt-3"><h4 className="mb-1 font-medium">{t("tab_emergency")}</h4><EmergencyTab personId={id} /></div> : null}
       <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
     </div>
+    </Modal>
   );
 }
 
@@ -193,10 +196,11 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
   void detail;
   const { run, message } = useAct(reload);
   const [transfer, setTransfer] = React.useState<Assignment | null>(null);
-  if (!d) return <p className="mt-3 text-sm text-muted">…</p>;
+  if (!d) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   const deptOptions = depts.filter((x) => x.status !== false).map((x) => ({ value: x.id, label: x.name }));
   return (
-    <div className="mt-4 rounded-md border border-border p-3 text-sm">
+    <Modal title={d.fullName} onClose={onClose}>
+    <div className="text-sm">
       <h3 className="mb-2 font-medium">{d.fullName} {d.staff ? `(${d.staff.employeeNo})` : ""}</h3>
       <div role="tablist" className="mb-3 flex gap-2">
         {(["basic", "assign", ...(canEmergency ? (["emergency"] as const) : [])] as const).map((k) => (
@@ -247,6 +251,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
       {tab === "emergency" ? <EmergencyTab personId={id} /> : null}
       <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
     </div>
+    </Modal>
   );
 }
 
@@ -284,6 +289,30 @@ function EmergencyTab({ personId }: { personId: string }) {
 interface StudentRow { id: string; fullName: string; studentNo: string | null; campusId: string | null; campusName: string | null; academicStatus: string | null; enrollTerm: string | null; program: string | null }
 interface CampusRow { id: string; name: string; code: string; status: string }
 
+/** 变更学生状态的弹窗：下拉选择，保存和取消在左下角。 */
+function StatusDialog({ student, statuses, onSave, onCancel }: { student: StudentRow; statuses: string[]; onSave: (next: string) => void | Promise<void>; onCancel: () => void }) {
+  const t = useTranslations("pages.hr");
+  const c = useTranslations("crud");
+  const [next, setNext] = React.useState(student.academicStatus ?? statuses[0] ?? "");
+  return (
+    <Modal title={t("changeStatus")} onClose={onCancel}>
+      <form className="text-sm" onSubmit={(e) => { e.preventDefault(); void onSave(next); }}>
+        <h3 className="mb-1 text-base font-semibold">{t("changeStatus")}</h3>
+        <p className="mb-4 text-muted">{student.fullName}{student.studentNo ? ` (${student.studentNo})` : ""}</p>
+        <label className="mb-6 flex flex-col gap-1">{c("status")}
+          <select className="w-56 rounded-md border border-border bg-transparent px-2 py-1" value={next} onChange={(e) => setNext(e.target.value)}>
+            {statuses.map((s) => <option key={s} value={s}>{t(`student_${s}`)}</option>)}
+          </select>
+        </label>
+        <div className="flex justify-start gap-2 border-t border-border pt-3">
+          <Button type="submit" size="sm">{c("save")}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={onCancel}>{c("cancel")}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function StudentsPage() {
   const t = useTranslations("pages.hr");
   const c = useTranslations("crud");
@@ -296,6 +325,7 @@ export function StudentsPage() {
   const { run, message } = useAct(list.reload);
   const [form, setForm] = React.useState(false);
   const [importing, setImporting] = React.useState(false);
+  const [editing, setEditing] = React.useState<StudentRow | null>(null);
   const statuses = ["enrolled", "on_leave", "graduated", "withdrawn", "completed"];
   const fields: Field[] = [
     { name: "fullName", label: t("name"), required: true },
@@ -315,7 +345,7 @@ export function StudentsPage() {
       key: "actions",
       header: "",
       cell: (r) => (
-        <PermButton perm={PERMS.hrStudentEdit} size="sm" variant="outline" onClick={() => { const next = window.prompt(t("statusPrompt", { options: statuses.join(" / ") }), r.academicStatus ?? ""); if (next && statuses.includes(next)) void run(() => bff(`students/${r.id}`, { method: "PATCH", body: { academicStatus: next } }), c("saved")); }}>{t("changeStatus")}</PermButton>
+        <PermButton perm={PERMS.hrStudentEdit} size="sm" variant="outline" onClick={() => setEditing(r)}>{t("changeStatus")}</PermButton>
       ),
     },
   ];
@@ -335,6 +365,10 @@ export function StudentsPage() {
           </select>
         </label>
       </div>
+      {editing ? (
+        <StatusDialog student={editing} statuses={statuses} onCancel={() => setEditing(null)}
+          onSave={async (next) => { if (await run(() => bff(`students/${editing.id}`, { method: "PATCH", body: { academicStatus: next } }), c("saved"))) setEditing(null); }} />
+      ) : null}
       {importing ? <ImportPanel path="import/students" columns="student_id, name, campus_id, program, cohort, status" onDone={list.reload} /> : null}
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("students", { method: "POST", body: p }), c("saved"))) setForm(false); }} /> : null}
       <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: list.rows.length === 20, onPageChange: setPage }} />

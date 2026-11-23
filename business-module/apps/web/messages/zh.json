@@ -402,7 +402,6 @@
       "guardian": "监护人",
       "emergencyNote": "敏感信息，查看和修改都会记录日志。",
       "changeStatus": "变更状态",
-      "statusPrompt": "新状态（{options}）：",
       "peopleTitle": "人员",
       "peopleHint": "公司里的所有人，教职员工和学生。敏感信息只对有权限的人显示。",
       "personType": "类型",
