@@ -736,6 +736,7 @@
       "instructor": "老师"
     },
     "library": {
+      "edit": "编辑文件夹",
       "folders": "文件夹",
       "deleteSelected": "删除所选",
       "confirmDeleteMany": "确定删除所选的 {n} 个文件吗？",

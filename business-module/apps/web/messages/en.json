@@ -736,6 +736,7 @@
       "instructor": "instructor"
     },
     "library": {
+      "edit": "Edit folder",
       "folders": "Folders",
       "deleteSelected": "Delete selected",
       "confirmDeleteMany": "Delete {n} selected files?",

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
-import { FolderPlus, Lock, Folder as FolderIcon, FolderTree, Upload } from "lucide-react";
+import { FolderPlus, FolderTree, Lock, Folder as FolderIcon, Pencil, Trash2, Upload } from "lucide-react";
 import { DataTable, type Column } from "../data-table";
 import { useFitHeight } from "../fit-height";
 import { NavTree, type NavNode } from "../nav-tree";
@@ -45,7 +45,6 @@ export function nest(rows: Folder[]): NavNode[] {
       id: f.id,
       label: f.name,
       icon: f.classification === "confidential" ? <Lock aria-hidden className="h-4 w-4" /> : <FolderIcon aria-hidden className="h-4 w-4" />,
-      hint: f.files > 0 ? String(f.files) : undefined,
       children: build(f.id),
     }));
   return build(null);
@@ -163,7 +162,7 @@ function FolderManager({ folder, onChanged, onClose }: { folder: Folder; onChang
           <div className="flex gap-2">
             <Button size="sm" onClick={() => void save()}>{t("save")}</Button>
             <Can perm={PERMS.docFolderRemove}>
-              <Button size="sm" variant="outline" onClick={() => window.confirm(t("confirmDeleteFolder")) && void run(() => bff(base, { method: "DELETE" }), onChanged)}>{t("deleteFolder")}</Button>
+              <Button size="sm" variant="outline" disabled={folder.level !== "manage"} onClick={() => window.confirm(t("confirmDeleteFolder")) && void run(() => bff(base, { method: "DELETE" }), onChanged)}>{t("deleteFolder")}</Button>
             </Can>
           </div>
         </div>
@@ -295,15 +294,25 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
       {dialog}
       <div className="flex gap-4">
         <aside className="w-72 shrink-0 overflow-hidden rounded-md border border-border">
-          <div className="flex items-center justify-between gap-2 border-b border-border bg-slate-100 px-3 py-2 dark:bg-slate-800">
+          <div className="border-b border-border bg-slate-100 px-3 py-2 dark:bg-slate-800">
             <span className="flex items-center gap-2 font-medium"><FolderTree aria-hidden className="h-4 w-4 text-muted" />{t("folders")}</span>
             {!portal ? (
-              <Can perm={PERMS.docFolderAdd}>
-                <span className="flex gap-1">
-                  <Button size="sm" variant="outline" title={t("add")} aria-label={t("add")} onClick={() => void ask(t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(null, v.name.trim()); })}><FolderPlus aria-hidden className="h-4 w-4" /></Button>
-                  <Button size="sm" variant="outline" disabled={!cur} title={t("addSub")} aria-label={t("addSub")} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })}><FolderPlus aria-hidden className="h-4 w-4" />+</Button>
-                </span>
-              </Can>
+              <div className="mt-2 flex flex-wrap gap-1">
+                <Can perm={PERMS.docFolderAdd}>
+                  <Button size="sm" variant="outline" disabled={!cur} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })}><FolderPlus aria-hidden className="mr-1 h-4 w-4" />{t("addSub")}</Button>
+                  <Button size="sm" variant="outline" onClick={() => void ask(t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(null, v.name.trim()); })}>{t("add")}</Button>
+                </Can>
+                {folder ? (
+                  <>
+                    <Can perm={PERMS.docFolderEdit}>
+                      <Button size="sm" variant="outline" disabled={folder.level !== "manage"} onClick={() => setManaging(true)}><Pencil aria-hidden className="mr-1 h-4 w-4" />{t("edit")}</Button>
+                    </Can>
+                    <Can perm={PERMS.docFolderRemove}>
+                      <Button size="sm" variant="outline" disabled={folder.level !== "manage"} onClick={() => window.confirm(t("confirmDeleteFolder")) && void run(() => bff(`library/folders/${folder.id}`, { method: "DELETE" }), () => { setCur(null); folders.reload(); })}><Trash2 aria-hidden className="mr-1 h-4 w-4" />{t("deleteFolder")}</Button>
+                    </Can>
+                  </>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <div ref={treeRef} className="overflow-y-auto p-2" style={treeMax ? { maxHeight: treeMax } : undefined}>
@@ -317,7 +326,6 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
                 <h3 className="text-base font-semibold">{folder.name}</h3>
                 <span className="text-muted">{t(`class_${folder.classification}`)}{folder.previewOnly ? ` · ${t("viewOnly")}` : ""}</span>
                 <span className="ml-auto flex items-center gap-2">
-                  {!portal && folder.level === "manage" ? <Button size="sm" variant="outline" onClick={() => setManaging(!managing)}>{t("manage")}</Button> : null}
                   {canUpload ? (
                     <Can perm={PERMS.docFileUpload}>
                       <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 py-1 text-primary-foreground"><Upload aria-hidden className="h-4 w-4" />{t("upload")}<input type="file" multiple className="hidden" aria-label={t("upload")} onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label>
