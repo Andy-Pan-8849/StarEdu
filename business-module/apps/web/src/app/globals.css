@@ -33,3 +33,10 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* 弹窗出现时淡入并轻微上移 */
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-rise { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.modal-backdrop { animation: modal-fade 120ms ease-out; }
+.modal-panel { animation: modal-rise 160ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .modal-backdrop, .modal-panel { animation: none; } }

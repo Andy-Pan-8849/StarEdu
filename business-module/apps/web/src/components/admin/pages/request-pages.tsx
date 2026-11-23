@@ -52,7 +52,6 @@ export function PortalRequestsPage() {
       {creating ? (
         <Modal title={t("myTitle")} onClose={() => setCreating(false)}>
         <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">{t("myTitle")}</h3>
           <select aria-label={t("pick")} className={input} value={target} onChange={(e) => setTarget(e.target.value)}>
             <option value="">{t("pick")}</option>
             {opts?.appeals.map((a) => <option key={a.enrollmentId} value={`appeal:${a.enrollmentId}`}>{t("appealOption", { section: a.section, grade: a.grade, total: a.total })}</option>)}

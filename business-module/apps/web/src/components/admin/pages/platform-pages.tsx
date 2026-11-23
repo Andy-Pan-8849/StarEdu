@@ -109,7 +109,6 @@ export function TenantsPage() {
               className="flex flex-col gap-3 text-sm"
               onSubmit={(e) => { e.preventDefault(); void act(() => bff("tenants", { method: "POST", body: form }), t("created")).then(() => setCreating(false)); }}
             >
-              <h3 className="text-base font-semibold">{t("new")}</h3>
               {(["code", "name", "adminEmail"] as const).map((k) => (
                 <label key={k} className="flex flex-col gap-1">
                   {t(k === "adminEmail" ? "adminEmail" : k)}
@@ -183,7 +182,6 @@ function SecurityPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => 
   return (
     <Modal wide title={t("securityOf", { name: tenant.name })} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{t("securityOf", { name: tenant.name })}</h3>
       <fieldset className="mb-3 flex flex-wrap gap-3"><legend className="mb-1 text-sm font-medium">{t("passwordRules")}</legend>
         {field(t("pwLength"), pw.length, (n) => setPw("length", n))}
         {field(t("pwUpper"), pw.upperCase, (n) => setPw("upperCase", n))}
@@ -250,7 +248,6 @@ function GrantsPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => vo
   return (
     <Modal title={t("featuresOf", { name: tenant.name })} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{t("featuresOf", { name: tenant.name })}</h3>
       <TreeSelect label={t("features")} nodes={tree} value={value} onChange={setValue} />
       <div className="mt-3 flex items-center gap-2 text-sm">
         <PermButton perm={PERMS.platformTenantGrant} size="sm" onClick={async () => { try { await bff(`tenants/${tenant.id}/grants`, { method: "PUT", body: { menuIds: submitIds(tree, new Set(value)) } }); setMsg(t("saved")); } catch (e) { setMsg((e as Error).message); } }}>{t("save")}</PermButton>
@@ -436,7 +433,6 @@ function QuotaPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => voi
   return (
     <Modal title={t("quotaOf", { name: tenant.name })} onClose={onClose}>
     <div className="text-sm">
-      <h3 className="mb-3 text-base font-semibold">{t("quotaOf", { name: tenant.name })}</h3>
       <div className="mb-3 grid gap-3 text-sm sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <span className="font-medium">{t("accountsUsed", { used: u.accounts, active: u.activeAccounts })}</span>

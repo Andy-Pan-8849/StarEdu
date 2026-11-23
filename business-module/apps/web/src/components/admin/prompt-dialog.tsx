@@ -34,7 +34,6 @@ function PromptForm({ title, fields, onDone }: { title: string; fields: PromptFi
   return (
     <Modal title={title} onClose={() => onDone(null)}>
       <form className="flex flex-col gap-3 text-sm" onSubmit={(e) => { e.preventDefault(); onDone(values); }}>
-        <h3 className="text-base font-semibold">{title}</h3>
         {fields.map((f) => (
           <label key={f.name} className="flex flex-col gap-1">{f.label}
             {f.type === "select"

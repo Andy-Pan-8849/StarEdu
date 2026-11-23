@@ -138,9 +138,8 @@ export function CampusesPage() {
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {closure ? (
-        <Modal title={t("closeCheck")} onClose={() => setClosure(null)}>
+        <Modal title={t("closeCheckFor", { name: closure.campus.name })} onClose={() => setClosure(null)}>
         <div className="text-sm">
-          <h3 className="mb-3 text-base font-semibold">{t("closeCheckFor", { name: closure.campus.name })}</h3>
           <ul className="mb-2 list-disc pl-5">
             <li>{t("students", { n: closure.data.students.count })}</li>
             <li>{t("staff", { n: closure.data.staffAssignments.count })}</li>
@@ -357,7 +356,6 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
   return (
     <Modal title={t("itemsOf", { name: type.name })} onClose={onClose}>
     <div>
-      <h3 className="mb-3 text-base font-semibold">{t("itemsOf", { name: type.name })}</h3>
       {message}
       {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <Button size="sm" className="mb-3" onClick={() => setForm({})}>{c("add")}</Button> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
       {form ? (
