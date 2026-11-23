@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { PermRowAction } from "../icon-button";
+import { Bell, CirclePause, Clock, Gauge, Mail, Power, RotateCcw, Shield, ToggleRight, Trash2, Undo2, Unlock } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -74,22 +76,22 @@ export function TenantsPage() {
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
           {r.status === "active" ? (
-            <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => void ask(t("notify"), [{ name: "text", label: t("noticePrompt"), type: "textarea" }]).then((v) => { if (v) void act(() => status(r, "notify", { noticeText: v.text }), t("notified")); })}>{t("notify")}</PermButton>
+            <PermRowAction perm={PERMS.platformTenantStatus} onClick={() => void ask(t("notify"), [{ name: "text", label: t("noticePrompt"), type: "textarea" }]).then((v) => { if (v) void act(() => status(r, "notify", { noticeText: v.text }), t("notified")); })} icon={Bell}>{t("notify")}</PermRowAction>
           ) : null}
           {r.status === "notified" ? (
-            <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => void act(() => status(r, "cancel-notice"), t("done"))}>{t("cancelNotice")}</PermButton>
+            <PermRowAction perm={PERMS.platformTenantStatus} onClick={() => void act(() => status(r, "cancel-notice"), t("done"))} icon={Undo2}>{t("cancelNotice")}</PermRowAction>
           ) : null}
           {r.status === "active" || r.status === "notified" ? (
-            <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => window.confirm(t("confirmSuspend", { name: r.name })) && void act(() => status(r, "suspend"), t("done"))}>{t("suspend")}</PermButton>
+            <PermRowAction perm={PERMS.platformTenantStatus} onClick={() => window.confirm(t("confirmSuspend", { name: r.name })) && void act(() => status(r, "suspend"), t("done"))} icon={CirclePause}>{t("suspend")}</PermRowAction>
           ) : null}
           {r.status === "suspended" ? (
-            <PermButton perm={PERMS.platformTenantStatus} size="sm" variant="outline" onClick={() => void act(() => status(r, "restore"), t("done"))}>{t("restore")}</PermButton>
+            <PermRowAction perm={PERMS.platformTenantStatus} onClick={() => void act(() => status(r, "restore"), t("done"))} icon={RotateCcw}>{t("restore")}</PermRowAction>
           ) : null}
-          <PermButton perm={PERMS.platformTenantGrant} size="sm" variant="outline" onClick={() => setGrantFor(r)}>{t("features")}</PermButton>
-          <PermButton perm={PERMS.platformTenantSecurity} size="sm" variant="outline" onClick={() => setSecurityFor(r)}>{t("security")}</PermButton>
-          <PermButton perm={PERMS.platformTenantQuota} size="sm" variant="outline" onClick={() => setQuotaFor(r)}>{t("quota")}</PermButton>
-          <PermButton perm={PERMS.platformTenantAdmin} size="sm" variant="outline" onClick={() => void act(() => bff(`tenants/${r.id}/admin/invite`, { method: "POST" }), t("inviteSent"))}>{t("resendInvite")}</PermButton>
-          <PermButton perm={PERMS.platformTenantAdmin} size="sm" variant="outline" onClick={() => void act(() => bff(`tenants/${r.id}/admin/unlock`, { method: "POST" }), t("unlocked"))}>{t("unlock")}</PermButton>
+          <PermRowAction perm={PERMS.platformTenantGrant} onClick={() => setGrantFor(r)} icon={ToggleRight}>{t("features")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformTenantSecurity} onClick={() => setSecurityFor(r)} icon={Shield}>{t("security")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformTenantQuota} onClick={() => setQuotaFor(r)} icon={Gauge}>{t("quota")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformTenantAdmin} onClick={() => void act(() => bff(`tenants/${r.id}/admin/invite`, { method: "POST" }), t("inviteSent"))} icon={Mail}>{t("resendInvite")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformTenantAdmin} onClick={() => void act(() => bff(`tenants/${r.id}/admin/unlock`, { method: "POST" }), t("unlocked"))} icon={Unlock}>{t("unlock")}</PermRowAction>
         </div>
       ),
     },
@@ -217,7 +219,7 @@ function SecurityPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => 
           <label className="flex flex-col gap-1">{t("googleSecret")}<input type="password" autoComplete="off" placeholder={data.google.hasSecret ? t("secretKept") : ""} className="w-64 rounded-md border border-border bg-transparent px-2 py-1" value={google.clientSecret} onChange={(e) => setGoogle({ ...google, clientSecret: e.target.value })} /></label>
           <label className="flex items-center gap-1"><input type="checkbox" checked={google.enabled} onChange={(e) => setGoogle({ ...google, enabled: e.target.checked })} />{t("googleEnabled")}</label>
           <PermButton perm={PERMS.platformTenantSecurity} size="sm" onClick={() => void run(() => bff(`tenants/${tenant.id}/security/google`, { method: "PUT", body: { clientId: google.clientId, enabled: google.enabled, ...(google.clientSecret ? { clientSecret: google.clientSecret } : {}) } }))}>{t("save")}</PermButton>
-          {data.google.configured ? <PermButton perm={PERMS.platformTenantSecurity} size="sm" variant="outline" onClick={() => window.confirm(t("confirmRemoveGoogle")) && void run(() => bff(`tenants/${tenant.id}/security/google`, { method: "DELETE" }))}>{t("googleRemove")}</PermButton> : null}
+          {data.google.configured ? <PermRowAction perm={PERMS.platformTenantSecurity} onClick={() => window.confirm(t("confirmRemoveGoogle")) && void run(() => bff(`tenants/${tenant.id}/security/google`, { method: "DELETE" }))} icon={Trash2} danger>{t("googleRemove")}</PermRowAction> : null}
         </div>
       </fieldset>
       <div className="mt-3 flex items-center gap-2 text-sm">
@@ -295,8 +297,8 @@ export function JobsPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <PermButton perm={PERMS.platformJobEdit} size="sm" variant="outline" onClick={() => void act(() => bff(`jobs/${r.code}`, { method: "PATCH", body: { enabled: !r.enabled } }))}>{r.enabled ? t("disable") : t("enable")}</PermButton>
-          <PermButton perm={PERMS.platformJobEdit} size="sm" variant="outline" onClick={() => void ask(t("editCron"), [{ name: "cron", label: t("cronPrompt"), initial: r.cron }]).then((v) => { if (v) void act(() => bff(`jobs/${r.code}`, { method: "PATCH", body: { cron: v.cron } })); })}>{t("editCron")}</PermButton>
+          <PermRowAction perm={PERMS.platformJobEdit} onClick={() => void act(() => bff(`jobs/${r.code}`, { method: "PATCH", body: { enabled: !r.enabled } }))} icon={Power}>{r.enabled ? t("disable") : t("enable")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformJobEdit} onClick={() => void ask(t("editCron"), [{ name: "cron", label: t("cronPrompt"), initial: r.cron }]).then((v) => { if (v) void act(() => bff(`jobs/${r.code}`, { method: "PATCH", body: { cron: v.cron } })); })} icon={Clock}>{t("editCron")}</PermRowAction>
           <PermButton perm={PERMS.platformJobRun} size="sm" onClick={() => void act(() => bff(`jobs/${r.code}/run`, { method: "POST" }))}>{t("runNow")}</PermButton>
         </div>
       ),

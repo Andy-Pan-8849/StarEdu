@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { PermRowAction, RowAction } from "../icon-button";
+import { Undo2, Users } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -35,8 +37,8 @@ export function AnnouncementsPage() {
             <div className="font-medium">{a.title} <span className="text-muted">· {t(`aud_${a.scopeKind}`)} · {t("recipients", { n: a.recipients })}{a.withdrawnAt ? ` · ${t("withdrawn")}` : ""}</span></div>
             <div className="whitespace-pre-wrap">{a.body}</div>
             <div className="mt-1 flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => void bff<Reader[]>(`announcements/${a.id}/readers`).then((rows) => setReaders({ id: a.id, rows }))}>{t("readers")}</Button>
-              {a.withdrawnAt ? null : <PermButton perm={PERMS.msgAnnouncementRemove} size="sm" variant="outline" onClick={() => void run(() => bff(`announcements/${a.id}`, { method: "DELETE" }), c("done"))}>{t("withdraw")}</PermButton>}
+              <RowAction onClick={() => void bff<Reader[]>(`announcements/${a.id}/readers`).then((rows) => setReaders({ id: a.id, rows }))} icon={Users}>{t("readers")}</RowAction>
+              {a.withdrawnAt ? null : <PermRowAction perm={PERMS.msgAnnouncementRemove} onClick={() => void run(() => bff(`announcements/${a.id}`, { method: "DELETE" }), c("done"))} icon={Undo2}>{t("withdraw")}</PermRowAction>}
             </div>
             {readers?.id === a.id ? <ul className="mt-1 list-disc pl-5">{readers.rows.map((r) => <li key={r.accountId}>{r.username}: {r.readAt ? t("read") : t("unread")}</li>)}</ul> : null}
           </li>

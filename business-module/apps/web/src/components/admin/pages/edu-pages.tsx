@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserMinus, UsersRound } from "lucide-react";
 import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export function TermsPage() {
         <div className="flex flex-wrap gap-1">
           {r.status !== "ended" ? <PermRowAction perm={PERMS.eduTermEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction> : null}
           {TERM_NEXT[r.status].map((next) => (
-            <PermButton key={next} perm={PERMS.eduTermEdit} size="sm" variant="outline" onClick={() => (next !== "ended" || window.confirm(t("confirmEnd", { name: r.name }))) && void run(() => bff(`terms/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))}>{t(`to_${next}`)}</PermButton>
+            <PermRowAction key={next} perm={PERMS.eduTermEdit} onClick={() => (next !== "ended" || window.confirm(t("confirmEnd", { name: r.name }))) && void run(() => bff(`terms/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))} icon={RefreshCw}>{t(`to_${next}`)}</PermRowAction>
           ))}
         </div>
       ),
@@ -191,7 +191,7 @@ export function MajorsPage() {
     { key: "name", header: t("name"), cell: (r) => r.name },
     { key: "degree", header: t("degreeType"), cell: (r) => r.degreeType ?? "" },
     { key: "credits", header: t("totalCredits"), cell: (r) => r.totalCredits },
-    { key: "actions", header: "", cell: (r) => <Button size="sm" variant="outline" onClick={() => { setVersionId(null); setOpen(r.id); }}>{t("curriculum")}</Button> },
+    { key: "actions", header: "", cell: (r) => <RowAction onClick={() => { setVersionId(null); setOpen(r.id); }} icon={BookOpen}>{t("curriculum")}</RowAction> },
   ];
   return (
     <section>
@@ -215,8 +215,8 @@ export function MajorsPage() {
             </label>
             <label className="flex flex-col gap-1">{t("versionYear")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={newYear} onChange={(e) => setNewYear(e.target.value)} /></label>
             <label className="flex flex-col gap-1">{t("versionLabel")}<input className="w-32 rounded-md border border-border bg-transparent px-2 py-1" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} /></label>
-            <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => void run(async () => { const r = await bff<{ id: string }>(`majors/${open}/versions`, { method: "POST", body: { effectiveYear: Number(newYear), ...(newLabel ? { label: newLabel } : {}), copyFromVersionId: detail.versionId } }); setNewYear(""); setNewLabel(""); setVersionId(r.id); setReloadKey((k) => k + 1); }, c("saved"))}>{t("versionAdd")}</PermButton>
-            {detail.versions.length > 1 ? <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => window.confirm(t("versionConfirmRemove")) && void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "DELETE" }); setVersionId(null); setReloadKey((k) => k + 1); }, c("done"))}>{t("versionRemove")}</PermButton> : null}
+            <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => void run(async () => { const r = await bff<{ id: string }>(`majors/${open}/versions`, { method: "POST", body: { effectiveYear: Number(newYear), ...(newLabel ? { label: newLabel } : {}), copyFromVersionId: detail.versionId } }); setNewYear(""); setNewLabel(""); setVersionId(r.id); setReloadKey((k) => k + 1); }, c("saved"))} icon={Plus}>{t("versionAdd")}</PermRowAction>
+            {detail.versions.length > 1 ? <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => window.confirm(t("versionConfirmRemove")) && void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "DELETE" }); setVersionId(null); setReloadKey((k) => k + 1); }, c("done"))} icon={Trash2} danger>{t("versionRemove")}</PermRowAction> : null}
           </div>
           <p className="mb-2 text-xs text-muted">{t("versionHelp")}</p>
           <div className="mb-3 flex flex-wrap items-end gap-3">
@@ -278,7 +278,7 @@ export function SectionsPage() {
         <div className="flex flex-wrap gap-1">
           <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction>
           {SEC_NEXT[r.status].map((next) => (
-            <PermButton key={next} perm={PERMS.eduSectionStatus} size="sm" variant="outline" onClick={() => (next !== "cancelled" || window.confirm(t("confirmCancel", { name: r.name }))) && void run(() => bff(`sections/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))}>{t(`to_sec_${next}`)}</PermButton>
+            <PermRowAction key={next} perm={PERMS.eduSectionStatus} onClick={() => (next !== "cancelled" || window.confirm(t("confirmCancel", { name: r.name }))) && void run(() => bff(`sections/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))} icon={RefreshCw}>{t(`to_sec_${next}`)}</PermRowAction>
           ))}
         </div>
       ),
@@ -290,7 +290,7 @@ export function SectionsPage() {
       <Err error={sections.error} />
       {message}
       <Can perm={PERMS.eduSectionAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
-      <Can perm={PERMS.eduEnrollmentAdd}>{!batchOpen ? <Button size="sm" variant="outline" className="mb-3 ml-2" onClick={() => setBatchOpen(true)}>{t("batchEnroll")}</Button> : null}</Can>
+      <Can perm={PERMS.eduEnrollmentAdd}>{!batchOpen ? <RowAction className="mb-3 ml-2" onClick={() => setBatchOpen(true)} icon={UsersRound}>{t("batchEnroll")}</RowAction> : null}</Can>
       {batchOpen ? <BatchEnrollPanel onClose={() => { setBatchOpen(false); sections.reload(); }} /> : null}
       {form ? (
         <FormPanel title={c("add")} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
@@ -356,7 +356,7 @@ function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
         <input aria-label={t("reason")} placeholder={t("reason")} className="w-64 rounded-md border border-border bg-transparent px-2 py-1" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} />
       </div>
       <div className="mb-3 flex items-center gap-2">
-        <Button size="sm" variant="outline" disabled={!ready} onClick={() => void go(true)}>{t("preview")}</Button>
+        <RowAction disabled={!ready} onClick={() => void go(true)} icon={Eye}>{t("preview")}</RowAction>
         <PermButton perm={PERMS.eduEnrollmentAdd} size="sm" disabled={!ready || !result?.dryRun || result.summary.ok + result.summary.needConfirmation === 0} onClick={() => window.confirm(t("batchConfirm", { n: result?.summary.ok ?? 0 })) && void go(false)}>{t("batchRun")}</PermButton>
         <Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button>
         {msg ? <span role="alert" className="text-red-600">{msg}</span> : null}
@@ -415,7 +415,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
     { key: "name", header: t("name"), cell: (r) => r.fullName ?? "" },
     { key: "status", header: c("status"), cell: (r) => t(`enr_${r.status}`) },
     { key: "method", header: t("method"), cell: (r) => (r.method === "registrar" ? t("byRegistrar") : t("bySelf")) },
-    { key: "a", header: "", cell: (r) => (r.status === "enrolled" ? <PermButton perm={PERMS.eduEnrollmentRemove} size="sm" variant="outline" onClick={() => void run(() => bff(`sections/${id}/enrollments/${r.id}`, { method: "DELETE" }), c("done"))}>{t("remove")}</PermButton> : null) },
+    { key: "a", header: "", cell: (r) => (r.status === "enrolled" ? <PermRowAction perm={PERMS.eduEnrollmentRemove} onClick={() => void run(() => bff(`sections/${id}/enrollments/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{t("remove")}</PermRowAction> : null) },
   ];
   return (
     <Modal wide title={`${s.name} — ${s.seated}/${s.capacity}`} onClose={onClose}>
@@ -502,7 +502,7 @@ export function PortalEnrollPage() {
       <ul className="mb-4 list-disc pl-5 text-sm">
         {enrolled.length === 0 ? <li className="text-muted">—</li> : enrolled.map((e) => (
           <li key={e.id}>{e.course.code} · {e.course.name} ({e.term}) — {t(`enr_${e.status}`)}
-            {e.canDrop ? <PermButton perm={PERMS.portalEnrollDrop} size="sm" variant="outline" className="ml-2" onClick={() => window.confirm(e.willBeW ? t("confirmDropW") : t("confirmDrop")) && void act(() => bff(`enrollments/${e.id}`, { method: "DELETE" }), c("done"))}>{t("drop")}</PermButton> : null}</li>
+            {e.canDrop ? <PermRowAction perm={PERMS.portalEnrollDrop} className="ml-2" onClick={() => window.confirm(e.willBeW ? t("confirmDropW") : t("confirmDrop")) && void act(() => bff(`enrollments/${e.id}`, { method: "DELETE" }), c("done"))} icon={UserMinus} danger>{t("drop")}</PermRowAction> : null}</li>
         ))}
       </ul>
       <div className="mb-2 flex items-center gap-2 text-sm">

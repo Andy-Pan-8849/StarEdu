@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Download, Eye, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowRightLeft, CircleCheck, Download, Eye, LogOut, Plus, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
 import { IconButton, IconLink, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ function ImportPanel({ path, onDone, onClose, columns }: { path: string; onDone:
       <input type="file" accept=".csv,text/csv" aria-label={t("chooseFile")} onChange={async (e) => { const f = e.target.files?.[0]; setCsv(f ? await f.text() : null); setResult(null); }} />
       <label className="my-2 flex flex-col gap-1">{t("aliases")}<input className="rounded-md border border-border bg-transparent px-2 py-1" placeholder="BJ=HQ" value={aliases} onChange={(e) => setAliases(e.target.value)} /></label>
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={!csv} onClick={() => void send(true)}>{t("check")}</Button>
+        <RowAction disabled={!csv} onClick={() => void send(true)} icon={CircleCheck}>{t("check")}</RowAction>
         <Button size="sm" disabled={!csv} onClick={() => void send(false)}>{t("import")}</Button>
       </div>
       <Err error={error} />
@@ -229,9 +229,9 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
       {tab === "basic" && d.staff ? (
         <div className="mt-3 flex gap-2">
           {d.staff.status === "active" ? (
-            <PermButton perm={PERMS.hrStaffEnd} size="sm" variant="outline" onClick={() => void ask(t("endEmployment"), [{ name: "date", label: t("endPrompt"), type: "date", initial: new Date().toISOString().slice(0, 10) }]).then((v) => { if (v) void run(() => bff(`staff/${id}/end`, { method: "POST", body: { status: "left", effectiveDate: v.date } }), c("done")); })}>{t("endEmployment")}</PermButton>
+            <PermRowAction perm={PERMS.hrStaffEnd} onClick={() => void ask(t("endEmployment"), [{ name: "date", label: t("endPrompt"), type: "date", initial: new Date().toISOString().slice(0, 10) }]).then((v) => { if (v) void run(() => bff(`staff/${id}/end`, { method: "POST", body: { status: "left", effectiveDate: v.date } }), c("done")); })} icon={LogOut}>{t("endEmployment")}</PermRowAction>
           ) : (
-            <PermButton perm={PERMS.hrStaffEnd} size="sm" variant="outline" onClick={() => void run(() => bff(`staff/${id}/reinstate`, { method: "POST" }), c("done"))}>{t("reinstate")}</PermButton>
+            <PermRowAction perm={PERMS.hrStaffEnd} onClick={() => void run(() => bff(`staff/${id}/reinstate`, { method: "POST" }), c("done"))} icon={RotateCcw}>{t("reinstate")}</PermRowAction>
           )}
         </div>
       ) : null}
@@ -241,8 +241,8 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
             {d.assignments.map((a) => (
               <li key={a.id} className={a.current ? "" : "text-muted"}>
                 {a.deptName}{a.postName ? ` · ${a.postName}` : ""}{a.isPrimary ? ` (${t("primary")})` : ""} — {a.startDate} → {a.endDate ?? t("present")}
-                {a.current ? <PermButton perm={PERMS.hrStaffAssign} size="sm" variant="outline" className="ml-2" onClick={() => setTransfer(a)}>{t("transfer")}</PermButton> : null}
-                {a.current ? <PermButton perm={PERMS.hrStaffAssign} size="sm" variant="outline" className="ml-1" onClick={() => void run(() => bff(`staff/${id}/assignments/${a.id}`, { method: "DELETE" }), c("done"))}>{t("endAssignment")}</PermButton> : null}
+                {a.current ? <PermRowAction perm={PERMS.hrStaffAssign} className="ml-2" onClick={() => setTransfer(a)} icon={ArrowRightLeft}>{t("transfer")}</PermRowAction> : null}
+                {a.current ? <PermRowAction perm={PERMS.hrStaffAssign} className="ml-1" onClick={() => void run(() => bff(`staff/${id}/assignments/${a.id}`, { method: "DELETE" }), c("done"))} icon={LogOut}>{t("endAssignment")}</PermRowAction> : null}
               </li>
             ))}
           </ul>
@@ -353,7 +353,7 @@ export function StudentsPage() {
       key: "actions",
       header: "",
       cell: (r) => (
-        <PermButton perm={PERMS.hrStudentEdit} size="sm" variant="outline" onClick={() => setEditing(r)}>{t("changeStatus")}</PermButton>
+        <PermRowAction perm={PERMS.hrStudentEdit} onClick={() => setEditing(r)} icon={RefreshCw}>{t("changeStatus")}</PermRowAction>
       ),
     },
   ];

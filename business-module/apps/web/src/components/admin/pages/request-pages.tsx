@@ -3,8 +3,8 @@
 // 学生申请：学生门户（提交、撤回）和管理后台（看、批准、驳回）。
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Plus } from "lucide-react";
-import { IconButton } from "../icon-button";
+import { Plus, Undo2, X } from "lucide-react";
+import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ export function PortalRequestsPage() {
               <div className="text-muted">{t(`status_${r.status}`)} · {new Date(r.createdAt).toLocaleString()}</div>
               <div>{r.reason}</div>
               {r.decisionNote ? <div className="text-muted">{t("note")}: {r.decisionNote}</div> : null}
-              {r.status === "pending" ? <PermButton perm={PERMS.portalRequestSubmit} size="sm" variant="outline" className="mt-1" onClick={() => void run(() => bff(`requests/${r.id}/withdraw`, { method: "POST" }))}>{t("withdraw")}</PermButton> : null}
+              {r.status === "pending" ? <PermRowAction perm={PERMS.portalRequestSubmit} className="mt-1" onClick={() => void run(() => bff(`requests/${r.id}/withdraw`, { method: "POST" }))} icon={Undo2}>{t("withdraw")}</PermRowAction> : null}
             </li>
           ))}
         </ul>
@@ -141,7 +141,7 @@ export function RequestsPage() {
               {r.status === "pending" && deciding?.id !== r.id ? (
                 <div className="mt-1 flex gap-2">
                   <PermButton perm={PERMS.eduRequestDecide} size="sm" onClick={() => open(r, "approve")}>{t("approve")}</PermButton>
-                  <PermButton perm={PERMS.eduRequestDecide} size="sm" variant="outline" onClick={() => open(r, "reject")}>{t("reject")}</PermButton>
+                  <PermRowAction perm={PERMS.eduRequestDecide} onClick={() => open(r, "reject")} icon={X}>{t("reject")}</PermRowAction>
                 </div>
               ) : null}
               {deciding?.id === r.id ? (
@@ -158,7 +158,7 @@ export function RequestsPage() {
                   <textarea aria-label={t("noteLabel")} placeholder={t(deciding.decision === "approve" ? "approveNote" : "rejectNote")} rows={2} className="rounded-md border border-border bg-transparent px-2 py-1" value={note} onChange={(e) => setNote(e.target.value)} />
                   <div className="flex gap-2 border-t border-border pt-3">
                     <PermButton perm={PERMS.eduRequestDecide} size="sm" disabled={!ready(r)} onClick={() => void send(r)}>{c("save")}</PermButton>
-                    <PermButton perm={PERMS.eduRequestDecide} size="sm" variant="outline" onClick={() => setDeciding(null)}>{c("cancel")}</PermButton>
+                    <PermRowAction perm={PERMS.eduRequestDecide} onClick={() => setDeciding(null)} icon={X}>{c("cancel")}</PermRowAction>
                   </div>
                 </div>
                 </Modal>

@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { IconButton, PermIconButton, PermRowAction } from "../icon-button";
+import { Ban, Eraser, List, Pencil, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { IconButton, PermIconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -112,10 +112,10 @@ export function CampusesPage() {
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
           <PermRowAction perm={PERMS.campusEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
-          {r.type !== "hq" && r.status === "normal" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "stop_new")}>{t("stopNew")}</PermButton> : null}
-          {r.type !== "hq" && r.status === "stop_new" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "normal")}>{t("resume")}</PermButton> : null}
-          {r.type !== "hq" && r.status === "stop_new" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void startClose(r)}>{t("close")}</PermButton> : null}
-          {r.status === "closed" ? <PermButton perm={PERMS.campusClose} size="sm" variant="outline" onClick={() => void setStatus(r, "normal")}>{t("reopen")}</PermButton> : null}
+          {r.type !== "hq" && r.status === "normal" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void setStatus(r, "stop_new")} icon={Ban}>{t("stopNew")}</PermRowAction> : null}
+          {r.type !== "hq" && r.status === "stop_new" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void setStatus(r, "normal")} icon={Play}>{t("resume")}</PermRowAction> : null}
+          {r.type !== "hq" && r.status === "stop_new" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void startClose(r)} icon={Ban}>{t("close")}</PermRowAction> : null}
+          {r.status === "closed" ? <PermRowAction perm={PERMS.campusClose} onClick={() => void setStatus(r, "normal")} icon={RotateCcw}>{t("reopen")}</PermRowAction> : null}
         </div>
       ),
     },
@@ -309,7 +309,7 @@ export function DictsPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline" onClick={() => setOpen(r)}>{t("items")}</Button>
+          <RowAction onClick={() => setOpen(r)} icon={List}>{t("items")}</RowAction>
           {!r.platformProvided ? <PermRowAction perm={PERMS.dictRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`dict-types/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> : null}
         </div>
       ),
@@ -406,7 +406,7 @@ export function OperationLogPage() {
             <option value="" />{["POST", "PUT", "PATCH", "DELETE"].map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </label>
-        <PermButton perm={PERMS.operationLogClear} size="sm" variant="outline" onClick={() => window.confirm(t("confirmClear")) && void run(() => bff("operation-logs", { method: "DELETE" }), c("done"))}>{t("clear")}</PermButton>
+        <PermRowAction perm={PERMS.operationLogClear} onClick={() => window.confirm(t("confirmClear")) && void run(() => bff("operation-logs", { method: "DELETE" }), c("done"))} icon={Eraser}>{t("clear")}</PermRowAction>
       </div>
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: rows.length === 20, onPageChange: setPage }} />
     </section>

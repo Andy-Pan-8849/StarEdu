@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import { RowAction } from "../icon-button";
+import { PinOff, RotateCcw } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { Can } from "../permissions";
@@ -39,8 +41,8 @@ export function DiscussionPanel({ sectionId }: { sectionId: string }) {
         <p className="text-muted">{who(open.author)} · {new Date(open.createdAt).toLocaleString()}</p>
         <p className="mb-2 whitespace-pre-wrap">{open.body}</p>
         <div className="mb-2 flex gap-2">
-          {open.canPin ? <Button size="sm" variant="outline" onClick={() => void act(() => bff(`${base}/${open.id}/pin`, { method: "POST", body: { pinned: !open.pinned } }), () => void show(open.id))}>{open.pinned ? t("unpin") : t("pin")}</Button> : null}
-          {open.canResolve ? <Button size="sm" variant="outline" onClick={() => void act(() => bff(`${base}/${open.id}/resolve`, { method: "POST", body: { resolved: !open.resolved } }), () => void show(open.id))}>{open.resolved ? t("reopen") : t("markResolved")}</Button> : null}
+          {open.canPin ? <RowAction onClick={() => void act(() => bff(`${base}/${open.id}/pin`, { method: "POST", body: { pinned: !open.pinned } }), () => void show(open.id))} icon={PinOff}>{open.pinned ? t("unpin") : t("pin")}</RowAction> : null}
+          {open.canResolve ? <RowAction onClick={() => void act(() => bff(`${base}/${open.id}/resolve`, { method: "POST", body: { resolved: !open.resolved } }), () => void show(open.id))} icon={RotateCcw}>{open.resolved ? t("reopen") : t("markResolved")}</RowAction> : null}
           {open.canDelete ? <Button size="sm" variant="outline" onClick={() => window.confirm(t("confirmDelete")) && void act(() => bff(`${base}/${open.id}`, { method: "DELETE" }), () => setOpen(null))}>{t("delete")}</Button> : null}
         </div>
         <ul className="mb-2 space-y-2">

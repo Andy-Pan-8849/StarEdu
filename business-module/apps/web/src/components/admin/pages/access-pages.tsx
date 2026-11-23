@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { KeyRound, Link, Mail, Pencil, Plus, Power, ShieldCheck, Trash2, Unlock, UserCog } from "lucide-react";
 import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -59,12 +59,12 @@ export function UsersPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userAssignRole} size="sm" variant="outline" onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }}>{t("assignRoles")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userEdit} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))}>{r.status === "disabled" ? t("enable") : t("disable")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userResetPwd} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/invite`, { method: "POST" }), t("sent"))}>{t("resendInvite")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userResetPwd} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/reset-link`, { method: "POST" }), t("sent"))}>{t("resetLink")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userResetPwd} size="sm" variant="outline" onClick={() => window.confirm(t("confirmTemp", { name: r.username })) && void bff<{ password: string }>(`accounts/${r.id}/temp-password`, { method: "POST" }).then((x) => setTemp({ username: r.username, password: x.password }))}>{t("tempPassword")}</PermButton> : null}
-          {!r.isBuiltinAdmin ? <PermButton perm={PERMS.userEdit} size="sm" variant="outline" onClick={() => act(() => bff(`accounts/${r.id}/unlock`, { method: "POST" }), t("unlocked"))}>{t("unlock")}</PermButton> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userAssignRole} onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }} icon={UserCog}>{t("assignRoles")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userEdit} onClick={() => act(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))} icon={Power}>{r.status === "disabled" ? t("enable") : t("disable")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userResetPwd} onClick={() => act(() => bff(`accounts/${r.id}/invite`, { method: "POST" }), t("sent"))} icon={Mail}>{t("resendInvite")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userResetPwd} onClick={() => act(() => bff(`accounts/${r.id}/reset-link`, { method: "POST" }), t("sent"))} icon={Link}>{t("resetLink")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userResetPwd} onClick={() => window.confirm(t("confirmTemp", { name: r.username })) && void bff<{ password: string }>(`accounts/${r.id}/temp-password`, { method: "POST" }).then((x) => setTemp({ username: r.username, password: x.password }))} icon={KeyRound}>{t("tempPassword")}</PermRowAction> : null}
+          {!r.isBuiltinAdmin ? <PermRowAction perm={PERMS.userEdit} onClick={() => act(() => bff(`accounts/${r.id}/unlock`, { method: "POST" }), t("unlocked"))} icon={Unlock}>{t("unlock")}</PermRowAction> : null}
         </div>
       ),
     },
@@ -140,7 +140,7 @@ export function RolesPage() {
       cell: (r) => (r.kind !== "custom" ? null : (
         <div className="flex flex-wrap gap-1">
           <PermRowAction perm={PERMS.roleEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
-          <PermButton perm={PERMS.roleAuthorize} size="sm" variant="outline" onClick={() => setEditing(r)}>{t("permissions")}</PermButton>
+          <PermRowAction perm={PERMS.roleAuthorize} onClick={() => setEditing(r)} icon={ShieldCheck}>{t("permissions")}</PermRowAction>
           <PermRowAction perm={PERMS.roleRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
           {r.templateMissingCount ? <PermButton perm={PERMS.roleAuthorize} size="sm" onClick={() => openUpgrade(r)}>{t("templateUpdate", { n: r.templateMissingCount })}</PermButton> : null}
         </div>

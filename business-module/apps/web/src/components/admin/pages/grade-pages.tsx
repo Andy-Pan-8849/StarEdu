@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Download } from "lucide-react";
-import { IconLink } from "../icon-button";
+import { Ban, Calculator, Download, FilePenLine, RotateCcw, Send, X } from "lucide-react";
+import { IconLink, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { bff } from "@/lib/bff";
 import { usePromptDialog } from "../prompt-dialog";
@@ -89,8 +89,8 @@ export function GradesPanel({ sectionId }: { sectionId: string }) {
       {book.pendingSubmissions ? <p className="mb-2 text-amber-600">{t("pending", { n: book.pendingSubmissions })}</p> : null}
       <div className="mb-2 flex flex-wrap gap-2">
         <PermButton perm={PERMS.eduGradeEdit} size="sm" onClick={() => void run(() => bff(`${base}/final-grades/calculate`, { method: "POST" }), c("done"))}>{t("calculate")}</PermButton>
-        <PermButton perm={PERMS.eduGradeEdit} size="sm" variant="outline" onClick={() => window.confirm(t("confirmPublish")) && void run(() => bff(`${base}/final-grades/publish`, { method: "POST" }), c("done"))}>{t("publishFinal")}</PermButton>
-        <PermButton perm={PERMS.eduGradeAmend} size="sm" variant="outline" onClick={() => void ask(t("recalculate"), [{ name: "reason", label: t("reasonPrompt"), type: "textarea" }]).then((v) => { if (v && v.reason.trim().length >= 5) void run(() => bff(`${base}/final-grades/recalculate`, { method: "POST", body: { reason: v.reason } }), c("done")); })}>{t("recalculate")}</PermButton>
+        <PermRowAction perm={PERMS.eduGradeEdit} onClick={() => window.confirm(t("confirmPublish")) && void run(() => bff(`${base}/final-grades/publish`, { method: "POST" }), c("done"))} icon={Send}>{t("publishFinal")}</PermRowAction>
+        <PermRowAction perm={PERMS.eduGradeAmend} onClick={() => void ask(t("recalculate"), [{ name: "reason", label: t("reasonPrompt"), type: "textarea" }]).then((v) => { if (v && v.reason.trim().length >= 5) void run(() => bff(`${base}/final-grades/recalculate`, { method: "POST", body: { reason: v.reason } }), c("done")); })} icon={Calculator}>{t("recalculate")}</PermRowAction>
         <Can perm={PERMS.eduGradeList}><IconLink icon={Download} label={t("exportCsv")} href={`/bff/${base}/gradebook.csv`}/></Can>
       </div>
       <div className="overflow-x-auto">
@@ -114,7 +114,7 @@ export function GradesPanel({ sectionId }: { sectionId: string }) {
                 <td>{s.total ?? ""}</td>
                 <td>{s.grade ?? ""}</td>
                 <td>{s.final ? `${s.final.grade} ${s.final.total} ${s.final.published ? t("published") : t("draft")}${s.final.passed ? "" : ` (${t("failed")})`}` : ""}</td>
-                <td>{s.final ? <PermButton perm={PERMS.eduGradeAmend} size="sm" variant="outline" onClick={() => void amend(s.enrollmentId)}>{t("amend")}</PermButton> : null}</td>
+                <td>{s.final ? <PermRowAction perm={PERMS.eduGradeAmend} onClick={() => void amend(s.enrollmentId)} icon={FilePenLine}>{t("amend")}</PermRowAction> : null}</td>
               </tr>
             ))}
           </tbody>
@@ -145,7 +145,7 @@ export function GradingScalePage() {
       <textarea aria-label={t("scaleTitle")} className={`${input} mb-2 w-full max-w-md font-mono`} rows={8} value={text} onChange={(e) => setText(e.target.value)} />
       <div className="flex gap-2">
         <PermButton perm={PERMS.eduScaleEdit} size="sm" onClick={() => void run(() => bff("grading-scale", { method: "PUT", body: { items: parseScale(text) } }), c("saved"))}>{c("save")}</PermButton>
-        <PermButton perm={PERMS.eduScaleEdit} size="sm" variant="outline" onClick={() => void run(() => bff("grading-scale/reset", { method: "POST" }), c("done"))}>{t("resetDefault")}</PermButton>
+        <PermRowAction perm={PERMS.eduScaleEdit} onClick={() => void run(() => bff("grading-scale/reset", { method: "POST" }), c("done"))} icon={RotateCcw}>{t("resetDefault")}</PermRowAction>
       </div>
     </section>
   );
@@ -190,10 +190,10 @@ export function TranscriptsPage() {
                   <span className="ml-2 inline-flex items-center gap-1">
                     <input aria-label={t("revokeReason")} placeholder={t("revokeReason")} className={`${input} w-80`} value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} />
                     <PermButton perm={PERMS.eduTranscriptIssue} size="sm" disabled={!revokeReason.trim()} onClick={() => void bff(`transcripts/issues/${i.id}/revoke`, { method: "POST", body: { reason: revokeReason.trim() } }).then(() => { setRevoking(null); open(current!); }).catch((e: Error) => setMsg(e.message))}>{t("revoke")}</PermButton>
-                    <PermButton perm={PERMS.eduTranscriptIssue} size="sm" variant="outline" onClick={() => setRevoking(null)}>{t("cancel")}</PermButton>
+                    <PermRowAction perm={PERMS.eduTranscriptIssue} onClick={() => setRevoking(null)} icon={X}>{t("cancel")}</PermRowAction>
                   </span>
                 ) : (
-                  <PermButton perm={PERMS.eduTranscriptIssue} size="sm" variant="outline" className="ml-2" onClick={() => { setRevoking(i.id); setRevokeReason(""); }}>{t("revoke")}</PermButton>
+                  <PermRowAction perm={PERMS.eduTranscriptIssue} className="ml-2" onClick={() => { setRevoking(i.id); setRevokeReason(""); }} icon={Ban} danger>{t("revoke")}</PermRowAction>
                 )
               )}
             </li>

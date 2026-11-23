@@ -3,7 +3,7 @@
 // 平台控制台的 5 个页面：平台账号、平台角色、菜单、入口分配、平台公告。接口在 B3/B17 已有，这里只补页面。
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { EyeOff, Plus, Power, ShieldCheck, Trash2, UserCog, UserPlus } from "lucide-react";
 import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -51,8 +51,8 @@ export function PlatformAccountsPage() {
       header: "",
       cell: (r) => (r.isBuiltin ? null : (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.platformAccountAssignRole} size="sm" variant="outline" onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }}>{t("assignRoles")}</PermButton>
-          <PermButton perm={PERMS.platformAccountEdit} size="sm" variant="outline" onClick={() => void run(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))}>{r.status === "disabled" ? t("enable") : t("disable")}</PermButton>
+          <PermRowAction perm={PERMS.platformAccountAssignRole} onClick={() => { setRolesFor(r); setPicked(r.roleIds.filter((id) => custom.some((x) => x.id === id))); }} icon={UserCog}>{t("assignRoles")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformAccountEdit} onClick={() => void run(() => bff(`accounts/${r.id}/status`, { method: "PATCH", body: { status: r.status === "disabled" ? "active" : "disabled" } }), c("done"))} icon={Power}>{r.status === "disabled" ? t("enable") : t("disable")}</PermRowAction>
         </div>
       )),
     },
@@ -113,7 +113,7 @@ export function PlatformRolesPage() {
       header: "",
       cell: (r) => (r.kind !== "custom" ? null : (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.platformRoleAuthorize} size="sm" variant="outline" onClick={() => open(r)}>{t("permissions")}</PermButton>
+          <PermRowAction perm={PERMS.platformRoleAuthorize} onClick={() => open(r)} icon={ShieldCheck}>{t("permissions")}</PermRowAction>
           <PermRowAction perm={PERMS.platformRoleRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`roles/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
         </div>
       )),
@@ -183,8 +183,8 @@ export function PlatformMenusPage() {
       header: "",
       cell: (r) => (
         <div className="flex flex-wrap gap-1">
-          <PermButton perm={PERMS.platformMenuEdit} size="sm" variant="outline" onClick={() => patch(r, { visible: !r.visible })}>{r.visible ? t("hide") : t("show")}</PermButton>
-          <PermButton perm={PERMS.platformMenuEdit} size="sm" variant="outline" onClick={() => patch(r, { status: !r.status })}>{r.status ? t("disable") : t("enable")}</PermButton>
+          <PermRowAction perm={PERMS.platformMenuEdit} onClick={() => patch(r, { visible: !r.visible })} icon={EyeOff}>{r.visible ? t("hide") : t("show")}</PermRowAction>
+          <PermRowAction perm={PERMS.platformMenuEdit} onClick={() => patch(r, { status: !r.status })} icon={Power}>{r.status ? t("disable") : t("enable")}</PermRowAction>
         </div>
       ),
     },
@@ -242,7 +242,7 @@ export function PlatformEntriesPage() {
             ) : (
               <div className="mt-1 flex items-center gap-3">
                 <span>{e.menus.length ? e.menus.map((m) => m.name ?? m.menuId).join(", ") : t("none")}</span>
-                <PermButton perm={PERMS.platformEntryEdit} size="sm" variant="outline" onClick={() => setEditing({ code: e.code, picked: e.menus.map((m) => m.menuId) })}>{t("assign")}</PermButton>
+                <PermRowAction perm={PERMS.platformEntryEdit} onClick={() => setEditing({ code: e.code, picked: e.menus.map((m) => m.menuId) })} icon={UserPlus}>{t("assign")}</PermRowAction>
               </div>
             )}
           </li>
