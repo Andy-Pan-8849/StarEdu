@@ -106,6 +106,29 @@ describe("DataTable", () => {
     expect(row("bob").getAttribute("aria-selected")).toBe("true");
   });
 
+  it("has a checkbox column: select all / one row, bulk actions appear, and the Actions column is last and named", async () => {
+    const user = userEvent.setup();
+    const cols = [
+      { key: "actions", header: "", cell: () => <button>Edit</button> },
+      { key: "n", header: "Name", cell: (r: { n: string }) => r.n },
+    ];
+    render(<DataTable columns={cols} rows={[{ n: "a" }, { n: "b" }]} rowKey={(r) => r.n} emptyText="-" bulkActions={(keys) => <button>Delete {keys.join(",")}</button>} />);
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(heads).toEqual(["", "Name", "Actions"]); // 复选列在最前，操作列在最后
+    expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
+    await user.click(screen.getAllByRole("checkbox", { name: "Select row" })[1]!);
+    expect(screen.getByRole("button", { name: "Delete b" })).toBeTruthy();
+    await user.click(screen.getByRole("checkbox", { name: "Select all" }));
+    expect(screen.getByRole("button", { name: "Delete a,b" })).toBeTruthy();
+    await user.click(screen.getByRole("checkbox", { name: "Select all" }));
+    expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
+  });
+
+  it("selectable={false} hides the checkbox column", () => {
+    render(<DataTable columns={columns} rows={[{ n: "a" }]} rowKey={(r) => r.n} emptyText="-" selectable={false} />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
   it("pages forwards and backwards within bounds (known total)", async () => {
     const user = userEvent.setup();
     const onPageChange = vi.fn();

@@ -13,7 +13,7 @@ const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleSt
 
 function useTableLabels() {
   const t = useTranslations("table");
-  return { empty: t("empty"), loading: t("loading"), labels: { previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
+  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
 }
 
 function Heading({ children }: { children: React.ReactNode }) {

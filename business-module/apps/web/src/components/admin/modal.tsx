@@ -6,6 +6,9 @@ import { X } from "lucide-react";
 /** 操作失败时发出的事件：弹窗开着时，把错误显示在弹窗里面（页面上的提示被遮罩盖住了）。 */
 export const ACT_ERROR_EVENT = "admin:act-error";
 
+/** 弹窗里面的内容读它：表格在弹窗里不做复选列和固定表头（弹窗自己滚动）。 */
+export const InDialogContext = React.createContext(false);
+
 /** 开着的弹窗，最后一个在最上面；Esc 只关最上面的。 */
 const stack: object[] = [];
 
@@ -34,7 +37,7 @@ export function Modal({ title, onClose, children, wide = false, closeLabel = "Cl
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <div onSubmitCapture={() => setError(null)}>{children}</div>
+          <InDialogContext.Provider value={true}><div onSubmitCapture={() => setError(null)}>{children}</div></InDialogContext.Provider>
           {error ? <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error}</p> : null}
         </div>
       </div>

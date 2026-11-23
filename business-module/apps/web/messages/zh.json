@@ -33,6 +33,11 @@
     "expandMenu": "展开菜单"
   },
   "table": {
+    "actions": "操作",
+    "selectAll": "全选",
+    "selectRow": "选择此行",
+    "selected": "已选 {n} 项",
+    "clearSelection": "取消选择",
     "empty": "没有数据。",
     "loading": "加载中…",
     "previous": "上一页",
