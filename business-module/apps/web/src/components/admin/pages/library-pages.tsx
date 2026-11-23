@@ -301,7 +301,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
             {!portal ? (
               <div className="mt-2 flex flex-wrap gap-1">
                 <Can perm={PERMS.docFolderAdd}>
-                  <IconButton icon={FolderPlus} label={t("addSub")} variant="outline" disabled={!cur} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })} />
+                  <IconButton icon={FolderPlus} label={t("addSub")} variant="outline" disabled={!folder || folder.level !== "manage"} onClick={() => void ask(t("addSub"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(cur, v.name.trim()); })} />
                   <IconButton icon={FolderRoot} label={t("add")} variant="outline" onClick={() => void ask(t("add"), [{ name: "name", label: t("newFolder") }]).then((v) => { if (v?.name.trim()) void createFolder(null, v.name.trim()); })} />
                 </Can>
                 {folder ? (
@@ -316,6 +316,7 @@ export function LibraryPanel({ portal = false }: { portal?: boolean }) {
                 ) : null}
               </div>
             ) : null}
+            {!portal && folder && folder.level !== "manage" ? <p className="mt-2 text-xs text-muted">{t("needManage")}</p> : null}
           </div>
           <div ref={treeRef} className="overflow-y-auto p-2" style={treeMax ? { maxHeight: treeMax } : undefined}>
             {nodes.length === 0 ? <p className="px-2 py-3 text-muted">{t("noFolders")}</p> : <NavTree label={t("folders")} nodes={nodes} selectedId={cur} onSelect={(id) => { setCur(id); setManaging(false); }} />}

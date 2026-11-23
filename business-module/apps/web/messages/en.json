@@ -746,6 +746,7 @@
       "instructor": "instructor"
     },
     "library": {
+      "needManage": "You only have view access to this folder, so you cannot add subfolders, edit or delete it. Pick a folder you manage, or add a top-level folder.",
       "edit": "Edit folder",
       "folders": "Folders",
       "deleteSelected": "Delete selected",
