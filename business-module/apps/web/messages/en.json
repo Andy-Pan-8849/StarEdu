@@ -223,15 +223,17 @@
       "closeNow": "Close campus"
     },
     "depts": {
+      "createdAt": "Created",
+      "saveSort": "Save order",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "hint": "The company is at the top, then the headquarters campus, then the branch campuses in the order they were set up. Change the order numbers in the list and press Save order. Departments with people, sub-departments or a campus can only be disabled. Campuses are added, renamed and closed under System management → Campuses.",
       "hq": "HQ",
       "campus": "Campus",
       "dept": "Department",
-      "kind": "Type",
-      "structure": "Organization",
       "company": "Company",
-      "addChild": "Add sub-department",
-      "campusManaged": "Campuses are added, renamed and closed under System management → Campuses. Departments are added under a campus or another department.",
-      "hint": "The company is at the top, then the headquarters campus, then the branch campuses in the order they were set up. Departments with people, sub-departments or a campus can only be disabled.",
       "title": "Departments",
       "name": "Name",
       "parent": "Parent department"
