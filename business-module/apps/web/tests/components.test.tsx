@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { DataTable, pageCount } from "../src/components/admin/data-table";
+import { Modal } from "../src/components/admin/modal";
 import { MenuTreeShell, type ShellLabels } from "../src/components/admin/menu-tree-shell";
 import type { MenuNode } from "../src/components/admin/menu-nav";
 import { Can, PermButton, PermissionProvider } from "../src/components/admin/permissions";
@@ -187,5 +188,21 @@ describe("MenuTreeShell", () => {
     expect(form.method).toBe("post");
     expect(form.getAttribute("action")).toBe("/admin/auth/logout");
     expect(within(form.parentElement as HTMLElement).getByText("alice")).toBeTruthy();
+  });
+});
+
+describe("Modal", () => {
+  it("shows its content as a dialog, and closes on Esc, on the backdrop, but not on a click inside", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<Modal title="Details" onClose={onClose}><p>body</p></Modal>);
+    const dialog = screen.getByRole("dialog", { name: "Details" });
+    expect(within(dialog).getByText("body")).toBeTruthy();
+    await user.click(screen.getByText("body"));
+    expect(onClose).not.toHaveBeenCalled();
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await user.click(dialog.parentElement as HTMLElement);
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 });
