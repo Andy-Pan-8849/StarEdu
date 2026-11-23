@@ -19,7 +19,7 @@ const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 
 
 function useTable() {
   const t = useTranslations("table");
-  return { empty: t("empty"), loading: t("loading"), labels: { previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
+  return { empty: t("empty"), loading: t("loading"), labels: { actions: t("actions"), selectAll: t("selectAll"), selectRow: t("selectRow"), clearSelection: t("clearSelection"), selected: (n: number) => t("selected", { n }), previous: t("previous"), next: t("next"), page: (p: number, n: number) => t("page", { page: p, pages: n }) } };
 }
 
 interface TenantRow {

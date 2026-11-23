@@ -33,6 +33,11 @@
     "expandMenu": "Expand menu"
   },
   "table": {
+    "actions": "Actions",
+    "selectAll": "Select all",
+    "selectRow": "Select row",
+    "selected": "{n} selected",
+    "clearSelection": "Clear",
     "empty": "Nothing to show.",
     "loading": "Loading…",
     "previous": "Previous",
