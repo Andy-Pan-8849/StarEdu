@@ -27,7 +27,7 @@ export function Modal({ title, onClose, children, wide = false, closeLabel = "Cl
   return (
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-label={title} className={`modal-panel flex max-h-[88vh] w-full ${wide ? "max-w-5xl" : "max-w-xl"} flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl`}>
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-3.5">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border bg-primary/10 px-5 py-3.5">
           <h2 className="truncate text-base font-semibold">{title}</h2>
           <button type="button" aria-label={closeLabel} title={closeLabel} className="-mr-1.5 rounded-md p-1.5 text-muted hover:bg-border/50 hover:text-foreground" onClick={onClose}>
             <X aria-hidden className="h-4 w-4" />
