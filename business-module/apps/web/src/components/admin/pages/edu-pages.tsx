@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Tabs } from "../tabs";
+import { TabBody, Tabs } from "../tabs";
 import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserPlus, UsersRound } from "lucide-react";
 import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
@@ -437,8 +437,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
     <Modal wide title={`${s.name} — ${s.seated}/${s.capacity}`} onClose={onClose}>
     <div className="text-sm">
       <Tabs value={tab} onChange={setTab} items={(["roster", "instructors", "materials", "assignments", "grades", "discussion"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList)) && (k !== "discussion" || perms.has(PERMS.eduDiscussionList))).map((k) => ({ key: k, label: t(`tab_${k}`) }))} />
-      {/* 内容区固定高度、内部滚动：切换标签页时弹窗不再忽大忽小 */}
-      <div className="h-[60vh] overflow-y-auto pr-1">
+      <TabBody>
       {message}
       {tab === "roster" ? (
         <div>
@@ -482,7 +481,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
       {tab === "assignments" ? <AssignmentsPanel sectionId={id} /> : null}
       {tab === "grades" ? <GradesPanel sectionId={id} /> : null}
       {tab === "discussion" ? <DiscussionPanel sectionId={id} /> : null}
-      </div>
+      </TabBody>
       <div className="mt-4 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button></div>
     </div>
     </Modal>

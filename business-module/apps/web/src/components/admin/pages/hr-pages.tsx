@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Tabs } from "../tabs";
+import { TabBody, Tabs } from "../tabs";
 import { ArrowRightLeft, CircleCheck, Download, Eye, LogOut, Plus, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
 import { IconButton, IconLink, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
@@ -218,6 +218,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
     <div className="text-sm">
       {d.staff ? <p className="mb-2 text-muted">{d.staff.employeeNo}</p> : null}
       <Tabs value={tab} onChange={setTab} items={(["basic", "assign", ...(canEmergency ? (["emergency"] as const) : [])] as const).map((k) => ({ key: k, label: t(`tab_${k}`) }))} />
+      <TabBody>
       {message}
       {dialog}
       {tab === "basic" ? (
@@ -261,6 +262,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
         </div>
       ) : null}
       {tab === "emergency" ? <EmergencyTab personId={id} /> : null}
+      </TabBody>
       <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
     </div>
     </Modal>
