@@ -20,12 +20,12 @@ export function maxUploadBytes(): number {
 }
 
 /** 校验文件名、大小；通过时返回规范化后的文件名。 */
-export function validateUpload(input: { fileName: string; size: number }): string {
+export function validateUpload(input: { fileName: string; size: number }, maxBytes: number = maxUploadBytes()): string {
   const name = [...input.fileName].map((c) => (c === "/" || c === "\\" || c.charCodeAt(0) < 32 ? "_" : c)).join("").trim().slice(-150);
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   if (!name || !ALLOWED_EXTENSIONS.has(ext)) throw new BadRequestException(`This file type is not allowed (allowed: ${[...ALLOWED_EXTENSIONS].join(", ")})`);
   if (!Number.isInteger(input.size) || input.size <= 0) throw new BadRequestException("The file is empty");
-  if (input.size > maxUploadBytes()) throw new BadRequestException(`The file is larger than ${Math.floor(maxUploadBytes() / 1024 / 1024)} MB`);
+  if (input.size > maxBytes) throw new BadRequestException(`The file is larger than ${Math.max(1, Math.floor(maxBytes / 1024 / 1024))} MB`);
   return name;
 }
 

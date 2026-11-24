@@ -19,13 +19,26 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       expect(gender).toMatchObject({ platformProvided: true, nameKey: "dict.type.gender" });
       expect((await admin().patch(`/api/dict-types/${gender.id}`, { name: "x" })).status).toBe(403);
       expect((await admin().del(`/api/dict-types/${gender.id}`)).status).toBe(403);
-      expect((await admin().post(`/api/dict-types/${gender.id}/items`, { value: "z", label: "Z" })).status).toBe(403);
       const items = (await admin().get(`/api/dict-types/${gender.id}/items`)).body as Array<{ id: string }>;
       expect((await admin().patch(`/api/dict-items/${items[0].id}`, { label: "x" })).status).toBe(403);
       expect((await admin().del(`/api/dict-items/${items[0].id}`)).status).toBe(403);
       const dropdown = (await admin().get("/api/dicts/gender")).body;
       expect(dropdown.items.map((i: { value: string }) => i.value)).toEqual(["male", "female", "other", "unknown"]);
       expect(dropdown.items[0].labelKey).toBe("dict.gender.male");
+    });
+
+    it("a tenant can append its own entries to a platform dictionary; built-in entries stay read-only; other tenants do not see them", async () => {
+      const types = (await admin().get("/api/dict-types")).body as Array<{ id: string; code: string }>;
+      const degree = types.find((t) => t.code === "degree_type")!;
+      expect((await admin().post(`/api/dict-types/${degree.id}/items`, { value: "bachelor", label: "Dup" })).status).toBe(409); // 和平台条目重复
+      const mine = (await admin().post(`/api/dict-types/${degree.id}/items`, { value: "diploma", label: "Diploma", remark: "Two-year program" })).body;
+      expect((await admin().get("/api/dicts/degree_type")).body.items.map((i: { value: string }) => i.value)).toContain("diploma");
+      expect((await admin().patch(`/api/dict-items/${mine.id}`, { label: "Higher diploma" })).status).toBe(200);
+      const other = await h.extraTenant();
+      await h.owner.dictItem.create({ data: { tenantId: other.tenantId, typeId: degree.id, value: "diploma", label: "Theirs" } }); // 不同租户可以用同一个值
+      await h.owner.dictItem.deleteMany({ where: { tenantId: other.tenantId, typeId: degree.id } });
+      expect((await admin().del(`/api/dict-items/${mine.id}`)).status).toBe(200);
+      expect((await admin().get("/api/dicts/degree_type")).body.items.map((i: { value: string }) => i.value)).not.toContain("diploma");
     });
 
     it("a tenant can build its own dictionary; codes cannot clash with platform ones; disabled items leave the dropdown", async () => {
@@ -43,6 +56,18 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       expect((await admin().del(`/api/dict-types/${type.id}`)).status).toBe(200);
       expect((await admin().post("/api/dict-types", { code: "club", name: "Reused" })).status).toBe(201);
       expect((await admin().get("/api/dicts/Not-A-Code")).status).toBe(400);
+    });
+
+    it("items can carry a remark, and a field that uses a dictionary only accepts its enabled values", async () => {
+      const type = (await admin().post("/api/dict-types", { code: "remarked", name: "Remarked", remark: "What this list is for" })).body;
+      const item = (await admin().post(`/api/dict-types/${type.id}/items`, { value: "a", label: "A", remark: "Means the first one" })).body;
+      expect(item.remark).toBe("Means the first one");
+      expect((await admin().patch(`/api/dict-items/${item.id}`, { remark: "Changed" })).body.remark).toBe("Changed");
+      const platform = (await admin().get("/api/dict-types")).body as Array<{ code: string; platformProvided: boolean }>;
+      expect(platform.filter((t) => t.platformProvided).map((t) => t.code)).toEqual(expect.arrayContaining(["gender", "employment_type", "degree_type", "relationship", "material_category"]));
+      const bad = await admin().post("/api/staff", { fullName: "Dict Check", hireDate: "2024-01-01", employmentType: "contract" });
+      expect(bad.status).toBe(400);
+      expect(JSON.stringify(bad.body)).toContain("full_time");
     });
 
     it("two tenants can each have their own dictionary with the same code", async () => {
@@ -70,6 +95,8 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       expect((await admin().del(`/api/params/${override.id}`)).status).toBe(200);
       expect(((await admin().get("/api/params")).body as Array<{ key: string; value: string }>).find((p) => p.key === "system.ui.defaultLocale")?.value).toBe("en");
       expect((await admin().post("/api/params", { key: "Bad Key", value: "1", name: "x" })).status).toBe(400);
+      expect((await admin().post("/api/params", { key: "library.upload.maxMb", value: "0", name: "x" })).status).toBe(400);
+      expect((await admin().post("/api/params", { key: "edu.extension.maxDays", value: "31", name: "x" })).status).toBe(400);
       const mine = (await admin().post("/api/params", { key: "school.openHour", value: "8", name: "Opening hour" })).body;
       expect((await admin().patch(`/api/params/${mine.id}`, { value: "9" })).body.value).toBe("9");
       expect((await admin().patch(`/api/params/${mine.id}`, { key: "x" })).status).toBe(400);

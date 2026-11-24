@@ -1,4 +1,4 @@
-// 字典：平台提供的类型和条目对租户只读；租户可以建自己的类型和条目。
+// 字典：平台提供的类型和条目对租户只读；租户可以建自己的类型，也可以往平台的类型里追加自己的条目（只有自己的条目能改、能删）。
 //   - 类型编码不能与平台提供的重名；条目的值在类型内唯一；
 //   - 名称和条目文字可以带翻译键（平台提供的）；租户自建的直接存文字；
 //   - `GET /api/dicts/:code` 给下拉框用，任何已登录账号可读，只返回启用的条目。没有服务端缓存（读很便宜），改了立即生效。
@@ -13,8 +13,8 @@ import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 
 const typeSchema = z.object({ code: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/), name: z.string().trim().min(1).max(100), remark: z.string().max(500).optional() });
 const typePatch = z.object({ name: z.string().trim().min(1).max(100).optional(), status: z.boolean().optional(), remark: z.string().max(500).nullable().optional() }).strict();
-const itemSchema = z.object({ value: z.string().trim().min(1).max(100), label: z.string().trim().min(1).max(200), sort: z.number().int().min(0).max(10000).optional() });
-const itemPatch = z.object({ label: z.string().trim().min(1).max(200).optional(), sort: z.number().int().min(0).max(10000).optional(), status: z.boolean().optional() }).strict();
+const itemSchema = z.object({ value: z.string().trim().min(1).max(100), label: z.string().trim().min(1).max(200), remark: z.string().max(500).optional(), sort: z.number().int().min(0).max(10000).optional() });
+const itemPatch = z.object({ label: z.string().trim().min(1).max(200).optional(), remark: z.string().max(500).nullable().optional(), sort: z.number().int().min(0).max(10000).optional(), status: z.boolean().optional() }).strict();
 
 @Controller("api")
 export class DictController {
@@ -81,9 +81,11 @@ export class DictController {
   @RequirePermissions(PERMS.dictAdd)
   async createItem(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     const input = parse(itemSchema, body);
-    await this.ownType(id, auth.tenantId);
+    // 平台字典也可以追加自己的条目（平台预置的条目仍然只读）
+    if (!(await this.tenantDb.db.dictType.findUnique({ where: { id } }))) throw new NotFoundException();
+    if (await this.tenantDb.db.dictItem.findFirst({ where: { typeId: id, value: input.value } })) throw new ConflictException("The value already exists in this dictionary");
     try {
-      return await this.tenantDb.db.dictItem.create({ data: { tenantId: auth.tenantId, typeId: id, value: input.value, label: input.label, sort: input.sort ?? 0, createdBy: auth.accountId } });
+      return await this.tenantDb.db.dictItem.create({ data: { tenantId: auth.tenantId, typeId: id, value: input.value, label: input.label, remark: input.remark ?? null, sort: input.sort ?? 0, createdBy: auth.accountId } });
     } catch (err) {
       if ((err as { code?: string }).code === "P2002") throw new ConflictException("The value already exists in this dictionary");
       throw err;

@@ -421,6 +421,7 @@ export function DataScopesPage() {
   return (
     <section>
       <H2>{t("title")}</H2>
+      <p className="mb-3 text-sm text-muted">{t("note")}</p>
       <Err error={sets.error} />
       {message}
       <Can perm={PERMS.dataScopeAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => { setForm({}); setName(""); setPicked([]); setWithChildren(true); }} className="mb-3"/> : null}</Can>

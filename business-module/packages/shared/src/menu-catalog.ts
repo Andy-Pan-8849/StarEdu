@@ -168,7 +168,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
     ["add", "Add", PERMS.eduCourseAdd],
     ["edit", "Edit", PERMS.eduCourseEdit],
   ]),
-  ...menuWithButtons("edu:section", "edu", "Sections", "section", 4, PERMS.eduSectionList, [
+  ...menuWithButtons("edu:section", "edu", "Class Sections", "section", 4, PERMS.eduSectionList, [
     ["add", "Add", PERMS.eduSectionAdd],
     ["edit", "Edit", PERMS.eduSectionEdit],
     ["status", "Change status", PERMS.eduSectionStatus],

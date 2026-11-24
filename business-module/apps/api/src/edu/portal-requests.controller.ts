@@ -18,7 +18,7 @@ const DAY_MS = 86_400_000;
 
 const submitSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("grade_appeal"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(10).max(1000) }).strict(),
-  z.object({ kind: z.literal("extension"), assignmentId: z.string().uuid(), days: z.number().int().min(1).max(3), reason: z.string().trim().min(3).max(500) }).strict(),
+  z.object({ kind: z.literal("extension"), assignmentId: z.string().uuid(), days: z.number().int().min(1).max(30), reason: z.string().trim().min(3).max(500) }).strict(),
 ]);
 
 @Controller("api/portal/requests")
@@ -61,6 +61,7 @@ export class PortalRequestsController {
   async options(@Auth() auth: AuthContext) {
     const personId = await this.me(auth);
     const { windowDays, maxAppeals } = await this.limits();
+    const maxDays = await this.params.int("edu.extension.maxDays");
     const now = new Date();
     const [enrollments, pending, all] = await Promise.all([
       this.db.enrollment.findMany({ where: { studentPersonId: personId, status: { in: ["enrolled", "completed"] } } }),
@@ -88,10 +89,10 @@ export class PortalRequestsController {
       .filter((a) => {
         const ext = exts.find((x) => x.assignmentId === a.id);
         const sub = subs.find((x) => x.assignmentId === a.id);
-        return now < effectiveDeadline(a.dueAt, ext?.days) && (ext?.days ?? 0) < 3 && !pendingExt.has(a.id) && (!sub || sub.status === "submitted");
+        return now < effectiveDeadline(a.dueAt, ext?.days) && (ext?.days ?? 0) < maxDays && !pendingExt.has(a.id) && (!sub || sub.status === "submitted");
       })
       .map((a) => ({ assignmentId: a.id, title: a.title, section: sectionName.get(a.sectionId) ?? "", dueAt: a.dueAt, currentDays: exts.find((x) => x.assignmentId === a.id)?.days ?? 0 }));
-    return { appeals, extensions, appealWindowDays: windowDays };
+    return { appeals, extensions, appealWindowDays: windowDays, maxExtensionDays: maxDays };
   }
 
   @Post()
@@ -119,6 +120,7 @@ export class PortalRequestsController {
       if (a.manualOnly) throw new ConflictException("This assignment is not submitted online, so there is no deadline to extend");
       const ext = await this.db.assignmentExtension.findFirst({ where: { assignmentId: a.id, studentPersonId: personId } });
       if (now >= effectiveDeadline(a.dueAt, ext?.days)) throw new ConflictException({ code: "DEADLINE_PASSED", message: "The deadline has passed; ask your instructor directly" });
+      await this.params.assertExtensionDays(input.days);
       if (ext && input.days <= ext.days) throw new ConflictException({ code: "ALREADY_EXTENDED", message: `You already have a ${ext.days}-day extension; request more days than that` });
       const sub = await this.db.submission.findFirst({ where: { assignmentId: a.id, studentPersonId: personId } });
       if (sub && sub.status !== "submitted") throw new ConflictException("Your submission is already being graded");

@@ -3,6 +3,7 @@
 //   - 延期：权限 + 范围内的任课教师或教务可以批（天数可以改小改大，1–3 天）；批准后和手工设延期完全一样。
 //   - 复评：批准要改分，所以还需要"结课后改成绩"权限（教务）；教师只能看和驳回。批准必须给新的总评和原因，改前改后记在成绩改动记录里。
 //   - 驳回必须写理由；每次处理都通知学生并写审计日志；已处理的申请不能再处理。
+import { ParamsService } from "../sysdata/params.service";
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import { PERMS } from "@staredu/shared";
@@ -23,7 +24,7 @@ const decideSchema = z
     decision: z.enum(["approve", "reject"]),
     note: z.string().trim().min(3).max(500),
     /** 延期：批准的天数，不给就按申请的天数 */
-    days: z.number().int().min(1).max(3).optional(),
+    days: z.number().int().min(1).max(30).optional(),
     /** 复评批准：新的总评 */
     total: z.number().min(0).max(100).optional(),
   })
@@ -37,6 +38,7 @@ export class RequestsController {
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly grades: GradesService,
+    private readonly params: ParamsService,
   ) {}
 
   private get db() {
@@ -78,6 +80,7 @@ export class RequestsController {
   @RequirePermissions(PERMS.eduRequestDecide)
   async decide(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     const input = parse(decideSchema, body);
+    if (input.days !== undefined) await this.params.assertExtensionDays(input.days);
     const ids = await this.visibleSectionIds(auth, PERMS.eduRequestDecide);
     const req = await this.db.studentRequest.findFirst({ where: { id, sectionId: { in: ids } } });
     if (!req) throw new NotFoundException();

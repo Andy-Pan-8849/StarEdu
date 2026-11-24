@@ -11,6 +11,10 @@ export const PARAM_DEFS: Record<string, ParamDef> = {
   "system.ui.defaultLocale": { type: "enum", options: ["en", "zh"], fallback: "en" },
   "edu.appeal.windowDays": { type: "int", min: 1, max: 90, fallback: "14" },
   "edu.appeal.maxPerCourse": { type: "int", min: 1, max: 10, fallback: "2" },
+  "edu.extension.maxDays": { type: "int", min: 1, max: 30, fallback: "3" },
+  "edu.submission.maxFiles": { type: "int", min: 1, max: 50, fallback: "10" },
+  "edu.upload.maxMb": { type: "int", min: 1, max: 500, fallback: "20" },
+  "library.upload.maxMb": { type: "int", min: 1, max: 2000, fallback: "50" },
 };
 
 /** 按登记的规则检查一个值；没问题返回 null，有问题返回原因。 */
@@ -51,8 +55,23 @@ export class ParamsService {
     return Number(await this.value(key));
   }
 
+  /**
+   * 上传大小上限（字节）：取租户的参数（MB），但不能超过运营方在环境变量里设的硬上限（试用站用它压低）。
+   */
+  async uploadLimitBytes(key: "edu.upload.maxMb" | "library.upload.maxMb", envName: "UPLOAD_MAX_BYTES" | "LIBRARY_MAX_BYTES"): Promise<number> {
+    const bytes = (await this.int(key)) * 1024 * 1024;
+    const cap = Number(process.env[envName]);
+    return cap > 0 ? Math.min(bytes, cap) : bytes;
+  }
+
+  /** 延期天数不能超过本租户设的上限。 */
+  async assertExtensionDays(days: number): Promise<void> {
+    const max = await this.int("edu.extension.maxDays");
+    if (days > max) throw new BadRequestException(`An extension is at most ${max} days`);
+  }
+
   /** 前端要用的几个设置，随 /api/me 一起给。 */
-  async uiSettings(): Promise<{ pageSize: number; defaultLocale: string }> {
-    return { pageSize: await this.int("system.list.pageSize"), defaultLocale: (await this.value("system.ui.defaultLocale")) ?? "en" };
+  async uiSettings(): Promise<{ pageSize: number; defaultLocale: string; maxExtensionDays: number }> {
+    return { pageSize: await this.int("system.list.pageSize"), defaultLocale: (await this.value("system.ui.defaultLocale")) ?? "en", maxExtensionDays: await this.int("edu.extension.maxDays") };
   }
 }

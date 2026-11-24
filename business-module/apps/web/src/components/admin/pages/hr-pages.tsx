@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Tabs } from "../tabs";
+import { TabBody, Tabs } from "../tabs";
 import { ArrowRightLeft, CircleCheck, Download, Eye, LogOut, Plus, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
 import { IconButton, IconLink, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
@@ -150,6 +150,7 @@ interface NamedRow { id: string; name: string; status?: boolean }
 
 export function StaffPage() {
   const { pageSize } = useSettings();
+  const employment = useDict("employment_type");
   const t = useTranslations("pages.hr");
   const c = useTranslations("crud");
   const tt = useTable();
@@ -166,7 +167,7 @@ export function StaffPage() {
     { name: "fullName", label: t("name"), required: true },
     { name: "workEmail", label: t("email"), type: "email" },
     { name: "hireDate", label: t("hireDate"), required: true },
-    { name: "employmentType", label: t("employmentType"), type: "select", options: [{ value: "full_time", label: t("full_time") }, { value: "part_time", label: t("part_time") }] },
+    { name: "employmentType", label: t("employmentType"), type: "select", options: employment.options },
     { name: "deptId", label: t("department"), type: "select", options: depts.rows.filter((d) => d.status !== false).map((d) => ({ value: d.id, label: d.name })) },
   ];
   const columns: Column<StaffRow>[] = [
@@ -217,6 +218,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
     <div className="text-sm">
       {d.staff ? <p className="mb-2 text-muted">{d.staff.employeeNo}</p> : null}
       <Tabs value={tab} onChange={setTab} items={(["basic", "assign", ...(canEmergency ? (["emergency"] as const) : [])] as const).map((k) => ({ key: k, label: t(`tab_${k}`) }))} />
+      <TabBody>
       {message}
       {dialog}
       {tab === "basic" ? (
@@ -260,6 +262,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
         </div>
       ) : null}
       {tab === "emergency" ? <EmergencyTab personId={id} /> : null}
+      </TabBody>
       <Button size="sm" variant="outline" className="mt-3" onClick={onClose}>{c("close")}</Button>
     </div>
     </Modal>
@@ -267,6 +270,7 @@ function StaffDetailPanel({ id, depts, canEmergency, onClose }: { id: string; de
 }
 
 function EmergencyTab({ personId }: { personId: string }) {
+  const relations = useDict("relationship");
   const t = useTranslations("pages.hr");
   const c = useTranslations("crud");
   const list = useList<Contact>(`persons/${personId}/emergency-contacts`);
@@ -288,7 +292,7 @@ function EmergencyTab({ personId }: { personId: string }) {
       {message}
       <Can perm={PERMS.hrEmergencyEdit}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-2"/> : null}</Can>
       {form ? (
-        <FormPanel inline title={c("add")} fields={[{ name: "name", label: t("name"), required: true }, { name: "relationship", label: t("relationship"), required: true }, { name: "phone", label: t("phone"), required: true }, { name: "isGuardian", label: t("guardian"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
+        <FormPanel inline title={c("add")} fields={[{ name: "name", label: t("name"), required: true }, { name: "relationship", label: t("relationship"), required: true, type: "select", options: relations.options }, { name: "phone", label: t("phone"), required: true }, { name: "isGuardian", label: t("guardian"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { if (await run(() => bff(`persons/${personId}/emergency-contacts`, { method: "POST", body: p }), c("saved"))) setForm(false); }} />
       ) : null}
       <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />

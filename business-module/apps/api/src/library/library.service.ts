@@ -1,6 +1,7 @@
 // 文档库的业务规则：文件夹树、文件、授权、密级、访问日志。
 // 两层权限：接口先检查菜单按钮上的"操作权限"，这里再检查用户在该文件夹上的"访问级别"（见 LibraryAccess）。
 // 没有查看权限的文件夹对用户来说就不存在（404，不透露是否存在）。
+import { ParamsService } from "../sysdata/params.service";
 import { QuotaService } from "../quota/quota.service";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
@@ -20,7 +21,6 @@ const RANK_CLASS: Record<string, number> = { public: 0, internal: 1, confidentia
 const ALLOWED_EXTENSIONS = new Set(["pdf", "png", "jpg", "jpeg", "gif", "txt", "md", "csv", "json", "docx", "xlsx", "pptx", "zip"]);
 const INLINE_TYPES: Record<string, string> = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", txt: "text/plain; charset=utf-8", md: "text/plain; charset=utf-8" };
 
-export const maxLibraryBytes = (): number => (Number(process.env.LIBRARY_MAX_BYTES) > 0 ? Number(process.env.LIBRARY_MAX_BYTES) : 50 * 1024 * 1024);
 const extOf = (name: string): string => (name.includes(".") ? name.split(".").pop()!.toLowerCase() : "");
 
 export const folderSchema = z.object({
@@ -55,6 +55,7 @@ export class LibraryService {
     private readonly quota: QuotaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly params: ParamsService,
   ) {}
 
   private get db() {
@@ -316,7 +317,8 @@ export class LibraryService {
     const name = input.name.replace(/[\\/]/g, "_").trim().slice(-150);
     if (!name || !ALLOWED_EXTENSIONS.has(extOf(name))) throw new BadRequestException(`This file type is not allowed (allowed: ${[...ALLOWED_EXTENSIONS].join(", ")})`);
     if (!Number.isInteger(input.size) || input.size <= 0) throw new BadRequestException("The file is empty");
-    if (input.size > maxLibraryBytes()) throw new BadRequestException(`The file is larger than ${Math.floor(maxLibraryBytes() / 1024 / 1024)} MB`);
+    const maxBytes = await this.params.uploadLimitBytes("library.upload.maxMb", "LIBRARY_MAX_BYTES");
+    if (input.size > maxBytes) throw new BadRequestException(`The file is larger than ${Math.max(1, Math.floor(maxBytes / 1024 / 1024))} MB`);
     await this.quota.assertCanStore(input.size);
     let target: string | null = null;
     if (input.fileId) {

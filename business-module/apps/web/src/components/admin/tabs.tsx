@@ -22,3 +22,8 @@ export function Tabs<T extends string>({ items, value, onChange, className }: { 
     </div>
   );
 }
+
+/** 弹窗里标签页的内容区：固定高度、内部滚动，切换标签页时弹窗不会忽大忽小。 */
+export function TabBody({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn("h-[60vh] overflow-y-auto pr-1", className)}>{children}</div>;
+}
