@@ -174,7 +174,7 @@ export function MajorsPage() {
   const { rows, loading, error, reload } = useList<MajorRow>("majors");
   const courses = useList<CourseRow>("courses");
   const { run, message } = useAct(reload);
-  const [form, setForm] = React.useState(false);
+  const [form, setForm] = React.useState<{ row?: MajorRow } | null>(null);
   const [open, setOpen] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<MajorDetail | null>(null);
   const [items, setItems] = React.useState<Record<string, { category: string; suggestedTerm: string }>>({});
@@ -192,17 +192,29 @@ export function MajorsPage() {
     { key: "name", header: t("name"), cell: (r) => r.name },
     { key: "degree", header: t("degreeType"), cell: (r) => r.degreeType ?? "" },
     { key: "credits", header: t("totalCredits"), cell: (r) => r.totalCredits },
-    { key: "actions", header: "", cell: (r) => <RowAction onClick={() => { setVersionId(null); setOpen(r.id); }} icon={BookOpen}>{t("curriculum")}</RowAction> },
+    {
+      key: "actions",
+      header: "",
+      cell: (r) => (
+        <>
+          <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <RowAction onClick={() => { setVersionId(null); setOpen(r.id); }} icon={BookOpen}>{t("curriculum")}</RowAction>
+        </>
+      ),
+    },
   ];
   return (
     <section>
       <H2>{t("majorsTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduMajorAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
+      <Can perm={PERMS.eduMajorAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
-        <FormPanel title={c("add")} fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType") }, { name: "totalCredits", label: t("totalCredits"), type: "number" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
-          onSubmit={async (p) => { if (await run(() => bff("majors", { method: "POST", body: p }), c("saved"))) setForm(false); }} />
+        <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
+          fields={[...(form.row ? [] : [{ name: "code", label: t("code"), required: true }]), { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType") }, { name: "totalCredits", label: t("totalCredits"), type: "number" as const }]}
+          initial={form.row ? { name: form.row.name, degreeType: form.row.degreeType ?? "", totalCredits: String(form.row.totalCredits) } : {}}
+          submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(null)}
+          onSubmit={async (p) => { if (await run(() => (form.row ? bff(`majors/${form.row.id}`, { method: "PATCH", body: p }) : bff("majors", { method: "POST", body: p })), c("saved"))) setForm(null); }} />
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
       {open && detail ? (
