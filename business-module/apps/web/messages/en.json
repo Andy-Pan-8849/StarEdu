@@ -246,7 +246,11 @@
       "value": "Value",
       "source": "Source",
       "platform": "Platform",
-      "own": "Own"
+      "own": "Own",
+      "customize": "Customize",
+      "customized": "Customized",
+      "restoreDefault": "Restore default",
+      "confirmRestore": "Restore the default value?"
     },
     "dicts": {
       "title": "Dictionaries",
@@ -961,7 +965,8 @@
   "dict": {
     "type": {
       "gender": "Gender",
-      "employment_type": "Employment type"
+      "employment_type": "Employment type",
+      "degree_type": "Degree type"
     },
     "gender": {
       "male": "Male",
@@ -972,6 +977,12 @@
     "employment_type": {
       "full_time": "Full time",
       "part_time": "Part time"
+    },
+    "degree_type": {
+      "associate": "Associate",
+      "bachelor": "Bachelor",
+      "master": "Master",
+      "doctor": "Doctor"
     }
   },
   "param": {
@@ -981,6 +992,12 @@
       },
       "list": {
         "pageSize": "Default page size"
+      }
+    },
+    "edu": {
+      "appeal": {
+        "windowDays": "Grade appeal window (days after publication)",
+        "maxPerCourse": "Maximum grade appeals per course"
       }
     }
   },

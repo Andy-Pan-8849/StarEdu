@@ -14,6 +14,8 @@ import { Modal } from "../modal";
 import { Can, usePermissions } from "../permissions";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
+import { useSettings } from "../settings-context";
+import { useDict } from "../use-dict";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
@@ -72,6 +74,7 @@ interface PersonRow { id: string; type: string; fullName: string; workEmail: str
 interface PersonDetail extends PersonRow { sensitive?: { birthDate: string | null; gender: string | null; idNumber: string | null; phone: string | null; address: string | null } }
 
 export function PeoplePage() {
+  const { pageSize } = useSettings();
   const t = useTranslations("pages.hr");
   const tt = useTable();
   const perms = usePermissions();
@@ -81,7 +84,7 @@ export function PeoplePage() {
   const [page, setPage] = React.useState(1);
   const [open, setOpen] = React.useState<string | null>(null);
   const filtered = list.rows.filter((r) => (!type || r.type === type) && (!q || `${r.fullName} ${r.workEmail ?? ""}`.toLowerCase().includes(q.toLowerCase())));
-  const shown = filtered.slice((page - 1) * 20, page * 20);
+  const shown = filtered.slice((page - 1) * pageSize, page * pageSize);
   const columns: Column<PersonRow>[] = [
     { key: "name", header: t("name"), cell: (r) => r.fullName },
     { key: "type", header: t("personType"), cell: (r) => t(`person_${r.type}`) },
@@ -101,13 +104,14 @@ export function PeoplePage() {
           </select>
         </label>
       </div>
-      <DataTable columns={columns} rows={shown} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: filtered.length > page * 20, onPageChange: setPage }} />
+      <DataTable columns={columns} rows={shown} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: pageSize, hasMore: filtered.length > page * pageSize, onPageChange: setPage }} />
       {open ? <PersonDetailPanel id={open} canEmergency={perms.has(PERMS.hrEmergencyView)} onClose={() => setOpen(null)} /> : null}
     </section>
   );
 }
 
 function PersonDetailPanel({ id, canEmergency, onClose }: { id: string; canEmergency: boolean; onClose: () => void }) {
+  const genders = useDict("gender");
   const t = useTranslations("pages.hr");
   const c = useTranslations("crud");
   const [d, setD] = React.useState<PersonDetail | null>(null);
@@ -122,7 +126,7 @@ function PersonDetailPanel({ id, canEmergency, onClose }: { id: string; canEmerg
         {d.sensitive ? (
           <>
             <dt className="text-muted">{t("birthDate")}</dt><dd>{d.sensitive.birthDate ?? ""}</dd>
-            <dt className="text-muted">{t("gender")}</dt><dd>{d.sensitive.gender ?? ""}</dd>
+            <dt className="text-muted">{t("gender")}</dt><dd>{genders.label(d.sensitive.gender)}</dd>
             <dt className="text-muted">{t("idNumber")}</dt><dd>{d.sensitive.idNumber ?? ""}</dd>
             <dt className="text-muted">{t("phone")}</dt><dd>{d.sensitive.phone ?? ""}</dd>
             <dt className="text-muted">{t("address")}</dt><dd>{d.sensitive.address ?? ""}</dd>
@@ -145,13 +149,14 @@ interface Contact { id: string; priority: number; name: string; relationship: st
 interface NamedRow { id: string; name: string; status?: boolean }
 
 export function StaffPage() {
+  const { pageSize } = useSettings();
   const t = useTranslations("pages.hr");
   const c = useTranslations("crud");
   const tt = useTable();
   const perms = usePermissions();
   const [q, setQ] = React.useState("");
   const [page, setPage] = React.useState(1);
-  const list = useList<StaffRow>(`staff?page=${page}&size=20${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+  const list = useList<StaffRow>(`staff?page=${page}&size=${pageSize}${q ? `&q=${encodeURIComponent(q)}` : ""}`);
   const depts = useList<NamedRow>("depts");
   const { run, message } = useAct(list.reload);
   const [form, setForm] = React.useState(false);
@@ -187,7 +192,7 @@ export function StaffPage() {
         <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
           onSubmit={async (p) => { const { deptId, ...rest } = p; if (await run(() => bff("staff", { method: "POST", body: { ...rest, assignments: deptId ? [{ deptId }] : undefined } }), c("saved"))) setForm(false); }} />
       ) : null}
-      <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: list.rows.length === 20, onPageChange: setPage }} />
+      <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: pageSize, hasMore: list.rows.length === pageSize, onPageChange: setPage }} />
       {open ? <StaffDetailPanel id={open} depts={depts.rows} canEmergency={perms.has(PERMS.hrEmergencyView)} onClose={() => { setOpen(null); list.reload(); }} /> : null}
     </section>
   );
@@ -319,13 +324,14 @@ function StatusDialog({ student, statuses, onSave, onCancel }: { student: Studen
 }
 
 export function StudentsPage() {
+  const { pageSize } = useSettings();
   const t = useTranslations("pages.hr");
   const c = useTranslations("crud");
   const tt = useTable();
   const [q, setQ] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [page, setPage] = React.useState(1);
-  const list = useList<StudentRow>(`students?page=${page}&size=20${q ? `&q=${encodeURIComponent(q)}` : ""}${status ? `&status=${status}` : ""}`);
+  const list = useList<StudentRow>(`students?page=${page}&size=${pageSize}${q ? `&q=${encodeURIComponent(q)}` : ""}${status ? `&status=${status}` : ""}`);
   const campuses = useList<CampusRow>("campuses");
   const { run, message } = useAct(list.reload);
   const [form, setForm] = React.useState(false);
@@ -376,7 +382,7 @@ export function StudentsPage() {
       ) : null}
       {importing ? <ImportPanel path="import/students" columns="student_id, name, campus_id, program, cohort, status" onDone={list.reload} onClose={() => setImporting(false)} /> : null}
       {form ? <FormPanel title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)} onSubmit={async (p) => { if (await run(() => bff("students", { method: "POST", body: p }), c("saved"))) setForm(false); }} /> : null}
-      <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: 20, hasMore: list.rows.length === 20, onPageChange: setPage }} />
+      <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} pagination={{ page, size: pageSize, hasMore: list.rows.length === pageSize, onPageChange: setPage }} />
     </section>
   );
 }

@@ -246,7 +246,11 @@
       "value": "值",
       "source": "来源",
       "platform": "平台提供",
-      "own": "自有"
+      "own": "自有",
+      "customize": "自定义",
+      "customized": "已自定义",
+      "restoreDefault": "恢复默认",
+      "confirmRestore": "确定要恢复缺省设置吗？"
     },
     "dicts": {
       "title": "字典管理",
@@ -961,7 +965,8 @@
   "dict": {
     "type": {
       "gender": "性别",
-      "employment_type": "雇佣类型"
+      "employment_type": "雇佣类型",
+      "degree_type": "学位类型"
     },
     "gender": {
       "male": "男",
@@ -972,6 +977,12 @@
     "employment_type": {
       "full_time": "全职",
       "part_time": "兼职"
+    },
+    "degree_type": {
+      "associate": "专科",
+      "bachelor": "本科",
+      "master": "硕士",
+      "doctor": "博士"
     }
   },
   "param": {
@@ -981,6 +992,12 @@
       },
       "list": {
         "pageSize": "默认每页条数"
+      }
+    },
+    "edu": {
+      "appeal": {
+        "windowDays": "成绩复评窗口（发布后天数）",
+        "maxPerCourse": "每门课最多复评次数"
       }
     }
   },
