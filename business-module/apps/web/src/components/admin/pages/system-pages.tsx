@@ -357,7 +357,7 @@ export function ParamsPage() {
 
 // ---------------------------------------------------------------- 字典
 interface DictType { id: string; code: string; name: string; nameKey: string | null; remark: string | null; status: boolean; platformProvided: boolean }
-interface DictItem { id: string; value: string; label: string; labelKey: string | null; remark: string | null; sort: number; status: boolean }
+interface DictItem { id: string; tenantId: string | null; value: string; label: string; labelKey: string | null; remark: string | null; sort: number; status: boolean }
 
 export function DictsPage() {
   const t = useTranslations("pages.dicts");
@@ -417,7 +417,7 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
     {
       key: "actions",
       header: "",
-      cell: (r) => (type.platformProvided ? null : (
+      cell: (r) => (r.tenantId === null ? null : (
         <div className="flex gap-1">
           <PermRowAction perm={PERMS.dictEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
           <PermRowAction perm={PERMS.dictRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.label })) && void run(() => bff(`dict-items/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
@@ -429,7 +429,8 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
     <Modal title={t("itemsOf", { name: type.name })} onClose={onClose}>
     <div>
       {message}
-      {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
+      {type.platformProvided ? <p className="mb-2 text-sm text-muted">{t("readOnly")}</p> : null}
+      <Can perm={PERMS.dictAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
           fields={[{ name: "value", label: t("value"), required: true, readOnly: !!form.row }, { name: "label", label: t("label"), required: true }, { name: "remark", label: t("remark"), type: "textarea" }, { name: "sort", label: c("sort"), type: "number" }, ...(form.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : [])]}

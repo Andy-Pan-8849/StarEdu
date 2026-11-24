@@ -822,7 +822,6 @@ model DictItem {
   tenant Tenant?  @relation(fields: [tenantId], references: [id])
   type   DictType @relation(fields: [typeId], references: [id])
 
-  @@unique([typeId, value])
   @@map("dict_item")
 }
 

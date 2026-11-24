@@ -264,7 +264,7 @@
       "itemsOf": "Items of {name}",
       "value": "Value",
       "label": "Label",
-      "readOnly": "Platform dictionaries are read-only.",
+      "readOnly": "Built-in entries are read-only. You can add your own entries below; only those can be edited or deleted.",
       "remark": "Remark"
     },
     "operationLog": {

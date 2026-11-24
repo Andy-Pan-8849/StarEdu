@@ -19,13 +19,26 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       expect(gender).toMatchObject({ platformProvided: true, nameKey: "dict.type.gender" });
       expect((await admin().patch(`/api/dict-types/${gender.id}`, { name: "x" })).status).toBe(403);
       expect((await admin().del(`/api/dict-types/${gender.id}`)).status).toBe(403);
-      expect((await admin().post(`/api/dict-types/${gender.id}/items`, { value: "z", label: "Z" })).status).toBe(403);
       const items = (await admin().get(`/api/dict-types/${gender.id}/items`)).body as Array<{ id: string }>;
       expect((await admin().patch(`/api/dict-items/${items[0].id}`, { label: "x" })).status).toBe(403);
       expect((await admin().del(`/api/dict-items/${items[0].id}`)).status).toBe(403);
       const dropdown = (await admin().get("/api/dicts/gender")).body;
       expect(dropdown.items.map((i: { value: string }) => i.value)).toEqual(["male", "female", "other", "unknown"]);
       expect(dropdown.items[0].labelKey).toBe("dict.gender.male");
+    });
+
+    it("a tenant can append its own entries to a platform dictionary; built-in entries stay read-only; other tenants do not see them", async () => {
+      const types = (await admin().get("/api/dict-types")).body as Array<{ id: string; code: string }>;
+      const degree = types.find((t) => t.code === "degree_type")!;
+      expect((await admin().post(`/api/dict-types/${degree.id}/items`, { value: "bachelor", label: "Dup" })).status).toBe(409); // 和平台条目重复
+      const mine = (await admin().post(`/api/dict-types/${degree.id}/items`, { value: "diploma", label: "Diploma", remark: "Two-year program" })).body;
+      expect((await admin().get("/api/dicts/degree_type")).body.items.map((i: { value: string }) => i.value)).toContain("diploma");
+      expect((await admin().patch(`/api/dict-items/${mine.id}`, { label: "Higher diploma" })).status).toBe(200);
+      const other = await h.extraTenant();
+      await h.owner.dictItem.create({ data: { tenantId: other.tenantId, typeId: degree.id, value: "diploma", label: "Theirs" } }); // 不同租户可以用同一个值
+      await h.owner.dictItem.deleteMany({ where: { tenantId: other.tenantId, typeId: degree.id } });
+      expect((await admin().del(`/api/dict-items/${mine.id}`)).status).toBe(200);
+      expect((await admin().get("/api/dicts/degree_type")).body.items.map((i: { value: string }) => i.value)).not.toContain("diploma");
     });
 
     it("a tenant can build its own dictionary; codes cannot clash with platform ones; disabled items leave the dropdown", async () => {

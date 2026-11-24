@@ -264,7 +264,7 @@
       "itemsOf": "{name} 的条目",
       "value": "值",
       "label": "显示文字",
-      "readOnly": "平台提供的字典只读。",
+      "readOnly": "系统内置的条目只读。你可以在下面追加自己的条目，只有自己追加的条目能修改和删除。",
       "remark": "备注"
     },
     "operationLog": {
