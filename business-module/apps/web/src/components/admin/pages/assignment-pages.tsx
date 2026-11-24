@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { PermRowAction, RowAction } from "../icon-button";
-import { CalendarPlus, ExternalLink, Inbox, Send } from "lucide-react";
+import { ArrowLeft, CalendarPlus, ExternalLink, Eye, Inbox, Send } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -11,6 +11,8 @@ import { usePromptDialog } from "../prompt-dialog";
 import { Can, PermButton } from "../permissions";
 import { FormPanel, useAct } from "./crud";
 import { useList } from "./use-api";
+import { useTable } from "./use-table";
+import { DataTable, type Column } from "../data-table";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const input = "rounded-md border border-border bg-transparent px-2 py-1";
@@ -184,6 +186,7 @@ interface MyDetail {
 export function PortalAssignmentsPage() {
   const t = useTranslations("pages.assignments");
   const c = useTranslations("crud");
+  const tbl = useTable();
   const list = useList<MyRow>("assignments");
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [d, setD] = React.useState<MyDetail | null>(null);
@@ -221,7 +224,7 @@ export function PortalAssignmentsPage() {
     const s = d.submission;
     return (
       <section className="text-sm">
-        <Button size="sm" variant="outline" className="mb-2" onClick={() => { setOpenId(null); setD(null); setMsg(null); }}>{t("back")}</Button>
+        <RowAction icon={ArrowLeft} className="mb-2" onClick={() => { setOpenId(null); setD(null); setMsg(null); }}>{t("back")}</RowAction>
         <H2>{d.title}</H2>
         <p className="mb-1 text-muted">{d.section.name} · {t("deadline", { when: new Date(d.deadline).toLocaleString() })} · {t("maxScore", { n: d.maxScore })}</p>
         {d.description ? <p className="mb-2 whitespace-pre-wrap">{d.description}</p> : null}
@@ -253,15 +256,23 @@ export function PortalAssignmentsPage() {
   return (
     <section className="text-sm">
       <H2>{t("myTitle")}</H2>
-      <ul className="space-y-2">
-        {list.rows.map((a) => (
-          <li key={a.id} className="rounded-md border border-border p-2">
-            <button className="font-medium underline" onClick={() => setOpenId(a.id)}>{a.title}</button>
-            <div className="text-muted">{a.section.course} · {t("deadline", { when: new Date(a.deadline).toLocaleString() })}{a.extensionDays ? ` · ${t("extended", { d: a.extensionDays })}` : ""} · {t(`sub_${a.status}`)}{a.finalScore !== null ? ` · ${a.finalScore}/${a.maxScore}` : ""}</div>
-          </li>
-        ))}
-        {list.rows.length === 0 ? <li className="text-muted">—</li> : null}
-      </ul>
+      <DataTable
+        columns={[
+          { key: "title", header: t("colTitle"), cell: (a) => <button className="font-medium text-primary hover:underline" onClick={() => setOpenId(a.id)}>{a.title}</button> },
+          { key: "course", header: t("colCourse"), cell: (a) => a.section.course },
+          { key: "deadline", header: t("colDeadline"), cell: (a) => `${new Date(a.deadline).toLocaleString()}${a.extensionDays ? ` · ${t("extended", { d: a.extensionDays })}` : ""}` },
+          { key: "status", header: t("colStatus"), cell: (a) => t(`sub_${a.status}`) },
+          { key: "score", header: t("colScore"), cell: (a) => (a.finalScore !== null ? `${a.finalScore}/${a.maxScore}` : "—") },
+          { key: "actions", header: "", cell: (a) => <RowAction icon={Eye} onClick={() => setOpenId(a.id)}>{t("open")}</RowAction> },
+        ] as Column<MyRow>[]}
+        rows={list.rows}
+        rowKey={(a) => a.id}
+        loading={list.loading}
+        emptyText={tbl.empty}
+        loadingText={tbl.loading}
+        selectable={false}
+        labels={tbl.labels}
+      />
     </section>
   );
 }

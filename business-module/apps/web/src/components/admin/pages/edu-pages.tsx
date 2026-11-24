@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { Tabs } from "../tabs";
-import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserMinus, UsersRound } from "lucide-react";
+import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserPlus, UsersRound } from "lucide-react";
 import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -478,6 +478,7 @@ interface MyEnrollment { id: string; status: string; course: { code: string; nam
 export function PortalEnrollPage() {
   const t = useTranslations("pages.edu");
   const c = useTranslations("crud");
+  const [tab, setTab] = React.useState<"open" | "mine">("open");
   const [filter, setFilter] = React.useState<"mine" | "all">("all");
   const [data, setData] = React.useState<{ declaredMajor: { name: string } | null; sections: OpenSection[] } | null>(null);
   const [enrolled, setEnrolled] = React.useState<MyEnrollment[]>([]);
@@ -491,34 +492,39 @@ export function PortalEnrollPage() {
     try { const r = await fn(); const conflicts = (r as { conflicts?: Array<{ name: string }> })?.conflicts ?? []; setMsg({ text: conflicts.length ? `${ok} ${t("clashWarning", { list: conflicts.map((x) => x.name).join(", ") })}` : ok, error: false }); } catch (e) { setMsg({ text: (e as Error).message, error: true }); }
     load();
   }
+  const tbl = useTable();
   if (!data) return <p className="text-sm text-muted">…</p>;
+  const mineCols: Column<MyEnrollment>[] = [
+    { key: "course", header: t("name"), cell: (e) => `${e.course.code} · ${e.course.name}` },
+    { key: "term", header: t("term"), cell: (e) => e.term },
+    { key: "status", header: t("state"), cell: (e) => t(`enr_${e.status}`) },
+    { key: "actions", header: "", cell: (e) => (e.canDrop ? <PermRowAction perm={PERMS.portalEnrollDrop} onClick={() => window.confirm(e.willBeW ? t("confirmDropW") : t("confirmDrop")) && void act(() => bff(`enrollments/${e.id}`, { method: "DELETE" }), c("done"))} icon={UserMinus} danger>{t("drop")}</PermRowAction> : null) },
+  ];
+  const openCols: Column<OpenSection>[] = [
+    { key: "course", header: t("name"), cell: (s) => (<div><div className="font-medium">{s.course.code} · {s.course.name} <span className="text-muted">({s.course.credits})</span> {s.requirement ? <span className="ml-1 rounded bg-border/50 px-1">{t(`cat_${s.requirement}`)}</span> : null}</div>
+      {!s.prerequisitesMet ? <div className="text-red-600">{t("missingPrereq", { list: s.missingPrerequisites.join(", ") })}</div> : null}
+      {s.conflicts.length ? <div className="text-amber-600">{t("clashWarning", { list: s.conflicts.join(", ") })}</div> : null}</div>) },
+    { key: "section", header: t("sectionCol"), cell: (s) => `${s.name} · ${s.campus}` },
+    { key: "instructors", header: t("instructorsCol"), cell: (s) => s.instructors.map((i) => i.fullName).filter(Boolean).join(", ") },
+    { key: "seats", header: t("seatsCol"), cell: (s) => t("seatsLeft", { n: s.seatsLeft }) },
+    { key: "actions", header: "", cell: (s) => <PermRowAction perm={PERMS.portalEnrollAdd} disabled={s.alreadyTaking || s.seatsLeft === 0} onClick={() => void act(() => bff("enrollments", { method: "POST", body: { sectionId: s.id } }), t("enrolledOk"))} icon={UserPlus}>{s.alreadyTaking ? t("taking") : s.seatsLeft === 0 ? t("full") : t("enroll")}</PermRowAction> },
+  ];
   return (
-    <section>
+    <section className="text-sm">
       <H2>{t("enrollTitle")}</H2>
-      {!data.declaredMajor ? <p className="mb-2 text-sm text-muted">{t("declareFirst")}</p> : null}
-      {msg ? <p role={msg.error ? "alert" : "status"} className={`mb-2 text-sm ${msg.error ? "text-red-600" : "text-muted"}`}>{msg.text}</p> : null}
-      <h3 className="mb-1 font-medium">{t("myCourses")}</h3>
-      <ul className="mb-4 list-disc pl-5 text-sm">
-        {enrolled.length === 0 ? <li className="text-muted">—</li> : enrolled.map((e) => (
-          <li key={e.id}>{e.course.code} · {e.course.name} ({e.term}) — {t(`enr_${e.status}`)}
-            {e.canDrop ? <PermRowAction perm={PERMS.portalEnrollDrop} className="ml-2" onClick={() => window.confirm(e.willBeW ? t("confirmDropW") : t("confirmDrop")) && void act(() => bff(`enrollments/${e.id}`, { method: "DELETE" }), c("done"))} icon={UserMinus} danger>{t("drop")}</PermRowAction> : null}</li>
-        ))}
-      </ul>
-      <div className="mb-2 flex items-center gap-2 text-sm">
-        <h3 className="font-medium">{t("openSections")}</h3>
-        <select aria-label={t("filter")} className="rounded-md border border-border bg-transparent px-2 py-1" value={filter} onChange={(e) => setFilter(e.target.value as "mine" | "all")}><option value="all">{t("allCourses")}</option><option value="mine">{t("myMajorOnly")}</option></select>
-      </div>
-      <ul className="space-y-2 text-sm">
-        {data.sections.map((s) => (
-          <li key={s.id} className="rounded-md border border-border p-2">
-            <div className="font-medium">{s.course.code} · {s.course.name} <span className="text-muted">({s.course.credits})</span> {s.requirement ? <span className="ml-1 rounded bg-border/50 px-1">{t(`cat_${s.requirement}`)}</span> : null}</div>
-            <div className="text-muted">{s.name} · {s.campus} · {t("seatsLeft", { n: s.seatsLeft })} · {s.instructors.map((i) => i.fullName).filter(Boolean).join(", ")}</div>
-            {!s.prerequisitesMet ? <div className="text-red-600">{t("missingPrereq", { list: s.missingPrerequisites.join(", ") })}</div> : null}
-            {s.conflicts.length ? <div className="text-amber-600">{t("clashWarning", { list: s.conflicts.join(", ") })}</div> : null}
-            <PermButton perm={PERMS.portalEnrollAdd} size="sm" className="mt-1" disabled={s.alreadyTaking || s.seatsLeft === 0} onClick={() => void act(() => bff("enrollments", { method: "POST", body: { sectionId: s.id } }), t("enrolledOk"))}>{s.alreadyTaking ? t("taking") : s.seatsLeft === 0 ? t("full") : t("enroll")}</PermButton>
-          </li>
-        ))}
-      </ul>
+      {!data.declaredMajor ? <p className="mb-2 text-muted">{t("declareFirst")}</p> : null}
+      {msg ? <p role={msg.error ? "alert" : "status"} className={`mb-2 ${msg.error ? "text-red-600" : "text-muted"}`}>{msg.text}</p> : null}
+      <Tabs value={tab} onChange={setTab} items={[{ key: "open", label: t("openSections") }, { key: "mine", label: `${t("myCourses")} (${enrolled.length})` }]} />
+      {tab === "open" ? (
+        <>
+          <div className="mb-2 flex items-center gap-2">
+            <select aria-label={t("filter")} className="rounded-md border border-border bg-transparent px-2 py-1" value={filter} onChange={(e) => setFilter(e.target.value as "mine" | "all")}><option value="all">{t("allCourses")}</option><option value="mine">{t("myMajorOnly")}</option></select>
+          </div>
+          <DataTable columns={openCols} rows={data.sections} rowKey={(s) => s.id} emptyText={tbl.empty} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
+        </>
+      ) : (
+        <DataTable columns={mineCols} rows={enrolled} rowKey={(e) => e.id} emptyText={tbl.empty} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
+      )}
     </section>
   );
 }
@@ -528,20 +534,33 @@ interface Plan { declaredMajor: { name: string } | null; message?: string; cours
 
 export function PortalPlanPage() {
   const t = useTranslations("pages.edu");
+  const tbl = useTable();
   const [plan, setPlan] = React.useState<Plan | null>(null);
   React.useEffect(() => { void bff<Plan>("plan").then(setPlan); }, []);
   if (!plan) return <p className="text-sm text-muted">…</p>;
   return (
-    <section>
+    <section className="text-sm">
       <H2>{t("planTitle")}</H2>
       {!plan.declaredMajor ? <p className="text-sm text-muted">{t("declareFirst")}</p> : (
         <>
           <p className="mb-2 text-sm">{plan.declaredMajor.name} — {t("progress", { earned: plan.credits.earned, required: plan.credits.required })}</p>
           <p className="mb-2 text-xs text-muted">{t("planNote")}</p>
-          <table className="w-full text-left text-sm">
-            <thead className="text-muted"><tr><th className="py-1">{t("code")}</th><th>{t("name")}</th><th>{t("credits")}</th><th>{t("category")}</th><th>{t("suggestedTerm")}</th><th>{t("state")}</th></tr></thead>
-            <tbody>{plan.courses.map((x) => <tr key={x.courseId} className="border-t border-border"><td className="py-1">{x.code}</td><td>{x.name}</td><td>{x.credits}</td><td>{t(`cat_${x.category}`)}</td><td>{x.suggestedTerm ?? ""}</td><td>{t(`state_${x.state}`)}</td></tr>)}</tbody>
-          </table>
+          <DataTable
+            columns={[
+              { key: "code", header: t("code"), cell: (x) => x.code },
+              { key: "name", header: t("name"), cell: (x) => x.name },
+              { key: "credits", header: t("credits"), cell: (x) => x.credits },
+              { key: "category", header: t("category"), cell: (x) => t(`cat_${x.category}`) },
+              { key: "term", header: t("suggestedTerm"), cell: (x) => x.suggestedTerm ?? "" },
+              { key: "state", header: t("state"), cell: (x) => t(`state_${x.state}`) },
+            ] as Column<Plan["courses"][number]>[]}
+            rows={plan.courses}
+            rowKey={(x) => x.courseId}
+            emptyText={tbl.empty}
+            loadingText={tbl.loading}
+            selectable={false}
+            labels={tbl.labels}
+          />
         </>
       )}
     </section>

@@ -10,6 +10,8 @@ import { usePromptDialog } from "../prompt-dialog";
 import { Can, PermButton } from "../permissions";
 import { useAct } from "./crud";
 import { useList } from "./use-api";
+import { useTable } from "./use-table";
+import { DataTable, type Column } from "../data-table";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const input = "rounded-md border border-border bg-transparent px-2 py-1";
@@ -230,6 +232,7 @@ interface MyGrades { student: { fullName: string }; terms: Array<{ termId: strin
 
 export function PortalGradesPage() {
   const t = useTranslations("pages.grades");
+  const tbl = useTable();
   const [g, setG] = React.useState<MyGrades | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
   React.useEffect(() => { void bff<MyGrades>("grades").then(setG); }, []);
@@ -239,11 +242,24 @@ export function PortalGradesPage() {
       <H2>{t("myGrades")}</H2>
       <p className="mb-2">{t("cumulative")}: GPA {g.cumulative.gpa ?? "-"} · {t("credits", { a: g.cumulative.creditsAttempted, e: g.cumulative.creditsEarned })}{g.progress.creditsRequired ? ` · ${t("progress", { e: g.progress.creditsEarned, r: g.progress.creditsRequired })}` : ""}</p>
       {err ? <p role="alert" className="mb-2 text-red-600">{err}</p> : null}
-      <PermButton perm={PERMS.portalTranscriptDownload} size="sm" className="mb-3" onClick={() => void downloadPdf("transcript.pdf", "GET").catch((e: Error) => setErr(e.message))}>{t("downloadTranscript")}</PermButton>
+      <div className="mb-3"><PermRowAction perm={PERMS.portalTranscriptDownload} icon={Download} onClick={() => void downloadPdf("transcript.pdf", "GET").catch((e: Error) => setErr(e.message))}>{t("downloadTranscript")}</PermRowAction></div>
       {g.terms.map((term) => (
-        <div key={term.termId} className="mb-3">
-          <h3 className="font-medium">{term.name} — GPA {term.gpa ?? "-"}</h3>
-          <ul className="list-disc pl-5">{term.rows.map((r) => <li key={r.enrollmentId}>{r.courseCode} · {r.courseName} ({r.credits}): {r.state === "graded" ? `${r.grade} (${r.total})${r.replaced ? ` · ${t("retaken")}` : ""}` : t(`state_${r.state}`)}</li>)}</ul>
+        <div key={term.termId} className="mb-4">
+          <h3 className="mb-1 font-medium">{term.name} — GPA {term.gpa ?? "-"}</h3>
+          <DataTable
+            columns={[
+              { key: "code", header: t("colCode"), cell: (r) => r.courseCode },
+              { key: "name", header: t("colCourse"), cell: (r) => r.courseName },
+              { key: "credits", header: t("colCredits"), cell: (r) => r.credits },
+              { key: "result", header: t("colResult"), cell: (r) => (r.state === "graded" ? `${r.grade} (${r.total})${r.replaced ? ` · ${t("retaken")}` : ""}` : t(`state_${r.state}`)) },
+            ] as Column<MyGrades["terms"][number]["rows"][number]>[]}
+            rows={term.rows}
+            rowKey={(r) => r.enrollmentId}
+            emptyText={tbl.empty}
+            loadingText={tbl.loading}
+            selectable={false}
+            labels={tbl.labels}
+          />
         </div>
       ))}
       <p className="text-xs text-muted">{t("unofficialNote")}</p>

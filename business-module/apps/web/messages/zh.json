@@ -567,7 +567,10 @@
       "batchDone": "已执行",
       "batchSummary": "选中 {selected} 人，可选 {ok}，需确认 {needConfirmation}，被拦 {blocked}",
       "batchWill": "将选上",
-      "batchEnrolled": "已选上"
+      "batchEnrolled": "已选上",
+      "sectionCol": "班级",
+      "instructorsCol": "授课老师",
+      "seatsCol": "余位"
     },
     "assignments": {
       "tab": "作业",
@@ -619,7 +622,12 @@
       "submit": "提交",
       "resubmit": "再次提交",
       "cannotSubmit": "现在不能提交这份作业。",
-      "uploadFailed": "上传 {name} 失败"
+      "uploadFailed": "上传 {name} 失败",
+      "colTitle": "作业",
+      "colCourse": "课程",
+      "colDeadline": "截止时间",
+      "colStatus": "状态",
+      "colScore": "得分"
     },
     "requests": {
       "colStudent": "学生",
@@ -657,7 +665,9 @@
       "rejectNote": "驳回的理由（学生可见）",
       "newTotal": "新的总评（当前：{current}）",
       "approveDays": "批准天数",
-      "decided": "已处理，并通知了学生。"
+      "decided": "已处理，并通知了学生。",
+      "colStatus": "状态",
+      "colCreated": "提交时间"
     },
     "grades": {
       "policy": "成绩构成（各作业分组的权重，合计 100%）",
@@ -713,7 +723,11 @@
       "revoked": "已作废",
       "revoke": "作废",
       "cancel": "取消",
-      "revokeReason": "为什么作废这份文档？扫码的人会看到它已作废。"
+      "revokeReason": "为什么作废这份文档？扫码的人会看到它已作废。",
+      "colCode": "课程代码",
+      "colCourse": "课程",
+      "colCredits": "学分",
+      "colResult": "成绩"
     },
     "announcements": {
       "recipientsCol": "接收人数",
@@ -756,7 +770,11 @@
       "post": "发布",
       "replies": "{n} 条回复",
       "empty": "还没有讨论。",
-      "instructor": "老师"
+      "instructor": "老师",
+      "colTitle": "主题",
+      "colAuthor": "发帖人",
+      "colReplies": "回复",
+      "colState": "状态"
     },
     "library": {
       "edit": "编辑文件夹",
