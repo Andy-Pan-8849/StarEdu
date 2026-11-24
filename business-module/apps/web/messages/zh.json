@@ -30,7 +30,9 @@
     "signOut": "退出登录",
     "searchMenus": "搜索菜单",
     "collapseMenu": "收起菜单",
-    "expandMenu": "展开菜单"
+    "expandMenu": "展开菜单",
+    "home": "首页",
+    "profile": "个人中心"
   },
   "table": {
     "more": "更多",
@@ -1107,5 +1109,40 @@
     "degree_type": "专业的学位层次（专科、本科、硕士、博士……）。编辑专业时选择。",
     "relationship": "紧急联系人与本人的关系（父母、配偶……）。新增联系人时作为选项。",
     "material_category": "教学班资料的类别（课件、参考资料、教学大纲）。资料只接受这里列出的值。"
+  },
+  "home": {
+    "greeting_morning": "早上好，{name}",
+    "greeting_afternoon": "下午好，{name}",
+    "greeting_evening": "晚上好，{name}",
+    "subtitleStudent": "这里是需要你关注的事情。",
+    "subtitleStaff": "这里是当前情况的概览。",
+    "unread": "未读消息",
+    "myCourses": "本学期课程",
+    "toSubmit": "待提交的作业",
+    "gpa": "GPA",
+    "creditsEarned": "已获得 {n} 学分",
+    "pendingRequests": "等你处理的申请",
+    "sectionsInProgress": "进行中的教学班",
+    "ofSections": "共 {n} 个",
+    "students": "学生数",
+    "dueSoon": "快到期的作业",
+    "viewAll": "查看全部",
+    "nothingDue": "目前没有待提交的作业。",
+    "recentMessages": "最近的消息",
+    "noMessages": "还没有消息。"
+  },
+  "profile": {
+    "number": "工号/学号",
+    "roles": "角色",
+    "depts": "所属部门",
+    "joined": "创建时间",
+    "tabBasic": "基本资料",
+    "tabPassword": "修改密码",
+    "basicNote": "姓名、工号/学号和部门由学校维护，你可以在这里更新自己的联系方式。",
+    "phone": "手机",
+    "email": "邮箱",
+    "noProfile": "这个账号没有对应的个人资料，不能在这里修改。",
+    "passwordNote": "密码由登录服务统一管理。点下面的按钮会跳转过去修改，改完自动回来。",
+    "changePassword": "修改密码"
   }
 }

@@ -20,6 +20,16 @@ export function findMenu(nodes: readonly MenuNode[], id: string): MenuNode | und
   return undefined;
 }
 
+/** 按页面组件路径找菜单（首页卡片跳转用）。 */
+export function findByComponent(nodes: readonly MenuNode[], component: string): MenuNode | undefined {
+  for (const n of nodes) {
+    if (n.type === "menu" && n.component === component) return n;
+    const hit = findByComponent(n.children, component);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 /** 第一个可打开的菜单（用来默认打开首页标签）。 */
 export function firstOpenable(nodes: readonly MenuNode[]): MenuNode | undefined {
   for (const n of nodes) {

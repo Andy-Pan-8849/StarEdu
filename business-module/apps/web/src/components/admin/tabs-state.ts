@@ -2,6 +2,8 @@
 export interface TabItem {
   id: string;
   title: string;
+  /** 固定的标签页（首页）：不能关闭 */
+  pinned?: boolean;
 }
 export interface TabsState {
   tabs: TabItem[];
@@ -16,7 +18,7 @@ export function openTab(state: TabsState, tab: TabItem): TabsState {
 
 export function closeTab(state: TabsState, id: string): TabsState {
   const index = state.tabs.findIndex((t) => t.id === id);
-  if (index < 0) return state;
+  if (index < 0 || state.tabs[index].pinned) return state;
   const tabs = state.tabs.filter((t) => t.id !== id);
   if (state.activeId !== id) return { tabs, activeId: state.activeId };
   const next = tabs[index] ?? tabs[index - 1] ?? null; // 先右邻、再左邻

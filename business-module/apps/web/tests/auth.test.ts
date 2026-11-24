@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { entryParams, isPlatformHostName, realmFor, safeReturnPath, tenantCodeFromHost } from "../src/lib/auth/host";
+import { greetingKey } from "../src/components/admin/pages/home-page";
+import { passwordChangeHref } from "../src/components/admin/pages/profile-page";
 import { authorizeUrl, exchangeCode, logoutUrl, OidcError, refreshTokens } from "../src/lib/auth/oidc";
 import { challengeFor, randomToken } from "../src/lib/auth/pkce";
 import { freshSession, loadSession } from "../src/lib/auth/server-session";
@@ -177,5 +179,20 @@ describe("config", () => {
     expect(() => webAuthConfig({ NODE_ENV: "production" } as unknown as NodeJS.ProcessEnv)).toThrow(/WEB_SESSION_SECRET/);
     expect(webAuthConfig({ NODE_ENV: "production", WEB_SESSION_SECRET: "x" } as unknown as NodeJS.ProcessEnv).secret).toBe("x");
     expect(webAuthConfig({} as NodeJS.ProcessEnv).keycloakPublicUrl).toBe("http://localhost:8180");
+  });
+});
+
+describe("password change entry and home greeting", () => {
+  it("asks Keycloak for the update-password action only when requested", () => {
+    const base = { publicUrl: "http://kc", tenantCode: "hq", entry: "admin" as const, origin: "http://hq.localhost:3001", state: "s", verifier: "v" };
+    expect(new URL(authorizeUrl(base)).searchParams.get("kc_action")).toBeNull();
+    expect(new URL(authorizeUrl({ ...base, kcAction: "password" })).searchParams.get("kc_action")).toBe("UPDATE_PASSWORD");
+  });
+  it("sends the password change through the login route of the current entry and returns to it", () => {
+    expect(passwordChangeHref("/admin")).toBe("/admin/auth/login?kc_action=password&return=%2Fadmin");
+    expect(passwordChangeHref("/")).toBe("/auth/login?kc_action=password&return=%2F");
+  });
+  it("greets by the time of day", () => {
+    expect([greetingKey(8), greetingKey(13), greetingKey(20)]).toEqual(["morning", "afternoon", "evening"]);
   });
 });

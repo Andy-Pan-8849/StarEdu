@@ -13,9 +13,11 @@ export function TabBar({ state, onActivate, onClose, closeLabel }: { state: Tabs
           <button type="button" role="tab" aria-selected={tab.id === state.activeId} onClick={() => onActivate(tab.id)}>
             {tab.title}
           </button>
-          <button type="button" aria-label={`${closeLabel} ${tab.title}`} className="text-muted hover:text-foreground" onClick={() => onClose(tab.id)}>
-            <X aria-hidden className="h-3.5 w-3.5" />
-          </button>
+          {tab.pinned ? null : (
+            <button type="button" aria-label={`${closeLabel} ${tab.title}`} className="text-muted hover:text-foreground" onClick={() => onClose(tab.id)}>
+              <X aria-hidden className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ))}
     </div>

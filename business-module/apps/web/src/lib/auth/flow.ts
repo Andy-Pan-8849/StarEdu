@@ -44,7 +44,7 @@ export async function handleAuth(entry: Entry, action: string, req: NextRequest)
     const state = randomToken(24);
     const verifier = randomToken(48);
     const returnTo = safeReturnPath(req.nextUrl.searchParams.get("return"), entry);
-    const res = NextResponse.redirect(authorizeUrl({ publicUrl: config.keycloakPublicUrl, tenantCode, entry, origin: self, state, verifier }));
+    const res = NextResponse.redirect(authorizeUrl({ publicUrl: config.keycloakPublicUrl, tenantCode, entry, origin: self, state, verifier, ...(req.nextUrl.searchParams.get("kc_action") === "password" ? { kcAction: "password" as const } : {}) }));
     res.cookies.set(OIDC_COOKIE, sign({ state, verifier, entry, tenantCode, returnTo } satisfies OidcState, config.secret), cookieOptions(secure, 600));
     return res;
   }
