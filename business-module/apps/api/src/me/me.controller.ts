@@ -1,8 +1,9 @@
 // "我"：登录登记（入口资格检查 + 登录日志 + 在线状态）、我的信息、我的菜单树。
 // 这三个接口对任何已登录的本租户账号开放（AnyAuthenticated），数据只涉及账号自己。
 import { ParamsService } from "../sysdata/params.service";
-import { Body, Controller, ForbiddenException, Get, NotFoundException, Post, Query } from "@nestjs/common";
+import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Patch, Post, Query } from "@nestjs/common";
 import { z } from "zod";
+import { AuditService } from "../audit/audit.service";
 import { AnyAuthenticated } from "../auth/decorators";
 import { SessionStore } from "../auth/session-store";
 import type { AuthContext } from "../auth/tenant-token.guard";
@@ -10,6 +11,7 @@ import { Auth, ClientInfo, parse } from "../common/http";
 import { AuthzService } from "../rbac/authz.service";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 
+const profilePatch = z.object({ phone: z.string().trim().max(50).nullable().optional(), workEmail: z.string().trim().email().max(200).nullable().optional() }).strict();
 const entrySchema = z.object({ entry: z.enum(["admin", "portal"]) });
 
 @Controller("api")
@@ -19,6 +21,7 @@ export class MeController {
     private readonly authz: AuthzService,
     private readonly sessions: SessionStore,
     private readonly params: ParamsService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get("me")
@@ -36,6 +39,61 @@ export class MeController {
       roles: auth.authz.roles.map((r) => ({ id: r.id, code: r.code, kind: r.kind })),
       permissions: auth.authz.perms,
     };
+  }
+
+  /**
+   * 个人中心：我是谁（姓名、账号、角色、所属部门），以及我自己能改的联系方式（手机、邮箱）。
+   * 姓名、学号、部门由教务/人事维护，这里只读；没有对应人员的账号（内置管理员）只显示账号信息。
+   */
+  @Get("me/profile")
+  @AnyAuthenticated()
+  async profile(@Auth() auth: AuthContext) {
+    const db = this.tenantDb.db;
+    const account = await db.account.findUnique({ where: { id: auth.accountId } });
+    if (!account) throw new NotFoundException("Account not found in this tenant");
+    const person = account.personId ? await db.person.findUnique({ where: { id: account.personId } }) : null;
+    const roles = await db.role.findMany({ where: { id: { in: auth.authz.roles.map((r) => r.id) } }, select: { code: true, name: true } });
+    const links = person ? await db.personDept.findMany({ where: { personId: person.id, endDate: null }, select: { deptId: true, isPrimary: true } }) : [];
+    const depts = links.length ? await db.dept.findMany({ where: { id: { in: links.map((l) => l.deptId) } }, select: { id: true, name: true } }) : [];
+    const [staff, student] = person ? await Promise.all([db.staffProfile.findFirst({ where: { personId: person.id } }), db.studentProfile.findFirst({ where: { personId: person.id } })]) : [null, null];
+    return {
+      username: account.username,
+      fullName: person?.fullName ?? null,
+      type: person?.type ?? null,
+      number: staff?.employeeNo ?? student?.studentNo ?? null,
+      email: person?.workEmail ?? account.email ?? null,
+      phone: person?.phone ?? null,
+      roles: roles.map((r) => ({ code: r.code, name: r.name })),
+      depts: depts.map((d) => d.name),
+      createdAt: account.createdAt,
+      editable: !!person,
+    };
+  }
+
+  /** 改自己的联系方式（手机、邮箱）。只能改自己的；其余资料由教务/人事维护。 */
+  @Patch("me/profile")
+  @AnyAuthenticated()
+  async updateProfile(@Auth() auth: AuthContext, @Body() body: unknown) {
+    const input = parse(profilePatch, body);
+    const db = this.tenantDb.db;
+    const account = await db.account.findUnique({ where: { id: auth.accountId } });
+    if (!account?.personId) throw new BadRequestException("This account has no personal profile to edit");
+    const person = await db.person.update({ where: { id: account.personId }, data: { ...(input.phone !== undefined ? { phone: input.phone || null } : {}), ...(input.workEmail !== undefined ? { workEmail: input.workEmail || null } : {}), updatedBy: auth.accountId } });
+    await this.audit.record(auth.accountId, "profile.update", "person", person.id, { fields: Object.keys(input) });
+    return { phone: person.phone, email: person.workEmail };
+  }
+
+  // 学生门户的会话走 /api/portal/*，同一个个人中心
+  @Get("portal/me/profile")
+  @AnyAuthenticated()
+  portalProfile(@Auth() auth: AuthContext) {
+    return this.profile(auth);
+  }
+
+  @Patch("portal/me/profile")
+  @AnyAuthenticated()
+  portalUpdateProfile(@Auth() auth: AuthContext, @Body() body: unknown) {
+    return this.updateProfile(auth, body);
   }
 
   /**

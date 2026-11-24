@@ -20,7 +20,10 @@ export class OidcError extends Error {
   }
 }
 
-export function authorizeUrl(opts: { publicUrl: string; tenantCode: string; entry: Entry; origin: string; state: string; verifier: string }): string {
+/** 登录时顺带要求的动作：改密码（Keycloak 的"应用发起的动作"，登录后先让用户设新密码再回来）。 */
+export const KC_ACTIONS = { password: "UPDATE_PASSWORD" } as const;
+
+export function authorizeUrl(opts: { publicUrl: string; tenantCode: string; entry: Entry; origin: string; state: string; verifier: string; kcAction?: keyof typeof KC_ACTIONS }): string {
   const { clientId, base } = entryParams(opts.entry);
   const url = new URL(`${opts.publicUrl}/realms/${realmFor(opts.tenantCode)}/protocol/openid-connect/auth`);
   url.search = new URLSearchParams({
@@ -31,6 +34,7 @@ export function authorizeUrl(opts: { publicUrl: string; tenantCode: string; entr
     state: opts.state,
     code_challenge: challengeFor(opts.verifier),
     code_challenge_method: "S256",
+    ...(opts.kcAction ? { kc_action: KC_ACTIONS[opts.kcAction] } : {}),
   }).toString();
   return url.toString();
 }

@@ -41,6 +41,19 @@ describe("sessions, force logout and entry qualification", () => {
     expect((await me()).logoUrl).toBeNull();
   });
 
+  it("the profile shows who I am and lets me change my own phone and email, nothing else", async () => {
+    const me = h.call(bossToken);
+    const before = (await me.get("/api/me/profile")).body;
+    expect(before).toMatchObject({ username: "boss", editable: true, type: "staff" });
+    expect(before.roles.map((r: { code: string }) => r.code)).toContain("tenant-admin");
+    const after = (await me.patch("/api/me/profile", { phone: "555-0100", workEmail: "boss@example.test" })).body;
+    expect(after).toEqual({ phone: "555-0100", email: "boss@example.test" });
+    expect((await me.get("/api/me/profile")).body).toMatchObject({ phone: "555-0100", email: "boss@example.test" });
+    expect((await me.patch("/api/me/profile", { fullName: "Hacked" })).status).toBe(400); // 姓名由人事维护
+    expect((await me.patch("/api/me/profile", { workEmail: "not-an-email" })).status).toBe(400);
+    expect((await me.patch("/api/me/profile", { phone: "" })).body.phone).toBeNull();
+  });
+
   it("a signed-in user shows up as online, and an administrator can force them out", async () => {
     const victim = await h.user("victim", { roles: ["tenant-admin"], person: "staff" });
     const victimToken = await victim.token();

@@ -30,7 +30,9 @@
     "signOut": "Sign out",
     "searchMenus": "Search menu",
     "collapseMenu": "Collapse menu",
-    "expandMenu": "Expand menu"
+    "expandMenu": "Expand menu",
+    "home": "Home",
+    "profile": "Profile"
   },
   "table": {
     "more": "More",
@@ -1107,5 +1109,40 @@
     "degree_type": "The level of a major (associate, bachelor, master, doctor…). Chosen when editing a major.",
     "relationship": "How an emergency contact is related to the person (parent, spouse…). Offered as choices when adding a contact.",
     "material_category": "The kind of a class section's teaching material (slides, reference, syllabus). A material only accepts values listed here."
+  },
+  "home": {
+    "greeting_morning": "Good morning, {name}",
+    "greeting_afternoon": "Good afternoon, {name}",
+    "greeting_evening": "Good evening, {name}",
+    "subtitleStudent": "Here is what needs your attention.",
+    "subtitleStaff": "Here is an overview of what is going on.",
+    "unread": "Unread messages",
+    "myCourses": "Courses this term",
+    "toSubmit": "Assignments to submit",
+    "gpa": "GPA",
+    "creditsEarned": "{n} credits earned",
+    "pendingRequests": "Requests waiting for you",
+    "sectionsInProgress": "Class sections in progress",
+    "ofSections": "of {n} in total",
+    "students": "Students",
+    "dueSoon": "Due soon",
+    "viewAll": "View all",
+    "nothingDue": "Nothing to submit right now.",
+    "recentMessages": "Recent messages",
+    "noMessages": "No messages yet."
+  },
+  "profile": {
+    "number": "ID",
+    "roles": "Roles",
+    "depts": "Departments",
+    "joined": "Joined",
+    "tabBasic": "Basic information",
+    "tabPassword": "Password",
+    "basicNote": "Your name, ID and department are maintained by the school. You can update your contact details here.",
+    "phone": "Phone",
+    "email": "Email",
+    "noProfile": "This account has no personal profile to edit.",
+    "passwordNote": "Your password is managed by the sign-in service. You will be taken there to change it and then brought back.",
+    "changePassword": "Change password"
   }
 }

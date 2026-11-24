@@ -7,6 +7,8 @@ import { PAGES } from "./page-registry";
 import { BannerStrip, NotificationBell } from "./notification-bell";
 import { BrandNameContext } from "./brand-context";
 import { PermissionProvider } from "./permissions";
+import { HomePage } from "./pages/home-page";
+import { ProfilePage } from "./pages/profile-page";
 import { SettingsContext, type UiSettings } from "./settings-context";
 
 export function AdminShell({ menus, permissions, userName, brand, signOutAction = "/admin/auth/logout", wsPort, settings }: { menus: MenuNode[]; permissions: string[]; userName: string; brand?: { name: string; logoUrl: string | null }; signOutAction?: string; wsPort?: string; settings?: UiSettings }) {
@@ -20,6 +22,9 @@ export function AdminShell({ menus, permissions, userName, brand, signOutAction 
         pages={PAGES}
         userName={userName}
         brand={brand}
+        // 租户的两个入口有首页和个人中心；平台控制台（没有消息中心）没有
+        homePage={wsPort === undefined ? undefined : HomePage}
+        profilePage={wsPort === undefined ? undefined : ProfilePage}
         signOutAction={signOutAction}
         // 平台控制台没有消息中心（wsPort 为 undefined 时不显示）
         headerExtra={wsPort === undefined ? null : <NotificationBell wsPort={wsPort} />}
@@ -34,6 +39,10 @@ export function AdminShell({ menus, permissions, userName, brand, signOutAction 
           searchMenus: t("shell.searchMenus"),
           collapseMenu: t("shell.collapseMenu"),
           expandMenu: t("shell.expandMenu"),
+          home: t("shell.home"),
+          profile: t("shell.profile"),
+          language: t("language.label"),
+          languageNames: { en: t("language.en"), zh: t("language.zh") },
         }}
       />
       </BrandNameContext.Provider>

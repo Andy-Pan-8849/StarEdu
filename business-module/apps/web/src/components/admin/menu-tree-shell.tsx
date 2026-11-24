@@ -8,9 +8,15 @@ import { ChevronDown, ChevronRight, ExternalLink, PanelLeftClose, PanelLeftOpen,
 import { cn } from "@/lib/utils";
 import { LogoMark } from "../logo-mark";
 import { MenuIcon } from "./menu-icon";
-import { filterMenus, firstOpenable, findMenu, type MenuNode } from "./menu-nav";
+import { filterMenus, findByComponent, firstOpenable, findMenu, type MenuNode } from "./menu-nav";
+import { NavContext } from "./nav-context";
 import { TabBar } from "./tab-bar";
 import { closeTab, emptyTabs, openTab, type TabsState } from "./tabs-state";
+import { UserMenu, type UserMenuLabels } from "./user-menu";
+
+/** 不在菜单里的两个固定页面：首页（固定标签页）和个人中心（从头像菜单打开）。 */
+export const HOME_ID = "@home";
+export const PROFILE_ID = "@profile";
 
 export interface ShellLabels {
   closeTab: string;
@@ -18,6 +24,11 @@ export interface ShellLabels {
   pageNotBuilt: string;
   signedInAs: string;
   signOut: string;
+  /** 首页、个人中心的标签页名字，和头像菜单里的文字；不给就用英文 */
+  home?: string;
+  profile?: string;
+  language?: string;
+  languageNames?: Record<string, string>;
   /** 以下三项是菜单搜索框和折叠按钮的文字；不给就用英文 */
   searchMenus?: string;
   collapseMenu?: string;
@@ -46,6 +57,8 @@ export function MenuTreeShell({
   labels,
   headerExtra,
   topExtra,
+  homePage,
+  profilePage,
 }: {
   menus: readonly MenuNode[];
   pages: Record<string, React.ComponentType>;
@@ -58,19 +71,34 @@ export function MenuTreeShell({
   headerExtra?: React.ReactNode;
   /** 顶栏上方的内容（平台横幅） */
   topExtra?: React.ReactNode;
+  /** 首页和个人中心页面；不给就没有首页（登录后打开第一个菜单）和个人中心 */
+  homePage?: React.ComponentType;
+  profilePage?: React.ComponentType;
   labels: ShellLabels;
 }) {
   const [tabs, setTabs] = React.useState<TabsState>(() => {
+    if (homePage) return openTab(emptyTabs, { id: HOME_ID, title: labels.home ?? "Home", pinned: true });
     const first = firstOpenable(menus);
     return first ? openTab(emptyTabs, { id: first.id, title: label(first) }) : emptyTabs;
   });
+  const nav = React.useMemo(
+    () => ({
+      openPage: (component: string) => {
+        const node = findByComponent(menus, component);
+        if (!node) return false;
+        setTabs((t) => openTab(t, { id: node.id, title: label(node) }));
+        return true;
+      },
+    }),
+    [menus, label],
+  );
   const [collapsed, setCollapsed] = React.useState<ReadonlySet<string>>(new Set());
   // 外链里的 {code} 要用浏览器里的域名；服务端渲染时不知道，所以挂载之后才换（否则服务端和浏览器渲染出的地址不同，React 报水合不一致）
   const [host, setHost] = React.useState<string | null>(null);
   React.useEffect(() => setHost(window.location.hostname), []);
 
   const active = tabs.activeId ? findMenu(menus, tabs.activeId) : undefined;
-  const Page = active?.component ? pages[active.component] : undefined;
+  const Page = tabs.activeId === HOME_ID ? homePage : tabs.activeId === PROFILE_ID ? profilePage : active?.component ? pages[active.component] : undefined;
 
   const [query, setQuery] = React.useState("");
   const [mini, setMini] = React.useState(false); // 只显示图标的窄菜单
@@ -132,6 +160,7 @@ export function MenuTreeShell({
   };
 
   return (
+    <NavContext.Provider value={nav}>
     <div className="flex h-screen overflow-hidden">
       {/* 左侧菜单：整列固定在屏幕高度内，菜单自己滚动，不带着右边的内容走 */}
       <nav aria-label="Menu" className={cn("flex shrink-0 flex-col border-r border-border bg-border/10 transition-[width]", mini ? "w-14" : "w-64")}>
@@ -181,14 +210,12 @@ export function MenuTreeShell({
         {topExtra}
         <header className="flex h-14 shrink-0 items-center justify-end gap-3 border-b border-border px-4 text-sm text-muted">
           {headerExtra}
-          <span>
-            {labels.signedInAs} <strong className="text-foreground">{userName}</strong>
-          </span>
-          <form method="post" action={signOutAction}>
-            <button type="submit" className="underline">
-              {labels.signOut}
-            </button>
-          </form>
+          <UserMenu
+            userName={userName}
+            signOutAction={signOutAction}
+            labels={{ signedInAs: labels.signedInAs, signOut: labels.signOut, profile: labels.profile, language: labels.language, languageNames: labels.languageNames } satisfies UserMenuLabels}
+            onProfile={profilePage ? () => setTabs((t) => openTab(t, { id: PROFILE_ID, title: labels.profile ?? "Profile" })) : undefined}
+          />
         </header>
         <TabBar
           state={tabs}
@@ -197,9 +224,10 @@ export function MenuTreeShell({
           onClose={(id) => setTabs((t) => closeTab(t, id))}
         />
         <main className="min-h-0 flex-1 overflow-y-auto p-4">
-          {active ? (Page ? <Page /> : <p className="text-sm text-muted">{labels.pageNotBuilt}</p>) : null}
+          {tabs.activeId === HOME_ID || tabs.activeId === PROFILE_ID || active ? (Page ? <Page /> : <p className="text-sm text-muted">{labels.pageNotBuilt}</p>) : null}
         </main>
       </div>
     </div>
+    </NavContext.Provider>
   );
 }

@@ -44,6 +44,7 @@ export interface LeakEntry {
 
 export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/me", kind: "self" },
+  { method: "GET", path: "/api/me/profile", kind: "other" },
   { method: "GET", path: "/api/me/menus?entry=admin", kind: "other" },
   { method: "GET", path: "/api/campuses", kind: "list" },
   { method: "GET", path: "/api/requests", kind: "other" },
@@ -267,6 +268,9 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
 
 /** 不接收别人的 id、只作用于调用者自己租户的写接口。 */
 export const OTHER_ROUTES: Record<string, string> = {
+  "PATCH /api/me/profile": "changes only the caller's own person record (found through the caller's account); takes no ids",
+  "GET /api/portal/me/profile": "same handler as the scanned GET /api/me/profile",
+  "PATCH /api/portal/me/profile": "same handler as PATCH /api/me/profile",
   "GET /api/library/principals": "candidate list from the caller's own tenant only (no ids in the request)",
   "GET /api/portal/library/folders": "portal read-only: same service and the same folder-level check as the admin routes, which are scanned above; student visibility tested in library.e2e.spec.ts",
   "GET /api/portal/library/folders/:id/files": "portal read-only: same service as the scanned admin route",

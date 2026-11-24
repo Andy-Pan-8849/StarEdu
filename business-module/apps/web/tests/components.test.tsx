@@ -158,11 +158,14 @@ describe("DataTable", () => {
   });
 });
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
+const intl = (ui: React.ReactElement) => <NextIntlClientProvider locale="en" messages={{}}>{ui}</NextIntlClientProvider>;
+
 describe("MenuTreeShell", () => {
   it("shows the company brand at the top of the menu: custom logo and short name, or the default logo", () => {
     const labels0: ShellLabels = { closeTab: "Close", noMenus: "No menus", pageNotBuilt: "Not built", signedInAs: "Signed in as", signOut: "Sign out" };
     const shell = (brand?: { name: string; logoUrl: string | null }) => (
-      <MenuTreeShell menus={[]} pages={{}} label={(n) => n.name} userName="a" brand={brand} signOutAction="/x" labels={labels0} />
+      intl(<MenuTreeShell menus={[]} pages={{}} label={(n) => n.name} userName="a" brand={brand} signOutAction="/x" labels={labels0} />)
     );
     const { container, rerender } = render(shell({ name: "RiverSide", logoUrl: "https://example.test/logo.png" }));
     expect(screen.getByText("RiverSide")).toBeTruthy();
@@ -183,7 +186,7 @@ describe("MenuTreeShell", () => {
   ];
   const labels: ShellLabels = { closeTab: "Close", noMenus: "No menus", pageNotBuilt: "Not built", signedInAs: "Signed in as", signOut: "Sign out" };
   const shell = (m: MenuNode[]) => (
-    <MenuTreeShell menus={m} pages={{ "system/online/index": () => <p>online page</p> }} label={(n) => n.name} userName="alice" signOutAction="/admin/auth/logout" labels={labels} />
+    intl(<MenuTreeShell menus={m} pages={{ "system/online/index": () => <p>online page</p> }} label={(n) => n.name} userName="alice" signOutAction="/admin/auth/logout" labels={labels} />)
   );
 
   it("opens the first page as a tab, switches between tabs, closes tabs, and shows a placeholder for pages that do not exist yet", async () => {
@@ -223,13 +226,28 @@ describe("MenuTreeShell", () => {
     expect(screen.queryByRole("link", { name: /Wiki/ })).toBeNull();
   });
 
-  it("says so when no menu is assigned, and offers sign-out as a POST form", () => {
+  it("says so when no menu is assigned, and offers sign-out as a POST form in the avatar menu", async () => {
+    const user = userEvent.setup();
     render(shell([]));
     expect(screen.getByText("No menus")).toBeTruthy();
-    const form = screen.getByRole("button", { name: "Sign out" }).closest("form") as HTMLFormElement;
+    await user.click(screen.getByRole("button", { name: "alice" })); // 头像
+    const form = screen.getByRole("menuitem", { name: "Sign out" }).closest("form") as HTMLFormElement;
     expect(form.method).toBe("post");
     expect(form.getAttribute("action")).toBe("/admin/auth/logout");
-    expect(within(form.parentElement as HTMLElement).getByText("alice")).toBeTruthy();
+    expect(within(screen.getByRole("menu")).getByText("alice")).toBeTruthy();
+  });
+
+  it("opens a pinned Home tab that cannot be closed, and the profile page from the avatar menu", async () => {
+    const user = userEvent.setup();
+    render(intl(<MenuTreeShell menus={menus} pages={{ "system/online/index": () => <p>online page</p> }} label={(n) => n.name} userName="alice" signOutAction="/x" labels={{ ...labels, home: "Home", profile: "Profile" }} homePage={() => <p>home content</p>} profilePage={() => <p>profile content</p>} />));
+    expect(screen.getByText("home content")).toBeTruthy(); // 登录后先到首页
+    expect(screen.queryByRole("button", { name: "Close Home" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "alice" }));
+    await user.click(screen.getByRole("menuitem", { name: "Profile" }));
+    expect(screen.getByText("profile content")).toBeTruthy();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Home", "Profile"]);
+    await user.click(screen.getByRole("button", { name: "Close Profile" }));
+    expect(screen.getByText("home content")).toBeTruthy();
   });
 });
 
