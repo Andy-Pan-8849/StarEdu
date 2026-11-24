@@ -13,8 +13,8 @@ import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 
 const typeSchema = z.object({ code: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/), name: z.string().trim().min(1).max(100), remark: z.string().max(500).optional() });
 const typePatch = z.object({ name: z.string().trim().min(1).max(100).optional(), status: z.boolean().optional(), remark: z.string().max(500).nullable().optional() }).strict();
-const itemSchema = z.object({ value: z.string().trim().min(1).max(100), label: z.string().trim().min(1).max(200), sort: z.number().int().min(0).max(10000).optional() });
-const itemPatch = z.object({ label: z.string().trim().min(1).max(200).optional(), sort: z.number().int().min(0).max(10000).optional(), status: z.boolean().optional() }).strict();
+const itemSchema = z.object({ value: z.string().trim().min(1).max(100), label: z.string().trim().min(1).max(200), remark: z.string().max(500).optional(), sort: z.number().int().min(0).max(10000).optional() });
+const itemPatch = z.object({ label: z.string().trim().min(1).max(200).optional(), remark: z.string().max(500).nullable().optional(), sort: z.number().int().min(0).max(10000).optional(), status: z.boolean().optional() }).strict();
 
 @Controller("api")
 export class DictController {
@@ -83,7 +83,7 @@ export class DictController {
     const input = parse(itemSchema, body);
     await this.ownType(id, auth.tenantId);
     try {
-      return await this.tenantDb.db.dictItem.create({ data: { tenantId: auth.tenantId, typeId: id, value: input.value, label: input.label, sort: input.sort ?? 0, createdBy: auth.accountId } });
+      return await this.tenantDb.db.dictItem.create({ data: { tenantId: auth.tenantId, typeId: id, value: input.value, label: input.label, remark: input.remark ?? null, sort: input.sort ?? 0, createdBy: auth.accountId } });
     } catch (err) {
       if ((err as { code?: string }).code === "P2002") throw new ConflictException("The value already exists in this dictionary");
       throw err;

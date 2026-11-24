@@ -45,6 +45,18 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       expect((await admin().get("/api/dicts/Not-A-Code")).status).toBe(400);
     });
 
+    it("items can carry a remark, and a field that uses a dictionary only accepts its enabled values", async () => {
+      const type = (await admin().post("/api/dict-types", { code: "remarked", name: "Remarked", remark: "What this list is for" })).body;
+      const item = (await admin().post(`/api/dict-types/${type.id}/items`, { value: "a", label: "A", remark: "Means the first one" })).body;
+      expect(item.remark).toBe("Means the first one");
+      expect((await admin().patch(`/api/dict-items/${item.id}`, { remark: "Changed" })).body.remark).toBe("Changed");
+      const platform = (await admin().get("/api/dict-types")).body as Array<{ code: string; platformProvided: boolean }>;
+      expect(platform.filter((t) => t.platformProvided).map((t) => t.code)).toEqual(expect.arrayContaining(["gender", "employment_type", "degree_type", "relationship", "material_category"]));
+      const bad = await admin().post("/api/staff", { fullName: "Dict Check", hireDate: "2024-01-01", employmentType: "contract" });
+      expect(bad.status).toBe(400);
+      expect(JSON.stringify(bad.body)).toContain("full_time");
+    });
+
     it("two tenants can each have their own dictionary with the same code", async () => {
       const other = await h.extraTenant();
       await h.owner.dictType.create({ data: { tenantId: other.tenantId, code: "shared_code", name: "Other tenant's" } });
@@ -70,6 +82,8 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       expect((await admin().del(`/api/params/${override.id}`)).status).toBe(200);
       expect(((await admin().get("/api/params")).body as Array<{ key: string; value: string }>).find((p) => p.key === "system.ui.defaultLocale")?.value).toBe("en");
       expect((await admin().post("/api/params", { key: "Bad Key", value: "1", name: "x" })).status).toBe(400);
+      expect((await admin().post("/api/params", { key: "library.upload.maxMb", value: "0", name: "x" })).status).toBe(400);
+      expect((await admin().post("/api/params", { key: "edu.extension.maxDays", value: "31", name: "x" })).status).toBe(400);
       const mine = (await admin().post("/api/params", { key: "school.openHour", value: "8", name: "Opening hour" })).body;
       expect((await admin().patch(`/api/params/${mine.id}`, { value: "9" })).body.value).toBe("9");
       expect((await admin().patch(`/api/params/${mine.id}`, { key: "x" })).status).toBe(400);

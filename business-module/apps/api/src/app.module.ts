@@ -17,6 +17,7 @@ import { OperationLogInterceptor } from "./oplog/operation-log.interceptor";
 import { DictController } from "./sysdata/dict.controller";
 import { ParamsController } from "./sysdata/params.controller";
 import { ParamsService } from "./sysdata/params.service";
+import { DictService } from "./sysdata/dict.service";
 import { ImportController } from "./hr/import.controller";
 import { ImportService } from "./hr/import.service";
 import { CatalogController } from "./edu/catalog.controller";
@@ -154,6 +155,7 @@ export const CONTROLLERS = [
     EnrollmentService,
     OutboxService,
     ParamsService,
+    DictService,
     ObjectStoreService,
     GradesService,
     InternalKeyGuard,

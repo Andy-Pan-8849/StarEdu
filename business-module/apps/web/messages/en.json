@@ -250,7 +250,8 @@
       "customize": "Customize",
       "customized": "Customized",
       "restoreDefault": "Restore default",
-      "confirmRestore": "Restore the default value?"
+      "confirmRestore": "Restore the default value?",
+      "remark": "Remark"
     },
     "dicts": {
       "title": "Dictionaries",
@@ -263,7 +264,8 @@
       "itemsOf": "Items of {name}",
       "value": "Value",
       "label": "Label",
-      "readOnly": "Platform dictionaries are read-only."
+      "readOnly": "Platform dictionaries are read-only.",
+      "remark": "Remark"
     },
     "operationLog": {
       "title": "Operation log",
@@ -373,7 +375,8 @@
       "kind_own_dept": "Own department",
       "kind_own_dept_tree": "Own department and below",
       "kind_self": "Own records only",
-      "kind_own_classes": "Classes I teach or attend"
+      "kind_own_classes": "Classes I teach or attend",
+      "note": "Decides which campuses or departments a role can see data for. Built-in scopes are provided; custom ones pick nodes in the organization tree and are then attached to a role."
     },
     "hr": {
       "staffTitle": "Staff",
@@ -444,7 +447,7 @@
       "termsTitle": "Terms",
       "coursesTitle": "Courses",
       "majorsTitle": "Majors",
-      "sectionsTitle": "Sections",
+      "sectionsTitle": "Class Sections",
       "code": "Code",
       "name": "Name",
       "startDate": "Start (YYYY-MM-DD)",
@@ -574,7 +577,8 @@
       "batchEnrolled": "enrolled",
       "sectionCol": "Section",
       "instructorsCol": "Instructors",
-      "seatsCol": "Seats"
+      "seatsCol": "Seats",
+      "sectionsNote": "A class section is one class of a course in one term: its own instructors, schedule, campus and seats. Students enroll in a section, not in the course itself (for example OS101, section 01, Fall 2026)."
     },
     "assignments": {
       "tab": "Assignments",
@@ -736,7 +740,8 @@
       "scaleMin": "Lowest percentage",
       "scalePoints": "Grade points",
       "scalePass": "Passing",
-      "confirmReset": "Restore the default grading scale?"
+      "confirmReset": "Restore the default grading scale?",
+      "scaleNote": "Turns a final percentage into a letter grade and grade points, and decides which grades count as passing. GPA and transcripts are calculated from this table."
     },
     "announcements": {
       "recipientsCol": "Recipients",
@@ -942,7 +947,7 @@
     "edu:term": "Terms",
     "edu:major": "Majors",
     "edu:course": "Courses",
-    "edu:section": "Sections",
+    "edu:section": "Class Sections",
     "portal": "My studies",
     "portal:enroll": "Course enrollment",
     "portal:plan": "Degree plan",
@@ -966,7 +971,9 @@
     "type": {
       "gender": "Gender",
       "employment_type": "Employment type",
-      "degree_type": "Degree type"
+      "degree_type": "Degree type",
+      "relationship": "Relationship",
+      "material_category": "Material category"
     },
     "gender": {
       "male": "Male",
@@ -983,6 +990,18 @@
       "bachelor": "Bachelor",
       "master": "Master",
       "doctor": "Doctor"
+    },
+    "relationship": {
+      "parent": "Parent",
+      "spouse": "Spouse",
+      "sibling": "Sibling",
+      "guardian": "Guardian",
+      "other": "Other"
+    },
+    "material_category": {
+      "slides": "Slides",
+      "reference": "Reference",
+      "syllabus": "Syllabus"
     }
   },
   "param": {
@@ -998,6 +1017,20 @@
       "appeal": {
         "windowDays": "Grade appeal window (days after publication)",
         "maxPerCourse": "Maximum grade appeals per course"
+      },
+      "extension": {
+        "maxDays": "Maximum assignment extension (days)"
+      },
+      "submission": {
+        "maxFiles": "Maximum files per submission"
+      },
+      "upload": {
+        "maxMb": "Assignment file size limit (MB)"
+      }
+    },
+    "library": {
+      "upload": {
+        "maxMb": "Document library file size limit (MB)"
       }
     }
   },
@@ -1036,5 +1069,42 @@
     "cat_announcement": "Announcements",
     "cat_request": "Requests",
     "cat_discussion": "Discussions"
+  },
+  "paramRemark": {
+    "system": {
+      "ui": {
+        "defaultLocale": "The language shown to people who have not picked one. Values: en (English), zh (Chinese)."
+      },
+      "list": {
+        "pageSize": "How many rows a list shows per page. A whole number from 5 to 100; larger pages scroll more."
+      }
+    },
+    "edu": {
+      "appeal": {
+        "windowDays": "How many days after a final grade is published a student may still ask for a review. 1 to 90.",
+        "maxPerCourse": "How many review requests a student may make for one course (withdrawn ones do not count). 1 to 10."
+      },
+      "extension": {
+        "maxDays": "The longest extension, in days, a student can request or an instructor can grant on one assignment. 1 to 30."
+      },
+      "submission": {
+        "maxFiles": "The most files a student may attach to one submission. 1 to 50."
+      },
+      "upload": {
+        "maxMb": "Largest single assignment file, in MB. 1 to 500. The platform operator may set a lower hard limit that wins."
+      }
+    },
+    "library": {
+      "upload": {
+        "maxMb": "Largest single document-library file, in MB. 1 to 2000. The platform operator may set a lower hard limit that wins."
+      }
+    }
+  },
+  "dictRemark": {
+    "gender": "Choices for a person's gender. Shown on person details. Add, rename or disable entries to match your records.",
+    "employment_type": "How a staff member is employed (full time, part time…). Used when adding or editing staff. A staff form only accepts values listed here.",
+    "degree_type": "The level of a major (associate, bachelor, master, doctor…). Chosen when editing a major.",
+    "relationship": "How an emergency contact is related to the person (parent, spouse…). Offered as choices when adding a contact.",
+    "material_category": "The kind of a class section's teaching material (slides, reference, syllabus). A material only accepts values listed here."
   }
 }

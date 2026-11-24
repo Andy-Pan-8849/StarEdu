@@ -218,8 +218,8 @@
       "closeCheckFor": "关闭 {name} 之前",
       "students": "仍在校区的学生：{n}",
       "staff": "有效任职的教职员工：{n}",
-      "classes": "进行中的班级：{n}",
-      "classesLater": "进行中的班级：教学模块上线后检查",
+      "classes": "进行中的教学班：{n}",
+      "classesLater": "进行中的教学班：教学模块上线后检查",
       "typeName": "请输入校区名称“{name}”以确认关闭：",
       "closeNow": "关闭校区"
     },
@@ -250,7 +250,8 @@
       "customize": "自定义",
       "customized": "已自定义",
       "restoreDefault": "恢复默认",
-      "confirmRestore": "确定要恢复缺省设置吗？"
+      "confirmRestore": "确定要恢复缺省设置吗？",
+      "remark": "备注"
     },
     "dicts": {
       "title": "字典管理",
@@ -263,7 +264,8 @@
       "itemsOf": "{name} 的条目",
       "value": "值",
       "label": "显示文字",
-      "readOnly": "平台提供的字典只读。"
+      "readOnly": "平台提供的字典只读。",
+      "remark": "备注"
     },
     "operationLog": {
       "title": "操作日志",
@@ -326,7 +328,7 @@
       "scope_own_dept": "本部门",
       "scope_own_dept_tree": "本部门及以下",
       "scope_self": "仅本人",
-      "scope_own_classes": "本人任教/就读的班级"
+      "scope_own_classes": "本人任教/就读的教学班"
     },
     "menus": {
       "expandAll": "展开全部",
@@ -373,7 +375,8 @@
       "kind_own_dept": "本部门",
       "kind_own_dept_tree": "本部门及以下",
       "kind_self": "仅本人",
-      "kind_own_classes": "本人任教/就读的班级"
+      "kind_own_classes": "本人任教/就读的教学班",
+      "note": "决定某个角色能看到哪些校区或部门的数据。系统内置了几种范围；自定义的在组织树上勾选节点，再授予角色。"
     },
     "hr": {
       "staffTitle": "教职员工",
@@ -444,7 +447,7 @@
       "termsTitle": "学期",
       "coursesTitle": "课程",
       "majorsTitle": "专业",
-      "sectionsTitle": "班级",
+      "sectionsTitle": "教学班",
       "code": "编码",
       "name": "名称",
       "startDate": "开始（YYYY-MM-DD）",
@@ -462,12 +465,12 @@
       "to_enrolling": "开放选课",
       "to_in_progress": "开学",
       "to_ended": "结束学期",
-      "confirmEnd": "结束 {name} 吗？班级会结课，已选的记录转为已完成。",
+      "confirmEnd": "结束 {name} 吗？教学班会结课，已选的记录转为已完成。",
       "credits": "学分",
       "details": "详情",
       "prerequisites": "先修课（须全部通过）",
       "appliesTo": "适用专业（在专业里维护）",
-      "history": "开过的班级",
+      "history": "开过的教学班",
       "degreeType": "学位类型",
       "totalCredits": "总学分要求",
       "curriculum": "课程设置",
@@ -493,7 +496,7 @@
       "to_sec_open": "开放选课",
       "to_sec_in_progress": "开课",
       "to_sec_ended": "结课",
-      "to_sec_cancelled": "取消班级",
+      "to_sec_cancelled": "取消教学班",
       "confirmCancel": "取消 {name} 吗？已选的学生会收到通知，记录作废。",
       "tab_roster": "学生名单",
       "tab_instructors": "任课教师",
@@ -527,7 +530,7 @@
       "enrollTitle": "选课",
       "declareFirst": "先申报专业，才能看到必修/选修标注。",
       "myCourses": "我的课程",
-      "openSections": "开放选课的班级",
+      "openSections": "开放选课的教学班",
       "filter": "筛选",
       "allCourses": "全部课程",
       "myMajorOnly": "只看我的专业",
@@ -559,7 +562,7 @@
       "versionHelp": "一个版本适用于从它的生效年份起入学、到下一个版本生效前的学生；早于第一个版本的入学年份按第一个版本。",
       "electiveMin": "选修最低学分",
       "batchEnroll": "批量选课",
-      "batchHelp": "选学期、课程、专业（可再限定入学年份和校区）。每个学生放进自己校区、开放中、剩余名额最多的班级。先预览，执行前什么都不会保存。超员等规则例外要勾选并填原因，和单个代选一样。",
+      "batchHelp": "选学期、课程、专业（可再限定入学年份和校区）。每个学生放进自己校区、开放中、剩余名额最多的教学班。先预览，执行前什么都不会保存。超员等规则例外要勾选并填原因，和单个代选一样。",
       "major": "专业",
       "entryYear": "入学年份",
       "any": "不限",
@@ -572,9 +575,10 @@
       "batchSummary": "选中 {selected} 人，可选 {ok}，需确认 {needConfirmation}，被拦 {blocked}",
       "batchWill": "将选上",
       "batchEnrolled": "已选上",
-      "sectionCol": "班级",
+      "sectionCol": "教学班",
       "instructorsCol": "授课老师",
-      "seatsCol": "余位"
+      "seatsCol": "余位",
+      "sectionsNote": "教学班是某门课在某个学期开的一个班：有自己的老师、时间、校区和名额。学生选课选的是教学班，而不是课程本身（例如 OS101 课程，2026 秋季的 01 班）。"
     },
     "assignments": {
       "tab": "作业",
@@ -635,7 +639,7 @@
     },
     "requests": {
       "colStudent": "学生",
-      "colSection": "班级",
+      "colSection": "教学班",
       "colKind": "类型",
       "colDetail": "详情",
       "myTitle": "我的申请",
@@ -712,10 +716,10 @@
       "v_formal": "正式版",
       "v_informal": "非正式版",
       "dashboardTitle": "仪表板",
-      "totals": "{s} 个班级（{p} 个进行中），范围内共 {n} 名学生",
+      "totals": "{s} 个教学班（{p} 个进行中），范围内共 {n} 名学生",
       "campus": "校区",
       "students": "学生数",
-      "sections": "班级",
+      "sections": "教学班",
       "completion": "作业完成率",
       "average": "平均分",
       "lateRate": "迟交率",
@@ -736,7 +740,8 @@
       "scaleMin": "最低百分比",
       "scalePoints": "绩点",
       "scalePass": "及格",
-      "confirmReset": "确定要恢复缺省设置吗？"
+      "confirmReset": "确定要恢复缺省设置吗？",
+      "scaleNote": "把总评百分比换算成字母等级和绩点，并决定哪些等级算及格。GPA 和成绩单都按这张表计算。"
     },
     "announcements": {
       "recipientsCol": "接收人数",
@@ -750,7 +755,7 @@
       "audience": "对象",
       "aud_tenant": "全公司",
       "aud_campus": "一个校区",
-      "aud_section": "一个班级",
+      "aud_section": "一个教学班",
       "pick": "请选择",
       "publish": "发布",
       "readers": "阅读名单",
@@ -762,7 +767,7 @@
     },
     "discussion": {
       "title": "讨论",
-      "pickSection": "选择班级",
+      "pickSection": "选择教学班",
       "back": "返回",
       "pin": "置顶",
       "unpin": "取消置顶",
@@ -915,7 +920,7 @@
     "system:role": "角色管理",
     "system:menu": "菜单管理",
     "system:entry": "入口管理",
-    "system:dataScope": "数据权限集",
+    "system:dataScope": "数据权限范围",
     "system:dept": "部门管理",
     "system:campus": "校区管理",
     "system:post": "岗位管理",
@@ -942,7 +947,7 @@
     "edu:term": "学期",
     "edu:major": "专业",
     "edu:course": "课程",
-    "edu:section": "班级",
+    "edu:section": "教学班",
     "portal": "我的学习",
     "portal:enroll": "选课",
     "portal:plan": "培养方案",
@@ -966,7 +971,9 @@
     "type": {
       "gender": "性别",
       "employment_type": "雇佣类型",
-      "degree_type": "学位类型"
+      "degree_type": "学位类型",
+      "relationship": "关系",
+      "material_category": "资料类别"
     },
     "gender": {
       "male": "男",
@@ -983,6 +990,18 @@
       "bachelor": "本科",
       "master": "硕士",
       "doctor": "博士"
+    },
+    "relationship": {
+      "parent": "父母",
+      "spouse": "配偶",
+      "sibling": "兄弟姐妹",
+      "guardian": "监护人",
+      "other": "其他"
+    },
+    "material_category": {
+      "slides": "课件",
+      "reference": "参考资料",
+      "syllabus": "教学大纲"
     }
   },
   "param": {
@@ -998,6 +1017,20 @@
       "appeal": {
         "windowDays": "成绩复评窗口（发布后天数）",
         "maxPerCourse": "每门课最多复评次数"
+      },
+      "extension": {
+        "maxDays": "作业延期上限（天）"
+      },
+      "submission": {
+        "maxFiles": "每次提交最多文件数"
+      },
+      "upload": {
+        "maxMb": "作业文件大小上限（MB）"
+      }
+    },
+    "library": {
+      "upload": {
+        "maxMb": "文档库文件大小上限（MB）"
       }
     }
   },
@@ -1036,5 +1069,42 @@
     "cat_announcement": "公告",
     "cat_request": "申请",
     "cat_discussion": "讨论"
+  },
+  "paramRemark": {
+    "system": {
+      "ui": {
+        "defaultLocale": "没有自己选过语言的人看到的界面语言。取值：en（英文）、zh（中文）。"
+      },
+      "list": {
+        "pageSize": "列表每页显示多少行。5 到 100 的整数；数字越大，一页越长。"
+      }
+    },
+    "edu": {
+      "appeal": {
+        "windowDays": "成绩发布后，学生还能在多少天内申请复评。1 到 90。",
+        "maxPerCourse": "每个学生对同一门课最多能申请几次复评（撤回的不算）。1 到 10。"
+      },
+      "extension": {
+        "maxDays": "一次作业最多能延期几天（学生申请、老师批准都不能超过）。1 到 30。"
+      },
+      "submission": {
+        "maxFiles": "学生交一次作业最多能附几个文件。1 到 50。"
+      },
+      "upload": {
+        "maxMb": "作业文件的单个大小上限，单位 MB。1 到 500。平台运营方如果设了更低的硬上限，以更低的为准。"
+      }
+    },
+    "library": {
+      "upload": {
+        "maxMb": "文档库文件的单个大小上限，单位 MB。1 到 2000。平台运营方如果设了更低的硬上限，以更低的为准。"
+      }
+    }
+  },
+  "dictRemark": {
+    "gender": "人员性别的可选项，显示在人员详情里。可以按你们的记录增删、改名或停用条目。",
+    "employment_type": "员工的用工类型（全职、兼职……）。新增、修改员工时选择。员工表单只接受这里列出的值。",
+    "degree_type": "专业的学位层次（专科、本科、硕士、博士……）。编辑专业时选择。",
+    "relationship": "紧急联系人与本人的关系（父母、配偶……）。新增联系人时作为选项。",
+    "material_category": "教学班资料的类别（课件、参考资料、教学大纲）。资料只接受这里列出的值。"
   }
 }

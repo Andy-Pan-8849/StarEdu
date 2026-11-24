@@ -302,6 +302,7 @@ export function SectionsPage() {
   return (
     <section>
       <H2>{t("sectionsTitle")}</H2>
+      <p className="mb-3 text-sm text-muted">{t("sectionsNote")}</p>
       <Err error={sections.error} />
       {message}
       <Can perm={PERMS.eduSectionAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>

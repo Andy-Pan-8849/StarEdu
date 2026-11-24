@@ -290,7 +290,17 @@ export function DeptsPage() {
 }
 
 // ---------------------------------------------------------------- 参数
-interface ParamRow { id: string; key: string; value: string; name: string; platformProvided: boolean; overridden: boolean; defaultValue: string | null }
+/** 名称，下面一行小字是备注（说明怎么取值、各个值是什么意思）。 */
+function Named({ title, note }: { title: string; note?: string | null }) {
+  return (
+    <div className="max-w-md">
+      <div>{title}</div>
+      {note ? <div className="text-xs text-muted">{note}</div> : null}
+    </div>
+  );
+}
+
+interface ParamRow { id: string; key: string; value: string; name: string; remark: string | null; platformProvided: boolean; overridden: boolean; defaultValue: string | null }
 
 export function ParamsPage() {
   const t = useTranslations("pages.params");
@@ -304,9 +314,10 @@ export function ParamsPage() {
     { name: "key", label: t("key"), required: true, readOnly: !!form?.row },
     { name: "name", label: t("name"), required: true, readOnly: !!form?.row?.platformProvided || !!form?.row?.overridden },
     { name: "value", label: t("value") },
+    { name: "remark", label: t("remark"), type: "textarea", readOnly: !!form?.row?.platformProvided },
   ];
   const columns: Column<ParamRow & { nameKey: string | null }>[] = [
-    { key: "name", header: t("name"), cell: (r) => (r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name) },
+    { key: "name", header: t("name"), cell: (r) => <Named title={r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name} note={tm.has(`paramRemark.${r.key}`) ? tm(`paramRemark.${r.key}`) : r.remark} /> },
     { key: "key", header: t("key"), cell: (r) => <code>{r.key}</code> },
     { key: "value", header: t("value"), cell: (r) => r.value },
     { key: "source", header: t("source"), cell: (r) => (r.platformProvided ? t("platform") : r.overridden ? t("customized") : t("own")) },
@@ -332,11 +343,11 @@ export function ParamsPage() {
         <FormPanel
           title={form.row ? c("edit") : c("add")}
           fields={fields}
-          initial={form.row ? { key: form.row.key, name: form.row.name, value: form.row.value } : {}}
+          initial={form.row ? { key: form.row.key, name: form.row.name, value: form.row.value, remark: form.row.remark ?? "" } : {}}
           submitLabel={c("save")}
           cancelLabel={c("cancel")}
           onCancel={() => setForm(null)}
-          onSubmit={async (p) => { if (await run(() => (form.row?.platformProvided ? bff("params", { method: "POST", body: { key: form.row.key, name: form.row.name, value: p.value ?? "" } }) : form.row ? bff(`params/${form.row.id}`, { method: "PATCH", body: { value: p.value ?? "", name: p.name } }) : bff("params", { method: "POST", body: p })), c("saved"))) setForm(null); }}
+          onSubmit={async (p) => { if (await run(() => (form.row?.platformProvided ? bff("params", { method: "POST", body: { key: form.row.key, name: form.row.name, value: p.value ?? "", ...(p.remark ? { remark: p.remark } : {}) } }) : form.row ? bff(`params/${form.row.id}`, { method: "PATCH", body: { value: p.value ?? "", name: p.name, remark: p.remark ? p.remark : null } }) : bff("params", { method: "POST", body: p })), c("saved"))) setForm(null); }}
         />
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
@@ -345,8 +356,8 @@ export function ParamsPage() {
 }
 
 // ---------------------------------------------------------------- 字典
-interface DictType { id: string; code: string; name: string; nameKey: string | null; status: boolean; platformProvided: boolean }
-interface DictItem { id: string; value: string; label: string; labelKey: string | null; sort: number; status: boolean }
+interface DictType { id: string; code: string; name: string; nameKey: string | null; remark: string | null; status: boolean; platformProvided: boolean }
+interface DictItem { id: string; value: string; label: string; labelKey: string | null; remark: string | null; sort: number; status: boolean }
 
 export function DictsPage() {
   const t = useTranslations("pages.dicts");
@@ -358,7 +369,7 @@ export function DictsPage() {
   const { run, message } = useAct(types.reload);
   const [newType, setNewType] = React.useState(false);
   const columns: Column<DictType>[] = [
-    { key: "name", header: t("name"), cell: (r) => (r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name) },
+    { key: "name", header: t("name"), cell: (r) => <Named title={r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name} note={r.platformProvided && tm.has(`dictRemark.${r.code}`) ? tm(`dictRemark.${r.code}`) : r.remark} /> },
     { key: "code", header: t("code"), cell: (r) => <code>{r.code}</code> },
     { key: "source", header: t("source"), cell: (r) => (r.platformProvided ? t("platform") : t("own")) },
     { key: "status", header: c("status"), cell: (r) => (r.status ? c("enabled") : c("disabled")) },
@@ -380,7 +391,7 @@ export function DictsPage() {
       {message}
       <Can perm={PERMS.dictAdd}>{!newType ? <IconButton icon={Plus} label={c("add")} onClick={() => setNewType(true)} className="mb-3"/> : null}</Can>
       {newType ? (
-        <FormPanel title={c("add")} fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setNewType(false)}
+        <FormPanel title={c("add")} fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }, { name: "remark", label: t("remark"), type: "textarea" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setNewType(false)}
           onSubmit={async (p) => { if (await run(() => bff("dict-types", { method: "POST", body: p }), c("saved"))) setNewType(false); }} />
       ) : null}
       <DataTable columns={columns} rows={types.rows} rowKey={(r) => r.id} loading={types.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
@@ -400,6 +411,7 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
   const columns: Column<DictItem>[] = [
     { key: "value", header: t("value"), cell: (r) => <code>{r.value}</code> },
     { key: "label", header: t("label"), cell: (r) => (r.labelKey && tm.has(r.labelKey) ? tm(r.labelKey) : r.label) },
+    { key: "remark", header: t("remark"), cell: (r) => <span className="text-muted">{r.remark ?? ""}</span> },
     { key: "sort", header: c("sort"), cell: (r) => r.sort },
     { key: "status", header: c("status"), cell: (r) => (r.status ? c("enabled") : c("disabled")) },
     {
@@ -420,8 +432,8 @@ function DictItems({ type, onClose }: { type: DictType; onClose: () => void }) {
       {!type.platformProvided ? <Can perm={PERMS.dictAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can> : <p className="mb-2 text-sm text-muted">{t("readOnly")}</p>}
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
-          fields={[{ name: "value", label: t("value"), required: true, readOnly: !!form.row }, { name: "label", label: t("label"), required: true }, { name: "sort", label: c("sort"), type: "number" }, ...(form.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : [])]}
-          initial={form.row ? { value: form.row.value, label: form.row.label, sort: String(form.row.sort), status: form.row.status } : {}}
+          fields={[{ name: "value", label: t("value"), required: true, readOnly: !!form.row }, { name: "label", label: t("label"), required: true }, { name: "remark", label: t("remark"), type: "textarea" }, { name: "sort", label: c("sort"), type: "number" }, ...(form.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : [])]}
+          initial={form.row ? { value: form.row.value, label: form.row.label, remark: form.row.remark ?? "", sort: String(form.row.sort), status: form.row.status } : {}}
           submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(null)}
           onSubmit={async (p) => { if (await run(() => (form.row ? bff(`dict-items/${form.row.id}`, { method: "PATCH", body: p }) : bff(`dict-types/${type.id}/items`, { method: "POST", body: p })), c("saved"))) setForm(null); }} />
       ) : null}

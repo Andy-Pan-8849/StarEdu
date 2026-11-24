@@ -152,6 +152,7 @@ export function GradingScalePage() {
   return (
     <section className="text-sm">
       <H2>{t("scaleTitle")}</H2>
+      <p className="mb-2 text-sm text-muted">{t("scaleNote")}</p>
       <p className="mb-2 text-muted">{scale.isDefault ? t("scaleDefault") : t("scaleCustom")}</p>
       {message}
       <div className="mb-3 flex gap-2">

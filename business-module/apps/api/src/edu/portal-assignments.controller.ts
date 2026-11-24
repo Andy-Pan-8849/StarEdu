@@ -13,18 +13,19 @@ import { Auth, parse } from "../common/http";
 import { Prisma } from "../generated/prisma";
 import { assertTenantKey, ObjectStoreService, safeKeyPart, tenantPrefix, validateUpload } from "../storage/object-store.service";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
+import { ParamsService } from "../sysdata/params.service";
 import { effectiveDeadline, lateness, num } from "./assignment-common";
 import { dayString } from "./edu-common";
 import { OutboxService } from "./outbox.service";
 
-const MAX_FILES_PER_SUBMISSION = 10;
 const MAX_PENDING_UPLOADS = 20;
 const uploadSchema = z.object({ fileName: z.string().min(1).max(300), contentType: z.string().trim().min(1).max(100), size: z.number().int() });
-const submitSchema = z.object({ text: z.string().max(50000).optional(), fileIds: z.array(z.string().uuid()).max(MAX_FILES_PER_SUBMISSION).optional() });
+const submitSchema = z.object({ text: z.string().max(50000).optional(), fileIds: z.array(z.string().uuid()).max(50).optional() });
 
 @Controller("api/portal/assignments")
 export class PortalAssignmentsController {
   constructor(
+    private readonly params: ParamsService,
     private readonly tenantDb: TenantPrismaService,
     private readonly store: ObjectStoreService,
     private readonly quota: QuotaService,
@@ -103,7 +104,7 @@ export class PortalAssignmentsController {
       id: a.id, title: a.title, description: a.description, attachments: a.attachments, section: { id: a.sectionId, name: a.section.name, course: a.section.course.name }, group: a.group?.name ?? null,
       dueDate: dayString(a.dueDate), deadline, extension: ext ? { days: ext.days, reason: ext.reason } : null, allowLate: a.allowLate, latePolicy: a.latePolicy, maxScore: num(a.maxScore),
       rubric: a.rubric.map((r) => ({ id: r.id, title: r.title, description: r.description, maxPoints: Number(r.maxPoints) })),
-      limits: { maxFiles: MAX_FILES_PER_SUBMISSION },
+      limits: { maxFiles: await this.params.int("edu.submission.maxFiles") },
       canSubmit,
       submission: s
         ? {
@@ -123,7 +124,7 @@ export class PortalAssignmentsController {
     const { personId, status } = await this.me(auth);
     const a = await this.visible(personId, id);
     await this.assertCanSubmit(auth, a, personId, status, new Date());
-    const fileName = validateUpload(input);
+    const fileName = validateUpload(input, await this.params.uploadLimitBytes("edu.upload.maxMb", "UPLOAD_MAX_BYTES"));
     await this.quota.assertCanStore(input.size);
     if ((await this.db.submissionFile.count({ where: { assignmentId: id, studentPersonId: personId, versionId: null } })) >= MAX_PENDING_UPLOADS) throw new ConflictException("Too many unfinished uploads; submit or wait");
     const key = `${tenantPrefix(auth.tenantId)}submissions/${id}/${personId}/${randomUUID()}/${safeKeyPart(fileName)}`;
@@ -139,6 +140,8 @@ export class PortalAssignmentsController {
     const input = parse(submitSchema, body);
     const text = input.text?.trim() ? input.text : null;
     const fileIds = [...new Set(input.fileIds ?? [])];
+    const maxFiles = await this.params.int("edu.submission.maxFiles");
+    if (fileIds.length > maxFiles) throw new BadRequestException(`At most ${maxFiles} files per submission`);
     if (!text && fileIds.length === 0) throw new BadRequestException("Add an answer or at least one file");
     const { personId, status } = await this.me(auth);
     const a = await this.visible(personId, id);

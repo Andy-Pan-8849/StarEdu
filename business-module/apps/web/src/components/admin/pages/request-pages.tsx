@@ -13,6 +13,7 @@ import { DataTable, type Column } from "../data-table";
 import { Modal } from "../modal";
 import { Can, PermButton } from "../permissions";
 import { useAct } from "./crud";
+import { useSettings } from "../settings-context";
 import { useTable } from "./use-table";
 import { useList } from "./use-api";
 
@@ -24,6 +25,7 @@ interface Options {
   appeals: Array<{ enrollmentId: string; section: string; total: number; grade: string; closesAt: string }>;
   extensions: Array<{ assignmentId: string; title: string; section: string; dueAt: string; currentDays: number }>;
   appealWindowDays: number;
+  maxExtensionDays?: number;
 }
 
 // ---------------------------------------------------------------- 学生门户：我的申请
@@ -73,7 +75,7 @@ export function PortalRequestsPage() {
           </select>
           {target.startsWith("extension:") ? (
             <label className="flex items-center gap-2">{t("days")}
-              <select className={input} value={days} onChange={(e) => setDays(e.target.value)}>{[1, 2, 3].map((d) => <option key={d} value={d}>{d}</option>)}</select>
+              <select className={input} value={days} onChange={(e) => setDays(e.target.value)}>{Array.from({ length: opts?.maxExtensionDays ?? 3 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}</select>
             </label>
           ) : null}
           <textarea aria-label={t("reason")} placeholder={t("reason")} className={input} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -103,6 +105,7 @@ export function PortalRequestsPage() {
 interface StaffRequest { id: string; kind: "grade_appeal" | "extension"; status: string; section: string; student: string; assignment: { title: string; dueAt: string } | null; days: number | null; currentGrade: { total: number; grade: string } | null; reason: string; decisionNote: string | null; result: { before?: { total: number }; after?: { total: number }; days?: number } | null; createdAt: string }
 
 export function RequestsPage() {
+  const maxDays = useSettings().maxExtensionDays ?? 3;
   const t = useTranslations("pages.requests");
   const [status, setStatus] = React.useState("pending");
   const list = useList<StaffRequest>(`requests?status=${status}`);
@@ -182,7 +185,7 @@ export function RequestsPage() {
                   {deciding.decision === "approve" && r.kind === "grade_appeal" ? <input aria-label={t("newTotalLabel")} placeholder={t("newTotal", { current: r.currentGrade?.total ?? "-" })} inputMode="decimal" className="rounded-md border border-border bg-transparent px-2 py-1" value={total} onChange={(e) => setTotal(e.target.value)} /> : null}
                   {deciding.decision === "approve" && r.kind === "extension" ? (
                     <label className="flex items-center gap-2">{t("approveDays")}
-                      <select className="rounded-md border border-border bg-transparent px-2 py-1" value={days} onChange={(e) => setDays(e.target.value)}>{[1, 2, 3].map((d) => <option key={d} value={d}>{d}</option>)}</select>
+                      <select className="rounded-md border border-border bg-transparent px-2 py-1" value={days} onChange={(e) => setDays(e.target.value)}>{Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}</select>
                     </label>
                   ) : null}
                   <textarea aria-label={t("noteLabel")} placeholder={t(deciding.decision === "approve" ? "approveNote" : "rejectNote")} rows={2} className="rounded-md border border-border bg-transparent px-2 py-1" value={note} onChange={(e) => setNote(e.target.value)} />

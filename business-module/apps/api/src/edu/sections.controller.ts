@@ -1,5 +1,6 @@
 // 班级：开班（教务）、结构修改（教务；任课教师不能改）、状态、任课教师、名单与教务代选、课件（任课教师）。
 // 列表和详情按数据范围：教务按校区，教师看自己任教的班，学生在门户里看自己的。内置租户管理员的范围里没有班级。
+import { DictService } from "../sysdata/dict.service";
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { z } from "zod";
 import { PERMS } from "@staredu/shared";
@@ -28,7 +29,7 @@ const createSchema = z.object({
 });
 const patchSchema = z.object({ capacity: z.number().int().min(1).max(10000).optional(), mode: z.enum(["onsite", "online", "hybrid"]).optional(), schedule: scheduleSchema.optional(), notes: z.string().max(2000).nullable().optional(), campusId: z.string().uuid().optional() }).strict();
 const NEXT: Record<string, string[]> = { draft: ["open", "cancelled"], open: ["draft", "in_progress", "cancelled"], in_progress: ["ended", "cancelled"], ended: [], cancelled: [] };
-const materialSchema = z.object({ title: z.string().trim().min(1).max(200), category: z.enum(["slides", "reference", "syllabus"]).optional(), url: z.string().url().max(1000), sort: z.number().int().min(0).max(10000).optional(), published: z.boolean().optional() });
+const materialSchema = z.object({ title: z.string().trim().min(1).max(200), category: z.string().trim().min(1).max(50).optional(), url: z.string().url().max(1000), sort: z.number().int().min(0).max(10000).optional(), published: z.boolean().optional() });
 
 @Controller("api/sections")
 export class SectionsController {
@@ -38,6 +39,7 @@ export class SectionsController {
     private readonly audit: AuditService,
     private readonly enrollments: EnrollmentService,
     private readonly outbox: OutboxService,
+    private readonly dicts: DictService,
   ) {}
 
   private get db() {
@@ -250,6 +252,7 @@ export class SectionsController {
   @RequirePermissions(PERMS.eduMaterialEdit)
   async addMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     const input = parse(materialSchema, body);
+    if (input.category) await this.dicts.assertValue("material_category", input.category, "category");
     const section = await this.editableSection(auth, id);
     const created = await this.db.sectionMaterial.create({ data: { tenantId: auth.tenantId, sectionId: id, ...input, createdBy: auth.accountId } });
     await this.materialChanged(id, section.courseId);
@@ -260,6 +263,7 @@ export class SectionsController {
   @RequirePermissions(PERMS.eduMaterialEdit)
   async updateMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("materialId", ParseUUIDPipe) materialId: string, @Body() body: unknown) {
     const input = parse(materialSchema.partial().strict(), body);
+    if (input.category) await this.dicts.assertValue("material_category", input.category, "category");
     const section = await this.editableSection(auth, id);
     if (!(await this.db.sectionMaterial.findFirst({ where: { id: materialId, sectionId: id } }))) throw new NotFoundException();
     const updated = await this.db.sectionMaterial.update({ where: { id: materialId }, data: input });

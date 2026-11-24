@@ -810,6 +810,7 @@ model DictItem {
   value     String
   label     String
   labelKey  String?   @map("label_key")
+  remark    String?
   sort      Int       @default(0)
   status    Boolean   @default(true)
   createdAt DateTime  @default(now()) @map("created_at")

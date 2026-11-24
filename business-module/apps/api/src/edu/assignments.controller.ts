@@ -3,6 +3,7 @@
 //   - 建改作业、批改、发布分数：权限 + 必须是该班的任课教师（教务没有这一项）。
 //   - 延期：任课教师或教务（权限 + 范围）。
 //   - 班级结课或取消后，作业和分数只读（改动要走教务的成绩修改流程，B8）。
+import { ParamsService } from "../sysdata/params.service";
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put } from "@nestjs/common";
 import { z } from "zod";
 import { PERMS } from "@staredu/shared";
@@ -26,7 +27,7 @@ const gradeSchema = z.object({
   scores: z.array(z.object({ rubricItemId: z.string().uuid(), points: pointsInput, comment: z.string().trim().max(1000).nullable().optional() })).max(30),
   feedback: z.string().trim().max(5000).nullable().optional(),
 });
-const extensionSchema = z.object({ days: z.number().int().min(1).max(3), reason: z.string().trim().min(3).max(500) });
+const extensionSchema = z.object({ days: z.number().int().min(1).max(30), reason: z.string().trim().min(3).max(500) });
 
 @Controller("api/sections")
 export class AssignmentsController {
@@ -36,6 +37,7 @@ export class AssignmentsController {
     private readonly audit: AuditService,
     private readonly store: ObjectStoreService,
     private readonly outbox: OutboxService,
+    private readonly params: ParamsService,
   ) {}
 
   private get db() {
@@ -256,6 +258,7 @@ export class AssignmentsController {
   @RequirePermissions(PERMS.eduExtensionEdit)
   async extend(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) sectionId: string, @Param("assignmentId", ParseUUIDPipe) id: string, @Param("studentId", ParseUUIDPipe) studentId: string, @Body() body: unknown) {
     const input = parse(extensionSchema, body);
+    await this.params.assertExtensionDays(input.days);
     await this.section(auth, sectionId, PERMS.eduExtensionEdit);
     const a = await this.assignmentOf(sectionId, id);
     const member = await this.db.enrollment.findFirst({ where: { sectionId, studentPersonId: studentId, status: { in: ["enrolled", "completed"] } } });

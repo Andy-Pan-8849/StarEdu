@@ -1,4 +1,5 @@
 // 教职员工接口。列表/详情走数据范围；内置租户管理员只看得到基础信息（教职员工），敏感信息要权限且在"非基础"范围内。
+import { DictService } from "../sysdata/dict.service";
 import { Body, Controller, ForbiddenException, Delete, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { z } from "zod";
@@ -21,10 +22,10 @@ const createSchema = z.object({
   idNumber: z.string().trim().max(50).optional(),
   employeeNo: z.string().regex(/^[A-Za-z0-9_-]{1,30}$/).optional(),
   hireDate: day,
-  employmentType: z.enum(["full_time", "part_time"]).optional(),
+  employmentType: z.string().trim().min(1).max(50).optional(),
   assignments: z.array(assignment).max(10).optional(),
 });
-const patchSchema = z.object({ employmentType: z.enum(["full_time", "part_time"]).optional(), hireDate: day.optional() }).strict();
+const patchSchema = z.object({ employmentType: z.string().trim().min(1).max(50).optional(), hireDate: day.optional() }).strict();
 const transferSchema = z.object({ fromAssignmentId: z.string().uuid(), deptId: z.string().uuid(), postId: z.string().uuid().nullable().optional(), effectiveDate: day.optional() });
 const endSchema = z.object({ status: z.enum(["left", "on_leave"]), effectiveDate: day.optional() });
 const endAssignmentSchema = z.object({ endDate: day.optional() });
@@ -34,6 +35,7 @@ export class StaffController {
   constructor(
     private readonly staff: StaffService,
     private readonly hr: HrAccess,
+    private readonly dicts: DictService,
   ) {}
 
   private async scoped(auth: AuthContext, id: string, perm: string) {
@@ -86,6 +88,7 @@ export class StaffController {
   @RequirePermissions(PERMS.hrStaffAdd)
   async create(@Auth() auth: AuthContext, @Body() body: unknown) {
     const input = parse(createSchema, body);
+    if (input.employmentType) await this.dicts.assertValue("employment_type", input.employmentType, "employmentType");
     if (input.idNumber) {
       // 证件号是敏感信息：要权限，并且操作者的范围不能只有"教职员工基础信息"（内置租户管理员就是这样）
       const sc = await this.hr.scope(auth, PERMS.hrPersonSensitive);
@@ -99,6 +102,7 @@ export class StaffController {
   @RequirePermissions(PERMS.hrStaffEdit)
   async update(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
     const input = parse(patchSchema, body);
+    if (input.employmentType) await this.dicts.assertValue("employment_type", input.employmentType, "employmentType");
     await this.scoped(auth, id, PERMS.hrStaffEdit);
     await this.hr.tenantDb.db.staffProfile.updateMany({ where: { personId: id }, data: { ...input, updatedBy: auth.accountId } });
     return this.staff.view(id);
