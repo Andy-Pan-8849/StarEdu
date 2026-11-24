@@ -989,7 +989,8 @@
       "associate": "Associate",
       "bachelor": "Bachelor",
       "master": "Master",
-      "doctor": "Doctor"
+      "doctor": "Doctor",
+      "certificate": "Certificate"
     },
     "relationship": {
       "parent": "Parent",
