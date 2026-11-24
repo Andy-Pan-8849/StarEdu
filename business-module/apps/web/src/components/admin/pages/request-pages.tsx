@@ -13,6 +13,7 @@ import { DataTable, type Column } from "../data-table";
 import { Modal } from "../modal";
 import { Can, PermButton } from "../permissions";
 import { useAct } from "./crud";
+import { useTable } from "./use-table";
 import { useList } from "./use-api";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
@@ -47,6 +48,15 @@ export function PortalRequestsPage() {
     if (await run(() => bff("requests", { method: "POST", body }), t("submitted"))) { setTarget(""); setReason(""); setCreating(false); }
   };
 
+  const tbl = useTable();
+  const myCols: Column<MyRequest>[] = [
+    { key: "kind", header: t("colKind"), cell: (r) => <span className="font-medium">{t(`kind_${r.kind}`)}</span> },
+    { key: "section", header: t("colSection"), cell: (r) => `${r.section}${r.assignment ? ` · ${r.assignment}` : ""}${r.days ? ` · ${t("daysN", { n: r.days })}` : ""}` },
+    { key: "detail", header: t("colDetail"), cell: (r) => (<div className="max-w-md space-y-0.5"><div>{r.reason}</div>{r.decisionNote ? <div className="text-muted">{t("note")}: {r.decisionNote}</div> : null}</div>) },
+    { key: "status", header: t("colStatus"), cell: (r) => t(`status_${r.status}`) },
+    { key: "createdAt", header: t("colCreated"), cell: (r) => new Date(r.createdAt).toLocaleString() },
+    { key: "actions", header: "", cell: (r) => (r.status === "pending" ? <PermRowAction perm={PERMS.portalRequestSubmit} onClick={() => void run(() => bff(`requests/${r.id}/withdraw`, { method: "POST" }))} icon={Undo2}>{t("withdraw")}</PermRowAction> : null) },
+  ];
   return (
     <section className="text-sm">
       <H2>{t("myTitle")}</H2>
@@ -76,19 +86,15 @@ export function PortalRequestsPage() {
         </Modal>
       ) : null}
       {message}
-      {list.rows.length === 0 ? <p className="text-muted">{t("none")}</p> : (
-        <ul className="flex flex-col gap-2">
-          {list.rows.map((r) => (
-            <li key={r.id} className="rounded-md border border-border p-2">
-              <div className="font-medium">{t(`kind_${r.kind}`)} · {r.section}{r.assignment ? ` · ${r.assignment}` : ""}{r.days ? ` · ${t("daysN", { n: r.days })}` : ""}</div>
-              <div className="text-muted">{t(`status_${r.status}`)} · {new Date(r.createdAt).toLocaleString()}</div>
-              <div>{r.reason}</div>
-              {r.decisionNote ? <div className="text-muted">{t("note")}: {r.decisionNote}</div> : null}
-              {r.status === "pending" ? <PermRowAction perm={PERMS.portalRequestSubmit} className="mt-1" onClick={() => void run(() => bff(`requests/${r.id}/withdraw`, { method: "POST" }))} icon={Undo2}>{t("withdraw")}</PermRowAction> : null}
-            </li>
-          ))}
-        </ul>
-      )}
+      <DataTable
+        columns={myCols}
+        rows={list.rows}
+        rowKey={(r) => r.id}
+        loading={list.loading}
+        emptyText={t("none")}
+        selectable={false}
+        labels={tbl.labels}
+      />
     </section>
   );
 }

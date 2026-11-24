@@ -3,12 +3,14 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { RowAction } from "../icon-button";
-import { PinOff, RotateCcw } from "lucide-react";
+import { Pin, PinOff, RotateCcw } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { Can } from "../permissions";
 import { bff } from "@/lib/bff";
 import { useList } from "./use-api";
+import { useTable } from "./use-table";
+import { DataTable, type Column } from "../data-table";
 
 interface Author { personId: string; name: string | null; role: string }
 interface Thread { id: string; title: string; body: string; author: Author; pinned: boolean; resolved: boolean; createdAt: string; replyCount: number; canDelete: boolean; canResolve: boolean; canPin: boolean; canReply: boolean }
@@ -19,6 +21,7 @@ const input = "rounded-md border border-border bg-transparent px-2 py-1";
 /** 班级讨论面板：管理后台（任课教师、教务）和学生门户共用，两边路径形状相同，按钮显示由服务端给的 canXxx 决定。 */
 export function DiscussionPanel({ sectionId }: { sectionId: string }) {
   const t = useTranslations("pages.discussion");
+  const tbl = useTable();
   const list = useList<Thread>(`sections/${sectionId}/discussions`);
   const [open, setOpen] = React.useState<Detail | null>(null);
   const [title, setTitle] = React.useState("");
@@ -66,16 +69,23 @@ export function DiscussionPanel({ sectionId }: { sectionId: string }) {
   return (
     <div className="text-sm">
       {err ? <p role="alert" className="mb-2 text-red-600">{err}</p> : null}
-      <ul className="mb-3 space-y-1">
-        {list.rows.map((th) => (
-          <li key={th.id} className="rounded-md border border-border p-2">
-            <button type="button" className="font-medium underline" onClick={() => void show(th.id)}>{th.pinned ? "📌 " : ""}{th.title}</button>
-            {th.resolved ? <span className="ml-2 text-green-700">✔ {t("resolved")}</span> : null}
-            <div className="text-muted">{who(th.author)} · {t("replies", { n: th.replyCount })}</div>
-          </li>
-        ))}
-        {list.rows.length === 0 ? <li className="text-muted">{t("empty")}</li> : null}
-      </ul>
+      <div className="mb-3">
+        <DataTable
+          columns={[
+            { key: "title", header: t("colTitle"), cell: (th) => <button type="button" className="font-medium text-primary hover:underline" onClick={() => void show(th.id)}>{th.pinned ? <Pin aria-hidden className="mr-1 inline h-3.5 w-3.5" /> : null}{th.title}</button> },
+            { key: "author", header: t("colAuthor"), cell: (th) => who(th.author) },
+            { key: "replies", header: t("colReplies"), cell: (th) => th.replyCount },
+            { key: "state", header: t("colState"), cell: (th) => (th.resolved ? <span className="text-green-700">{t("resolved")}</span> : "—") },
+          ] as Column<Thread>[]}
+          rows={list.rows}
+          rowKey={(th) => th.id}
+          loading={list.loading}
+          emptyText={t("empty")}
+          loadingText={tbl.loading}
+          selectable={false}
+          labels={tbl.labels}
+        />
+      </div>
       <Can any={[PERMS.eduDiscussionEdit, PERMS.portalDiscussionPost]}>
         <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); void act(() => bff(base, { method: "POST", body: { title, body } }), () => { setTitle(""); setBody(""); }); }}>
           <h4 className="font-medium">{t("newPost")}</h4>

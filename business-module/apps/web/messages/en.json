@@ -567,7 +567,10 @@
       "batchDone": "Done",
       "batchSummary": "{selected} selected, {ok} ok, {needConfirmation} need confirmation, {blocked} blocked",
       "batchWill": "will be enrolled",
-      "batchEnrolled": "enrolled"
+      "batchEnrolled": "enrolled",
+      "sectionCol": "Section",
+      "instructorsCol": "Instructors",
+      "seatsCol": "Seats"
     },
     "assignments": {
       "tab": "Assignments",
@@ -619,7 +622,12 @@
       "submit": "Submit",
       "resubmit": "Submit again",
       "cannotSubmit": "This assignment cannot be submitted to now.",
-      "uploadFailed": "Upload of {name} failed"
+      "uploadFailed": "Upload of {name} failed",
+      "colTitle": "Assignment",
+      "colCourse": "Course",
+      "colDeadline": "Deadline",
+      "colStatus": "Status",
+      "colScore": "Score"
     },
     "requests": {
       "colStudent": "Student",
@@ -657,7 +665,9 @@
       "rejectNote": "Why is it rejected? (shown to the student)",
       "newTotal": "New total (current: {current})",
       "approveDays": "Approve how many days",
-      "decided": "Decision saved; the student was notified."
+      "decided": "Decision saved; the student was notified.",
+      "colStatus": "Status",
+      "colCreated": "Submitted"
     },
     "grades": {
       "policy": "Grade policy (weights of the assignment groups, total 100%)",
@@ -713,7 +723,16 @@
       "revoked": "Revoked",
       "revoke": "Revoke",
       "cancel": "Cancel",
-      "revokeReason": "Why is this document being revoked? Anyone who scans it will see it as revoked."
+      "revokeReason": "Why is this document being revoked? Anyone who scans it will see it as revoked.",
+      "colCode": "Code",
+      "colCourse": "Course",
+      "colCredits": "Credits",
+      "colResult": "Result",
+      "scaleGrade": "Grade",
+      "scaleMin": "Lowest percentage",
+      "scalePoints": "Grade points",
+      "scalePass": "Passing",
+      "confirmReset": "Restore the default grading scale?"
     },
     "announcements": {
       "recipientsCol": "Recipients",
@@ -756,7 +775,11 @@
       "post": "Post",
       "replies": "{n} replies",
       "empty": "No discussions yet.",
-      "instructor": "instructor"
+      "instructor": "instructor",
+      "colTitle": "Topic",
+      "colAuthor": "Author",
+      "colReplies": "Replies",
+      "colState": "Status"
     },
     "library": {
       "edit": "Edit folder",
@@ -974,7 +997,9 @@
     "sort": "Order",
     "status": "Status",
     "enabled": "Enabled",
-    "disabled": "Disabled"
+    "disabled": "Disabled",
+    "yes": "Yes",
+    "no": "No"
   },
   "notifications": {
     "bell": "Notifications",
