@@ -727,7 +727,12 @@
       "colCode": "Code",
       "colCourse": "Course",
       "colCredits": "Credits",
-      "colResult": "Result"
+      "colResult": "Result",
+      "scaleGrade": "Grade",
+      "scaleMin": "Lowest percentage",
+      "scalePoints": "Grade points",
+      "scalePass": "Passing",
+      "confirmReset": "Restore the default grading scale?"
     },
     "announcements": {
       "recipientsCol": "Recipients",
@@ -992,7 +997,9 @@
     "sort": "Order",
     "status": "Status",
     "enabled": "Enabled",
-    "disabled": "Disabled"
+    "disabled": "Disabled",
+    "yes": "Yes",
+    "no": "No"
   },
   "notifications": {
     "bell": "Notifications",

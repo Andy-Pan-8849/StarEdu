@@ -727,7 +727,12 @@
       "colCode": "课程代码",
       "colCourse": "课程",
       "colCredits": "学分",
-      "colResult": "成绩"
+      "colResult": "成绩",
+      "scaleGrade": "等级",
+      "scaleMin": "最低百分比",
+      "scalePoints": "绩点",
+      "scalePass": "及格",
+      "confirmReset": "确定要恢复缺省设置吗？"
     },
     "announcements": {
       "recipientsCol": "接收人数",
@@ -992,7 +997,9 @@
     "sort": "排序",
     "status": "状态",
     "enabled": "启用",
-    "disabled": "停用"
+    "disabled": "停用",
+    "yes": "是",
+    "no": "否"
   },
   "notifications": {
     "bell": "通知",
