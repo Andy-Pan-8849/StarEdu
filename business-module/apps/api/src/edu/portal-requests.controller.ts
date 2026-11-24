@@ -1,5 +1,5 @@
 // 学生申请（学生一侧）：成绩复评、作业延期。
-//   - 复评：只针对已发布的最终成绩，发布后 14 天内；同一份成绩同时只有一条待处理，最多申请 2 次（撤回的不算）。
+//   - 复评：只针对已发布的最终成绩，发布后 N 天内（参数 edu.appeal.windowDays，缺省 14）；同一份成绩同时只有一条待处理，最多申请 M 次（参数 edu.appeal.maxPerCourse，缺省 2）（撤回的不算）。
 //   - 延期：只针对已发布、截止还没到的作业；该学生还没被批改；不能比现有延期更短；同一次作业同时只有一条待处理。
 //   - 学生可以在处理之前撤回；每次提交通知任课教师。
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post } from "@nestjs/common";
@@ -12,9 +12,8 @@ import { Auth, parse } from "../common/http";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { effectiveDeadline } from "./assignment-common";
 import { OutboxService } from "./outbox.service";
+import { ParamsService } from "../sysdata/params.service";
 
-export const APPEAL_WINDOW_DAYS = 14;
-export const MAX_APPEALS = 2;
 const DAY_MS = 86_400_000;
 
 const submitSchema = z.discriminatedUnion("kind", [
@@ -28,7 +27,13 @@ export class PortalRequestsController {
     private readonly tenantDb: TenantPrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly params: ParamsService,
   ) {}
+
+  /** 复评窗口天数和每门课最多复评次数：租户可在"参数"里调整。 */
+  private async limits() {
+    return { windowDays: await this.params.int("edu.appeal.windowDays"), maxAppeals: await this.params.int("edu.appeal.maxPerCourse") };
+  }
 
   private get db() {
     return this.tenantDb.db;
@@ -55,6 +60,7 @@ export class PortalRequestsController {
   @RequirePermissions(PERMS.portalRequestList)
   async options(@Auth() auth: AuthContext) {
     const personId = await this.me(auth);
+    const { windowDays, maxAppeals } = await this.limits();
     const now = new Date();
     const [enrollments, pending, all] = await Promise.all([
       this.db.enrollment.findMany({ where: { studentPersonId: personId, status: { in: ["enrolled", "completed"] } } }),
@@ -66,10 +72,10 @@ export class PortalRequestsController {
     const finals = await this.db.finalGrade.findMany({ where: { enrollmentId: { in: enrollments.map((e) => e.id) }, publishedAt: { not: null } } });
     const pendingAppeal = new Set(pending.filter((p) => p.kind === "grade_appeal").map((p) => p.enrollmentId));
     const appeals = finals
-      .filter((f) => f.publishedAt && now.getTime() <= f.publishedAt.getTime() + APPEAL_WINDOW_DAYS * DAY_MS && !pendingAppeal.has(f.enrollmentId) && all.filter((a) => a.enrollmentId === f.enrollmentId).length < MAX_APPEALS)
+      .filter((f) => f.publishedAt && now.getTime() <= f.publishedAt.getTime() + windowDays * DAY_MS && !pendingAppeal.has(f.enrollmentId) && all.filter((a) => a.enrollmentId === f.enrollmentId).length < maxAppeals)
       .map((f) => {
         const e = enrollments.find((x) => x.id === f.enrollmentId)!;
-        return { enrollmentId: f.enrollmentId, section: sectionName.get(e.sectionId) ?? "", total: Number(f.total), grade: f.grade, closesAt: new Date(f.publishedAt!.getTime() + APPEAL_WINDOW_DAYS * DAY_MS) };
+        return { enrollmentId: f.enrollmentId, section: sectionName.get(e.sectionId) ?? "", total: Number(f.total), grade: f.grade, closesAt: new Date(f.publishedAt!.getTime() + windowDays * DAY_MS) };
       });
     const active = enrollments.filter((e) => e.status === "enrolled" && sections.find((s) => s.id === e.sectionId)?.status !== "ended" && sections.find((s) => s.id === e.sectionId)?.status !== "cancelled");
     const assignments = await this.db.assignment.findMany({ where: { sectionId: { in: active.map((e) => e.sectionId) }, published: true, manualOnly: false }, orderBy: { dueAt: "asc" } });
@@ -85,7 +91,7 @@ export class PortalRequestsController {
         return now < effectiveDeadline(a.dueAt, ext?.days) && (ext?.days ?? 0) < 3 && !pendingExt.has(a.id) && (!sub || sub.status === "submitted");
       })
       .map((a) => ({ assignmentId: a.id, title: a.title, section: sectionName.get(a.sectionId) ?? "", dueAt: a.dueAt, currentDays: exts.find((x) => x.assignmentId === a.id)?.days ?? 0 }));
-    return { appeals, extensions, appealWindowDays: APPEAL_WINDOW_DAYS };
+    return { appeals, extensions, appealWindowDays: windowDays };
   }
 
   @Post()
@@ -93,6 +99,7 @@ export class PortalRequestsController {
   async submit(@Auth() auth: AuthContext, @Body() body: unknown) {
     const input = parse(submitSchema, body);
     const personId = await this.me(auth);
+    const { windowDays, maxAppeals } = await this.limits();
     const now = new Date();
     let sectionId: string;
     let data: { enrollmentId?: string; assignmentId?: string; days?: number };
@@ -101,8 +108,8 @@ export class PortalRequestsController {
       if (!e) throw new NotFoundException();
       const f = await this.db.finalGrade.findUnique({ where: { enrollmentId: e.id } });
       if (!f?.publishedAt) throw new ConflictException("The final grade has not been published");
-      if (now.getTime() > f.publishedAt.getTime() + APPEAL_WINDOW_DAYS * DAY_MS) throw new ConflictException({ code: "APPEAL_WINDOW_CLOSED", message: `The appeal window (${APPEAL_WINDOW_DAYS} days after publication) has closed` });
-      if ((await this.db.studentRequest.count({ where: { enrollmentId: e.id, kind: "grade_appeal", status: { not: "withdrawn" } } })) >= MAX_APPEALS) throw new ConflictException({ code: "APPEAL_LIMIT", message: `At most ${MAX_APPEALS} appeals per course` });
+      if (now.getTime() > f.publishedAt.getTime() + windowDays * DAY_MS) throw new ConflictException({ code: "APPEAL_WINDOW_CLOSED", message: `The appeal window (${windowDays} days after publication) has closed` });
+      if ((await this.db.studentRequest.count({ where: { enrollmentId: e.id, kind: "grade_appeal", status: { not: "withdrawn" } } })) >= maxAppeals) throw new ConflictException({ code: "APPEAL_LIMIT", message: `At most ${maxAppeals} appeals per course` });
       sectionId = e.sectionId;
       data = { enrollmentId: e.id };
     } else {

@@ -1,5 +1,6 @@
 // "我"：登录登记（入口资格检查 + 登录日志 + 在线状态）、我的信息、我的菜单树。
 // 这三个接口对任何已登录的本租户账号开放（AnyAuthenticated），数据只涉及账号自己。
+import { ParamsService } from "../sysdata/params.service";
 import { Body, Controller, ForbiddenException, Get, NotFoundException, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import { AnyAuthenticated } from "../auth/decorators";
@@ -17,6 +18,7 @@ export class MeController {
     private readonly tenantDb: TenantPrismaService,
     private readonly authz: AuthzService,
     private readonly sessions: SessionStore,
+    private readonly params: ParamsService,
   ) {}
 
   @Get("me")
@@ -26,6 +28,7 @@ export class MeController {
     if (!account) throw new NotFoundException("Account not found in this tenant");
     return {
       brand: await this.brand(auth.tenantId),
+      settings: await this.params.uiSettings(),
       id: account.id,
       tenantId: account.tenantId,
       username: account.username,

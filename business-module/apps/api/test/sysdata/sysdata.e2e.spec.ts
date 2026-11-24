@@ -53,13 +53,22 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
   });
 
   describe("parameters", () => {
-    it("platform parameters are read-only; tenant parameters can be edited; keys cannot clash", async () => {
+    it("platform parameters are defaults a tenant can override and restore; tenant parameters can be edited", async () => {
       const list = (await admin().get("/api/params")).body as Array<{ id: string; key: string; platformProvided: boolean }>;
       const platform = list.find((p) => p.key === "system.ui.defaultLocale")!;
       expect(platform.platformProvided).toBe(true);
       expect((await admin().patch(`/api/params/${platform.id}`, { value: "zh" })).status).toBe(403);
       expect((await admin().del(`/api/params/${platform.id}`)).status).toBe(403);
-      expect((await admin().post("/api/params", { key: "system.ui.defaultLocale", value: "zh", name: "Clash" })).status).toBe(409);
+      // 覆盖平台默认：值要符合登记的范围；覆盖后列表里该键只出现一次，显示本租户的值和默认值；删除覆盖恢复默认
+      expect((await admin().post("/api/params", { key: "system.ui.defaultLocale", value: "fr", name: "x" })).status).toBe(400);
+      const override = (await admin().post("/api/params", { key: "system.ui.defaultLocale", value: "zh", name: "x" })).body;
+      expect((await admin().post("/api/params", { key: "system.ui.defaultLocale", value: "en", name: "x" })).status).toBe(409);
+      const after = ((await admin().get("/api/params")).body as Array<{ key: string; value: string; overridden: boolean; defaultValue: string | null; platformProvided: boolean }>).filter((p) => p.key === "system.ui.defaultLocale");
+      expect(after).toHaveLength(1);
+      expect(after[0]).toMatchObject({ value: "zh", overridden: true, defaultValue: "en", platformProvided: false });
+      expect((await admin().patch(`/api/params/${override.id}`, { value: "nope" })).status).toBe(400);
+      expect((await admin().del(`/api/params/${override.id}`)).status).toBe(200);
+      expect(((await admin().get("/api/params")).body as Array<{ key: string; value: string }>).find((p) => p.key === "system.ui.defaultLocale")?.value).toBe("en");
       expect((await admin().post("/api/params", { key: "Bad Key", value: "1", name: "x" })).status).toBe(400);
       const mine = (await admin().post("/api/params", { key: "school.openHour", value: "8", name: "Opening hour" })).body;
       expect((await admin().patch(`/api/params/${mine.id}`, { value: "9" })).body.value).toBe("9");

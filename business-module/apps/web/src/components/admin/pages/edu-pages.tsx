@@ -16,6 +16,7 @@ import { DiscussionPanel } from "./discussion-pages";
 import { GradesPanel } from "./grade-pages";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
+import { useDict } from "../use-dict";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
@@ -173,6 +174,7 @@ export function MajorsPage() {
   const tt = useTable();
   const { rows, loading, error, reload } = useList<MajorRow>("majors");
   const courses = useList<CourseRow>("courses");
+  const degrees = useDict("degree_type");
   const { run, message } = useAct(reload);
   const [form, setForm] = React.useState<{ row?: MajorRow } | null>(null);
   const [open, setOpen] = React.useState<string | null>(null);
@@ -190,7 +192,7 @@ export function MajorsPage() {
   const columns: Column<MajorRow>[] = [
     { key: "code", header: t("code"), cell: (r) => r.code },
     { key: "name", header: t("name"), cell: (r) => r.name },
-    { key: "degree", header: t("degreeType"), cell: (r) => r.degreeType ?? "" },
+    { key: "degree", header: t("degreeType"), cell: (r) => degrees.label(r.degreeType) },
     { key: "credits", header: t("totalCredits"), cell: (r) => r.totalCredits },
     {
       key: "actions",
@@ -211,7 +213,7 @@ export function MajorsPage() {
       <Can perm={PERMS.eduMajorAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
       {form ? (
         <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
-          fields={[...(form.row ? [] : [{ name: "code", label: t("code"), required: true }]), { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType") }, { name: "totalCredits", label: t("totalCredits"), type: "number" as const }]}
+          fields={[...(form.row ? [] : [{ name: "code", label: t("code"), required: true }]), { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType"), type: "select" as const, options: form.row?.degreeType && !degrees.options.some((o) => o.value === form.row?.degreeType) ? [...degrees.options, { value: form.row.degreeType, label: form.row.degreeType }] : degrees.options }, { name: "totalCredits", label: t("totalCredits"), type: "number" as const }]}
           initial={form.row ? { name: form.row.name, degreeType: form.row.degreeType ?? "", totalCredits: String(form.row.totalCredits) } : {}}
           submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(null)}
           onSubmit={async (p) => { if (await run(() => (form.row ? bff(`majors/${form.row.id}`, { method: "PATCH", body: p }) : bff("majors", { method: "POST", body: p })), c("saved"))) setForm(null); }} />

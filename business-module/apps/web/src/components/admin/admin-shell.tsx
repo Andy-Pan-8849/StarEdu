@@ -7,11 +7,13 @@ import { PAGES } from "./page-registry";
 import { BannerStrip, NotificationBell } from "./notification-bell";
 import { BrandNameContext } from "./brand-context";
 import { PermissionProvider } from "./permissions";
+import { SettingsContext, type UiSettings } from "./settings-context";
 
-export function AdminShell({ menus, permissions, userName, brand, signOutAction = "/admin/auth/logout", wsPort }: { menus: MenuNode[]; permissions: string[]; userName: string; brand?: { name: string; logoUrl: string | null }; signOutAction?: string; wsPort?: string }) {
+export function AdminShell({ menus, permissions, userName, brand, signOutAction = "/admin/auth/logout", wsPort, settings }: { menus: MenuNode[]; permissions: string[]; userName: string; brand?: { name: string; logoUrl: string | null }; signOutAction?: string; wsPort?: string; settings?: UiSettings }) {
   const t = useTranslations();
   return (
     <PermissionProvider permissions={permissions}>
+      <SettingsContext.Provider value={settings ?? { pageSize: 20 }}>
       <BrandNameContext.Provider value={brand?.name ?? ""}>
       <MenuTreeShell
         menus={menus}
@@ -35,6 +37,7 @@ export function AdminShell({ menus, permissions, userName, brand, signOutAction 
         }}
       />
       </BrandNameContext.Provider>
+      </SettingsContext.Provider>
     </PermissionProvider>
   );
 }

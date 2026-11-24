@@ -290,7 +290,7 @@ export function DeptsPage() {
 }
 
 // ---------------------------------------------------------------- 参数
-interface ParamRow { id: string; key: string; value: string; name: string; platformProvided: boolean }
+interface ParamRow { id: string; key: string; value: string; name: string; platformProvided: boolean; overridden: boolean; defaultValue: string | null }
 
 export function ParamsPage() {
   const t = useTranslations("pages.params");
@@ -302,23 +302,24 @@ export function ParamsPage() {
   const [form, setForm] = React.useState<{ row?: ParamRow } | null>(null);
   const fields: Field[] = [
     { name: "key", label: t("key"), required: true, readOnly: !!form?.row },
-    { name: "name", label: t("name"), required: true },
+    { name: "name", label: t("name"), required: true, readOnly: !!form?.row?.platformProvided || !!form?.row?.overridden },
     { name: "value", label: t("value") },
   ];
   const columns: Column<ParamRow & { nameKey: string | null }>[] = [
     { key: "name", header: t("name"), cell: (r) => (r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name) },
     { key: "key", header: t("key"), cell: (r) => <code>{r.key}</code> },
     { key: "value", header: t("value"), cell: (r) => r.value },
-    { key: "source", header: t("source"), cell: (r) => (r.platformProvided ? t("platform") : t("own")) },
+    { key: "source", header: t("source"), cell: (r) => (r.platformProvided ? t("platform") : r.overridden ? t("customized") : t("own")) },
     {
       key: "actions",
       header: "",
-      cell: (r) => (r.platformProvided ? null : (
+      cell: (r) => (
         <div className="flex gap-1">
-          <PermRowAction perm={PERMS.paramEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
-          <PermRowAction perm={PERMS.paramRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`params/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
+          <PermRowAction perm={PERMS.paramEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{r.platformProvided ? t("customize") : c("edit")}</PermRowAction>
+          {!r.platformProvided && r.overridden ? <PermRowAction perm={PERMS.paramRemove} onClick={() => window.confirm(t("confirmRestore")) && void run(() => bff(`params/${r.id}`, { method: "DELETE" }), c("done"))} icon={RotateCcw}>{t("restoreDefault")}</PermRowAction> : null}
+          {!r.platformProvided && !r.overridden ? <PermRowAction perm={PERMS.paramRemove} onClick={() => window.confirm(c("confirmDelete", { name: r.name })) && void run(() => bff(`params/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction> : null}
         </div>
-      )),
+      ),
     },
   ];
   return (
@@ -335,7 +336,7 @@ export function ParamsPage() {
           submitLabel={c("save")}
           cancelLabel={c("cancel")}
           onCancel={() => setForm(null)}
-          onSubmit={async (p) => { if (await run(() => (form.row ? bff(`params/${form.row.id}`, { method: "PATCH", body: { value: p.value ?? "", name: p.name } }) : bff("params", { method: "POST", body: p })), c("saved"))) setForm(null); }}
+          onSubmit={async (p) => { if (await run(() => (form.row?.platformProvided ? bff("params", { method: "POST", body: { key: form.row.key, name: form.row.name, value: p.value ?? "" } }) : form.row ? bff(`params/${form.row.id}`, { method: "PATCH", body: { value: p.value ?? "", name: p.name } }) : bff("params", { method: "POST", body: p })), c("saved"))) setForm(null); }}
         />
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
