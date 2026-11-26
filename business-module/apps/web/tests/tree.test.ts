@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { descendantIds, stateOf, submitIds, toggle, type TreeNode } from "../src/components/admin/tree";
+import { descendantIds, mergeTopLevel, stateOf, submitIds, toggle, type TreeNode } from "../src/components/admin/tree";
 import { closeTab, emptyTabs, openTab } from "../src/components/admin/tabs-state";
 
 const tree: TreeNode[] = [
@@ -73,5 +73,13 @@ describe("tabs state", () => {
     for (const id of ["a", "b"]) s = openTab(s, { id, title: id });
     expect(closeTab(s, "a").activeId).toBe("b");
     expect(closeTab(s, "zzz")).toBe(s);
+  });
+});
+
+describe("mergeTopLevel", () => {
+  it("keeps a menu assigned to two entries only once, so React keys stay unique", () => {
+    const admin: TreeNode[] = [{ id: "hr", label: "HR" }, { id: "ai", label: "AI assistant" }];
+    const portal: TreeNode[] = [{ id: "studies", label: "My studies" }, { id: "ai", label: "AI assistant" }];
+    expect(mergeTopLevel(admin, portal).map((n) => n.id)).toEqual(["hr", "ai", "studies"]);
   });
 });
