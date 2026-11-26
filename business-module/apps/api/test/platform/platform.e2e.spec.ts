@@ -303,7 +303,8 @@ describe("platform console", () => {
 
     it("says Grafana is not configured / not running, and where Swagger is", async () => {
       const l = (await root().get("/api/platform/external-links")).body;
-      expect(l.grafana).toMatchObject({ up: false });
+      expect(l.grafana).toMatchObject({ up: false, state: expect.stringMatching(/^(notConfigured|down)$/) });
+      expect(l.langfuse).toMatchObject({ up: false, state: expect.stringMatching(/^(notConfigured|down)$/) }); // 两个入口始终有答案，页面据此显示原因
       expect(l.swagger.enabled).toBe(true);
       expect(l.swagger.path).toBe("/api-docs");
     });

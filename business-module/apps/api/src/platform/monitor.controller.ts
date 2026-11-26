@@ -16,6 +16,18 @@ function parseInfo(text: string): Record<string, string> {
   return Object.fromEntries(text.split("\r\n").filter((l) => l && !l.startsWith("#") && l.includes(":")).map((l) => [l.slice(0, l.indexOf(":")), l.slice(l.indexOf(":") + 1)]));
 }
 
+/** 探一个外部看板：没配地址 → notConfigured；连不上或不健康 → down；否则 up。 */
+async function probe(url: string | undefined, healthPath: string): Promise<{ configured: boolean; url: string | null; up: boolean; state: "notConfigured" | "down" | "up" }> {
+  if (!url) return { configured: false, url: null, up: false, state: "notConfigured" };
+  let up = false;
+  try {
+    up = (await fetch(`${url.replace(/\/$/, "")}${healthPath}`, { signal: AbortSignal.timeout(2000) })).ok;
+  } catch {
+    up = false;
+  }
+  return { configured: true, url, up, state: up ? "up" : "down" };
+}
+
 @PlatformRoute()
 @Controller("api/platform")
 export class MonitorController {
@@ -73,22 +85,18 @@ export class MonitorController {
     };
   }
 
-  /** Swagger 文档页的地址（只有开启时才有），和 Grafana 的地址与是否在运行（探活）。 */
+  /** Swagger 文档页的地址（只有开启时才有），和 Grafana、Langfuse 的地址与状态（探活）：未配置 / 没在运行 / 运行中。 */
   @Get("external-links")
   @RequirePermissions(PERMS.platformMonitorList)
   async externalLinks() {
     const config = loadConfig();
-    const swaggerOn = config.SWAGGER_ENABLED === "true" || (config.SWAGGER_ENABLED === undefined && process.env.NODE_ENV !== "production");
-    const grafanaUrl = config.GRAFANA_URL ?? null;
-    let grafanaUp = false;
-    if (grafanaUrl) {
-      try {
-        grafanaUp = (await fetch(`${grafanaUrl.replace(/\/$/, "")}/api/health`, { signal: AbortSignal.timeout(2000) })).ok;
-      } catch {
-        grafanaUp = false;
-      }
-    }
-    return { swagger: { enabled: swaggerOn, path: swaggerOn ? "/api-docs" : null }, grafana: { configured: !!grafanaUrl, url: grafanaUrl, up: grafanaUp } };
+    const dev = process.env.NODE_ENV !== "production";
+    const swaggerOn = config.SWAGGER_ENABLED === "true" || (config.SWAGGER_ENABLED === undefined && dev);
+    const [grafana, langfuse] = await Promise.all([
+      probe(config.GRAFANA_URL ?? (dev ? "http://localhost:3300" : undefined), "/api/health"),
+      probe(config.LANGFUSE_URL ?? (dev ? "http://localhost:3100" : undefined), "/api/public/health"),
+    ]);
+    return { swagger: { enabled: swaggerOn, path: swaggerOn ? "/api-docs" : null }, grafana, langfuse };
   }
 
   // ---- 定时任务 ----

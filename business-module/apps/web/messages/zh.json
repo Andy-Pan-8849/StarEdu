@@ -184,8 +184,18 @@
       "latency": "延迟",
       "swagger": "接口文档（Swagger）",
       "swaggerOff": "接口文档未开启。",
-      "grafana": "Grafana",
-      "grafanaDown": "Grafana 没有启动。"
+      "grafana": "看板（Grafana）",
+      "observability": "可观测",
+      "grafanaAbout": "指标、链路和服务看板：延迟、错误、资源占用。",
+      "langfuse": "大模型追踪（Langfuse）",
+      "langfuseAbout": "每一次 AI 调用的费用、耗时和错误。里面可能含有问答的原文。",
+      "swaggerAbout": "给开发者看的接口文档。",
+      "open": "打开",
+      "state_up": "运行中",
+      "state_down": "未运行",
+      "state_notConfigured": "未配置",
+      "reason_down": "连不上 {url}。请先启动可观测组件（AI 模块里 make up-obs 或 make up-langfuse），再刷新。",
+      "reason_notConfigured": "没有设置地址。请在 API 的配置里设置 {env}。"
     },
     "platformAudit": {
       "title": "平台操作日志",
@@ -1162,11 +1172,13 @@
     "healthOk": "全部运行中",
     "healthDown": "{n} 项未运行",
     "grafana": "看板（Grafana）",
-    "grafanaUp": "运行中",
-    "grafanaDown": "未运行",
     "recentActivity": "最近的平台操作",
     "noActivity": "还没有操作。",
     "viewAll": "查看全部",
-    "system": "系统"
+    "system": "系统",
+    "langfuse": "大模型追踪（Langfuse）",
+    "state_up": "运行中",
+    "state_down": "未运行",
+    "state_notConfigured": "未配置"
   }
 }

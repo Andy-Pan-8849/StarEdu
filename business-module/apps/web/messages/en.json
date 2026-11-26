@@ -184,8 +184,18 @@
       "latency": "Latency",
       "swagger": "API documentation (Swagger)",
       "swaggerOff": "API documentation is switched off.",
-      "grafana": "Grafana",
-      "grafanaDown": "Grafana is not running."
+      "grafana": "Dashboards (Grafana)",
+      "observability": "Observability",
+      "grafanaAbout": "Metrics, traces and service dashboards: latency, errors and resource use.",
+      "langfuse": "LLM tracing (Langfuse)",
+      "langfuseAbout": "Every AI call with its cost, latency and errors. It can contain the text of questions and answers.",
+      "swaggerAbout": "API reference for developers.",
+      "open": "Open",
+      "state_up": "Running",
+      "state_down": "Not running",
+      "state_notConfigured": "Not configured",
+      "reason_down": "Could not reach {url}. Start the observability stack (make up-obs or make up-langfuse in the AI module) and reload.",
+      "reason_notConfigured": "No address set. Set {env} in the API settings."
     },
     "platformAudit": {
       "title": "Platform audit log",
@@ -1162,11 +1172,13 @@
     "healthOk": "All running",
     "healthDown": "{n} not running",
     "grafana": "Dashboards (Grafana)",
-    "grafanaUp": "Running",
-    "grafanaDown": "Not running",
     "recentActivity": "Recent platform activity",
     "noActivity": "No activity yet.",
     "viewAll": "View all",
-    "system": "system"
+    "system": "system",
+    "langfuse": "LLM tracing (Langfuse)",
+    "state_up": "Running",
+    "state_down": "Not running",
+    "state_notConfigured": "Not configured"
   }
 }
