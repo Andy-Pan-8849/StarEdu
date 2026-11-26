@@ -687,7 +687,8 @@
       "approveDays": "批准天数",
       "decided": "已处理，并通知了学生。",
       "colStatus": "状态",
-      "colCreated": "提交时间"
+      "colCreated": "提交时间",
+      "nothingToAsk": "现在没有可以申请的事项。成绩复评要在最终成绩发布之后，延期只针对还没截止的作业。"
     },
     "grades": {
       "policy": "成绩构成（各作业分组的权重，合计 100%）",
