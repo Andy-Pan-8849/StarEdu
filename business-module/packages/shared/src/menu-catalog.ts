@@ -131,7 +131,7 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ]),
   ...menuWithButtons("platform:menu", "platform", "Menus", "menu", 4, PERMS.platformMenuList, [["edit", "Edit", PERMS.platformMenuEdit]]),
   ...menuWithButtons("platform:entry", "platform", "Entry assignment", "entry", 5, PERMS.platformEntryList, [["edit", "Assign", PERMS.platformEntryEdit]]),
-  ...menuWithButtons("platform:monitor", "platform", "Monitoring", "monitor", 6, PERMS.platformMonitorList, []),
+  ...menuWithButtons("platform:monitor", "platform", "System monitoring", "monitor", 6, PERMS.platformMonitorList, []),
   ...menuWithButtons("platform:job", "platform", "Scheduled jobs", "job", 7, PERMS.platformJobList, [
     ["edit", "Edit", PERMS.platformJobEdit],
     ["run", "Run now", PERMS.platformJobRun],

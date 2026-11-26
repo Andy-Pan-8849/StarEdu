@@ -81,7 +81,7 @@ export function HomePage() {
   return (
     <div className="space-y-4 text-sm">
       <div>
-        <h2 className="text-xl font-semibold">{t(`greeting_${greetingKey(new Date().getHours())}`, { name })}</h2>
+        <h2 suppressHydrationWarning className="text-xl font-semibold">{t(`greeting_${greetingKey(new Date().getHours())}`, { name })}</h2>
         <p className="text-muted">{student ? t("subtitleStudent") : t("subtitleStaff")}</p>
       </div>
 

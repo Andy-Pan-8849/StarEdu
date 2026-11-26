@@ -250,7 +250,7 @@ export class PlatformController {
     const graph = await this.authz.graph();
     const entryOf = new Map<string, string[]>();
     for (const code of ["admin", "portal", "platform"]) for (const top of graph.topsOfEntry(code).keys()) entryOf.set(top, [...(entryOf.get(top) ?? []), code]);
-    return graph.menus.map((m) => ({ id: m.id, parentId: m.parentId, code: m.code, name: m.name, type: m.type, route: m.route, component: m.component, perms: m.perms, sort: m.sort, visible: m.visible, status: m.status, entries: entryOf.get(graph.topOf(m.id)) ?? [] }));
+    return graph.menus.map((m) => ({ id: m.id, parentId: m.parentId, code: m.code, name: m.name, nameKey: m.nameKey, type: m.type, route: m.route, component: m.component, perms: m.perms, sort: m.sort, visible: m.visible, status: m.status, entries: entryOf.get(graph.topOf(m.id)) ?? [] }));
   }
 
   /** 平台只能调整"显示"、"启用"和排序；菜单本身（名称、路由、权限标识）由代码里的目录定义，下次同步会还原。 */

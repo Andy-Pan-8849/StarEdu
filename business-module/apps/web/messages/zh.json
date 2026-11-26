@@ -166,7 +166,7 @@
       "runNow": "立即执行"
     },
     "monitor": {
-      "title": "监控",
+      "title": "系统监控",
       "server": "服务器",
       "cache": "缓存（Redis）",
       "database": "数据库",
@@ -895,7 +895,11 @@
       "show": "显示",
       "hide": "隐藏",
       "enable": "启用",
-      "disable": "停用"
+      "disable": "停用",
+      "expandAll": "全部展开",
+      "collapseAll": "全部折叠",
+      "expand": "展开",
+      "collapse": "折叠"
     },
     "platformEntries": {
       "title": "入口分配",
@@ -937,7 +941,7 @@
     "platform:role": "平台角色",
     "platform:menu": "菜单管理",
     "platform:entry": "入口管理",
-    "platform:monitor": "监控",
+    "platform:monitor": "系统监控",
     "platform:job": "定时任务",
     "platform:log": "操作日志",
     "system:dict": "字典管理",
@@ -1144,5 +1148,25 @@
     "noProfile": "这个账号没有对应的个人资料，不能在这里修改。",
     "passwordNote": "密码由登录服务统一管理。点下面的按钮会跳转过去修改，改完自动回来。",
     "changePassword": "修改密码"
+  },
+  "platformHome": {
+    "greeting_morning": "早上好，{name}",
+    "greeting_afternoon": "下午好，{name}",
+    "greeting_evening": "晚上好，{name}",
+    "subtitle": "这是平台目前的整体情况。",
+    "tenants": "租户",
+    "tenantsActive": "正常",
+    "tenantsNotified": "待停用",
+    "tenantsSuspended": "已停用",
+    "health": "服务状态",
+    "healthOk": "全部运行中",
+    "healthDown": "{n} 项未运行",
+    "grafana": "看板（Grafana）",
+    "grafanaUp": "运行中",
+    "grafanaDown": "未运行",
+    "recentActivity": "最近的平台操作",
+    "noActivity": "还没有操作。",
+    "viewAll": "查看全部",
+    "system": "系统"
   }
 }
