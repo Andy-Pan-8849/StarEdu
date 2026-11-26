@@ -473,7 +473,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
           ))}</ul>
           <Can perm={PERMS.eduMaterialEdit}>
             {matForm ? (
-              <FormPanel inline title={c("add")} fields={[{ name: "title", label: t("name"), required: true }, { name: "url", label: t("url"), required: true }, { name: "published", label: t("published"), type: "checkbox" }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setMatForm(false)}
+              <FormPanel inline title={c("add")} fields={[{ name: "title", label: t("name"), required: true }, { name: "url", label: t("url"), required: true }, { name: "published", label: t("published"), type: "checkbox", hint: t("publishedHint") }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setMatForm(false)}
                 onSubmit={async (p) => { if (await run(() => bff(`sections/${id}/materials`, { method: "POST", body: p }), c("saved"))) setMatForm(false); }} />
             ) : <IconButton icon={Plus} label={c("add")} onClick={() => setMatForm(true)}/>}
           </Can>

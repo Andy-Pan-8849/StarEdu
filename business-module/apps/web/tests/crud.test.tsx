@@ -45,3 +45,11 @@ describe("FormPanel", () => {
     expect(onSubmit).not.toHaveBeenCalled(); // 必填没填，浏览器的表单校验拦住
   });
 });
+
+describe("FormPanel field hint", () => {
+  it("shows the explanation right after a checkbox option", () => {
+    render(<FormPanel title="Add" fields={[{ name: "published", label: "Published", type: "checkbox", hint: "Students can only see this once it is published." }]} submitLabel="Save" cancelLabel="Cancel" onCancel={() => undefined} onSubmit={() => undefined} />);
+    expect(screen.getByLabelText(/Published/).getAttribute("type")).toBe("checkbox");
+    expect(screen.getByText(/Students can only see this once it is published/)).toBeTruthy();
+  });
+});

@@ -591,7 +591,8 @@
       "instructorsCol": "Instructors",
       "seatsCol": "Seats",
       "sectionsNote": "A class section is one class of a course in one term: its own instructors, schedule, campus and seats. Students enroll in a section, not in the course itself (for example OS101, section 01, Fall 2026).",
-      "enrollHint": "Click a course name to see its details before you enroll. Your enrolled courses are under My courses."
+      "enrollHint": "Click a course name to see its details before you enroll. Your enrolled courses are under My courses.",
+      "publishedHint": "Students can only see this material once it is published."
     },
     "assignments": {
       "tab": "Assignments",

@@ -12,6 +12,8 @@ export interface Field {
   options?: Array<{ value: string; label: string }>;
   required?: boolean;
   readOnly?: boolean;
+  /** 字段后面的一行说明（小字） */
+  hint?: string;
 }
 
 type Values = Record<string, string | boolean>;
@@ -63,7 +65,7 @@ export function FormPanel({
     >
       {inline ? <h3 className="text-base font-semibold">{title}</h3> : null}
       {fields.map((f) => (
-        <label key={f.name} className={f.type === "checkbox" ? "flex items-center gap-2" : "flex flex-col gap-1"}>
+        <label key={f.name} className={f.type === "checkbox" ? "flex flex-wrap items-center gap-x-2" : "flex flex-col gap-1"}>
           {f.type === "checkbox" ? null : f.label}
           {f.type === "select" ? (
             <select className={cls} required={f.required} disabled={f.readOnly} value={String(values[f.name])} onChange={(e) => set(f.name, e.target.value)}>
@@ -71,12 +73,13 @@ export function FormPanel({
               {f.options?.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
             </select>
           ) : f.type === "checkbox" ? (
-            <><input type="checkbox" disabled={f.readOnly} checked={Boolean(values[f.name])} onChange={(e) => set(f.name, e.target.checked)} />{f.label}</>
+            <><input type="checkbox" disabled={f.readOnly} checked={Boolean(values[f.name])} onChange={(e) => set(f.name, e.target.checked)} />{f.label}{f.hint ? <span className="text-xs text-muted">— {f.hint}</span> : null}</>
           ) : f.type === "textarea" ? (
             <textarea className={cls} rows={4} required={f.required} readOnly={f.readOnly} value={String(values[f.name])} onChange={(e) => set(f.name, e.target.value)} />
           ) : (
             <input className={cls} type={f.type ?? "text"} required={f.required} readOnly={f.readOnly} value={String(values[f.name])} onChange={(e) => set(f.name, e.target.value)} />
           )}
+          {f.hint && f.type !== "checkbox" ? <span className="text-xs text-muted">{f.hint}</span> : null}
         </label>
       ))}
       <div className="mt-2 flex justify-start gap-2 border-t border-border pt-3">
