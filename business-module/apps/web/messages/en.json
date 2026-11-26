@@ -687,7 +687,8 @@
       "approveDays": "Approve how many days",
       "decided": "Decision saved; the student was notified.",
       "colStatus": "Status",
-      "colCreated": "Submitted"
+      "colCreated": "Submitted",
+      "nothingToAsk": "There is nothing to ask for right now. Grade appeals open when a final grade is published, and extensions are only for assignments that are still open."
     },
     "grades": {
       "policy": "Grade policy (weights of the assignment groups, total 100%)",

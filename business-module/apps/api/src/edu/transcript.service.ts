@@ -167,6 +167,8 @@ export class TranscriptService {
     const text = (s: string) => [...s].map((c) => (c === "\n" || has(c.codePointAt(0)!) ? c : "?")).join("");
     // 水印：每一页斜着印淡淡的大字（非正式版"UNOFFICIAL COPY"，正式版"OFFICIAL"+文档编号），复印或截图后仍能看出是哪种
     const watermark = () => {
+      // 画水印用 text(x, y) 会把文字光标留在页面中间、x 也变成 0：正文会从半页开始、顶格写，还把本该一页的内容挤成两页。画完把光标放回页边距
+      const { x, y } = doc;
       doc.save();
       doc.rotate(-40, { origin: [doc.page.width / 2, doc.page.height / 2] });
       doc.font("body").fillColor("#000000").fillOpacity(0.07);
@@ -175,6 +177,8 @@ export class TranscriptService {
       doc.fontSize(18).text(meta.docNumber, 0, doc.page.height / 2 + 40, { align: "center", width: doc.page.width, lineBreak: false });
       doc.restore();
       doc.fillOpacity(1).fillColor("#000000");
+      doc.x = x;
+      doc.y = y;
     };
     doc.on("pageAdded", watermark);
     watermark();

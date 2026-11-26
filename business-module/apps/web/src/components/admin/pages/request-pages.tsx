@@ -42,6 +42,7 @@ export function PortalRequestsPage() {
   const [reason, setReason] = React.useState("");
   const [creating, setCreating] = React.useState(false);
   const c = useTranslations("crud");
+  const nothingToAsk = !!opts && opts.appeals.length === 0 && opts.extensions.length === 0;
 
   const submit = async () => {
     const [kind, id] = target.split(":");
@@ -68,21 +69,34 @@ export function PortalRequestsPage() {
       {creating ? (
         <Modal title={t("myTitle")} onClose={() => setCreating(false)}>
         <div className="flex flex-col gap-3">
-          <select aria-label={t("pick")} className={input} value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">{t("pick")}</option>
-            {opts?.appeals.map((a) => <option key={a.enrollmentId} value={`appeal:${a.enrollmentId}`}>{t("appealOption", { section: a.section, grade: a.grade, total: a.total })}</option>)}
-            {opts?.extensions.map((x) => <option key={x.assignmentId} value={`extension:${x.assignmentId}`}>{t("extensionOption", { section: x.section, title: x.title, due: new Date(x.dueAt).toLocaleString() })}</option>)}
-          </select>
+          {/* 只列"现在可以申请的"。一个都没有时要说明，不能给一个打不开的空下拉 */}
+          {nothingToAsk ? (
+            <p role="status" className="rounded-md border border-border bg-border/20 px-3 py-2">{t("nothingToAsk")}</p>
+          ) : (
+            <select aria-label={t("pick")} className={input} value={target} onChange={(e) => setTarget(e.target.value)} disabled={!opts}>
+              <option value="">{t("pick")}</option>
+              {opts && opts.appeals.length > 0 ? (
+                <optgroup label={t("kind_grade_appeal")}>
+                  {opts.appeals.map((a) => <option key={a.enrollmentId} value={`appeal:${a.enrollmentId}`}>{t("appealOption", { section: a.section, grade: a.grade, total: a.total })}</option>)}
+                </optgroup>
+              ) : null}
+              {opts && opts.extensions.length > 0 ? (
+                <optgroup label={t("kind_extension")}>
+                  {opts.extensions.map((x) => <option key={x.assignmentId} value={`extension:${x.assignmentId}`}>{t("extensionOption", { section: x.section, title: x.title, due: new Date(x.dueAt).toLocaleString() })}</option>)}
+                </optgroup>
+              ) : null}
+            </select>
+          )}
           {target.startsWith("extension:") ? (
             <label className="flex items-center gap-2">{t("days")}
               <select className={input} value={days} onChange={(e) => setDays(e.target.value)}>{Array.from({ length: opts?.maxExtensionDays ?? 3 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}</select>
             </label>
           ) : null}
-          <textarea aria-label={t("reason")} placeholder={t("reason")} className={input} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+          {nothingToAsk ? null : <textarea aria-label={t("reason")} placeholder={t("reason")} className={input} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />}
           <p className="text-xs text-muted">{t("windowNote", { days: opts?.appealWindowDays ?? 14 })}</p>
           <div className="flex gap-2 border-t border-border pt-3">
-            <PermButton perm={PERMS.portalRequestSubmit} size="sm" disabled={!target || reason.trim().length < 3} onClick={() => void submit()}>{t("submit")}</PermButton>
-            <Button size="sm" variant="outline" onClick={() => setCreating(false)}>{c("cancel")}</Button>
+            {nothingToAsk ? null : <PermButton perm={PERMS.portalRequestSubmit} size="sm" disabled={!target || reason.trim().length < 3} onClick={() => void submit()}>{t("submit")}</PermButton>}
+            <Button size="sm" variant="outline" onClick={() => setCreating(false)}>{nothingToAsk ? c("close") : c("cancel")}</Button>
           </div>
         </div>
         </Modal>
