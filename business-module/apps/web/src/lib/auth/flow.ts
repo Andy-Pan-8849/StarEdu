@@ -100,7 +100,8 @@ export async function handleAuth(entry: Entry, action: string, req: NextRequest)
     const store = sessionStore(config.redisUrl);
     const saved = sid ? await store.get(sid) : null;
     if (sid) await store.delete(sid);
-    const res = NextResponse.redirect(logoutUrl({ publicUrl: config.keycloakPublicUrl, tenantCode, entry, origin: self, idToken: saved?.idToken }));
+    // 退出按钮是表单 POST：必须用 303 让浏览器改用 GET 去 Keycloak（默认的 307 会把 POST 原样带过去，Keycloak 当成"确认退出"的提交，就停在"已退出"页面）
+    const res = NextResponse.redirect(logoutUrl({ publicUrl: config.keycloakPublicUrl, tenantCode, entry, origin: self, idToken: saved?.idToken }), 303);
     res.cookies.delete(SESSION_COOKIE);
     return res;
   }
