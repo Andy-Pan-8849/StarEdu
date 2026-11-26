@@ -58,3 +58,15 @@ export function submitIds(nodes: TreeNode[], checked: ReadonlySet<string>): stri
   nodes.forEach(walk);
   return [...out];
 }
+
+/** 把几棵树的顶层拼在一起；同一个菜单分配给了多个入口（如 AI 助手同时在管理端和门户）只保留第一次出现的，id 不能重复。 */
+export function mergeTopLevel(...trees: TreeNode[][]): TreeNode[] {
+  const seen = new Set<string>();
+  const out: TreeNode[] = [];
+  for (const node of trees.flat()) {
+    if (seen.has(node.id)) continue;
+    seen.add(node.id);
+    out.push(node);
+  }
+  return out;
+}

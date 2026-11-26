@@ -13,7 +13,7 @@ import { DataTable, type Column } from "../data-table";
 import { Can, PermButton } from "../permissions";
 import { TreeSelect } from "../tree-select";
 import type { TreeNode } from "../tree";
-import { submitIds } from "../tree";
+import { mergeTopLevel, submitIds } from "../tree";
 import { useList } from "./use-api";
 
 const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : "");
@@ -246,7 +246,7 @@ function GrantsPanel({ tenant, onClose }: { tenant: TenantRow; onClose: () => vo
   }, [tenant.id]);
   if (!data) return <Modal title={t("features")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   const label = (n: MenuApiNode) => (n.nameKey && tm.has(n.nameKey) ? tm(n.nameKey) : n.name);
-  const tree = [...toTree(data.tree.admin, label), ...toTree(data.tree.portal, label)];
+  const tree = mergeTopLevel(toTree(data.tree.admin, label), toTree(data.tree.portal, label)); // AI 助手等同时在两个入口的菜单只出现一次
   return (
     <Modal title={t("featuresOf", { name: tenant.name })} onClose={onClose}>
     <div className="text-sm">
