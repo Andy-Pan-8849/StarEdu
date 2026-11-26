@@ -201,6 +201,24 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       expect(cs[0]).toMatchObject({ requirement: "elective", prerequisitesMet: false, missingPrerequisites: ["CS101"] });
       expect(mine.sections.every((s: { course: { code: string } }) => ["CS101", "CS102"].includes(s.course.code))).toBe(true); // 只列我专业里的
     });
+
+    it("a student can open the details of an open section, and of a class they took; other classes are 404", async () => {
+      const a = await student("detail.one");
+      const open = (await h.call(a.token).get("/api/portal/sections")).body.sections as Array<{ id: string; course: { code: string } }>;
+      const target = open.find((s) => s.course.code === "CS102")!;
+      const d = await h.call(a.token).get(`/api/portal/sections/${target.id}`);
+      expect(d.status).toBe(200);
+      expect(d.body).toMatchObject({ id: target.id, course: { code: "CS102", credits: expect.any(Number) }, prerequisites: [expect.objectContaining({ code: "CS101", met: false })], myEnrollment: null });
+      expect(d.body.seatsLeft).toBeGreaterThanOrEqual(0);
+      // 选了之后详情里能看到"我的选课"
+      const first = open.find((s) => s.course.code === "CS101")!;
+      expect((await h.call(a.token).post("/api/portal/enrollments", { sectionId: first.id })).status).toBe(201);
+      expect((await h.call(a.token).get(`/api/portal/sections/${first.id}`)).body.myEnrollment).toMatchObject({ status: "enrolled" });
+      // 草稿班（没开放、也不是我的）和不存在的 id 看不到
+      const draft = (await registrar().post("/api/sections", { courseId: cs101, termId, campusId: hqCampus, number: "97", capacity: 5 })).body.id;
+      expect((await h.call(a.token).get(`/api/portal/sections/${draft}`)).status).toBe(404);
+      expect((await h.call(a.token).get("/api/portal/sections/00000000-0000-4000-8000-000000000000")).status).toBe(404);
+    });
   });
 
   describe("concurrency", () => {

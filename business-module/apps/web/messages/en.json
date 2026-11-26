@@ -590,7 +590,8 @@
       "sectionCol": "Section",
       "instructorsCol": "Instructors",
       "seatsCol": "Seats",
-      "sectionsNote": "A class section is one class of a course in one term: its own instructors, schedule, campus and seats. Students enroll in a section, not in the course itself (for example OS101, section 01, Fall 2026)."
+      "sectionsNote": "A class section is one class of a course in one term: its own instructors, schedule, campus and seats. Students enroll in a section, not in the course itself (for example OS101, section 01, Fall 2026).",
+      "enrollHint": "Click a course name to see its details before you enroll. Your enrolled courses are under My courses."
     },
     "assignments": {
       "tab": "Assignments",
@@ -929,6 +930,38 @@
       "endsAt": "Ends",
       "period": "Shown",
       "publish": "Publish"
+    },
+    "courseDetail": {
+      "title": "Course details",
+      "credits": "Credits",
+      "section": "Class section",
+      "term": "Term",
+      "campus": "Campus",
+      "mode": "Mode",
+      "mode_onsite": "On campus",
+      "mode_online": "Online",
+      "mode_hybrid": "Blended",
+      "schedule": "Schedule",
+      "noSchedule": "Not scheduled yet",
+      "instructors": "Instructors",
+      "seats": "Seats",
+      "seatsOf": "{left} left of {capacity}",
+      "prerequisites": "Prerequisites",
+      "none": "None",
+      "passed": "passed",
+      "notPassed": "not passed yet",
+      "notes": "Notes",
+      "syllabus": "About this course",
+      "noSyllabus": "No description yet.",
+      "enroll": "Enroll",
+      "full": "Full",
+      "weekday_1": "Mon",
+      "weekday_2": "Tue",
+      "weekday_3": "Wed",
+      "weekday_4": "Thu",
+      "weekday_5": "Fri",
+      "weekday_6": "Sat",
+      "weekday_7": "Sun"
     }
   },
   "menu": {
@@ -982,7 +1015,8 @@
     "ai": "AI assistant",
     "doc": "Library",
     "doc:library": "Document library",
-    "portal:library": "Library"
+    "portal:library": "Library",
+    "portal:course": "My courses"
   },
   "dict": {
     "type": {

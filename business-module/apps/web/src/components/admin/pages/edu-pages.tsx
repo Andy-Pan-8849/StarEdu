@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { TabBody, Tabs } from "../tabs";
-import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserMinus, UserPlus, UsersRound } from "lucide-react";
+import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserPlus, UsersRound } from "lucide-react";
 import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { GradesPanel } from "./grade-pages";
 import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
 import { useDict } from "../use-dict";
+import { CourseDetailDialog, CourseLink } from "./course-pages";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
@@ -490,58 +491,43 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
 
 // ---------------------------------------------------------------- 学生门户：选课
 interface OpenSection { id: string; name: string; course: { code: string; name: string; credits: number }; campus: string; seatsLeft: number; capacity: number; requirement: string | null; prerequisitesMet: boolean; missingPrerequisites: string[]; conflicts: string[]; alreadyTaking: boolean; alreadyPassed: boolean; instructors: Array<{ fullName: string | null }> }
-interface MyEnrollment { id: string; status: string; course: { code: string; name: string }; term: string; canDrop: boolean; willBeW: boolean; section: { id: string; name: string } }
-
 export function PortalEnrollPage() {
   const t = useTranslations("pages.edu");
-  const c = useTranslations("crud");
-  const [tab, setTab] = React.useState<"open" | "mine">("open");
   const [filter, setFilter] = React.useState<"mine" | "all">("all");
   const [data, setData] = React.useState<{ declaredMajor: { name: string } | null; sections: OpenSection[] } | null>(null);
-  const [enrolled, setEnrolled] = React.useState<MyEnrollment[]>([]);
+  const [detail, setDetail] = React.useState<string | null>(null);
   const [msg, setMsg] = React.useState<{ text: string; error: boolean } | null>(null);
   const load = React.useCallback(() => {
     void bff<{ declaredMajor: { name: string } | null; sections: OpenSection[] }>(`sections?filter=${filter}`).then(setData);
-    void bff<MyEnrollment[]>("my-enrollments").then(setEnrolled);
   }, [filter]);
   React.useEffect(load, [load]);
   async function act(fn: () => Promise<unknown>, ok: string) {
     try { const r = await fn(); const conflicts = (r as { conflicts?: Array<{ name: string }> })?.conflicts ?? []; setMsg({ text: conflicts.length ? `${ok} ${t("clashWarning", { list: conflicts.map((x) => x.name).join(", ") })}` : ok, error: false }); } catch (e) { setMsg({ text: (e as Error).message, error: true }); }
     load();
   }
+  const enroll = (sectionId: string) => act(() => bff("enrollments", { method: "POST", body: { sectionId } }), t("enrolledOk"));
   const tbl = useTable();
   if (!data) return <p className="text-sm text-muted">…</p>;
-  const mineCols: Column<MyEnrollment>[] = [
-    { key: "course", header: t("name"), cell: (e) => `${e.course.code} · ${e.course.name}` },
-    { key: "term", header: t("term"), cell: (e) => e.term },
-    { key: "status", header: t("state"), cell: (e) => t(`enr_${e.status}`) },
-    { key: "actions", header: "", cell: (e) => (e.canDrop ? <PermRowAction perm={PERMS.portalEnrollDrop} onClick={() => window.confirm(e.willBeW ? t("confirmDropW") : t("confirmDrop")) && void act(() => bff(`enrollments/${e.id}`, { method: "DELETE" }), c("done"))} icon={UserMinus} danger>{t("drop")}</PermRowAction> : null) },
-  ];
   const openCols: Column<OpenSection>[] = [
-    { key: "course", header: t("name"), cell: (s) => (<div><div className="font-medium">{s.course.code} · {s.course.name} <span className="text-muted">({s.course.credits})</span> {s.requirement ? <span className="ml-1 rounded bg-border/50 px-1">{t(`cat_${s.requirement}`)}</span> : null}</div>
+    { key: "course", header: t("name"), cell: (s) => (<div><div className="font-medium"><CourseLink onOpen={() => setDetail(s.id)}>{s.course.code} · {s.course.name}</CourseLink> <span className="text-muted">({s.course.credits})</span> {s.requirement ? <span className="ml-1 rounded bg-border/50 px-1">{t(`cat_${s.requirement}`)}</span> : null}</div>
       {!s.prerequisitesMet ? <div className="text-red-600">{t("missingPrereq", { list: s.missingPrerequisites.join(", ") })}</div> : null}
       {s.conflicts.length ? <div className="text-amber-600">{t("clashWarning", { list: s.conflicts.join(", ") })}</div> : null}</div>) },
     { key: "section", header: t("sectionCol"), cell: (s) => `${s.name} · ${s.campus}` },
     { key: "instructors", header: t("instructorsCol"), cell: (s) => s.instructors.map((i) => i.fullName).filter(Boolean).join(", ") },
     { key: "seats", header: t("seatsCol"), cell: (s) => t("seatsLeft", { n: s.seatsLeft }) },
-    { key: "actions", header: "", cell: (s) => <PermRowAction perm={PERMS.portalEnrollAdd} disabled={s.alreadyTaking || s.seatsLeft === 0} onClick={() => void act(() => bff("enrollments", { method: "POST", body: { sectionId: s.id } }), t("enrolledOk"))} icon={UserPlus}>{s.alreadyTaking ? t("taking") : s.seatsLeft === 0 ? t("full") : t("enroll")}</PermRowAction> },
+    { key: "actions", header: "", cell: (s) => <PermRowAction perm={PERMS.portalEnrollAdd} disabled={s.alreadyTaking || s.seatsLeft === 0} onClick={() => void enroll(s.id)} icon={UserPlus}>{s.alreadyTaking ? t("taking") : s.seatsLeft === 0 ? t("full") : t("enroll")}</PermRowAction> },
   ];
   return (
     <section className="text-sm">
       <H2>{t("enrollTitle")}</H2>
+      <p className="mb-2 text-muted">{t("enrollHint")}</p>
       {!data.declaredMajor ? <p className="mb-2 text-muted">{t("declareFirst")}</p> : null}
       {msg ? <p role={msg.error ? "alert" : "status"} className={`mb-2 ${msg.error ? "text-red-600" : "text-muted"}`}>{msg.text}</p> : null}
-      <Tabs value={tab} onChange={setTab} items={[{ key: "open", label: t("openSections") }, { key: "mine", label: `${t("myCourses")} (${enrolled.length})` }]} />
-      {tab === "open" ? (
-        <>
-          <div className="mb-2 flex items-center gap-2">
-            <select aria-label={t("filter")} className="rounded-md border border-border bg-transparent px-2 py-1" value={filter} onChange={(e) => setFilter(e.target.value as "mine" | "all")}><option value="all">{t("allCourses")}</option><option value="mine">{t("myMajorOnly")}</option></select>
-          </div>
-          <DataTable columns={openCols} rows={data.sections} rowKey={(s) => s.id} emptyText={tbl.empty} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
-        </>
-      ) : (
-        <DataTable columns={mineCols} rows={enrolled} rowKey={(e) => e.id} emptyText={tbl.empty} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
-      )}
+      <div className="mb-2 flex items-center gap-2">
+        <select aria-label={t("filter")} className="rounded-md border border-border bg-transparent px-2 py-1" value={filter} onChange={(e) => setFilter(e.target.value as "mine" | "all")}><option value="all">{t("allCourses")}</option><option value="mine">{t("myMajorOnly")}</option></select>
+      </div>
+      <DataTable columns={openCols} rows={data.sections} rowKey={(s) => s.id} emptyText={tbl.empty} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
+      {detail ? <CourseDetailDialog sectionId={detail} onClose={() => setDetail(null)} onEnroll={(id) => { setDetail(null); void enroll(id); }} /> : null}
     </section>
   );
 }

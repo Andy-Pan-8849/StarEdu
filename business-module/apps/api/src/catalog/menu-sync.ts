@@ -62,7 +62,11 @@ export async function syncPlatformMenus(owner: PrismaClient): Promise<MenuSyncRe
   // 已有菜单的分配由平台管理员在"入口管理"里调整，同步不覆盖、不删除。
   const entries = new Map((await owner.entry.findMany()).map((e) => [e.code, e.id]));
   for (const item of MENU_CATALOG) {
-    if (!createdCodes.has(item.code)) continue;
+    if (!createdCodes.has(item.code)) {
+      // 已有的顶层菜单：分配本身不动，但入口里的排序跟着目录走（入口里的顺序就是左侧菜单树的顺序；目录调整了排序，老库也要跟上）
+      if ((item.entries ?? []).length > 0) await owner.entryMenu.updateMany({ where: { tenantId: null, menuId: idOf.get(item.code) as string, NOT: { sort: item.sort } }, data: { sort: item.sort } });
+      continue;
+    }
     for (const code of item.entries ?? []) {
       const entryId = entries.get(code);
       if (!entryId) throw new Error(`unknown entry "${code}" in menu catalog`);

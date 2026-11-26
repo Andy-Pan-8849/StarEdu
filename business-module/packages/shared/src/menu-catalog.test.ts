@@ -52,4 +52,12 @@ describe("menu catalog", () => {
     }
     expect(new Set(ROLE_TEMPLATES.map((t) => t.code)).size).toBe(ROLE_TEMPLATES.length);
   });
+
+  it("student portal: everyday items come first (My courses, assignments, discussions, grades, requests), and the AI assistant sits right under Home", () => {
+    const portalChildren = MENU_CATALOG.filter((m) => m.parent === "portal" && m.type === "menu").sort((a, b) => a.sort - b.sort).map((m) => m.code);
+    expect(portalChildren).toEqual(["portal:course", "portal:assignment", "portal:discussion", "portal:grade", "portal:request", "portal:enroll", "portal:plan", "portal:library"]);
+    const tops = MENU_CATALOG.filter((m) => !m.parent && m.entries?.includes("portal")).sort((a, b) => a.sort - b.sort).map((m) => m.code);
+    expect(tops[0]).toBe("ai"); // 首页是外壳里固定的，AI 助手是菜单树的第一项
+    expect(tops).toContain("portal");
+  });
 });

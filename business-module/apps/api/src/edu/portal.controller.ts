@@ -72,6 +72,43 @@ export class PortalController {
     return { declaredMajor: major ? { id: major.major?.id, name: major.major?.name } : null, sections: rows };
   }
 
+  /**
+   * 课程详情：学生选课前要看清这门课是什么（简介、先修、上课时间、老师、剩余名额），选上之后也要能回头看。
+   * 能看的班：正在开放选课的班，或自己选过的班（含已结课、已退课的）；其他 id 一律 404。
+   */
+  @Get("sections/:id")
+  @RequirePermissions(PERMS.portalEnrollList)
+  async sectionDetail(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    const { personId } = await this.me(auth);
+    const section = await this.db.section.findUnique({ where: { id }, include: { course: true, term: true, campus: true, instructors: true } });
+    if (!section) throw new NotFoundException();
+    const mine = await this.db.enrollment.findMany({ where: { studentPersonId: personId }, include: { section: true } });
+    const myEnrollment = mine.find((e) => e.sectionId === id && ["enrolled", "completed", "withdrawn"].includes(e.status)) ?? null;
+    const openForEnrollment = section.status === "open" && ["enrolling", "in_progress"].includes(section.term.status);
+    if (!openForEnrollment && !myEnrollment) throw new NotFoundException();
+    const passed = new Set(mine.filter((e) => e.passed && ["enrolled", "completed"].includes(e.status)).map((e) => e.section.courseId));
+    const prereqs = await this.db.coursePrerequisite.findMany({ where: { courseId: section.courseId }, include: { prerequisite: true } });
+    const names = new Map((await this.db.person.findMany({ where: { id: { in: section.instructors.map((i) => i.personId) } }, select: { id: true, fullName: true } })).map((p) => [p.id, p.fullName]));
+    const seated = await this.db.enrollment.count({ where: { sectionId: id, status: "enrolled" } });
+    const major = await this.myMajor(personId);
+    return {
+      id: section.id,
+      name: section.name,
+      course: { id: section.courseId, code: section.course.code, name: section.course.name, credits: Number(section.course.credits), syllabus: section.course.syllabus },
+      term: { name: section.term.name, startDate: section.term.startDate.toISOString().slice(0, 10), endDate: section.term.endDate.toISOString().slice(0, 10) },
+      campus: section.campus.name,
+      mode: section.mode,
+      schedule: section.schedule,
+      notes: section.notes,
+      capacity: section.capacity,
+      seatsLeft: Math.max(0, section.capacity - seated),
+      instructors: section.instructors.map((i) => ({ role: i.role, fullName: names.get(i.personId) ?? null })),
+      prerequisites: prereqs.map((p) => ({ code: p.prerequisite.code, name: p.prerequisite.name, met: passed.has(p.prerequisiteId) })),
+      requirement: major?.items.get(section.courseId)?.category ?? null,
+      myEnrollment: myEnrollment ? { id: myEnrollment.id, status: myEnrollment.status } : null,
+    };
+  }
+
   @Post("enrollments")
   @RequirePermissions(PERMS.portalEnrollAdd)
   async enroll(@Auth() auth: AuthContext, @Body() body: unknown) {
