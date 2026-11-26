@@ -315,6 +315,7 @@ export function JobsPage() {
   );
 }
 
+interface ExternalState { configured: boolean; url: string | null; up: boolean; state: "notConfigured" | "down" | "up" }
 interface Monitor {
   server: { hostname: string; nodeVersion: string; cpuCount: number; loadAverage: number[]; totalMemoryBytes: number; freeMemoryBytes: number; processRssBytes: number; uptimeSeconds: number };
   cache: { ok: boolean; version?: string; usedMemoryBytes?: number; connectedClients?: number; keys?: number; error?: string };
@@ -322,9 +323,33 @@ interface Monitor {
 }
 interface Links {
   swagger: { enabled: boolean; path: string | null };
-  grafana: { configured: boolean; url: string | null; up: boolean };
+  grafana: ExternalState;
+  langfuse: ExternalState;
 }
 const mb = (n: number | undefined) => (n === undefined ? "" : `${Math.round(n / 1048576)} MB`);
+
+/** 外部看板入口：不管有没有在运行都显示，让用户知道有这个功能；没配或没运行时说明原因，运行中给打开的链接。 */
+function ExternalCard({ name, about, ext, envName }: { name: string; about: string; ext: ExternalState | undefined; envName: string }) {
+  const t = useTranslations("pages.monitor");
+  return (
+    <div className="rounded-md border border-border p-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-medium">{name}</h3>
+        {ext ? <span className={ext.state === "up" ? "rounded bg-green-50 px-2 py-0.5 text-xs text-green-700 dark:bg-green-950 dark:text-green-300" : "rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800"}>{t(`state_${ext.state}`)}</span> : null}
+      </div>
+      <p className="mt-1 text-muted">{about}</p>
+      <p className="mt-2">
+        {!ext ? null : ext.state === "up" ? (
+          <a className="text-primary underline" href={ext.url ?? "#"} target="_blank" rel="noopener noreferrer">{t("open")} ↗</a>
+        ) : ext.state === "down" ? (
+          <span className="text-muted">{t("reason_down", { url: ext.url ?? "" })}</span>
+        ) : (
+          <span className="text-muted">{t("reason_notConfigured", { env: envName })}</span>
+        )}
+      </p>
+    </div>
+  );
+}
 
 export function MonitorPage() {
   const t = useTranslations("pages.monitor");
@@ -365,9 +390,17 @@ export function MonitorPage() {
           <Row k={t("latency")} v={m ? `${m.database.latencyMs} ms` : ""} />
         </Card>
       </div>
-      <div className="mt-4 flex flex-wrap gap-3 text-sm">
-        {links?.swagger.enabled ? <a className="underline" href={`${window.location.protocol}//${window.location.hostname}:4000${links.swagger.path}`} target="_blank" rel="noopener noreferrer">{t("swagger")} ↗</a> : <span className="text-muted">{t("swaggerOff")}</span>}
-        {links?.grafana.configured && links.grafana.up ? <a className="underline" href={links.grafana.url ?? "#"} target="_blank" rel="noopener noreferrer">{t("grafana")} ↗</a> : links ? <span className="text-muted">{t("grafanaDown")}</span> : null}
+      <h3 className="mb-2 mt-5 font-medium">{t("observability")}</h3>
+      <div className="grid gap-3 md:grid-cols-3">
+        <ExternalCard name={t("grafana")} about={t("grafanaAbout")} ext={links?.grafana} envName="GRAFANA_URL" />
+        <ExternalCard name={t("langfuse")} about={t("langfuseAbout")} ext={links?.langfuse} envName="LANGFUSE_URL" />
+        <div className="rounded-md border border-border p-3 text-sm">
+          <h3 className="font-medium">{t("swagger")}</h3>
+          <p className="mt-1 text-muted">{t("swaggerAbout")}</p>
+          <p className="mt-2">
+            {links?.swagger.enabled ? <a className="text-primary underline" href={`${window.location.protocol}//${window.location.hostname}:4000${links.swagger.path}`} target="_blank" rel="noopener noreferrer">{t("open")} ↗</a> : links ? <span className="text-muted">{t("swaggerOff")}</span> : null}
+          </p>
+        </div>
       </div>
     </section>
   );

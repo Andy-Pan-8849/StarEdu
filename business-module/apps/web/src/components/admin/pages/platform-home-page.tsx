@@ -12,7 +12,8 @@ import { greetingKey } from "./home-page";
 
 interface Tenant { id: string; status: "active" | "notified" | "suspended" | "provisioning" }
 interface Health { database: { ok: boolean }; cache: { ok: boolean } }
-interface Links { grafana: { configured: boolean; up: boolean } }
+interface External { state: "notConfigured" | "down" | "up" }
+interface Links { grafana: External; langfuse: External }
 interface Audit { id: string; action: string; targetType: string; actorAccountId: string | null; createdAt: string }
 
 function Card({ title, value, hint, to }: { title: string; value: React.ReactNode; hint?: string; to?: string }) {
@@ -64,7 +65,8 @@ export function PlatformHomePage({ userName }: { userName: string }) {
         {tenants ? <Card title={t("tenantsNotified")} value={count("notified")} to="platform/tenant/index" /> : null}
         {tenants ? <Card title={t("tenantsSuspended")} value={count("suspended")} to="platform/tenant/index" /> : null}
         {health ? <Card title={t("health")} value={down === 0 ? t("healthOk") : t("healthDown", { n: down })} to="platform/monitor/index" /> : null}
-        {links?.grafana.configured ? <Card title={t("grafana")} value={links.grafana.up ? t("grafanaUp") : t("grafanaDown")} to="platform/monitor/index" /> : null}
+        {links ? <Card title={t("grafana")} value={t(`state_${links.grafana.state}`)} to="platform/monitor/index" /> : null}
+        {links ? <Card title={t("langfuse")} value={t(`state_${links.langfuse.state}`)} to="platform/monitor/index" /> : null}
       </div>
 
       {audit ? (
