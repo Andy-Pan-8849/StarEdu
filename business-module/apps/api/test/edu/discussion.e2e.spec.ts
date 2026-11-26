@@ -148,6 +148,58 @@ describe("class discussion", () => {
     });
   });
 
+  describe("one list across all my classes, with unread first", () => {
+    let sec2: string;
+    const all = async (n: string) => (await as(n).get("/api/portal/discussions")).body as { unread: number; sections: Array<{ id: string; name: string; unread: number }>; threads: Array<{ id: string; unread: boolean; title: string; section: { id: string; name: string } }> };
+
+    beforeAll(async () => {
+      const course = (await registrar().post("/api/courses", { code: "CS602", name: "Networks", credits: 3 })).body.id;
+      sec2 = (await registrar().post("/api/sections", { courseId: course, termId, campusId: hqCampus, number: "01", capacity: 20, schedule: [] })).body.id;
+      await registrar().put(`/api/sections/${sec2}/instructors`, { items: [{ personId: teacher1.personId, role: "lead" }] });
+      await registrar().post(`/api/sections/${sec2}/status`, { status: "open" });
+      await registrar().post(`/api/sections/${sec2}/enrollments`, { studentIds: [pid("stu1"), pid("stu2")] });
+    });
+
+    it("lists the discussions of every class I am in, each with its class, and counts unread per class", async () => {
+      const mine = (await as("stu1").post(pd(sec), { title: "Mine in A", body: "x" })).body.id;
+      const theirs = (await as("stu2").post(pd(sec2), { title: "Theirs in B", body: "y" })).body.id;
+      const res = await all("stu1");
+      expect(res.sections.map((s) => s.id).sort()).toEqual([sec, sec2].sort());
+      expect(res.threads.find((t) => t.id === mine)).toMatchObject({ unread: false, section: { id: sec } }); // 自己发的不算未读
+      expect(res.threads.find((t) => t.id === theirs)).toMatchObject({ unread: true, title: "Theirs in B", section: { id: sec2 } });
+      expect(res.sections.find((s) => s.id === sec2)!.unread).toBe(1);
+    });
+
+    it("unread comes first; opening a discussion marks it read; a new reply from someone else makes it unread again", async () => {
+      const res = await all("stu1");
+      const firstRead = res.threads.findIndex((t) => !t.unread);
+      expect(firstRead === -1 || res.threads.slice(firstRead).every((t) => !t.unread)).toBe(true); // 未读都在已读前面
+      const unread = res.threads.find((t) => t.unread)!;
+      expect(res.threads[0].unread).toBe(true);
+      await as("stu1").get(`${pd(unread.section.id)}/${unread.id}`); // 打开
+      expect((await all("stu1")).threads.find((t) => t.id === unread.id)!.unread).toBe(false);
+      // 别人回复 → 又是未读；自己回复不算
+      await as("stu2").post(`${pd(unread.section.id)}/${unread.id}/replies`, { body: "ping" });
+      expect((await all("stu1")).threads.find((t) => t.id === unread.id)!.unread).toBe(true);
+      await as("stu1").post(`${pd(unread.section.id)}/${unread.id}/replies`, { body: "pong" }); // 回复会打开帖子
+      expect((await all("stu1")).threads.find((t) => t.id === unread.id)!.unread).toBe(false);
+    });
+
+    it("the per-class list carries the same unread flag; read marks are per person", async () => {
+      const t = (await as("stu2").post(pd(sec2), { title: "For everyone", body: "z" })).body.id;
+      expect((await as("stu1").get(pd(sec2))).body.find((x: { id: string }) => x.id === t).unread).toBe(true);
+      expect((await as("stu2").get(pd(sec2))).body.find((x: { id: string }) => x.id === t).unread).toBe(false); // 发帖人自己
+      await as("stu1").get(`${pd(sec2)}/${t}`);
+      expect((await as("stu1").get(pd(sec2))).body.find((x: { id: string }) => x.id === t).unread).toBe(false);
+      expect((await as("stu3").get("/api/portal/discussions")).body.threads.some((x: { id: string }) => x.id === t)).toBe(false); // stu3 不在这个班
+    });
+
+    it("a student who is in no class gets an empty list; people without a student record are refused", async () => {
+      expect(await all("stu.out")).toMatchObject({ sections: [], threads: [], unread: 0 });
+      expect((await h.call(t1).get("/api/portal/discussions")).status).toBe(403);
+    });
+  });
+
   describe("when the section is over", () => {
     it("the discussion stays readable but nobody can write, pin, resolve or delete", async () => {
       const t = (await as("stu1").post(pd(), { title: "Last words", body: "x" })).body.id;
