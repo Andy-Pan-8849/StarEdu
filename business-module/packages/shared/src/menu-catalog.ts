@@ -200,19 +200,18 @@ export const MENU_CATALOG: CatalogMenu[] = [
 
   // 学生门户：学生角色的权限就是这个入口下全部菜单和按钮的权限
   { code: "portal", type: "directory", name: "My studies", nameKey: "menu.portal", route: "studies", icon: "graduation", sort: 10, entries: ["portal"] },
-  ...menuWithButtons("portal:enroll", "portal", "Course enrollment", "enroll", 1, PERMS.portalEnrollList, [
-    ["add", "Enroll", PERMS.portalEnrollAdd],
-    ["drop", "Drop", PERMS.portalEnrollDrop],
-  ]),
-  ...menuWithButtons("portal:plan", "portal", "Degree plan", "plan", 2, PERMS.portalPlanView, []),
-  ...menuWithButtons("portal:assignment", "portal", "My assignments", "assignment", 3, PERMS.portalAssignmentList, [["submit", "Submit", PERMS.portalAssignmentSubmit]]),
-  ...menuWithButtons("portal:discussion", "portal", "Discussions", "discussion", 5, PERMS.portalDiscussionList, [["post", "Post", PERMS.portalDiscussionPost]]),
-  ...menuWithButtons("portal:library", "portal", "Library", "library", 6, PERMS.portalLibraryList, [["download", "Download", PERMS.portalLibraryDownload]]),
-  ...menuWithButtons("portal:request", "portal", "My requests", "request", 7, PERMS.portalRequestList, [["submit", "Submit", PERMS.portalRequestSubmit]]),
+  // 学生每天用的在前：我的课程、我的作业、讨论、我的成绩、我的申请；选课、培养方案、图书馆用得少，放后面
+  ...menuWithButtons("portal:course", "portal", "My courses", "course", 1, PERMS.portalCourseList, [["drop", "Drop", PERMS.portalEnrollDrop]]),
+  ...menuWithButtons("portal:assignment", "portal", "My assignments", "assignment", 2, PERMS.portalAssignmentList, [["submit", "Submit", PERMS.portalAssignmentSubmit]]),
+  ...menuWithButtons("portal:discussion", "portal", "Discussions", "discussion", 3, PERMS.portalDiscussionList, [["post", "Post", PERMS.portalDiscussionPost]]),
   ...menuWithButtons("portal:grade", "portal", "My grades", "grade", 4, PERMS.portalGradeList, [["download", "Download transcript", PERMS.portalTranscriptDownload]]),
+  ...menuWithButtons("portal:request", "portal", "My requests", "request", 5, PERMS.portalRequestList, [["submit", "Submit", PERMS.portalRequestSubmit]]),
+  ...menuWithButtons("portal:enroll", "portal", "Course enrollment", "enroll", 6, PERMS.portalEnrollList, [["add", "Enroll", PERMS.portalEnrollAdd]]),
+  ...menuWithButtons("portal:plan", "portal", "Degree plan", "plan", 7, PERMS.portalPlanView, []),
+  ...menuWithButtons("portal:library", "portal", "Library", "library", 8, PERMS.portalLibraryList, [["download", "Download", PERMS.portalLibraryDownload]]),
 
-  // AI 助手：外链，管理后台和学生门户两个入口都分配（入口管理的多对多）；{code} 换成当前租户代码
-  { code: "ai", type: "link", name: "AI assistant", nameKey: "menu.ai", route: "http://{code}.localhost:3000/", icon: "bot", sort: 40, entries: ["admin", "portal"] },
+  // AI 助手：外链，管理后台和学生门户两个入口都分配（入口管理的多对多）；{code} 换成当前租户代码。排序 0：紧跟在"首页"下面，和别的系统一样
+  { code: "ai", type: "link", name: "AI assistant", nameKey: "menu.ai", route: "http://{code}.localhost:3000/", icon: "bot", sort: 0, entries: ["admin", "portal"] },
 
   { code: "hr", type: "directory", name: "Human resources", nameKey: "menu.hr", route: "hr", icon: "users", sort: 10, entries: ["admin"] },
   ...menuWithButtons("hr:person", "hr", "People", "person", 1, PERMS.hrPersonList, [

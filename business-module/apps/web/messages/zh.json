@@ -590,7 +590,8 @@
       "sectionCol": "教学班",
       "instructorsCol": "授课老师",
       "seatsCol": "余位",
-      "sectionsNote": "教学班是某门课在某个学期开的一个班：有自己的老师、时间、校区和名额。学生选课选的是教学班，而不是课程本身（例如 OS101 课程，2026 秋季的 01 班）。"
+      "sectionsNote": "教学班是某门课在某个学期开的一个班：有自己的老师、时间、校区和名额。学生选课选的是教学班，而不是课程本身（例如 OS101 课程，2026 秋季的 01 班）。",
+      "enrollHint": "点击课程名可以先看课程详情再选课。已选的课程在\"我的课程\"里。"
     },
     "assignments": {
       "tab": "作业",
@@ -929,6 +930,38 @@
       "endsAt": "结束时间",
       "period": "展示时间",
       "publish": "发布"
+    },
+    "courseDetail": {
+      "title": "课程详情",
+      "credits": "学分",
+      "section": "教学班",
+      "term": "学期",
+      "campus": "校区",
+      "mode": "授课方式",
+      "mode_onsite": "线下",
+      "mode_online": "线上",
+      "mode_hybrid": "线上线下结合",
+      "schedule": "上课时间",
+      "noSchedule": "还没有排课",
+      "instructors": "老师",
+      "seats": "名额",
+      "seatsOf": "剩 {left} 个，共 {capacity} 个",
+      "prerequisites": "先修课程",
+      "none": "无",
+      "passed": "已通过",
+      "notPassed": "还没通过",
+      "notes": "备注",
+      "syllabus": "课程简介",
+      "noSyllabus": "暂时没有简介。",
+      "enroll": "选课",
+      "full": "已满",
+      "weekday_1": "周一",
+      "weekday_2": "周二",
+      "weekday_3": "周三",
+      "weekday_4": "周四",
+      "weekday_5": "周五",
+      "weekday_6": "周六",
+      "weekday_7": "周日"
     }
   },
   "menu": {
@@ -982,7 +1015,8 @@
     "ai": "AI 助手",
     "doc": "文档库",
     "doc:library": "文档库",
-    "portal:library": "资料库"
+    "portal:library": "资料库",
+    "portal:course": "我的课程"
   },
   "dict": {
     "type": {

@@ -289,6 +289,7 @@ export const OTHER_ROUTES: Record<string, string> = {
   "DELETE /api/portal/enrollments/:id": "student portal: only the caller's own enrollments (edu.e2e.spec.ts)",
   "GET /api/portal/my-enrollments": "student portal: the caller's own enrollments only",
   "GET /api/portal/plan": "student portal: the caller's own plan only",
+  "GET /api/portal/sections/:id": "student portal: only sections open for enrollment or ones the caller took; other ids are 404 (edu.e2e.spec.ts)",
   "GET /api/portal/sections/:id/materials": "student portal: members of the section only (edu.e2e.spec.ts)",
   "GET /api/portal/assignments": "student portal: the caller's own sections' published assignments only (assignments.e2e.spec.ts)",
   "GET /api/portal/assignments/:id": "student portal: assignments of the caller's own sections only; other ids are 404 (assignments.e2e.spec.ts)",

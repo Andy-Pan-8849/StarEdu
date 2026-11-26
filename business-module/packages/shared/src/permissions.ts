@@ -173,6 +173,7 @@ export const PERMS = {
   msgAnnouncementAdd: "msg:announcement:add",
   msgAnnouncementRemove: "msg:announcement:remove",
   // 学生门户
+  portalCourseList: "portal:course:list",
   portalEnrollList: "portal:enroll:list",
   portalEnrollAdd: "portal:enroll:add",
   portalEnrollDrop: "portal:enroll:drop",
