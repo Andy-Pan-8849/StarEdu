@@ -166,7 +166,7 @@
       "runNow": "Run now"
     },
     "monitor": {
-      "title": "Monitoring",
+      "title": "System monitoring",
       "server": "Server",
       "cache": "Cache (Redis)",
       "database": "Database",
@@ -895,7 +895,11 @@
       "show": "Show",
       "hide": "Hide",
       "enable": "Enable",
-      "disable": "Disable"
+      "disable": "Disable",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "expand": "Expand",
+      "collapse": "Collapse"
     },
     "platformEntries": {
       "title": "Entry assignment",
@@ -937,7 +941,7 @@
     "platform:role": "Platform roles",
     "platform:menu": "Menus",
     "platform:entry": "Entry assignment",
-    "platform:monitor": "Monitoring",
+    "platform:monitor": "System monitoring",
     "platform:job": "Scheduled jobs",
     "platform:log": "Audit log",
     "system:dict": "Dictionaries",
@@ -1144,5 +1148,25 @@
     "noProfile": "This account has no personal profile to edit.",
     "passwordNote": "Your password is managed by the sign-in service. You will be taken there to change it and then brought back.",
     "changePassword": "Change password"
+  },
+  "platformHome": {
+    "greeting_morning": "Good morning, {name}",
+    "greeting_afternoon": "Good afternoon, {name}",
+    "greeting_evening": "Good evening, {name}",
+    "subtitle": "Here is the state of the platform.",
+    "tenants": "Tenants",
+    "tenantsActive": "Active",
+    "tenantsNotified": "Pending suspension",
+    "tenantsSuspended": "Suspended",
+    "health": "Services",
+    "healthOk": "All running",
+    "healthDown": "{n} not running",
+    "grafana": "Dashboards (Grafana)",
+    "grafanaUp": "Running",
+    "grafanaDown": "Not running",
+    "recentActivity": "Recent platform activity",
+    "noActivity": "No activity yet.",
+    "viewAll": "View all",
+    "system": "system"
   }
 }

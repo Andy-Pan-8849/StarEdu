@@ -3,7 +3,7 @@
 // 平台控制台的 5 个页面：平台账号、平台角色、菜单、入口分配、平台公告。接口在 B3/B17 已有，这里只补页面。
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { EyeOff, Plus, Power, ShieldCheck, Trash2, UserCog, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsUpDown, EyeOff, ExternalLink, FileText, Folder, MousePointerClick, Plus, Power, ShieldCheck, Trash2, UserCog, UserPlus } from "lucide-react";
 import { IconButton, PermRowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -161,21 +161,74 @@ export function PlatformRolesPage() {
 }
 
 // ---------------------------------------------------------------- 菜单
-interface MenuRow { id: string; parentId: string | null; code: string; name: string; type: string; route: string | null; perms: string | null; sort: number; visible: boolean; status: boolean; entries: string[] }
+interface MenuRow { id: string; parentId: string | null; code: string; name: string; nameKey?: string | null; type: string; route: string | null; perms: string | null; sort: number; visible: boolean; status: boolean; entries: string[] }
+type MenuTreeRow = MenuRow & { depth: number };
+
+/** 把平铺的菜单按"先父后子"排好并带上层级；折叠的节点下面的行不出现。 */
+export function flattenMenus(rows: readonly MenuRow[], folded: ReadonlySet<string>): { all: MenuTreeRow[]; visible: MenuTreeRow[]; foldable: string[] } {
+  const byParent = new Map<string | null, MenuRow[]>();
+  for (const r of rows) byParent.set(r.parentId, [...(byParent.get(r.parentId) ?? []), r]);
+  const all: MenuTreeRow[] = [];
+  const walk = (p: string | null, depth: number) => {
+    for (const r of [...(byParent.get(p) ?? [])].sort((a, b) => a.sort - b.sort || a.code.localeCompare(b.code))) { all.push({ ...r, depth }); walk(r.id, depth + 1); }
+  };
+  walk(null, 0);
+  const visible: MenuTreeRow[] = [];
+  let hideBelow: number | null = null;
+  for (const r of all) {
+    if (hideBelow !== null && r.depth > hideBelow) continue;
+    hideBelow = null;
+    visible.push(r);
+    if (folded.has(r.id)) hideBelow = r.depth;
+  }
+  return { all, visible, foldable: [...new Set(rows.map((r) => r.parentId).filter((x): x is string => x !== null))] };
+}
 
 export function PlatformMenusPage() {
   const t = useTranslations("pages.platformMenus");
   const c = useTranslations("crud");
+  const tm = useTranslations();
   const tt = useTable();
   const menus = useList<MenuRow>("menus");
   const { run, message } = useAct(menus.reload);
   const patch = (r: MenuRow, body: Record<string, unknown>) => void run(() => bff(`menus/${r.id}`, { method: "PATCH", body }), c("done"));
-  const rows = React.useMemo(() => [...menus.rows].sort((a, b) => a.code.localeCompare(b.code)), [menus.rows]);
-  const columns: Column<MenuRow>[] = [
-    { key: "name", header: t("name"), cell: (r) => r.name },
+  // 默认只展开到"菜单"这一层：按钮（每个菜单下面一串）折叠起来，操作的人先看到目录和菜单的结构
+  const [folded, setFolded] = React.useState<ReadonlySet<string>>(new Set());
+  const seeded = React.useRef(false);
+  React.useEffect(() => {
+    if (seeded.current || menus.rows.length === 0) return;
+    seeded.current = true;
+    const dirs = new Set(menus.rows.filter((r) => r.type !== "button").map((r) => r.id));
+    setFolded(new Set(menus.rows.filter((r) => r.parentId && dirs.has(r.parentId) && menus.rows.some((k) => k.parentId === r.id)).map((r) => r.id)));
+  }, [menus.rows]);
+  const { visible, foldable } = React.useMemo(() => flattenMenus(menus.rows, folded), [menus.rows, folded]);
+  const hasKids = React.useMemo(() => new Set(foldable), [foldable]);
+  const allFolded = foldable.length > 0 && foldable.every((id) => folded.has(id));
+  const label = (r: MenuRow) => (r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name);
+  const columns: Column<MenuTreeRow>[] = [
+    {
+      key: "name",
+      header: t("name"),
+      cell: (r) => {
+        const Icon = r.type === "directory" ? Folder : r.type === "link" ? ExternalLink : r.type === "button" ? MousePointerClick : FileText;
+        const kids = hasKids.has(r.id);
+        const isFolded = folded.has(r.id);
+        return (
+          <span className="flex items-center gap-1" style={{ paddingLeft: r.depth * 22 }}>
+            {kids ? (
+              <button type="button" aria-label={`${isFolded ? t("expand") : t("collapse")} ${label(r)}`} aria-expanded={!isFolded} className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-border/50" onClick={() => setFolded((f) => { const n = new Set(f); if (isFolded) n.delete(r.id); else n.add(r.id); return n; })}>
+                {isFolded ? <ChevronRight aria-hidden className="h-4 w-4" /> : <ChevronDown aria-hidden className="h-4 w-4" />}
+              </button>
+            ) : <span aria-hidden className="w-6" />}
+            <Icon aria-hidden className="h-4 w-4 shrink-0 text-muted" />
+            <span className={r.type === "directory" ? "font-medium" : r.type === "button" ? "text-muted" : ""}>{label(r)}</span>
+          </span>
+        );
+      },
+    },
     { key: "code", header: t("code"), cell: (r) => <code>{r.code}</code> },
     { key: "type", header: t("type"), cell: (r) => r.type },
-    { key: "entries", header: t("entries"), cell: (r) => r.entries.join(", ") },
+    { key: "entries", header: t("entries"), cell: (r) => (r.parentId ? "" : r.entries.join(", ")) },
     { key: "visible", header: t("visible"), cell: (r) => (r.visible ? "✓" : "–") },
     { key: "status", header: t("enabled"), cell: (r) => (r.status ? "✓" : "–") },
     {
@@ -195,7 +248,10 @@ export function PlatformMenusPage() {
       <p className="mb-2 text-sm text-muted">{t("hint")}</p>
       <Err error={menus.error} />
       {message}
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={menus.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
+      <div className="mb-3 flex items-center gap-2">
+        <IconButton icon={ChevronsUpDown} label={allFolded ? t("expandAll") : t("collapseAll")} variant="outline" onClick={() => setFolded(allFolded ? new Set() : new Set(foldable))} />
+      </div>
+      <DataTable columns={columns} rows={visible} rowKey={(r) => r.id} selectable={false} loading={menus.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
     </section>
   );
 }

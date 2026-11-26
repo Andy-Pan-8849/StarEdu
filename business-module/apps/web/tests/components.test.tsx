@@ -8,6 +8,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { Modal } from "../src/components/admin/modal";
 import { usePromptDialog } from "../src/components/admin/prompt-dialog";
 import { MenuTreeShell, type ShellLabels } from "../src/components/admin/menu-tree-shell";
+import { flattenMenus } from "../src/components/admin/pages/platform-console-pages";
 import type { MenuNode } from "../src/components/admin/menu-nav";
 import { Can, PermButton, PermissionProvider } from "../src/components/admin/permissions";
 import { IconButton, PermRowAction, RowAction } from "../src/components/admin/icon-button";
@@ -359,5 +360,23 @@ describe("table row actions overflow", () => {
     expect(screen.queryByRole("button", { name: "More" })).toBeNull();
     expect(screen.getByRole("button", { name: "Three" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Hidden" })).toBeNull();
+  });
+});
+
+describe("platform Menus tree", () => {
+  const rows = [
+    { id: "d", parentId: null, code: "platform", name: "Platform", type: "directory", route: null, perms: null, sort: 10, visible: true, status: true, entries: ["platform"] },
+    { id: "m2", parentId: "d", code: "platform:role", name: "Roles", type: "menu", route: "role", perms: null, sort: 3, visible: true, status: true, entries: [] },
+    { id: "m1", parentId: "d", code: "platform:tenant", name: "Tenants", type: "menu", route: "tenant", perms: null, sort: 1, visible: true, status: true, entries: [] },
+    { id: "b1", parentId: "m1", code: "platform:tenant:add", name: "Add", type: "button", route: null, perms: "x", sort: 1, visible: true, status: true, entries: [] },
+  ];
+  it("orders parents before children, by sort, with depth", () => {
+    const { all, foldable } = flattenMenus(rows, new Set());
+    expect(all.map((r) => `${r.depth}:${r.code}`)).toEqual(["0:platform", "1:platform:tenant", "2:platform:tenant:add", "1:platform:role"]);
+    expect(foldable.sort()).toEqual(["d", "m1"]);
+  });
+  it("hides what is under a folded node", () => {
+    expect(flattenMenus(rows, new Set(["m1"])).visible.map((r) => r.code)).toEqual(["platform", "platform:tenant", "platform:role"]);
+    expect(flattenMenus(rows, new Set(["d"])).visible.map((r) => r.code)).toEqual(["platform"]);
   });
 });
