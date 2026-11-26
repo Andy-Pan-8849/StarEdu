@@ -290,16 +290,6 @@ export function DeptsPage() {
 }
 
 // ---------------------------------------------------------------- 参数
-/** 名称，下面一行小字是备注（说明怎么取值、各个值是什么意思）。 */
-function Named({ title, note }: { title: string; note?: string | null }) {
-  return (
-    <div className="max-w-md">
-      <div>{title}</div>
-      {note ? <div className="text-xs text-muted">{note}</div> : null}
-    </div>
-  );
-}
-
 interface ParamRow { id: string; key: string; value: string; name: string; remark: string | null; platformProvided: boolean; overridden: boolean; defaultValue: string | null }
 
 export function ParamsPage() {
@@ -317,9 +307,10 @@ export function ParamsPage() {
     { name: "remark", label: t("remark"), type: "textarea", readOnly: !!form?.row?.platformProvided },
   ];
   const columns: Column<ParamRow & { nameKey: string | null }>[] = [
-    { key: "name", header: t("name"), cell: (r) => <Named title={r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name} note={tm.has(`paramRemark.${r.key}`) ? tm(`paramRemark.${r.key}`) : r.remark} /> },
+    { key: "name", header: t("name"), cell: (r) => (r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name) },
     { key: "key", header: t("key"), cell: (r) => <code>{r.key}</code> },
     { key: "value", header: t("value"), cell: (r) => r.value },
+    { key: "remark", header: t("remark"), cell: (r) => <span className="block max-w-md whitespace-normal text-muted">{tm.has(`paramRemark.${r.key}`) ? tm(`paramRemark.${r.key}`) : (r.remark ?? "")}</span> },
     { key: "source", header: t("source"), cell: (r) => (r.platformProvided ? t("platform") : r.overridden ? t("customized") : t("own")) },
     {
       key: "actions",
@@ -369,8 +360,9 @@ export function DictsPage() {
   const { run, message } = useAct(types.reload);
   const [newType, setNewType] = React.useState(false);
   const columns: Column<DictType>[] = [
-    { key: "name", header: t("name"), cell: (r) => <Named title={r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name} note={r.platformProvided && tm.has(`dictRemark.${r.code}`) ? tm(`dictRemark.${r.code}`) : r.remark} /> },
+    { key: "name", header: t("name"), cell: (r) => (r.nameKey && tm.has(r.nameKey) ? tm(r.nameKey) : r.name) },
     { key: "code", header: t("code"), cell: (r) => <code>{r.code}</code> },
+    { key: "remark", header: t("remark"), cell: (r) => <span className="block max-w-md whitespace-normal text-muted">{r.platformProvided && tm.has(`dictRemark.${r.code}`) ? tm(`dictRemark.${r.code}`) : (r.remark ?? "")}</span> },
     { key: "source", header: t("source"), cell: (r) => (r.platformProvided ? t("platform") : t("own")) },
     { key: "status", header: c("status"), cell: (r) => (r.status ? c("enabled") : c("disabled")) },
     {

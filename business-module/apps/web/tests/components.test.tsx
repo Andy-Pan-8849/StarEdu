@@ -249,6 +249,17 @@ describe("MenuTreeShell", () => {
     await user.click(screen.getByRole("button", { name: "Close Profile" }));
     expect(screen.getByText("home content")).toBeTruthy();
   });
+
+  it("lists Home at the top of the menu tree and returns to it from the tree", async () => {
+    const user = userEvent.setup();
+    render(intl(<MenuTreeShell menus={menus} pages={{ "system/online/index": () => <p>online page</p> }} label={(n) => n.name} userName="alice" signOutAction="/x" labels={{ ...labels, home: "Home" }} homePage={() => <p>home content</p>} />));
+    const nav = within(screen.getByRole("navigation", { name: "Menu" }));
+    expect(nav.getByRole("button", { name: "Home" }).getAttribute("aria-current")).toBe("page");
+    await user.click(nav.getByRole("button", { name: "Online users" }));
+    expect(screen.getByText("online page")).toBeTruthy();
+    await user.click(nav.getByRole("button", { name: "Home" }));
+    expect(screen.getByText("home content")).toBeTruthy();
+  });
 });
 
 describe("Modal", () => {
