@@ -4,7 +4,7 @@
 //   - 目录可展开；"菜单"点击在标签页打开；"外链"在新窗口打开（租户自己的网址）；
 //   - 页面组件是构建时打包的：按菜单的"组件路径"在 pages 里找；还没有的显示占位说明，不报错。
 import * as React from "react";
-import { ChevronDown, ChevronRight, ExternalLink, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, House, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "../logo-mark";
 import { MenuIcon } from "./menu-icon";
@@ -14,7 +14,7 @@ import { TabBar } from "./tab-bar";
 import { closeTab, emptyTabs, openTab, type TabsState } from "./tabs-state";
 import { UserMenu, type UserMenuLabels } from "./user-menu";
 
-/** 不在菜单里的两个固定页面：首页（固定标签页）和个人中心（从头像菜单打开）。 */
+/** 不在后端菜单数据里的两个固定页面：首页（菜单树最上面的入口，也是固定标签页）和个人中心（从头像菜单打开）。 */
 export const HOME_ID = "@home";
 export const PROFILE_ID = "@profile";
 
@@ -108,6 +108,12 @@ export function MenuTreeShell({
   const toggleDir = (id: string, isCollapsed: boolean) =>
     setCollapsed((c) => { const n = new Set(c); if (isCollapsed) n.delete(id); else n.add(id); return n; });
 
+  // 首页：菜单树最上面的固定入口（和竞品一样），点击切到首页标签；搜索时只在名字匹配时显示
+  const homeTitle = labels.home ?? "Home";
+  const showHomeItem = !!homePage && (!searching || homeTitle.toLowerCase().includes(query.trim().toLowerCase()));
+  const homeActive = tabs.activeId === HOME_ID;
+  const openHome = () => setTabs((t) => openTab(t, { id: HOME_ID, title: homeTitle, pinned: true }));
+
   const renderNode = (node: MenuNode, depth: number): React.ReactNode => {
     if (node.type === "directory") {
       const isCollapsed = !searching && collapsed.has(node.id);
@@ -170,6 +176,13 @@ export function MenuTreeShell({
         </div>
         {mini ? (
           <ul className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
+            {homePage ? (
+              <li>
+                <button type="button" title={homeTitle} aria-label={homeTitle} aria-current={homeActive ? "page" : undefined} className={cn("flex w-full justify-center rounded-md p-2 text-muted hover:bg-border/40 hover:text-foreground", homeActive && "bg-primary/10 text-primary")} onClick={openHome}>
+                  <House aria-hidden className="h-5 w-5" />
+                </button>
+              </li>
+            ) : null}
             {menus.map((m) => (
               <li key={m.id}>
                 <button type="button" title={label(m)} aria-label={label(m)} className="flex w-full justify-center rounded-md p-2 text-muted hover:bg-border/40 hover:text-foreground" onClick={() => setMini(false)}>
@@ -192,7 +205,22 @@ export function MenuTreeShell({
               />
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-3">
-              {menus.length === 0 ? <p className="text-sm text-muted">{labels.noMenus}</p> : <ul className="space-y-0.5">{shown.map((m) => renderNode(m, 0))}</ul>}
+              {menus.length === 0 && !homePage ? <p className="text-sm text-muted">{labels.noMenus}</p> : <ul className="space-y-0.5">
+                {showHomeItem ? (
+                  <li>
+                    <button
+                      type="button"
+                      aria-current={homeActive ? "page" : undefined}
+                      className={cn("flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-border/40", homeActive && "bg-primary/10 text-primary hover:bg-primary/10")}
+                      onClick={openHome}
+                    >
+                      <House aria-hidden className="h-4 w-4" />
+                      <span className="flex-1 truncate">{homeTitle}</span>
+                    </button>
+                  </li>
+                ) : null}
+                {shown.map((m) => renderNode(m, 0))}
+              </ul>}
             </div>
           </>
         )}
