@@ -1512,6 +1512,18 @@ model DiscussionPost {
   @@map("discussion_post")
 }
 
+/// 讨论的"已读"：某人最后一次打开某个讨论帖（根帖）的时间；别人在这之后的发言就是未读
+model DiscussionRead {
+  tenantId   String   @map("tenant_id") @db.Uuid
+  personId   String   @map("person_id") @db.Uuid
+  threadId   String   @map("thread_id") @db.Uuid
+  lastReadAt DateTime @default(now()) @map("last_read_at")
+
+  @@id([personId, threadId])
+  @@index([tenantId])
+  @@map("discussion_read")
+}
+
 /// 文档库文件夹（树）。ancestors 含自己，由触发器维护；"子树" = ancestors @> ARRAY[文件夹id]
 model DocFolder {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

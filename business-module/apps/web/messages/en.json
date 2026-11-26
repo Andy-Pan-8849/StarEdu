@@ -802,7 +802,13 @@
       "colTitle": "Topic",
       "colAuthor": "Author",
       "colReplies": "Replies",
-      "colState": "Status"
+      "colState": "Status",
+      "allSections": "All class sections",
+      "unread": "Unread",
+      "unreadN": "{n} unread",
+      "colSection": "Class Section",
+      "colLast": "Last activity",
+      "pickToPost": "To start a discussion, pick a class section above."
     },
     "library": {
       "edit": "Edit folder",

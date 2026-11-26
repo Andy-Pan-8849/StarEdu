@@ -802,7 +802,13 @@
       "colTitle": "主题",
       "colAuthor": "发帖人",
       "colReplies": "回复",
-      "colState": "状态"
+      "colState": "状态",
+      "allSections": "全部教学班",
+      "unread": "未读",
+      "unreadN": "{n} 条未读",
+      "colSection": "教学班",
+      "colLast": "最近活动",
+      "pickToPost": "要发起讨论，请先在上面选一个教学班。"
     },
     "library": {
       "edit": "编辑文件夹",

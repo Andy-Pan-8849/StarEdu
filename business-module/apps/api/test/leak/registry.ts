@@ -318,6 +318,7 @@ export const OTHER_ROUTES: Record<string, string> = {
   "POST /api/portal/notifications/ws-ticket": "issues a ticket bound to the caller's own tenant and account (notify.e2e.spec.ts)",
   "GET /api/portal/notifications/preferences": "the caller's own settings only",
   "PUT /api/portal/notifications/preferences": "changes the caller's own settings only",
+  "GET /api/portal/discussions": "student portal: only the discussions of classes the caller is in (discussion.e2e.spec.ts)",
   "GET /api/portal/sections/:id/discussions": "student portal: members of the section only; other ids are 404 (discussion.e2e.spec.ts)",
   "GET /api/portal/sections/:id/discussions/:postId": "student portal: members of the section only; other ids are 404 (discussion.e2e.spec.ts)",
   "POST /api/portal/sections/:id/discussions": "student portal: members of the section only; other ids are 404 (discussion.e2e.spec.ts)",

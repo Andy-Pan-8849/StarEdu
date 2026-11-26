@@ -38,7 +38,7 @@ import { NotificationService } from "./notify/notification.service";
 import { NotifyWorker } from "./notify/notify-worker";
 import { PlatformAnnouncementsController } from "./notify/platform-announcements.controller";
 import { RealtimeService } from "./notify/realtime.service";
-import { DiscussionController, PortalDiscussionController } from "./edu/discussion.controller";
+import { DiscussionController, PortalAllDiscussionsController, PortalDiscussionController } from "./edu/discussion.controller";
 import { DiscussionService } from "./edu/discussion.service";
 import { GradesController } from "./edu/grades.controller";
 import { GradeAdminController } from "./edu/grade-admin.controller";
@@ -114,6 +114,7 @@ export const CONTROLLERS = [
   InternalKbController,
   DiscussionController,
   PortalDiscussionController,
+  PortalAllDiscussionsController,
   LibraryController,
   PortalLibraryController,
   NotificationsController,

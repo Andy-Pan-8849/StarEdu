@@ -140,3 +140,29 @@ export class PortalDiscussionController {
     return this.discussion.remove(id, postId, await this.actor(auth, id));
   }
 }
+
+/** 学生的"讨论"页：我所有班级里的讨论放在一起，未读的排在最前；页面里再按班级筛选。 */
+@Controller("api/portal/discussions")
+export class PortalAllDiscussionsController {
+  constructor(
+    private readonly tenantDb: TenantPrismaService,
+    private readonly discussion: DiscussionService,
+  ) {}
+
+  private get db() {
+    return this.tenantDb.db;
+  }
+
+  @Get()
+  @RequirePermissions(PERMS.portalDiscussionList)
+  async list(@Auth() auth: AuthContext) {
+    const personId = auth.authz.personId;
+    const profile = personId ? await this.db.studentProfile.findFirst({ where: { personId } }) : null;
+    if (!personId || !profile) throw new ForbiddenException("This area is for students");
+    if (profile.academicStatus !== "enrolled" && profile.academicStatus !== "on_leave") throw new ForbiddenException("Class content is not available for your student status");
+    // 和单个班级的接口同一条规则：已选或已完成的班
+    const seats = await this.db.enrollment.findMany({ where: { studentPersonId: personId, status: { in: ["enrolled", "completed"] } }, select: { sectionId: true } });
+    const sections = await this.db.section.findMany({ where: { id: { in: [...new Set(seats.map((s) => s.sectionId))] } }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+    return this.discussion.listAll(sections, { personId, instructor: false, activeStudent: false });
+  }
+}
