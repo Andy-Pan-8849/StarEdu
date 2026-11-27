@@ -211,8 +211,28 @@ function SubmissionsView({ sectionId, assignment, onBack }: { sectionId: string;
   );
 }
 
+/** 课程详情里的"作业"页签：这个班已发布的作业（截止时间、状态、得分），提交在"我的作业"里。 */
+export function StudentAssignments({ sectionId }: { sectionId: string }) {
+  const t = useTranslations("pages.assignments");
+  const tbl = useTable();
+  const [rows, setRows] = React.useState<MyRow[] | null>(null);
+  React.useEffect(() => { void bff<MyRow[]>("assignments").then((all) => setRows(all.filter((a) => a.section.id === sectionId))).catch(() => setRows([])); }, [sectionId]);
+  const cols: Column<MyRow>[] = [
+    { key: "title", header: t("colTitle"), cell: (a) => <span className="font-medium">{a.title}</span> },
+    { key: "deadline", header: t("colDeadline"), cell: (a) => `${new Date(a.deadline).toLocaleString()}${a.extensionDays ? ` · ${t("extended", { d: a.extensionDays })}` : ""}` },
+    { key: "status", header: t("colStatus"), cell: (a) => t(`sub_${a.status}`) },
+    { key: "score", header: t("colScore"), cell: (a) => (a.finalScore !== null ? `${a.finalScore}/${a.maxScore}` : "—") },
+  ];
+  return (
+    <div>
+      <DataTable columns={cols} rows={rows ?? []} rowKey={(a) => a.id} loading={rows === null} emptyText={t("studentEmpty")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
+      {rows && rows.length ? <p className="mt-2 text-muted">{t("submitHint")}</p> : null}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- 学生门户：我的作业
-interface MyRow { id: string; title: string; section: { name: string; course: string }; deadline: string; extensionDays: number; status: string; isLate: boolean; finalScore: number | null; maxScore: number }
+interface MyRow { id: string; title: string; section: { id: string; name: string; course: string }; deadline: string; extensionDays: number; status: string; isLate: boolean; finalScore: number | null; maxScore: number }
 interface MyDetail {
   id: string; title: string; description: string; section: { name: string }; deadline: string; allowLate: boolean; maxScore: number; canSubmit: boolean; limits: { maxFiles: number };
   rubric: Array<{ id: string; title: string; maxPoints: number }>;

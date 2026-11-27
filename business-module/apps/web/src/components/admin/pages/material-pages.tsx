@@ -150,26 +150,16 @@ export function MaterialsPanel({ sectionId, onChanged }: { sectionId: string; on
   );
 }
 
-/** 学生看自己班级里已发布的课件（说明、链接、附件下载）；没选这个班时接口返回 404，这里什么都不显示。 */
+/** 学生看自己班级里已发布的课件：和老师端一样是列表（名称、描述、附件）；没选这个班时接口返回 404，这里显示空列表。 */
 export function StudentMaterials({ sectionId }: { sectionId: string }) {
   const t = useTranslations("pages.materials");
+  const tbl = useTable();
   const [rows, setRows] = React.useState<Material[] | null>(null);
-  React.useEffect(() => { void bff<Material[]>(`sections/${sectionId}/materials`).then(setRows).catch(() => setRows(null)); }, [sectionId]);
-  if (rows === null) return null;
-  return (
-    <div>
-      <h3 className="mb-1 font-medium">{t("studentTitle")}</h3>
-      {rows.length === 0 ? <p className="text-muted">{t("studentEmpty")}</p> : (
-        <ul className="space-y-2">
-          {rows.map((m) => (
-            <li key={m.id} className="rounded-md border border-border p-2">
-              <div className="font-medium">{safeHref(m.url) ? <a className="text-primary underline" href={safeHref(m.url) ?? undefined} target="_blank" rel="noopener noreferrer">{m.title}</a> : m.title}</div>
-              {m.description ? <p className="whitespace-pre-wrap text-muted">{m.description}</p> : null}
-              {m.files.length ? <div className="mt-1"><Files files={m.files} /></div> : null}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+  React.useEffect(() => { void bff<Material[]>(`sections/${sectionId}/materials`).then(setRows).catch(() => setRows([])); }, [sectionId]);
+  const cols: Column<Material>[] = [
+    { key: "title", header: t("name"), cell: (m) => (safeHref(m.url) ? <a className="font-medium text-primary underline" href={safeHref(m.url) ?? undefined} target="_blank" rel="noopener noreferrer">{m.title}</a> : <span className="font-medium">{m.title}</span>) },
+    { key: "description", header: t("description"), cell: (m) => (m.description ? <span className="line-clamp-3 whitespace-pre-wrap text-muted">{m.description}</span> : "—") },
+    { key: "files", header: t("files"), cell: (m) => <Files files={m.files} /> },
+  ];
+  return <DataTable columns={cols} rows={rows ?? []} rowKey={(m) => m.id} loading={rows === null} emptyText={t("studentEmpty")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />;
 }

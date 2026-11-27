@@ -616,6 +616,8 @@
     },
     "assignments": {
       "tab": "Assignments",
+      "studentEmpty": "No assignments have been published yet.",
+      "submitHint": "Submit your work under My assignments.",
       "myTitle": "My assignments",
       "dueCol": "Due date",
       "maxCol": "Points",
@@ -994,6 +996,11 @@
       "weekday_4": "Thu",
       "weekday_5": "Fri",
       "weekday_6": "Sat",
+      "tab_basic": "Base information",
+      "tab_instructors": "Instructors",
+      "tab_materials": "Materials",
+      "tab_assignments": "Assignments",
+      "noInstructors": "No instructors assigned yet.",
       "weekday_7": "Sun"
     },
     "plan": {

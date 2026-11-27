@@ -20,7 +20,7 @@ describe("student class materials", () => {
     expect(screen.getByRole("link", { name: "notes.pdf" }).getAttribute("href")).toBe("https://store/notes.pdf");
     expect(bff).toHaveBeenCalledWith("sections/s1/materials");
   });
-  it("says so when nothing is published, and shows nothing when the section is not the student's", async () => {
+  it("says so when nothing is published, and shows the empty list when the section is not the student's", async () => {
     bff.mockResolvedValueOnce([]);
     const a = wrap();
     expect(await screen.findByText(en.pages.materials.studentEmpty)).toBeTruthy();
@@ -28,7 +28,7 @@ describe("student class materials", () => {
     bff.mockRejectedValueOnce(new Error("404"));
     const b = wrap();
     await waitFor(() => expect(bff).toHaveBeenCalledTimes(2));
-    expect(b.container.textContent).toBe("");
+    expect(b.container.textContent).toContain(en.pages.materials.studentEmpty);
   });
   it("does not turn a non-http(s) link into a clickable link", async () => {
     bff.mockResolvedValueOnce([{ id: "m1", title: "Evil", description: "", url: "javascript:alert(1)", category: "", published: true, files: [] }]);
