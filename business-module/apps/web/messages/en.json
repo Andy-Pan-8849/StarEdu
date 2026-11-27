@@ -610,6 +610,8 @@
       "removeFile": "Remove {name}",
       "filesHint": "Up to {n} files (PDF, Word, PowerPoint, Excel, images, text, archives…).",
       "uploadFailed": "Could not upload {name}.",
+      "studentTitle": "Class materials",
+      "studentEmpty": "No materials have been published yet.",
       "empty": "No materials yet."
     },
     "assignments": {

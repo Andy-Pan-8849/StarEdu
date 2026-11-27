@@ -610,6 +610,8 @@
       "removeFile": "移除 {name}",
       "filesHint": "最多 {n} 个文件（PDF、Word、PowerPoint、Excel、图片、文本、压缩包等）。",
       "uploadFailed": "{name} 上传失败。",
+      "studentTitle": "课程资料",
+      "studentEmpty": "老师还没有发布资料。",
       "empty": "还没有资料。"
     },
     "assignments": {

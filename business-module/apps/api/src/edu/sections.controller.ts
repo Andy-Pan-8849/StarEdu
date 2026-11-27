@@ -39,7 +39,7 @@ const materialSchema = z.object({
   title: z.string().trim().min(1).max(200),
   category: z.string().trim().min(1).max(50).optional(),
   description: z.string().max(20000).optional(),
-  url: z.string().url().max(1000).nullable().optional(),
+  url: z.string().url().max(1000).refine((u) => /^https?:\/\//i.test(u), "Only http(s) links are allowed").nullable().optional(),
   sort: z.number().int().min(0).max(10000).optional(),
   published: z.boolean().optional(),
   /** 附件（先 POST materials/uploads 拿到 id）；更新时给的是完整清单，不在清单里的附件会被删除 */

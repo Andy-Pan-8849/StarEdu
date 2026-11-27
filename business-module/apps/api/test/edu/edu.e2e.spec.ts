@@ -379,6 +379,7 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       const draft = await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "Draft notes", url: "https://example.test/draft", published: false });
       expect(draft.status).toBe(201);
       await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "Week 1", url: "https://example.test/w1", published: true, category: "slides" });
+      expect((await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "bad", url: "javascript:alert(1)" })).status).toBe(400); // 只收 http(s) 链接
       expect((await h.call(t2).post(`/api/sections/${sec}/materials`, { title: "x", url: "https://example.test/x" })).status).toBe(404); // 别班的老师：看不到这个班
       expect((await registrar().post(`/api/sections/${sec}/materials`, { title: "x", url: "https://example.test/x" })).status).toBe(403); // 教务可看不可改
       expect((await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "bad", url: "not a url" })).status).toBe(400);
