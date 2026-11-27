@@ -12,6 +12,7 @@ import { Modal } from "../modal";
 import { DataTable, type Column } from "../data-table";
 import { Can, PermButton, usePermissions } from "../permissions";
 import { AssignmentsPanel } from "./assignment-pages";
+import { MaterialsPanel } from "./material-pages";
 import { DiscussionPanel } from "./discussion-pages";
 import { GradesPanel } from "./grade-pages";
 import { FormPanel, useAct, type Field } from "./crud";
@@ -266,7 +267,6 @@ interface SectionRow { id: string; name: string; status: string; capacity: numbe
 interface RosterRow { id: string; fullName: string | null; studentNo: string | null; status: string; method: string }
 interface StaffOpt { id: string; fullName: string }
 interface StudentOpt { id: string; fullName: string; studentNo: string | null }
-interface Material { id: string; title: string; url: string; category: string; published: boolean }
 const SEC_NEXT: Record<string, string[]> = { draft: ["open", "cancelled"], open: ["draft", "in_progress", "cancelled"], in_progress: ["ended", "cancelled"], ended: [], cancelled: [] };
 
 export function SectionsPage() {
@@ -405,17 +405,15 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const perms = usePermissions();
   const [s, setS] = React.useState<SectionRow | null>(null);
   const roster = useList<RosterRow>(`sections/${id}/roster`);
-  const materials = useList<Material>(`sections/${id}/materials`);
   const staff = useList<StaffOpt>("staff?size=100");
   const students = useList<StudentOpt>("students?size=100");
-  const reloadAll = React.useCallback(() => { void bff<SectionRow>(`sections/${id}`).then(setS); roster.reload(); materials.reload(); }, [id, roster, materials]);
+  const reloadAll = React.useCallback(() => { void bff<SectionRow>(`sections/${id}`).then(setS); roster.reload(); }, [id, roster]);
   React.useEffect(() => { void bff<SectionRow>(`sections/${id}`).then(setS); }, [id]);
   const { run, message } = useAct(reloadAll);
   const [pickedStudents, setPickedStudents] = React.useState<string[]>([]);
   const [reason, setReason] = React.useState("");
   const [needs, setNeeds] = React.useState<string[] | null>(null);
   const [teacher, setTeacher] = React.useState("");
-  const [matForm, setMatForm] = React.useState(false);
   if (!s) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
   async function enroll(confirm?: string[]) {
     const r = await bff<{ results: Array<{ ok: boolean; code?: string; violations?: string[]; message?: string }> }>(`sections/${id}/enrollments`, { method: "POST", body: { studentIds: pickedStudents, confirm, reason: reason || undefined } });
@@ -465,20 +463,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
           </Can>
         </div>
       ) : null}
-      {tab === "materials" ? (
-        <div>
-          <ul className="mb-2 list-disc pl-5">{materials.rows.map((m) => (
-            <li key={m.id}><a className="underline" href={m.url} target="_blank" rel="noopener noreferrer">{m.title}</a> {m.published ? "" : `(${t("draft")})`}
-              <PermRowAction perm={PERMS.eduMaterialEdit} className="ml-2" onClick={() => void run(() => bff(`sections/${id}/materials/${m.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction></li>
-          ))}</ul>
-          <Can perm={PERMS.eduMaterialEdit}>
-            {matForm ? (
-              <FormPanel inline title={c("add")} fields={[{ name: "title", label: t("name"), required: true }, { name: "url", label: t("url"), required: true }, { name: "published", label: t("published"), type: "checkbox", hint: t("publishedHint") }]} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setMatForm(false)}
-                onSubmit={async (p) => { if (await run(() => bff(`sections/${id}/materials`, { method: "POST", body: p }), c("saved"))) setMatForm(false); }} />
-            ) : <IconButton icon={Plus} label={c("add")} onClick={() => setMatForm(true)}/>}
-          </Can>
-        </div>
-      ) : null}
+      {tab === "materials" ? <MaterialsPanel sectionId={id} /> : null}
       {tab === "assignments" ? <AssignmentsPanel sectionId={id} /> : null}
       {tab === "grades" ? <GradesPanel sectionId={id} /> : null}
       {tab === "discussion" ? <DiscussionPanel sectionId={id} /> : null}

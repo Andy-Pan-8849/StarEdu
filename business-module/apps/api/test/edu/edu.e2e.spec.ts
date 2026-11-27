@@ -403,6 +403,45 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
     });
   });
 
+  describe("course material files", () => {
+    it("a material can carry a description and several uploaded files; the link is optional; students see the files; dropped files and deleted materials are removed", async () => {
+      const sec = await mkSection(cs101, "71");
+      const a = await student("mf.one");
+      await h.call(a.token).post("/api/portal/enrollments", { sectionId: sec });
+      const upload = async (name: string, text: string) => {
+        const bytes = Buffer.from(text);
+        const res = await h.call(t1).post(`/api/sections/${sec}/materials/uploads`, { fileName: name, contentType: "application/pdf", size: bytes.length });
+        expect(res.status).toBe(201);
+        expect((await fetch(res.body.uploadUrl, { method: "PUT", headers: res.body.headers, body: bytes })).status).toBe(200);
+        return res.body.fileId as string;
+      };
+      // 只有标题不行；有说明、文件或链接之一就行
+      expect((await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "Empty" })).status).toBe(400);
+      expect((await h.call(t1).post(`/api/sections/${sec}/materials/uploads`, { fileName: "run.exe", contentType: "application/octet-stream", size: 5 })).status).toBe(400);
+      const f1 = await upload("week1.pdf", "pdf-one");
+      const f2 = await upload("week1.pptx", "slides");
+      const made = await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "Week 1", description: "Read chapter 1.\n".repeat(500), published: true, fileIds: [f1, f2] });
+      expect(made.status).toBe(201);
+      expect(made.body.url).toBeNull();
+      expect(made.body.files.map((f: { fileName: string }) => f.fileName)).toEqual(["week1.pdf", "week1.pptx"]);
+      expect(await (await fetch(made.body.files[0].downloadUrl)).text()).toBe("pdf-one");
+      // 同一个文件不能挂两次；没传好的文件不能挂
+      expect((await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "Again", fileIds: [f1] })).status).toBe(400);
+      const ghost = (await h.call(t1).post(`/api/sections/${sec}/materials/uploads`, { fileName: "ghost.pdf", contentType: "application/pdf", size: 9 })).body.fileId;
+      expect((await h.call(t1).post(`/api/sections/${sec}/materials`, { title: "Ghost", fileIds: [ghost] })).status).toBe(400);
+      // 学生看得到已发布课件的文件
+      const seen = (await h.call(a.token).get(`/api/portal/sections/${sec}/materials`)).body as Array<{ description: string; files: Array<{ fileName: string }> }>;
+      expect(seen[0].files.map((f) => f.fileName)).toEqual(["week1.pdf", "week1.pptx"]);
+      expect(seen[0].description.length).toBeGreaterThan(5000);
+      // 更新：给的清单是完整清单，不在里面的文件被删除；去掉所有内容就不行
+      const patched = await h.call(t1).patch(`/api/sections/${sec}/materials/${made.body.id}`, { fileIds: [f2] });
+      expect(patched.body.files.map((f: { fileName: string }) => f.fileName)).toEqual(["week1.pptx"]);
+      expect((await h.call(t1).patch(`/api/sections/${sec}/materials/${made.body.id}`, { fileIds: [], description: "" })).status).toBe(400);
+      expect((await h.call(t1).del(`/api/sections/${sec}/materials/${made.body.id}`)).status).toBe(200);
+      expect(((await h.call(t1).get(`/api/sections/${sec}/materials`)).body as unknown[]).length).toBe(0);
+    });
+  });
+
   describe("degree plan", () => {
     it("shows each course of my major as not started, in progress or passed, and counts only passed credits", async () => {
       const a = await student("plan.one");

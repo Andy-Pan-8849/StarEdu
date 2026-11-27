@@ -1105,18 +1105,43 @@ model SectionMaterial {
   tenantId  String   @map("tenant_id") @db.Uuid
   sectionId String   @map("section_id") @db.Uuid
   title     String
+  /// 说明（可以是大段文字）
+  description String @default("")
   /// slides / reference / syllabus
   category  String   @default("slides")
-  url       String
+  /// 外部链接；可以没有（只有附件或说明）
+  url       String?
   sort      Int      @default(0)
   published Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
   createdBy String?  @map("created_by") @db.Uuid
 
   section Section @relation(fields: [sectionId], references: [id])
+  files   SectionMaterialFile[]
 
   @@index([sectionId])
   @@map("section_material")
+}
+
+/// 课件的附件：先登记并拿预签名地址上传（materialId 为空），保存课件时再挂到课件上
+model SectionMaterialFile {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  sectionId   String   @map("section_id") @db.Uuid
+  materialId  String?  @map("material_id") @db.Uuid
+  /// 对象存储键，以 tenant/<租户id>/ 开头
+  storageKey  String   @unique @map("storage_key")
+  fileName    String   @map("file_name")
+  contentType String   @map("content_type")
+  size        Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+
+  material SectionMaterial? @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([sectionId])
+  @@map("section_material_file")
 }
 
 /// 事件（出站箱）：选课作废、班级取消等要通知的事先写在这里，B9 的通知服务消费

@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { PermRowAction, RowAction } from "../icon-button";
-import { ArrowLeft, CalendarPlus, ExternalLink, Eye, Inbox, Send } from "lucide-react";
+import { IconButton, PermRowAction, RowAction } from "../icon-button";
+import { ArrowLeft, CalendarPlus, ExternalLink, Eye, Inbox, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -13,6 +13,7 @@ import { FormPanel, useAct } from "./crud";
 import { useList } from "./use-api";
 import { useTable } from "./use-table";
 import { DataTable, type Column } from "../data-table";
+import { Modal } from "../modal";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const input = "rounded-md border border-border bg-transparent px-2 py-1";
@@ -31,18 +32,42 @@ export function parseRubric(text: string): Array<{ title: string; maxPoints: num
 
 // ---------------------------------------------------------------- 管理后台：班级的"作业"页签
 interface Rubric { id: string; title: string; maxPoints: number }
-interface Asg { id: string; title: string; dueDate: string; published: boolean; maxScore: number; group: { name: string } | null; rubric: Rubric[]; counts: { submitted: number; grading: number; published: number } }
+interface Asg { id: string; title: string; description: string; allowLate: boolean; dueDate: string; published: boolean; maxScore: number; group: { name: string } | null; rubric: Rubric[]; counts: { submitted: number; grading: number; published: number } }
 interface SubRow { studentPersonId: string; fullName: string | null; studentNo: string | null; submissionId: string | null; status: string; submittedAt: string | null; isLate: boolean; hoursLate: number; latePenaltyPct: number | null; rawScore: number | null; finalScore: number | null; extension: { days: number; reason: string } | null }
 interface SubDetail { id: string; fullName: string | null; status: string; feedback: string | null; rawScore: number | null; finalScore: number | null; latePenaltyPct: number | null; versions: Array<{ version: number; textAnswer: string | null; submittedAt: string; isLate: boolean; files: Array<{ id: string; fileName: string; size: number; downloadUrl: string }> }>; scores: Array<{ rubricItemId: string; points: number }> }
+
+/** 评分标准输入框里的文字：每行"标题: 分值"（parseRubric 的反向）。 */
+export const rubricText = (r: Rubric[]) => r.map((x) => `${x.title}: ${x.maxPoints}`).join("\n");
 
 export function AssignmentsPanel({ sectionId }: { sectionId: string }) {
   const t = useTranslations("pages.assignments");
   const c = useTranslations("crud");
+  const tbl = useTable();
   const list = useList<Asg>(`sections/${sectionId}/assignments`);
   const { run, message } = useAct(list.reload);
-  const [creating, setCreating] = React.useState(false);
+  const [form, setForm] = React.useState<{ mode: "create" | "edit" | "view"; row: Asg | null } | null>(null);
   const [openId, setOpenId] = React.useState<string | null>(null);
   const open = list.rows.find((a) => a.id === openId) ?? null;
+  const columns: Column<Asg>[] = [
+    { key: "title", header: t("title"), cell: (a) => <button type="button" className="text-left font-medium text-primary hover:underline" onClick={() => setForm({ mode: "view", row: a })}>{a.title}</button> },
+    { key: "due", header: t("dueCol"), cell: (a) => a.dueDate },
+    { key: "max", header: t("maxCol"), cell: (a) => a.maxScore },
+    { key: "counts", header: t("countsCol"), cell: (a) => t("counts", { s: a.counts.submitted, g: a.counts.grading, p: a.counts.published }) },
+    { key: "status", header: t("status"), cell: (a) => (a.published ? t("published") : <span className="text-muted">{t("draft")}</span>) },
+    {
+      key: "actions",
+      header: "",
+      cell: (a) => (
+        <div className="flex flex-wrap gap-1">
+          <RowAction onClick={() => setForm({ mode: "view", row: a })} icon={Eye}>{t("detail")}</RowAction>
+          <PermRowAction perm={PERMS.eduAssignmentEdit} onClick={() => setForm({ mode: "edit", row: a })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <RowAction onClick={() => setOpenId(a.id)} icon={Inbox}>{t("submissions")}</RowAction>
+          <PermRowAction perm={PERMS.eduAssignmentEdit} onClick={() => void run(() => bff(`sections/${sectionId}/assignments/${a.id}/publish`, { method: "POST", body: { published: !a.published } }), c("done"))} icon={Send}>{a.published ? t("unpublish") : t("publish")}</PermRowAction>
+          <PermRowAction perm={PERMS.eduAssignmentEdit} onClick={() => window.confirm(c("confirmDelete", { name: a.title })) && void run(() => bff(`sections/${sectionId}/assignments/${a.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{c("delete")}</PermRowAction>
+        </div>
+      ),
+    },
+  ];
   return (
     <div>
       {message}
@@ -50,40 +75,51 @@ export function AssignmentsPanel({ sectionId }: { sectionId: string }) {
         <SubmissionsView sectionId={sectionId} assignment={open} onBack={() => { setOpenId(null); list.reload(); }} />
       ) : (
         <>
-          <ul className="mb-3 space-y-1">
-            {list.rows.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
-                <span className="font-medium">{a.title}</span>
-                <span className="text-muted">{t("due", { date: a.dueDate })} · {t("maxScore", { n: a.maxScore })}{a.group ? ` · ${a.group.name}` : ""}</span>
-                <span className="text-muted">{a.published ? t("published") : t("draft")} · {t("counts", { s: a.counts.submitted, g: a.counts.grading, p: a.counts.published })}</span>
-                <RowAction onClick={() => setOpenId(a.id)} icon={Inbox}>{t("submissions")}</RowAction>
-                <PermRowAction perm={PERMS.eduAssignmentEdit} onClick={() => void run(() => bff(`sections/${sectionId}/assignments/${a.id}/publish`, { method: "POST", body: { published: !a.published } }), c("done"))} icon={Send}>{a.published ? t("unpublish") : t("publish")}</PermRowAction>
-              </li>
-            ))}
-            {list.rows.length === 0 ? <li className="text-muted">—</li> : null}
-          </ul>
           <Can perm={PERMS.eduAssignmentEdit}>
-            {creating ? (
-              <FormPanel
-                title={t("newAssignment")}
-                fields={[
-                  { name: "title", label: t("title"), required: true },
-                  { name: "dueDate", label: t("dueDateField"), required: true },
-                  { name: "description", label: t("description"), type: "textarea" },
-                  { name: "rubric", label: t("rubricField"), type: "textarea", required: true },
-                  { name: "allowLate", label: t("allowLate"), type: "checkbox" },
-                ]}
-                initial={{ allowLate: true, rubric: "Correctness: 6\nStyle: 4" }}
-                submitLabel={c("save")}
-                cancelLabel={c("cancel")}
-                onCancel={() => setCreating(false)}
-                onSubmit={async (p) => {
-                  const ok = await run(() => bff(`sections/${sectionId}/assignments`, { method: "POST", body: { ...p, rubric: parseRubric(String(p.rubric ?? "")) } }), c("saved"));
-                  if (ok) setCreating(false);
-                }}
-              />
-            ) : <Button size="sm" onClick={() => setCreating(true)}>{t("newAssignment")}</Button>}
+            <div className="mb-2"><IconButton icon={Plus} label={t("newAssignment")} onClick={() => setForm({ mode: "create", row: null })} /></div>
           </Can>
+          <DataTable columns={columns} rows={list.rows} rowKey={(a) => a.id} loading={list.loading} emptyText={t("empty")} loadingText={tbl.loading} selectable={false} maxActions={5} labels={tbl.labels} />
+          {form?.mode === "view" && form.row ? (
+            <Modal title={form.row.title} onClose={() => setForm(null)} closeLabel={c("close")}>
+              <dl className="flex flex-col gap-3 text-sm">
+                <div><dt className="text-muted">{t("status")}</dt><dd>{form.row.published ? t("published") : t("draft")}</dd></div>
+                <div><dt className="text-muted">{t("dueCol")}</dt><dd>{form.row.dueDate}{form.row.group ? ` · ${form.row.group.name}` : ""}</dd></div>
+                <div><dt className="text-muted">{t("maxCol")}</dt><dd>{form.row.maxScore}</dd></div>
+                <div><dt className="text-muted">{t("allowLate")}</dt><dd>{form.row.allowLate ? c("yes") : c("no")}</dd></div>
+                <div><dt className="text-muted">{t("description")}</dt><dd className="whitespace-pre-wrap">{form.row.description || "—"}</dd></div>
+                <div><dt className="text-muted">{t("rubric")}</dt><dd>{form.row.rubric.length ? <ul className="list-disc pl-5">{form.row.rubric.map((r) => <li key={r.id}>{r.title} — {r.maxPoints}</li>)}</ul> : "—"}</dd></div>
+              </dl>
+              <div className="mt-4"><Button size="sm" variant="outline" onClick={() => setForm(null)}>{c("close")}</Button></div>
+            </Modal>
+          ) : null}
+          {form && form.mode !== "view" ? (
+            <FormPanel
+              key={form.row?.id ?? "new"}
+              title={form.row ? t("editAssignment") : t("newAssignment")}
+              fields={[
+                { name: "title", label: t("title"), required: true },
+                { name: "dueDate", label: t("dueDateField"), required: true },
+                { name: "description", label: t("description"), type: "textarea" },
+                { name: "rubric", label: t("rubricField"), type: "textarea", required: true },
+                { name: "allowLate", label: t("allowLate"), type: "checkbox" },
+              ]}
+              initial={form.row ? { title: form.row.title, dueDate: form.row.dueDate, description: form.row.description, rubric: rubricText(form.row.rubric), allowLate: form.row.allowLate } : { allowLate: true, rubric: "Correctness: 6\nStyle: 4" }}
+              submitLabel={c("save")}
+              cancelLabel={c("cancel")}
+              onCancel={() => setForm(null)}
+              onSubmit={async (p) => {
+                const rubric = parseRubric(String(p.rubric ?? ""));
+                const row = form.row;
+                const ok = await run(async () => {
+                  if (!row) { await bff(`sections/${sectionId}/assignments`, { method: "POST", body: { ...p, rubric } }); return; }
+                  const { rubric: _text, ...rest } = p;
+                  await bff(`sections/${sectionId}/assignments/${row.id}`, { method: "PATCH", body: rest });
+                  if (String(p.rubric ?? "") !== rubricText(row.rubric)) await bff(`sections/${sectionId}/assignments/${row.id}/rubric`, { method: "PUT", body: { items: rubric } });
+                }, c("saved"));
+                if (ok) setForm(null);
+              }}
+            />
+          ) : null}
         </>
       )}
     </div>
