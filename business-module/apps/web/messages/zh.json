@@ -997,7 +997,12 @@
       "colState": "状态",
       "state_not_started": "未开始",
       "state_in_progress": "进行中",
-      "state_passed": "已通过"
+      "state_passed": "已通过",
+      "allMajors": "全部专业",
+      "noMajorOption": "你还没有专业",
+      "tabInfo": "专业信息",
+      "tabProgress": "进度",
+      "tabCourses": "课程"
     },
     "courseInfo": {
       "title": "课程信息",

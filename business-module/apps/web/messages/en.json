@@ -997,7 +997,12 @@
       "colState": "Status",
       "state_not_started": "Not started",
       "state_in_progress": "In progress",
-      "state_passed": "Passed"
+      "state_passed": "Passed",
+      "allMajors": "All majors",
+      "noMajorOption": "You have no major yet",
+      "tabInfo": "Major information",
+      "tabProgress": "Progress",
+      "tabCourses": "Courses"
     },
     "courseInfo": {
       "title": "Course information",
