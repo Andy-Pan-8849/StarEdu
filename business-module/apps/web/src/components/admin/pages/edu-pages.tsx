@@ -19,6 +19,7 @@ import { FormPanel, useAct, type Field } from "./crud";
 import { useList } from "./use-api";
 import { useDict } from "../use-dict";
 import { CourseDetailDialog, CourseLink } from "./course-pages";
+import { CourseDialog } from "./course-dialogs";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
@@ -86,7 +87,6 @@ export function TermsPage() {
 
 // ---------------------------------------------------------------- 课程
 interface CourseRow { id: string; code: string; name: string; credits: number; status: boolean }
-interface CourseDetail { id: string; code: string; name: string; credits: number; syllabus: string | null; prerequisites: Array<{ id: string; code: string }>; majors: Array<{ code: string; name: string; category: string }>; sections: Array<{ id: string; name: string; status: string }> }
 
 export function CoursesPage() {
   const t = useTranslations("pages.edu");
@@ -94,13 +94,13 @@ export function CoursesPage() {
   const tt = useTable();
   const { rows, loading, error, reload } = useList<CourseRow>("courses");
   const { run, message } = useAct(reload);
-  const [form, setForm] = React.useState<{ row?: CourseRow } | null>(null);
-  const [open, setOpen] = React.useState<string | null>(null);
+  const [form, setForm] = React.useState<boolean>(false); // 新增（编辑在 CourseDialog 里）
+  const [open, setOpen] = React.useState<{ id: string; mode: "view" | "edit" } | null>(null);
   const fields: Field[] = [
     { name: "code", label: t("code"), required: true },
     { name: "name", label: t("name"), required: true },
     { name: "credits", label: t("credits"), type: "number", required: true },
-    ...(form?.row ? [{ name: "status", label: c("enabled"), type: "checkbox" as const }] : []),
+    { name: "syllabus", label: t("syllabusField"), type: "textarea" },
   ];
   const columns: Column<CourseRow>[] = [
     { key: "code", header: t("code"), cell: (r) => r.code },
@@ -112,8 +112,8 @@ export function CoursesPage() {
       header: "",
       cell: (r) => (
         <div className="flex gap-1">
-          <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction>
-          <PermRowAction perm={PERMS.eduCourseEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
+          <RowAction onClick={() => setOpen({ id: r.id, mode: "view" })} icon={Eye}>{t("details")}</RowAction>
+          <PermRowAction perm={PERMS.eduCourseEdit} onClick={() => setOpen({ id: r.id, mode: "edit" })} icon={Pencil}>{c("edit")}</PermRowAction>
         </div>
       ),
     },
@@ -123,45 +123,14 @@ export function CoursesPage() {
       <H2>{t("coursesTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduCourseAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
+      <Can perm={PERMS.eduCourseAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
       {form ? (
-        <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")} fields={fields}
-          initial={form.row ? { code: form.row.code, name: form.row.name, credits: String(form.row.credits), status: form.row.status } : {}}
-          submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(null)}
-          onSubmit={async (p) => { if (await run(() => (form.row ? bff(`courses/${form.row.id}`, { method: "PATCH", body: p }) : bff("courses", { method: "POST", body: p })), c("saved"))) setForm(null); }} />
+        <FormPanel key="new" title={c("add")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
+          onSubmit={async (p) => { if (await run(() => bff("courses", { method: "POST", body: p }), c("saved"))) setForm(false); }} />
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
-      {open ? <CourseDetailPanel id={open} all={rows} onClose={() => { setOpen(null); reload(); }} /> : null}
+      {open ? <CourseDialog id={open.id} mode={open.mode} onClose={() => setOpen(null)} onSaved={reload} /> : null}
     </section>
-  );
-}
-
-function CourseDetailPanel({ id, all, onClose }: { id: string; all: CourseRow[]; onClose: () => void }) {
-  const t = useTranslations("pages.edu");
-  const c = useTranslations("crud");
-  const [d, setD] = React.useState<CourseDetail | null>(null);
-  const [picked, setPicked] = React.useState<string[]>([]);
-  const [msg, setMsg] = React.useState<{ text: string; error: boolean } | null>(null);
-  React.useEffect(() => { void bff<CourseDetail>(`courses/${id}`).then((x) => { setD(x); setPicked(x.prerequisites.map((p) => p.id)); }); }, [id]);
-  if (!d) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
-  return (
-    <Modal title={`${d.code} · ${d.name}`} onClose={onClose}>
-    <div className="text-sm">
-      <p className="mb-1 text-muted">{t("prerequisites")}</p>
-      <div className="mb-2 flex flex-wrap gap-3">
-        {all.filter((x) => x.id !== id).map((x) => (
-          <label key={x.id} className="flex items-center gap-1"><input type="checkbox" checked={picked.includes(x.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, x.id] : picked.filter((y) => y !== x.id))} />{x.code}</label>
-        ))}
-      </div>
-      <PermButton perm={PERMS.eduCourseEdit} size="sm" onClick={async () => { try { await bff(`courses/${id}/prerequisites`, { method: "PUT", body: { courseIds: picked } }); setMsg({ text: c("saved"), error: false }); } catch (e) { setMsg({ text: (e as Error).message, error: true }); } }}>{c("save")}</PermButton>
-      {msg ? <span role={msg.error ? "alert" : "status"} className={`ml-2 ${msg.error ? "text-red-600" : "text-muted"}`}>{msg.text}</span> : null}
-      <p className="mb-1 mt-3 text-muted">{t("appliesTo")}</p>
-      <p>{d.majors.map((m) => `${m.name} (${t(`cat_${m.category}`)})`).join(", ") || "—"}</p>
-      <p className="mb-1 mt-3 text-muted">{t("history")}</p>
-      <p>{d.sections.map((s) => s.name).join(", ") || "—"}</p>
-      <div className="mt-4 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={onClose}>{c("close")}</Button></div>
-    </div>
-    </Modal>
   );
 }
 
