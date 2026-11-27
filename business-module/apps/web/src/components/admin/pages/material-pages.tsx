@@ -19,6 +19,9 @@ export const MAX_MATERIAL_FILES = 10;
 export interface MaterialFile { id: string; fileName: string; size: number; downloadUrl: string }
 export interface Material { id: string; title: string; description: string; url: string | null; category: string; published: boolean; files: MaterialFile[] }
 
+/** 只放行 http(s) 链接（老数据或手写请求里的 javascript: 之类不渲染成链接）。 */
+export const safeHref = (u: string | null): string | null => { if (!u) return null; try { const p = new URL(u); return p.protocol === "https:" || p.protocol === "http:" ? p.href : null; } catch { return null; } };
+
 const input = "rounded-md border border-border bg-transparent px-2 py-1";
 export const kb = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.ceil(n / 1024))} KB`);
 
@@ -51,7 +54,7 @@ function MaterialDialog({ sectionId, material, mode, onClose, onSaved }: { secti
       <Modal title={material.title} onClose={onClose} closeLabel={c("close")}>
         <dl className="flex flex-col gap-3 text-sm">
           <div><dt className="text-muted">{t("status")}</dt><dd>{material.published ? t("published") : t("draft")}</dd></div>
-          <div><dt className="text-muted">{t("url")}</dt><dd>{material.url ? <a className="text-primary underline" href={material.url} target="_blank" rel="noopener noreferrer">{material.url}</a> : "—"}</dd></div>
+          <div><dt className="text-muted">{t("url")}</dt><dd>{safeHref(material.url) ? <a className="text-primary underline" href={safeHref(material.url) ?? undefined} target="_blank" rel="noopener noreferrer">{material.url}</a> : (material.url ?? "—")}</dd></div>
           <div><dt className="text-muted">{t("description")}</dt><dd className="whitespace-pre-wrap">{material.description || "—"}</dd></div>
           <div><dt className="text-muted">{t("files")}</dt><dd><Files files={material.files} /></dd></div>
         </dl>
@@ -119,7 +122,7 @@ export function MaterialsPanel({ sectionId, onChanged }: { sectionId: string; on
   const { run, message } = useAct(reload);
   const [dialog, setDialog] = React.useState<{ mode: "create" | "edit" | "view"; row: Material | null } | null>(null);
   const columns: Column<Material>[] = [
-    { key: "title", header: t("name"), cell: (m) => (m.url ? <a className="font-medium text-primary underline" href={m.url} target="_blank" rel="noopener noreferrer">{m.title}</a> : <span className="font-medium">{m.title}</span>) },
+    { key: "title", header: t("name"), cell: (m) => (safeHref(m.url) ? <a className="font-medium text-primary underline" href={safeHref(m.url) ?? undefined} target="_blank" rel="noopener noreferrer">{m.title}</a> : <span className="font-medium">{m.title}</span>) },
     { key: "description", header: t("description"), cell: (m) => <span className="line-clamp-2 max-w-xs whitespace-pre-line">{m.description || "—"}</span> },
     { key: "files", header: t("files"), cell: (m) => <Files files={m.files} /> },
     { key: "status", header: t("status"), cell: (m) => (m.published ? t("published") : <span className="text-muted">{t("draft")}</span>) },
@@ -160,7 +163,7 @@ export function StudentMaterials({ sectionId }: { sectionId: string }) {
         <ul className="space-y-2">
           {rows.map((m) => (
             <li key={m.id} className="rounded-md border border-border p-2">
-              <div className="font-medium">{m.url ? <a className="text-primary underline" href={m.url} target="_blank" rel="noopener noreferrer">{m.title}</a> : m.title}</div>
+              <div className="font-medium">{safeHref(m.url) ? <a className="text-primary underline" href={safeHref(m.url) ?? undefined} target="_blank" rel="noopener noreferrer">{m.title}</a> : m.title}</div>
               {m.description ? <p className="whitespace-pre-wrap text-muted">{m.description}</p> : null}
               {m.files.length ? <div className="mt-1"><Files files={m.files} /></div> : null}
             </li>

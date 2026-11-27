@@ -30,4 +30,10 @@ describe("student class materials", () => {
     await waitFor(() => expect(bff).toHaveBeenCalledTimes(2));
     expect(b.container.textContent).toBe("");
   });
+  it("does not turn a non-http(s) link into a clickable link", async () => {
+    bff.mockResolvedValueOnce([{ id: "m1", title: "Evil", description: "", url: "javascript:alert(1)", category: "", published: true, files: [] }]);
+    wrap();
+    expect(await screen.findByText("Evil")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Evil" })).toBeNull();
+  });
 });
