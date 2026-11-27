@@ -21,6 +21,7 @@ import { useDict } from "../use-dict";
 import { CourseDetailDialog, CourseLink } from "./course-pages";
 import { CourseDialog } from "./course-dialogs";
 import { MajorDialog, type MajorRow } from "./major-dialogs";
+import { StudentPicker } from "./student-picker";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
@@ -182,9 +183,8 @@ export function MajorsPage() {
 
 // ---------------------------------------------------------------- 班级
 interface SectionRow { id: string; name: string; status: string; capacity: number; seated: number; mode: string; course: { code: string; name: string }; term: { id: string; name: string }; campus: { name: string }; instructors: Array<{ personId: string; fullName: string | null; role: string }> }
-interface RosterRow { id: string; fullName: string | null; studentNo: string | null; status: string; method: string }
+interface RosterRow { id: string; studentPersonId: string; fullName: string | null; studentNo: string | null; status: string; method: string }
 interface StaffOpt { id: string; fullName: string }
-interface StudentOpt { id: string; fullName: string; studentNo: string | null }
 const SEC_NEXT: Record<string, string[]> = { draft: ["open", "cancelled"], open: ["draft", "in_progress", "cancelled"], in_progress: ["ended", "cancelled"], ended: [], cancelled: [] };
 
 export function SectionsPage() {
@@ -324,25 +324,12 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const [s, setS] = React.useState<SectionRow | null>(null);
   const roster = useList<RosterRow>(`sections/${id}/roster`);
   const staff = useList<StaffOpt>("staff?size=100");
-  const students = useList<StudentOpt>("students?size=100");
   const reloadAll = React.useCallback(() => { void bff<SectionRow>(`sections/${id}`).then(setS); roster.reload(); }, [id, roster]);
   React.useEffect(() => { void bff<SectionRow>(`sections/${id}`).then(setS); }, [id]);
   const { run, message } = useAct(reloadAll);
-  const [pickedStudents, setPickedStudents] = React.useState<string[]>([]);
-  const [reason, setReason] = React.useState("");
-  const [needs, setNeeds] = React.useState<string[] | null>(null);
+  const [adding, setAdding] = React.useState(false);
   const [teacher, setTeacher] = React.useState("");
   if (!s) return <Modal title={t("details")} onClose={onClose}><p className="text-sm text-muted">…</p></Modal>;
-  async function enroll(confirm?: string[]) {
-    const r = await bff<{ results: Array<{ ok: boolean; code?: string; violations?: string[]; message?: string }> }>(`sections/${id}/enrollments`, { method: "POST", body: { studentIds: pickedStudents, confirm, reason: reason || undefined } });
-    const need = [...new Set(r.results.flatMap((x) => (x.code === "CONFIRMATION_REQUIRED" ? (x.violations ?? []) : [])))];
-    const failed = r.results.filter((x) => !x.ok && x.code !== "CONFIRMATION_REQUIRED");
-    if (need.length) setNeeds(need);
-    else setNeeds(null);
-    if (!need.length && failed.length === 0) { setPickedStudents([]); setReason(""); }
-    reloadAll();
-    return failed.map((f) => f.message).filter(Boolean).join("; ");
-  }
   const rosterCols: Column<RosterRow>[] = [
     { key: "no", header: t("studentNo"), cell: (r) => r.studentNo ?? "" },
     { key: "name", header: t("name"), cell: (r) => r.fullName ?? "" },
@@ -358,18 +345,9 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
       {message}
       {tab === "roster" ? (
         <div>
-          <Can perm={PERMS.eduEnrollmentAdd}>
-            <div className="mb-3 rounded-md border border-border p-2">
-              <p className="mb-1 text-muted">{t("addStudents")}</p>
-              <div className="mb-2 flex max-h-32 flex-wrap gap-3 overflow-auto">
-                {students.rows.map((x) => <label key={x.id} className="flex items-center gap-1"><input type="checkbox" checked={pickedStudents.includes(x.id)} onChange={(e) => setPickedStudents(e.target.checked ? [...pickedStudents, x.id] : pickedStudents.filter((y) => y !== x.id))} />{x.fullName} ({x.studentNo})</label>)}
-              </div>
-              {needs ? <p role="alert" className="mb-1 text-red-600">{t("needConfirm", { list: needs.map((n) => t(`viol_${n}`)).join(", ") })}</p> : null}
-              {needs ? <label className="mb-2 flex flex-col gap-1">{t("reason")}<input className="rounded-md border border-border bg-transparent px-2 py-1" value={reason} onChange={(e) => setReason(e.target.value)} /></label> : null}
-              <PermButton perm={PERMS.eduEnrollmentAdd} size="sm" disabled={pickedStudents.length === 0 || (needs !== null && !reason.trim())} onClick={() => void enroll(needs ?? undefined).catch(() => undefined)}>{needs ? t("confirmEnroll") : t("enroll")}</PermButton>
-            </div>
-          </Can>
+          <Can perm={PERMS.eduEnrollmentAdd}><IconButton icon={Plus} label={t("addStudents")} className="mb-3" onClick={() => setAdding(true)} /></Can>
           <DataTable columns={rosterCols} rows={roster.rows} rowKey={(r) => r.id} loading={roster.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
+          {adding ? <StudentPicker sectionId={id} exclude={roster.rows.filter((r) => r.status === "enrolled").map((r) => r.studentPersonId)} onChanged={reloadAll} onClose={() => setAdding(false)} /> : null}
         </div>
       ) : null}
       {tab === "instructors" ? (

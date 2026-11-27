@@ -46,8 +46,10 @@ describe("demo scenario", () => {
     expect(await h.owner.notification.count({ where: { tenantId: tenantId() } })).toBe(7);
     expect(await h.owner.transcriptIssue.count({ where: { tenantId: tenantId(), revokedAt: { not: null } } })).toBe(1);
     expect(await h.owner.gradeChange.count({ where: { tenantId: tenantId() } })).toBe(1);
-    // 新旧两版培养方案，两个学生各按自己的入学年份
-    expect(await h.owner.majorVersion.count({ where: { tenantId: tenantId(), effectiveYear: new Date().getUTCFullYear() } })).toBe(3);
+    // 新旧两版培养方案，两个学生各按自己的入学年份；课程和专业各 20 个左右，界面才看得出问题
+    expect(await h.owner.course.count({ where: { tenantId: tenantId(), deletedAt: null } })).toBe(20);
+    expect(await h.owner.major.count({ where: { tenantId: tenantId(), deletedAt: null } })).toBe(20);
+    expect(await h.owner.majorVersion.count({ where: { tenantId: tenantId(), effectiveYear: new Date().getUTCFullYear() } })).toBe(20); // 20 个专业，各有一个本年的新版
     // 配额有上限，使用情况页有东西可看
     const t = await h.owner.tenant.findUniqueOrThrow({ where: { id: tenantId() } });
     expect(t.maxAccounts).toBeGreaterThan(0);

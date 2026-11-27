@@ -93,10 +93,8 @@ function CurriculumTab({ majorId, editable }: { majorId: string; editable: boole
             </dl>
           )}
         </div>
-        <div className="mb-2 flex items-center gap-2">
-          <h3 className="font-medium">{t("curriculumCourses")}</h3>
-          {editable ? <Can perm={PERMS.eduMajorEdit}><IconButton icon={Plus} label={t("addCourse")} onClick={() => setPicking(true)} /></Can> : null}
-        </div>
+        <h3 className="mb-2 font-medium">{t("curriculumCourses")}</h3>
+        {editable ? <Can perm={PERMS.eduMajorEdit}><IconButton icon={Plus} label={t("addCourse")} className="mb-2" onClick={() => setPicking(true)} /></Can> : null}
         {message}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">

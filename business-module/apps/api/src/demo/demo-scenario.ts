@@ -165,6 +165,55 @@ export async function seedScenario(opts: ScenarioOptions): Promise<ScenarioResul
       () => owner.majorCourse.create({ data: { tenantId, majorId: major.id, versionId: next.id, courseId: otherCourse, category: "elective", suggestedTerm: 2 } }),
     );
   }
+  // 课程和专业各凑到 20 个左右：列表、搜索、选择窗口、分页这些界面才看得出问题。每个专业有旧版（初版）和新版（本年）培养方案，几门课有先修课。
+  const extraCourses: Array<[string, string, number]> = [
+    ["CS101", "Introduction to Computer Science", 3], ["DS201", "Data Structures", 4], ["ALG301", "Algorithms", 4], ["DB201", "Database Systems", 3],
+    ["OS301", "Operating Systems", 4], ["NET201", "Computer Networks", 3], ["SWE301", "Software Engineering", 3], ["AI201", "Introduction to Artificial Intelligence", 3],
+    ["ML301", "Machine Learning", 4], ["MATH101", "Calculus I", 4], ["MATH102", "Linear Algebra", 3], ["STAT201", "Probability and Statistics", 3],
+    ["WEB201", "Web Development", 3], ["MOB301", "Mobile App Development", 3], ["SEC301", "Information Security", 3], ["CLOUD301", "Cloud Computing", 3], ["UX101", "UX Design Basics", 2],
+  ];
+  for (const [code, name, credits] of extraCourses) {
+    courses[code] = (await find(
+      () => owner.course.findFirst({ where: { tenantId, code, deletedAt: null } }),
+      () => owner.course.create({ data: { tenantId, code, name, credits } }),
+    )).id;
+  }
+  const prereqs: Array<[string, string]> = [["DS201", "CS101"], ["ALG301", "DS201"], ["DB201", "CS101"], ["OS301", "DS201"], ["ML301", "AI201"], ["AI201", "MATH102"], ["STAT201", "MATH101"], ["CLOUD301", "NET201"]];
+  for (const [code, pre] of prereqs) {
+    await find(
+      () => owner.coursePrerequisite.findFirst({ where: { courseId: courses[code], prerequisiteId: courses[pre] } }),
+      () => owner.coursePrerequisite.create({ data: { tenantId, courseId: courses[code], prerequisiteId: courses[pre] } }),
+    );
+  }
+  const allCodes = Object.keys(courses);
+  const extraMajors: Array<[string, string, string, number]> = [
+    ["CS", "Computer Science", "bachelor", 120], ["SE", "Software Engineering", "bachelor", 120], ["DSCI", "Data Science", "bachelor", 120], ["AIE", "Artificial Intelligence", "bachelor", 120],
+    ["CYB", "Cybersecurity", "bachelor", 120], ["IS", "Information Systems", "bachelor", 110], ["NETE", "Network Engineering", "bachelor", 110], ["WEBD", "Web Development", "associate", 70],
+    ["MOBD", "Mobile App Development", "associate", 70], ["CLOUD", "Cloud Computing", "associate", 70], ["AMATH", "Applied Mathematics", "bachelor", 120], ["STATS", "Statistics", "bachelor", 120],
+    ["UXD", "UX Design", "associate", 66], ["GAME", "Game Development", "bachelor", 120], ["EMBED", "Embedded Systems", "bachelor", 120], ["DEVOPS", "DevOps Engineering", "associate", 72], ["BANA", "Business Analytics", "master", 36],
+  ];
+  for (const [i, [code, name, degreeType, totalCredits]] of extraMajors.entries()) {
+    const major = await find(
+      () => owner.major.findFirst({ where: { tenantId, code, deletedAt: null } }),
+      () => owner.major.create({ data: { tenantId, code, name, degreeType, totalCredits } }),
+    );
+    const required = [0, 1, 2, 3].map((k) => allCodes[(i * 3 + k) % allCodes.length]);
+    const elective = allCodes[(i * 3 + 7) % allCodes.length];
+    const mkVersion = async (label: string, effectiveYear: number, withElective: boolean) => {
+      const v = await find(
+        () => owner.majorVersion.findFirst({ where: { majorId: major.id, effectiveYear } }),
+        () => owner.majorVersion.create({ data: { tenantId, majorId: major.id, label, effectiveYear, totalCredits, electiveMinCredits: withElective ? 6 : 0 } }),
+      );
+      for (const [k, courseCode] of [...required, ...(withElective && !required.includes(elective) ? [elective] : [])].entries()) {
+        await find(
+          () => owner.majorCourse.findFirst({ where: { versionId: v.id, courseId: courses[courseCode] } }),
+          () => owner.majorCourse.create({ data: { tenantId, majorId: major.id, versionId: v.id, courseId: courses[courseCode], category: courseCode === elective && k >= required.length ? "elective" : "required", suggestedTerm: (k % 4) + 1 } }),
+        );
+      }
+    };
+    await mkVersion("Initial", 2000, false);
+    await mkVersion(`${year} curriculum`, year, true);
+  }
   const majorJava = await owner.major.findFirstOrThrow({ where: { tenantId, code: "JAVA101" } });
   for (const [personId, entryYear] of [[s1, year - 1], [s2, year]] as const) {
     await find(
