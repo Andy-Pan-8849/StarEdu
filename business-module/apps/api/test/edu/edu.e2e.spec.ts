@@ -82,6 +82,17 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       expect((await registrar().get(`/api/courses/${cs101}`)).body.majors).toEqual([expect.objectContaining({ code: "CS", category: "required" })]);
     });
 
+    it("the course search can be limited and restricted to enabled courses (for the prerequisite picker)", async () => {
+      const on = (await registrar().post("/api/courses", { code: "SRCH1", name: "Searchable one", credits: 1 })).body.id;
+      const off = (await registrar().post("/api/courses", { code: "SRCH2", name: "Searchable two", credits: 1 })).body.id;
+      expect((await registrar().patch(`/api/courses/${off}`, { status: false })).status).toBe(200);
+      const all = (await registrar().get("/api/courses?q=searchable")).body.map((c: { id: string }) => c.id);
+      expect(all).toEqual(expect.arrayContaining([on, off]));
+      expect((await registrar().get("/api/courses?q=searchable&status=enabled")).body.map((c: { id: string }) => c.id)).toEqual([on]);
+      expect((await registrar().get("/api/courses?q=searchable&limit=1")).body).toHaveLength(1);
+      expect((await registrar().get("/api/courses?limit=1")).body).toHaveLength(1);
+    });
+
     it("once a course has sections, its code and credits are read-only", async () => {
       const spare = (await registrar().post("/api/courses", { code: "SP100", name: "Spare", credits: 2 })).body.id;
       expect((await registrar().patch(`/api/courses/${spare}`, { credits: 3 })).status).toBe(200); // 还没有班级

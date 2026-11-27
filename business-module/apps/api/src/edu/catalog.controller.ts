@@ -121,9 +121,15 @@ export class CatalogController {
 
   @Get("courses")
   @RequirePermissions(PERMS.eduCourseList)
-  async courses(@Query() query: { q?: string }) {
+  async courses(@Query() query: { q?: string; limit?: string; status?: string }) {
     const q = query.q?.trim();
-    const rows = await this.db.course.findMany({ where: q ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }] } : {}, orderBy: { code: "asc" } });
+    // 选择器用：limit 限制返回条数、status=enabled 只要启用的课（课程多的时候不要一次把全部取出来）
+    const limit = query.limit === undefined ? undefined : Math.min(Math.max(Math.trunc(Number(query.limit)) || 1, 1), 100);
+    const rows = await this.db.course.findMany({
+      where: { ...(query.status === "enabled" ? { status: true } : {}), ...(q ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }] } : {}) },
+      orderBy: { code: "asc" },
+      ...(limit ? { take: limit } : {}),
+    });
     return rows.map((c) => ({ id: c.id, code: c.code, name: c.name, credits: Number(c.credits), status: c.status }));
   }
 
