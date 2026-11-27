@@ -10,7 +10,7 @@ import { Auth, parse } from "../common/http";
 import { todayUtc } from "../hr/effective";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { schedulesOverlap, type ScheduleItem } from "./edu-common";
-import { EnrollmentService } from "./enrollment.service";
+import { EnrollmentService, studentDropDeadline } from "./enrollment.service";
 import { ObjectStoreService } from "../storage/object-store.service";
 
 @Controller("api/portal")
@@ -150,7 +150,7 @@ export class PortalController {
     const { personId } = await this.me(auth);
     const rows = await this.db.enrollment.findMany({ where: { studentPersonId: personId, status: { in: ["enrolled", "withdrawn", "completed"] } }, include: { section: { include: { course: true, term: true } } }, orderBy: { enrolledAt: "desc" } });
     const deadline = (t: Date | null) => t?.toISOString().slice(0, 10) ?? null;
-    return rows.map((e) => ({ id: e.id, status: e.status, passed: e.passed, section: { id: e.sectionId, name: e.section.name, status: e.section.status }, course: { code: e.section.course.code, name: e.section.course.name, credits: Number(e.section.course.credits) }, term: e.section.term.name, dropDeadline: deadline(e.section.term.dropDeadline), canDrop: e.status === "enrolled" && e.section.term.status !== "ended" && e.section.status !== "ended", willBeW: !!e.section.term.dropDeadline && todayUtc() > e.section.term.dropDeadline }));
+    return rows.map((e) => ({ id: e.id, status: e.status, passed: e.passed, section: { id: e.sectionId, name: e.section.name, status: e.section.status }, course: { code: e.section.course.code, name: e.section.course.name, credits: Number(e.section.course.credits) }, term: e.section.term.name, dropDeadline: deadline(e.section.term.dropDeadline), canDrop: e.status === "enrolled" && e.section.term.status !== "ended" && e.section.status !== "ended" && todayUtc() <= studentDropDeadline(e.section.term), willBeW: !!e.section.term.dropDeadline && todayUtc() > e.section.term.dropDeadline }));
   }
 
   /**

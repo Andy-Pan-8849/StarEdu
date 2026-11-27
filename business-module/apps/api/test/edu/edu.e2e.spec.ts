@@ -246,7 +246,7 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
   });
 
   describe("dropping", () => {
-    it("before the deadline the record is voided and disappears; after it the record becomes W and stays; nobody can drop someone else's", async () => {
+    it("before the deadline the record is voided and disappears; after it students cannot drop (the registrar still can, recorded as W); nobody can drop someone else's", async () => {
       const a = await student("d.one");
       const b = await student("d.two");
       const sec = await mkSection(cs101, "40");
@@ -259,7 +259,12 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       // 退课截止日已过
       await h.owner.term.update({ where: { id: termId }, data: { dropDeadline: new Date(iso(-1)) } });
       try {
-        const dropped = await h.call(b.token).del(`/api/portal/enrollments/${eb}`);
+        // 学生：过了截止日不能再退，列表上也没有退课按钮（只能上完拿成绩）
+        expect((await h.call(b.token).del(`/api/portal/enrollments/${eb}`)).status).toBe(409);
+        const row = ((await h.call(b.token).get("/api/portal/my-enrollments")).body as Array<{ id: string; canDrop: boolean }>).find((e) => e.id === eb);
+        expect(row?.canDrop).toBe(false);
+        // 教务老师仍可代办，记 W
+        const dropped = await registrar().del(`/api/sections/${sec}/enrollments/${eb}`);
         expect(dropped.body.status).toBe("withdrawn");
         const mine = (await h.call(b.token).get("/api/portal/my-enrollments")).body as Array<{ id: string; status: string }>;
         expect(mine.find((e) => e.id === eb)?.status).toBe("withdrawn"); // W 保留

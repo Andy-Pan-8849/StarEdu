@@ -36,6 +36,12 @@ export interface EnrollResult {
   conflictCheckSkipped: boolean;
 }
 
+/** 学生自己退课的最后一天：学期的退课截止日；没设就是开学后 14 天。 */
+export const DEFAULT_DROP_DAYS = 14;
+export function studentDropDeadline(term: { dropDeadline: Date | null; startDate: Date }): Date {
+  return term.dropDeadline ?? new Date(term.startDate.getTime() + DEFAULT_DROP_DAYS * 86_400_000);
+}
+
 @Injectable()
 export class EnrollmentService {
   constructor(
@@ -133,7 +139,7 @@ export class EnrollmentService {
     });
   }
 
-  /** 退课：退课截止日（含）之前作废；之后记 W（退课）。没有设截止日的学期按"作废"处理。学期或班级结束后不能退。 */
+  /** 退课：退课截止日（含）之前作废；之后学生不能再退（只能上完拿成绩），教务老师仍可代办，记 W（退课）。没设截止日的学期，学生在开学后 14 天内可退。学期或班级结束后谁都不能退。 */
   async drop(opts: { enrollmentId: string; actorAccountId: string | null; actorPersonId?: string | null; byRegistrar: boolean }) {
     const tenant = requireTenant("drop");
     const result = await this.tenantDb.transaction(async (tx) => {
@@ -146,6 +152,7 @@ export class EnrollmentService {
       if (e.status !== "enrolled") throw new ConflictException(`The enrollment is already ${e.status}`);
       if (e.section.term.status === "ended" || e.section.status === "ended") throw new ConflictException("The term or section has ended; the record is final");
       const deadline = e.section.term.dropDeadline;
+      if (!opts.byRegistrar && todayUtc() > studentDropDeadline(e.section.term)) throw new ConflictException("The drop deadline has passed; the course can no longer be dropped");
       const status = !deadline || todayUtc() <= deadline ? "voided" : "withdrawn";
       await tx.enrollment.update({ where: { id: e.id }, data: { status, droppedAt: new Date() } });
       if (extendedEvents()) await tx.outboxEvent.create({ data: { tenantId: tenant.tenantId, type: "enrollment.dropped", payload: { enrollmentId: e.id, studentPersonId: e.studentPersonId, sectionId: e.sectionId, status, by: opts.byRegistrar ? "registrar" : "student" } } });
