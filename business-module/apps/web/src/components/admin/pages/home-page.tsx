@@ -14,7 +14,8 @@ import { usePermissions } from "../permissions";
 interface Profile { fullName: string | null; username: string }
 interface Note { id: string; title: string; body: string; createdAt: string; readAt: string | null }
 interface MyAssignment { id: string; title: string; section: { course: string }; deadline: string; status: string }
-interface Overview { totals: { sections: number; inProgressSections: number; students: number } }
+interface CampusRow { campusId: string; campus: string; sections: number; inProgressSections: number; students: number; completionRate: number | null; averageScore: number | null; lateRate: number | null }
+interface Overview { campuses: CampusRow[]; totals: { sections: number; inProgressSections: number; students: number } }
 interface Grades { cumulative: { gpa: number | null; creditsEarned: number } }
 
 function Card({ title, value, hint, to }: { title: string; value: React.ReactNode; hint?: string; to?: string }) {
@@ -41,6 +42,8 @@ function Block({ title, children, action }: { title: string; children: React.Rea
     </section>
   );
 }
+
+const pct = (v: number | null) => (v === null ? "-" : `${v}%`);
 
 export function greetingKey(hour: number): "morning" | "afternoon" | "evening" {
   return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
@@ -92,7 +95,7 @@ export function HomePage() {
         {student && grades ? <Card title={t("gpa")} value={grades.cumulative.gpa ?? "–"} hint={t("creditsEarned", { n: grades.cumulative.creditsEarned })} to="portal/grade/index" /> : null}
         {pending !== null ? <Card title={t("pendingRequests")} value={pending} to="edu/request/index" /> : null}
         {overview ? <Card title={t("sectionsInProgress")} value={overview.totals.inProgressSections} hint={t("ofSections", { n: overview.totals.sections })} to="edu/section/index" /> : null}
-        {overview ? <Card title={t("students")} value={overview.totals.students} to="edu/dashboard/index" /> : null}
+        {overview ? <Card title={t("students")} value={overview.totals.students} /> : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -109,6 +112,18 @@ export function HomePage() {
               </ul>
             )}
           </Block>
+        ) : null}
+        {overview ? (
+          <div className="lg:col-span-2">
+            <Block title={t("campusOverview")}>
+              {overview.campuses.length === 0 ? <p className="text-muted">{t("noCampuses")}</p> : (
+                <table className="w-full text-left">
+                  <thead className="text-muted"><tr><th className="py-1">{t("campus")}</th><th>{t("students")}</th><th>{t("sectionsCol")}</th><th>{t("completion")}</th><th>{t("average")}</th><th>{t("lateRate")}</th></tr></thead>
+                  <tbody>{overview.campuses.map((c) => <tr key={c.campusId} className="border-t border-border"><td className="py-1">{c.campus}</td><td>{c.students}</td><td>{c.inProgressSections}/{c.sections}</td><td>{pct(c.completionRate)}</td><td>{pct(c.averageScore)}</td><td>{pct(c.lateRate)}</td></tr>)}</tbody>
+                </table>
+              )}
+            </Block>
+          </div>
         ) : null}
         <Block title={t("recentMessages")}>
           {notes === null ? <p className="text-muted">…</p> : notes.items.length === 0 ? <p className="text-muted">{t("noMessages")}</p> : (

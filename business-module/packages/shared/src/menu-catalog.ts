@@ -190,7 +190,8 @@ export const MENU_CATALOG: CatalogMenu[] = [
   ...menuWithButtons("edu:request", "edu", "Student requests", "request", 8, PERMS.eduRequestList, [["decide", "Decide", PERMS.eduRequestDecide]]),
   ...menuWithButtons("edu:scale", "edu", "Grading scale", "scale", 5, PERMS.eduScaleList, [["edit", "Edit", PERMS.eduScaleEdit]]),
   ...menuWithButtons("edu:transcript", "edu", "Transcripts", "transcript", 6, PERMS.eduTranscriptList, [["issue", "Issue formal transcript", PERMS.eduTranscriptIssue]]),
-  ...menuWithButtons("edu:dashboard", "edu", "Dashboard", "dashboard", 7, PERMS.eduDashboardView, []),
+  // 校区概况不再是单独的页面：它是首页上的一块（有这个权限的人才看得到）。保留为"按钮"，权限码和角色里的授权都不变，菜单里不显示。
+  { code: "edu:dashboard", parent: "edu", type: "button", name: "Campus overview on Home", nameKey: "menu.edu:dashboard", perms: PERMS.eduDashboardView, sort: 7 },
 
   { code: "msg", type: "directory", name: "Messages", nameKey: "menu.msg", route: "msg", icon: "bell", sort: 30, entries: ["admin"] },
   ...menuWithButtons("msg:announcement", "msg", "Announcements", "announcement", 1, PERMS.msgAnnouncementList, [
