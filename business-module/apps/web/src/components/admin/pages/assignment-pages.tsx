@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { IconButton, PermRowAction, RowAction } from "../icon-button";
-import { ArrowLeft, CalendarPlus, ExternalLink, Eye, Inbox, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { CalendarPlus, ExternalLink, Eye, Inbox, Pencil, Plus, Send, Trash2, Upload } from "lucide-react";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
 import { bff } from "@/lib/bff";
@@ -211,40 +211,16 @@ function SubmissionsView({ sectionId, assignment, onBack }: { sectionId: string;
   );
 }
 
-/** 课程详情里的"作业"页签：这个班已发布的作业（截止时间、状态、得分），提交在"我的作业"里。 */
-export function StudentAssignments({ sectionId }: { sectionId: string }) {
-  const t = useTranslations("pages.assignments");
-  const tbl = useTable();
-  const [rows, setRows] = React.useState<MyRow[] | null>(null);
-  const [open, setOpen] = React.useState<MyRow | null>(null);
-  const load = React.useCallback(() => { void bff<MyRow[]>("assignments").then((all) => setRows(all.filter((a) => a.section.id === sectionId))).catch(() => setRows([])); }, [sectionId]);
-  React.useEffect(load, [load]);
-  const cols: Column<MyRow>[] = [
-    { key: "title", header: t("colTitle"), cell: (a) => <button type="button" className="font-medium text-primary hover:underline" onClick={() => setOpen(a)}>{a.title}</button> },
-    { key: "deadline", header: t("colDeadline"), cell: (a) => `${new Date(a.deadline).toLocaleString()}${a.extensionDays ? ` · ${t("extended", { d: a.extensionDays })}` : ""}` },
-    { key: "status", header: t("colStatus"), cell: (a) => t(`sub_${a.status}`) },
-    { key: "score", header: t("colScore"), cell: (a) => (a.finalScore !== null ? `${a.finalScore}/${a.maxScore}` : "—") },
-    { key: "actions", header: "", cell: (a) => <RowAction icon={Eye} onClick={() => setOpen(a)}>{t("open")}</RowAction> },
-  ];
-  return (
-    <div>
-      {open ? <Modal wide title={open.title} onClose={() => setOpen(null)}><StudentAssignmentDetail id={open.id} onChanged={load} /></Modal> : null}
-      <DataTable columns={cols} rows={rows ?? []} rowKey={(a) => a.id} loading={rows === null} emptyText={t("studentEmpty")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
-      {rows && rows.length ? <p className="mt-2 text-muted">{t("submitHint")}</p> : null}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- 学生门户：我的作业
-interface MyRow { id: string; title: string; section: { id: string; name: string; course: string }; deadline: string; extensionDays: number; status: string; isLate: boolean; finalScore: number | null; maxScore: number }
+interface MyRow { id: string; title: string; section: { id: string; name: string; course: string }; deadline: string; extensionDays: number; status: string; isLate: boolean; finalScore: number | null; maxScore: number; canSubmit: boolean }
 interface MyDetail {
   id: string; title: string; description: string; section: { name: string }; deadline: string; allowLate: boolean; maxScore: number; canSubmit: boolean; limits: { maxFiles: number };
   rubric: Array<{ id: string; title: string; maxPoints: number }>;
   submission: null | { status: string; currentVersion: number; isLate: boolean; latePenaltyPct: number | null; versions: Array<{ version: number; textAnswer: string | null; submittedAt: string; isLate: boolean; files: Array<{ id: string; fileName: string; downloadUrl: string }> }>; result: null | { rawScore: number; latePenaltyPct: number; finalScore: number; feedback: string | null; scores: Array<{ rubricItemId: string; points: number }> } };
 }
 
-/** 学生看一份作业的详情、提交记录和成绩，也能在这里提交；"我的作业"页和课程详情的作业页签共用。 */
-export function StudentAssignmentDetail({ id, onBack, onChanged }: { id: string; onBack?: () => void; onChanged: () => void }) {
+/** 学生的作业弹窗内容：mode="view" 只读（说明、评分标准、成绩、提交记录）；mode="submit" 是提交 / 重新提交的表单。 */
+export function StudentAssignmentDetail({ id, mode, onDone }: { id: string; mode: "view" | "submit"; onDone: () => void }) {
   const t = useTranslations("pages.assignments");
   const c = useTranslations("crud");
   const [d, setD] = React.useState<MyDetail | null>(null);
@@ -267,10 +243,8 @@ export function StudentAssignmentDetail({ id, onBack, onChanged }: { id: string;
         fileIds.push(up.fileId);
       }
       await bff(`assignments/${d.id}/submissions`, { method: "POST", body: { text: text || undefined, fileIds } });
-      setMsg({ text: c("done"), error: false });
       setFiles([]);
-      load(d.id);
-      onChanged();
+      onDone(); // 提交成功：关掉弹窗、刷新列表
     } catch (e) {
       setMsg({ text: (e as Error).message, error: true });
     } finally {
@@ -283,10 +257,10 @@ export function StudentAssignmentDetail({ id, onBack, onChanged }: { id: string;
     const s = d.submission;
     return (
       <section className="text-sm">
-        {onBack ? <RowAction icon={ArrowLeft} className="mb-2" onClick={onBack}>{t("back")}</RowAction> : null}
-        {onBack ? <H2>{d.title}</H2> : null}
         <p className="mb-1 text-muted">{d.section.name} · {t("deadline", { when: new Date(d.deadline).toLocaleString() })} · {t("maxScore", { n: d.maxScore })}</p>
         {d.description ? <p className="mb-2 whitespace-pre-wrap">{d.description}</p> : null}
+        {mode === "view" ? (
+          <>
         <h3 className="mb-1 font-medium">{t("rubric")}</h3>
         <ul className="mb-3 list-disc pl-5">{d.rubric.map((r) => <li key={r.id}>{r.title} ({r.maxPoints})</li>)}</ul>
         {s ? <p className="mb-2">{t("yourStatus")}: {t(`sub_${s.status}`)} · {t("version", { n: s.currentVersion })}{s.isLate ? ` · ${t("lateInfo", { h: "", p: s.latePenaltyPct ?? 0 })}` : ""}</p> : <p className="mb-2 text-muted">{t("sub_missing")}</p>}
@@ -300,7 +274,11 @@ export function StudentAssignmentDetail({ id, onBack, onChanged }: { id: string;
         {s?.versions.map((v) => (
           <div key={v.version} className="mb-1 text-muted">{t("version", { n: v.version })} · {new Date(v.submittedAt).toLocaleString()} {v.files.map((f) => <a key={f.id} className="ml-2 underline" href={f.downloadUrl} rel="noopener noreferrer">{f.fileName}</a>)}</div>
         ))}
+          </>
+        ) : null}
         {msg ? <p role={msg.error ? "alert" : "status"} className={`my-2 ${msg.error ? "text-red-600" : "text-muted"}`}>{msg.text}</p> : null}
+        {mode === "submit" ? (
+          <>
         {d.canSubmit ? (
           <div className="mt-3 flex flex-col gap-2">
             <label className="flex flex-col gap-1">{t("yourAnswer")}<textarea className={input} rows={5} value={text} onChange={(e) => setText(e.target.value)} /></label>
@@ -309,37 +287,58 @@ export function StudentAssignmentDetail({ id, onBack, onChanged }: { id: string;
             <PermButton perm={PERMS.portalAssignmentSubmit} size="sm" disabled={busy || (!text.trim() && files.length === 0)} onClick={() => void submit()}>{s ? t("resubmit") : t("submit")}</PermButton>
           </div>
         ) : <p className="mt-2 text-muted">{t("cannotSubmit")}</p>}
+          </>
+        ) : null}
       </section>
     );
   }
 }
 
-export function PortalAssignmentsPage() {
+
+/** 学生的作业列表（"我的作业"页和课程详情的作业页签共用）：操作是 详情、提交 / 重新提交（还能提交时才有）；都在弹窗里。 */
+export function StudentAssignmentList({ sectionId }: { sectionId?: string }) {
   const t = useTranslations("pages.assignments");
   const tbl = useTable();
-  const list = useList<MyRow>("assignments");
-  const [openId, setOpenId] = React.useState<string | null>(null);
-  if (openId) return <StudentAssignmentDetail id={openId} onBack={() => setOpenId(null)} onChanged={list.reload} />;
+  const [rows, setRows] = React.useState<MyRow[] | null>(null);
+  const [open, setOpen] = React.useState<{ row: MyRow; mode: "view" | "submit" } | null>(null);
+  const load = React.useCallback(() => { void bff<MyRow[]>("assignments").then((all) => setRows(sectionId ? all.filter((a) => a.section.id === sectionId) : all)).catch(() => setRows([])); }, [sectionId]);
+  React.useEffect(load, [load]);
+  const cols: Column<MyRow>[] = [
+    { key: "title", header: t("colTitle"), cell: (a) => <button type="button" className="font-medium text-primary hover:underline" onClick={() => setOpen({ row: a, mode: "view" })}>{a.title}</button> },
+    ...(sectionId ? [] : [{ key: "course", header: t("colCourse"), cell: (a: MyRow) => a.section.course } as Column<MyRow>]),
+    { key: "deadline", header: t("colDeadline"), cell: (a) => `${new Date(a.deadline).toLocaleString()}${a.extensionDays ? ` · ${t("extended", { d: a.extensionDays })}` : ""}` },
+    { key: "status", header: t("colStatus"), cell: (a) => t(`sub_${a.status}`) },
+    { key: "score", header: t("colScore"), cell: (a) => (a.finalScore !== null ? `${a.finalScore}/${a.maxScore}` : "—") },
+    { key: "actions", header: "", cell: (a) => (
+      <>
+        <RowAction icon={Eye} onClick={() => setOpen({ row: a, mode: "view" })}>{t("detail")}</RowAction>
+        {a.canSubmit ? <PermRowAction perm={PERMS.portalAssignmentSubmit} icon={Upload} onClick={() => setOpen({ row: a, mode: "submit" })}>{a.status === "missing" ? t("submit") : t("resubmit")}</PermRowAction> : null}
+      </>
+    ) },
+  ];
+  return (
+    <div>
+      {open ? (
+        <Modal wide title={open.mode === "submit" ? `${open.row.status === "missing" ? t("submit") : t("resubmit")} · ${open.row.title}` : open.row.title} onClose={() => setOpen(null)}>
+          <StudentAssignmentDetail id={open.row.id} mode={open.mode} onDone={() => { setOpen(null); load(); }} />
+        </Modal>
+      ) : null}
+      <DataTable columns={cols} rows={rows ?? []} rowKey={(a) => a.id} loading={rows === null} emptyText={t("studentEmpty")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} maxActions={2} />
+    </div>
+  );
+}
+
+/** 课程详情里的"作业"页签：这个班的作业。 */
+export function StudentAssignments({ sectionId }: { sectionId: string }) {
+  return <StudentAssignmentList sectionId={sectionId} />;
+}
+
+export function PortalAssignmentsPage() {
+  const t = useTranslations("pages.assignments");
   return (
     <section className="text-sm">
       <H2>{t("myTitle")}</H2>
-      <DataTable
-        columns={[
-          { key: "title", header: t("colTitle"), cell: (a) => <button className="font-medium text-primary hover:underline" onClick={() => setOpenId(a.id)}>{a.title}</button> },
-          { key: "course", header: t("colCourse"), cell: (a) => a.section.course },
-          { key: "deadline", header: t("colDeadline"), cell: (a) => `${new Date(a.deadline).toLocaleString()}${a.extensionDays ? ` · ${t("extended", { d: a.extensionDays })}` : ""}` },
-          { key: "status", header: t("colStatus"), cell: (a) => t(`sub_${a.status}`) },
-          { key: "score", header: t("colScore"), cell: (a) => (a.finalScore !== null ? `${a.finalScore}/${a.maxScore}` : "—") },
-          { key: "actions", header: "", cell: (a) => <RowAction icon={Eye} onClick={() => setOpenId(a.id)}>{t("open")}</RowAction> },
-        ] as Column<MyRow>[]}
-        rows={list.rows}
-        rowKey={(a) => a.id}
-        loading={list.loading}
-        emptyText={tbl.empty}
-        loadingText={tbl.loading}
-        selectable={false}
-        labels={tbl.labels}
-      />
+      <StudentAssignmentList />
     </section>
   );
 }

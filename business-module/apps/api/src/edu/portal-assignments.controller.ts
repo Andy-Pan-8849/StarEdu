@@ -66,7 +66,7 @@ export class PortalAssignmentsController {
   @Get()
   @RequirePermissions(PERMS.portalAssignmentList)
   async list(@Auth() auth: AuthContext) {
-    const { personId } = await this.me(auth);
+    const { personId, status } = await this.me(auth);
     const rows = await this.db.assignment.findMany({
       where: { published: true, section: { status: { not: "cancelled" }, enrollments: { some: { studentPersonId: personId, status: { in: ["enrolled", "completed"] } } } } },
       include: { section: { include: { course: true } } },
@@ -81,8 +81,15 @@ export class PortalAssignmentsController {
         id: a.id, title: a.title, section: { id: a.sectionId, name: a.section.name, course: a.section.course.name }, dueDate: dayString(a.dueDate), deadline: effectiveDeadline(a.dueAt, ext.get(a.id)), extensionDays: ext.get(a.id) ?? 0,
         allowLate: a.allowLate, maxScore: num(a.maxScore), status: s?.status ?? "missing", submittedAt: s?.submittedAt ?? null, isLate: s?.isLate ?? false,
         finalScore: s?.status === "published" ? num(s.finalScore) : null,
+        // 列表上要决定显示不显示"提交/重新提交"，规则和详情里一样
+        canSubmit: this.canSubmit(a, s, effectiveDeadline(a.dueAt, ext.get(a.id)), status),
       };
     });
+  }
+
+  /** 能不能（再）提交：不是只能手工录分、我还在班里、班没结束、还没被批改、没过截止（或允许迟交）。 */
+  private canSubmit(a: { manualOnly: boolean; allowLate: boolean; section: { status: string } }, s: { status: string } | null | undefined, deadline: Date, studentStatus: string): boolean {
+    return !a.manualOnly && studentStatus === "enrolled" && a.section.status !== "ended" && a.section.status !== "cancelled" && (!s || s.status === "submitted") && (a.allowLate || new Date() <= deadline);
   }
 
   @Get(":id")
@@ -99,7 +106,7 @@ export class PortalAssignmentsController {
       ? await Promise.all(s.versions.map(async (v) => ({ version: v.version, textAnswer: v.textAnswer, submittedAt: v.submittedAt, isLate: v.isLate, files: await Promise.all(v.files.map(async (f) => ({ id: f.id, fileName: f.fileName, size: f.size, downloadUrl: await this.store.presignDownload(f.storageKey, f.fileName) }))) })))
       : [];
     const deadline = effectiveDeadline(a.dueAt, ext?.days);
-    const canSubmit = !a.manualOnly && status === "enrolled" && a.section.status !== "ended" && a.section.status !== "cancelled" && (!s || s.status === "submitted") && (a.allowLate || new Date() <= deadline);
+    const canSubmit = this.canSubmit(a, s, deadline, status);
     return {
       id: a.id, title: a.title, description: a.description, attachments: a.attachments, section: { id: a.sectionId, name: a.section.name, course: a.section.course.name }, group: a.group?.name ?? null,
       dueDate: dayString(a.dueDate), deadline, extension: ext ? { days: ext.days, reason: ext.reason } : null, allowLate: a.allowLate, latePolicy: a.latePolicy, maxScore: num(a.maxScore),

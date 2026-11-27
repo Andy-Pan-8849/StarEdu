@@ -252,6 +252,7 @@ describe("assignments, submissions and grading", () => {
       expect((await as("st3").post(`/api/portal/assignments/${id}/submissions`, { text: "late" })).status).toBe(409);
       expect((await as("st3").post(`/api/portal/assignments/${id}/uploads`, { fileName: "a.txt", contentType: "text/plain", size: 5 })).status).toBe(409);
       expect((await as("st3").get(`/api/portal/assignments/${id}`)).body.canSubmit).toBe(false);
+      expect((await as("st3").get("/api/portal/assignments")).body.find((x: { id: string }) => x.id === id).canSubmit).toBe(false); // 列表上也一样：过了截止就不显示提交按钮
     });
 
     it("a custom late table is used; changing the deadline re-computes ungraded submissions", async () => {
@@ -340,6 +341,7 @@ describe("assignments, submissions and grading", () => {
       expect(view.submission.result).toMatchObject({ rawScore: 10, finalScore: 10, feedback: "well done" });
       expect(view.submission.result.scores).toHaveLength(2);
       expect((await as("st2").get("/api/portal/assignments")).body.find((x: { id: string }) => x.id === id).finalScore).toBe(10);
+      expect((await as("st2").get("/api/portal/assignments")).body.find((x: { id: string }) => x.id === id).canSubmit).toBe(false); // 成绩发布后不能再提交
       // 发布后不能再改
       expect((await teacher().put(`/api/sections/${sec}/assignments/${id}/submissions/${sub}/grade`, { scores: [] })).status).toBe(409);
       expect((await teacher().post(`/api/sections/${sec}/assignments/${id}/submissions/${sub}/publish`)).status).toBe(409);
