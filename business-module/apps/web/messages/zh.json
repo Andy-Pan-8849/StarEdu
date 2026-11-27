@@ -505,6 +505,7 @@
       "pickedCount": "已选 {n} 人",
       "cancelPick": "取消",
       "addSelected": "添加所选（{n}）",
+      "overrideHelp": "教务老师可以照样选入，请填写原因，原因会和这次选课一起记录。",
       "history": "开过的教学班",
       "degreeType": "学位类型",
       "totalCredits": "总学分要求",

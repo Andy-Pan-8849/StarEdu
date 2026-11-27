@@ -54,11 +54,13 @@ export function CoursePicker({ title, exclude, onPick, onClose }: { title: strin
   }
   return (
     <Modal wide title={title} onClose={onClose}>
-      <div className="min-h-[24rem] space-y-3 text-sm">
-        <input aria-label={t("searchCourses")} placeholder={t("searchCourses")} className="w-full rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        <DataTable columns={cols} rows={shown} rowKey={(r) => r.id} loading={rows === null} emptyText={t("noMatches")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
-        {rows && rows.length >= PICK_LIMIT ? <p className="text-xs text-muted">{t("searchHint", { n: PICK_LIMIT })}</p> : null}
-        <div className="flex items-center gap-2 border-t border-border pt-3">
+      <div className="flex h-[calc(88vh-9rem)] flex-col gap-3 text-sm">
+        <input aria-label={t("searchCourses")} placeholder={t("searchCourses")} className="w-full shrink-0 rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <DataTable columns={cols} rows={shown} rowKey={(r) => r.id} loading={rows === null} emptyText={t("noMatches")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
+          {rows && rows.length >= PICK_LIMIT ? <p className="mt-2 text-xs text-muted">{t("searchHint", { n: PICK_LIMIT })}</p> : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 border-t border-border pt-3">
           <Button size="sm" disabled={busy || picked.length === 0} onClick={() => void addPicked()}>{t("addSelected", { n: picked.length })}</Button>
           <Button size="sm" variant="outline" onClick={onClose}>{t("cancelPick")}</Button>
         </div>
