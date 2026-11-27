@@ -222,7 +222,6 @@ interface MyDetail {
 /** 学生的作业弹窗内容：mode="view" 只读（说明、评分标准、成绩、提交记录）；mode="submit" 是提交 / 重新提交的表单。 */
 export function StudentAssignmentDetail({ id, mode, onDone }: { id: string; mode: "view" | "submit"; onDone: () => void }) {
   const t = useTranslations("pages.assignments");
-  const c = useTranslations("crud");
   const [d, setD] = React.useState<MyDetail | null>(null);
   const [text, setText] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
