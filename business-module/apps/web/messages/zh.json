@@ -616,6 +616,8 @@
     },
     "assignments": {
       "tab": "作业",
+      "studentEmpty": "老师还没有发布作业。",
+      "submitHint": "要提交作业，请到“我的作业”。",
       "myTitle": "我的作业",
       "dueCol": "截止日期",
       "maxCol": "满分",
@@ -994,6 +996,11 @@
       "weekday_4": "周四",
       "weekday_5": "周五",
       "weekday_6": "周六",
+      "tab_basic": "基本信息",
+      "tab_instructors": "任课教师",
+      "tab_materials": "课程资料",
+      "tab_assignments": "作业",
+      "noInstructors": "还没有安排任课教师。",
       "weekday_7": "周日"
     },
     "plan": {
