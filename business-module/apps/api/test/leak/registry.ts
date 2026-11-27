@@ -172,6 +172,7 @@ export const MUTATION_REGISTRY: MutationEntry[] = [
   { method: "DELETE", path: "/api/sections/:id/enrollments/:enrollmentId", fixture: "sectionId", target: "foreign", note: "remove an enrollment of another tenant" },
   { method: "GET", path: "/api/sections/:id/materials", fixture: "sectionId", target: "foreign", note: "read another tenant's materials" },
   { method: "POST", path: "/api/sections/:id/materials", fixture: "sectionId", target: "foreign", body: { title: "x", url: "https://example.test" }, note: "add material to another tenant's section" },
+  { method: "POST", path: "/api/sections/:id/materials/uploads", fixture: "sectionId", target: "foreign", body: { fileName: "a.pdf", contentType: "application/pdf", size: 5 }, note: "get an upload address for another tenant's material" },
   { method: "PATCH", path: "/api/sections/:id/materials/:materialId", fixture: "sectionId", target: "foreign", body: { title: "x" }, note: "edit another tenant's material" },
   { method: "DELETE", path: "/api/sections/:id/materials/:materialId", fixture: "sectionId", target: "foreign", note: "delete another tenant's material" },
   { method: "GET", path: "/api/sections/:id/assignment-groups", fixture: "sectionId", target: "foreign", note: "read another tenant's assignment groups" },

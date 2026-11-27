@@ -48,6 +48,7 @@ export const TENANT_MODELS: Record<string, ModelRule> = {
   SectionInstructor: { nullable: false, softDelete: false },
   Enrollment: { nullable: false, softDelete: false },
   SectionMaterial: { nullable: false, softDelete: false },
+  SectionMaterialFile: { nullable: false, softDelete: false },
   OutboxEvent: { nullable: false, softDelete: false },
   AssignmentGroup: { nullable: false, softDelete: false },
   Assignment: { nullable: false, softDelete: false },

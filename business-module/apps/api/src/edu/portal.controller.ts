@@ -11,12 +11,14 @@ import { todayUtc } from "../hr/effective";
 import { TenantPrismaService } from "../tenancy/tenant-prisma.service";
 import { schedulesOverlap, type ScheduleItem } from "./edu-common";
 import { EnrollmentService } from "./enrollment.service";
+import { ObjectStoreService } from "../storage/object-store.service";
 
 @Controller("api/portal")
 export class PortalController {
   constructor(
     private readonly tenantDb: TenantPrismaService,
     private readonly enrollments: EnrollmentService,
+    private readonly store: ObjectStoreService,
   ) {}
 
   private get db() {
@@ -227,6 +229,9 @@ export class PortalController {
     const { personId } = await this.me(auth);
     const member = await this.db.enrollment.findFirst({ where: { sectionId: id, studentPersonId: personId, status: { in: ["enrolled", "completed"] } } });
     if (!member) throw new NotFoundException();
-    return this.db.sectionMaterial.findMany({ where: { sectionId: id, published: true }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] });
+    const rows = await this.db.sectionMaterial.findMany({ where: { sectionId: id, published: true }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] });
+    const files = rows.length ? await this.db.sectionMaterialFile.findMany({ where: { materialId: { in: rows.map((r) => r.id) } }, orderBy: { createdAt: "asc" } }) : [];
+    const urls = await Promise.all(files.map((f) => this.store.presignDownload(f.storageKey, f.fileName)));
+    return rows.map((r) => ({ ...r, files: files.flatMap((f, i) => (f.materialId === r.id ? [{ id: f.id, fileName: f.fileName, contentType: f.contentType, size: f.size, downloadUrl: urls[i] }] : [])) }));
   }
 }

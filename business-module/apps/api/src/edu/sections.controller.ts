@@ -1,6 +1,10 @@
 // 班级：开班（教务）、结构修改（教务；任课教师不能改）、状态、任课教师、名单与教务代选、课件（任课教师）。
 // 列表和详情按数据范围：教务按校区，教师看自己任教的班，学生在门户里看自己的。内置租户管理员的范围里没有班级。
 import { DictService } from "../sysdata/dict.service";
+import { randomUUID } from "node:crypto";
+import { QuotaService } from "../quota/quota.service";
+import { assertTenantKey, ObjectStoreService, safeKeyPart, tenantPrefix, validateUpload } from "../storage/object-store.service";
+import { ParamsService } from "../sysdata/params.service";
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { z } from "zod";
 import { PERMS } from "@staredu/shared";
@@ -29,7 +33,19 @@ const createSchema = z.object({
 });
 const patchSchema = z.object({ capacity: z.number().int().min(1).max(10000).optional(), mode: z.enum(["onsite", "online", "hybrid"]).optional(), schedule: scheduleSchema.optional(), notes: z.string().max(2000).nullable().optional(), campusId: z.string().uuid().optional() }).strict();
 const NEXT: Record<string, string[]> = { draft: ["open", "cancelled"], open: ["draft", "in_progress", "cancelled"], in_progress: ["ended", "cancelled"], ended: [], cancelled: [] };
-const materialSchema = z.object({ title: z.string().trim().min(1).max(200), category: z.string().trim().min(1).max(50).optional(), url: z.string().url().max(1000), sort: z.number().int().min(0).max(10000).optional(), published: z.boolean().optional() });
+const MAX_MATERIAL_FILES = 10;
+const MAX_PENDING_MATERIAL_UPLOADS = 30;
+const materialSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  category: z.string().trim().min(1).max(50).optional(),
+  description: z.string().max(20000).optional(),
+  url: z.string().url().max(1000).nullable().optional(),
+  sort: z.number().int().min(0).max(10000).optional(),
+  published: z.boolean().optional(),
+  /** 附件（先 POST materials/uploads 拿到 id）；更新时给的是完整清单，不在清单里的附件会被删除 */
+  fileIds: z.array(z.string().uuid()).max(MAX_MATERIAL_FILES).optional(),
+});
+const materialUploadSchema = z.object({ fileName: z.string().min(1).max(300), contentType: z.string().trim().min(1).max(100), size: z.number().int() });
 
 @Controller("api/sections")
 export class SectionsController {
@@ -40,6 +56,9 @@ export class SectionsController {
     private readonly enrollments: EnrollmentService,
     private readonly outbox: OutboxService,
     private readonly dicts: DictService,
+    private readonly store: ObjectStoreService,
+    private readonly quota: QuotaService,
+    private readonly params: ParamsService,
   ) {}
 
   private get db() {
@@ -227,13 +246,20 @@ export class SectionsController {
     return !!auth.authz.personId && !!(await this.db.sectionInstructor.findFirst({ where: { sectionId, personId: auth.authz.personId } }));
   }
 
+  /** 课件列表加上附件（带临时下载地址）。 */
+  private async withFiles<T extends { id: string }>(rows: T[]) {
+    const files = rows.length ? await this.db.sectionMaterialFile.findMany({ where: { materialId: { in: rows.map((r) => r.id) } }, orderBy: { createdAt: "asc" } }) : [];
+    const urls = await Promise.all(files.map((f) => this.store.presignDownload(f.storageKey, f.fileName)));
+    return rows.map((r) => ({ ...r, files: files.flatMap((f, i) => (f.materialId === r.id ? [{ id: f.id, fileName: f.fileName, contentType: f.contentType, size: f.size, downloadUrl: urls[i] }] : [])) }));
+  }
+
   /** 教师（含助教）看全部；教务按范围也看全部；其他人只看已发布的。 */
   @Get(":id/materials")
   @RequirePermissions(PERMS.eduSectionList)
   async materials(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
     await this.scoped(auth, id, PERMS.eduSectionList);
     const all = await this.db.sectionMaterial.findMany({ where: { sectionId: id }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] });
-    return (await this.isInstructor(auth, id)) || auth.authz.perms.includes(PERMS.eduEnrollmentAdd) ? all : all.filter((m) => m.published);
+    return this.withFiles((await this.isInstructor(auth, id)) || auth.authz.perms.includes(PERMS.eduEnrollmentAdd) ? all : all.filter((m) => m.published));
   }
 
   /** 课件清单变了：知识库要更新（kafka 模式；事件里只有班级和课程 id）。 */
@@ -248,35 +274,84 @@ export class SectionsController {
     return row;
   }
 
+  /** 第一步：登记要传的附件（校验类型、大小），拿预签名地址，浏览器直接传给对象存储。 */
+  @Post(":id/materials/uploads")
+  @RequirePermissions(PERMS.eduMaterialEdit)
+  async uploadMaterialFile(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const input = parse(materialUploadSchema, body);
+    await this.editableSection(auth, id);
+    const fileName = validateUpload(input, await this.params.uploadLimitBytes("edu.upload.maxMb", "UPLOAD_MAX_BYTES"));
+    await this.quota.assertCanStore(input.size);
+    if ((await this.db.sectionMaterialFile.count({ where: { sectionId: id, materialId: null } })) >= MAX_PENDING_MATERIAL_UPLOADS) throw new ConflictException("Too many unfinished uploads; save the material or wait");
+    const key = `${tenantPrefix(auth.tenantId)}materials/${id}/${randomUUID()}/${safeKeyPart(fileName)}`;
+    const file = await this.db.sectionMaterialFile.create({ data: { tenantId: auth.tenantId, sectionId: id, storageKey: key, fileName, contentType: input.contentType, size: input.size, createdBy: auth.accountId } });
+    const signed = await this.store.presignUpload(key, input.contentType, input.size);
+    return { fileId: file.id, fileName, uploadUrl: signed.url, method: "PUT", headers: signed.headers, expiresInSeconds: signed.expiresInSeconds };
+  }
+
+  /** 核对附件清单：都属于本班、没被别的课件用过、对象确实传好了。 */
+  private async checkFiles(auth: AuthContext, sectionId: string, materialId: string | null, fileIds: string[]) {
+    const ids = [...new Set(fileIds)];
+    const found = ids.length ? await this.db.sectionMaterialFile.findMany({ where: { id: { in: ids }, sectionId, OR: materialId ? [{ materialId: null }, { materialId }] : [{ materialId: null }] } }) : [];
+    if (found.length !== ids.length) throw new BadRequestException("Unknown or already used file");
+    for (const f of found.filter((x) => x.materialId === null)) {
+      assertTenantKey(auth.tenantId, f.storageKey);
+      const head = await this.store.head(f.storageKey);
+      if (!head) throw new BadRequestException(`"${f.fileName}" was not uploaded`);
+      if (head.size !== f.size) throw new BadRequestException(`"${f.fileName}" does not match the size you declared`);
+    }
+    return ids;
+  }
+
+  /** 把（已核对的）附件清单落到课件上：不在清单里的旧附件删除。 */
+  private async bindFiles(materialId: string, ids: string[]) {
+    const dropped = await this.db.sectionMaterialFile.findMany({ where: { materialId, id: { notIn: ids } } });
+    await this.db.sectionMaterialFile.deleteMany({ where: { id: { in: dropped.map((f) => f.id) } } });
+    await Promise.all(dropped.map((f) => this.store.remove(f.storageKey).catch(() => undefined)));
+    if (ids.length) await this.db.sectionMaterialFile.updateMany({ where: { id: { in: ids } }, data: { materialId } });
+  }
+
   @Post(":id/materials")
   @RequirePermissions(PERMS.eduMaterialEdit)
   async addMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
-    const input = parse(materialSchema, body);
+    const { fileIds, ...input } = parse(materialSchema, body);
+    if (!input.url && !input.description?.trim() && !fileIds?.length) throw new BadRequestException("Add a link, a file or a description");
     if (input.category) await this.dicts.assertValue("material_category", input.category, "category");
     const section = await this.editableSection(auth, id);
+    const ids = await this.checkFiles(auth, id, null, fileIds ?? []);
     const created = await this.db.sectionMaterial.create({ data: { tenantId: auth.tenantId, sectionId: id, ...input, createdBy: auth.accountId } });
+    await this.bindFiles(created.id, ids);
     await this.materialChanged(id, section.courseId);
-    return created;
+    return (await this.withFiles([created]))[0];
   }
 
   @Patch(":id/materials/:materialId")
   @RequirePermissions(PERMS.eduMaterialEdit)
   async updateMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("materialId", ParseUUIDPipe) materialId: string, @Body() body: unknown) {
-    const input = parse(materialSchema.partial().strict(), body);
+    const { fileIds, ...input } = parse(materialSchema.partial().strict(), body);
     if (input.category) await this.dicts.assertValue("material_category", input.category, "category");
     const section = await this.editableSection(auth, id);
-    if (!(await this.db.sectionMaterial.findFirst({ where: { id: materialId, sectionId: id } }))) throw new NotFoundException();
+    const current = await this.db.sectionMaterial.findFirst({ where: { id: materialId, sectionId: id } });
+    if (!current) throw new NotFoundException();
+    const fileCount = fileIds ? fileIds.length : await this.db.sectionMaterialFile.count({ where: { materialId } });
+    const url = input.url === undefined ? current.url : input.url;
+    const description = input.description === undefined ? current.description : input.description;
+    if (!url && !description.trim() && !fileCount) throw new BadRequestException("Add a link, a file or a description");
+    const ids = fileIds ? await this.checkFiles(auth, id, materialId, fileIds) : null;
     const updated = await this.db.sectionMaterial.update({ where: { id: materialId }, data: input });
+    if (ids) await this.bindFiles(materialId, ids);
     await this.materialChanged(id, section.courseId);
-    return updated;
+    return (await this.withFiles([updated]))[0];
   }
 
   @Delete(":id/materials/:materialId")
   @RequirePermissions(PERMS.eduMaterialEdit)
   async removeMaterial(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Param("materialId", ParseUUIDPipe) materialId: string) {
     const section = await this.editableSection(auth, id);
+    const files = await this.db.sectionMaterialFile.findMany({ where: { materialId } });
     const { count } = await this.db.sectionMaterial.deleteMany({ where: { id: materialId, sectionId: id } });
     if (!count) throw new NotFoundException();
+    await Promise.all(files.map((f) => this.store.remove(f.storageKey).catch(() => undefined)));
     await this.materialChanged(id, section.courseId);
     return { id: materialId };
   }

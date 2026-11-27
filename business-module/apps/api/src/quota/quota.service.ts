@@ -28,11 +28,12 @@ export class QuotaService {
   /** 已用存储字节：文档库未删除的文件 + 已提交的作业文件。 */
   async storageUsedBytes(): Promise<number> {
     const db = this.tenantDb.db;
-    const [lib, sub] = await Promise.all([
+    const [lib, sub, mat] = await Promise.all([
       db.docFile.aggregate({ _sum: { size: true }, where: { deletedAt: null } }),
       db.submissionFile.aggregate({ _sum: { size: true }, where: { versionId: { not: null } } }),
+      db.sectionMaterialFile.aggregate({ _sum: { size: true }, where: { materialId: { not: null } } }),
     ]);
-    return (lib._sum.size ?? 0) + (sub._sum.size ?? 0);
+    return (lib._sum.size ?? 0) + (sub._sum.size ?? 0) + (mat._sum.size ?? 0);
   }
 
   /** 申请上传 `bytes` 字节前调用；超限抛 413。 */
