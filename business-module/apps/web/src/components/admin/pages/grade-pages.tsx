@@ -229,27 +229,6 @@ export function TranscriptsPage() {
   );
 }
 
-// ---------------------------------------------------------------- 仪表板
-interface Overview { campuses: Array<{ campusId: string; campus: string; sections: number; inProgressSections: number; students: number; completionRate: number | null; averageScore: number | null; lateRate: number | null }>; totals: { sections: number; inProgressSections: number; students: number } }
-
-export function DashboardPage() {
-  const t = useTranslations("pages.grades");
-  const [o, setO] = React.useState<Overview | null>(null);
-  React.useEffect(() => { void bff<Overview>("dashboard/overview").then(setO); }, []);
-  if (!o) return <p className="text-sm text-muted">…</p>;
-  const pct = (v: number | null) => (v === null ? "-" : `${v}%`);
-  return (
-    <section className="text-sm">
-      <H2>{t("dashboardTitle")}</H2>
-      <p className="mb-3">{t("totals", { s: o.totals.sections, p: o.totals.inProgressSections, n: o.totals.students })}</p>
-      <table className="w-full text-left">
-        <thead className="text-muted"><tr><th className="py-1">{t("campus")}</th><th>{t("students")}</th><th>{t("sections")}</th><th>{t("completion")}</th><th>{t("average")}</th><th>{t("lateRate")}</th></tr></thead>
-        <tbody>{o.campuses.map((c) => <tr key={c.campusId} className="border-t border-border"><td className="py-1">{c.campus}</td><td>{c.students}</td><td>{c.inProgressSections}/{c.sections}</td><td>{pct(c.completionRate)}</td><td>{pct(c.averageScore)}</td><td>{pct(c.lateRate)}</td></tr>)}</tbody>
-      </table>
-    </section>
-  );
-}
-
 // ---------------------------------------------------------------- 学生门户：我的成绩
 interface MyGrades { student: { fullName: string }; terms: Array<{ termId: string; name: string; gpa: number | null; rows: Array<{ enrollmentId: string; courseCode: string; courseName: string; credits: number; state: string; grade: string | null; total: number | null; replaced: boolean }> }>; cumulative: { gpa: number | null; creditsAttempted: number; creditsEarned: number }; progress: { creditsEarned: number; creditsRequired: number | null } }
 
