@@ -20,8 +20,8 @@ export const PICK_LIMIT = 20;
 export interface CoursePick { id: string; code: string; name: string; credits: number }
 interface CourseFull { id: string; code: string; name: string; credits: number; syllabus: string | null; status: boolean; prerequisites: CoursePick[]; majors: Array<{ code: string; name: string; category: string }>; sections: Array<{ id: string; name: string; status: string }> }
 
-/** 选一门先修课：搜索框 + 最多 PICK_LIMIT 条结果，已选的和课程自己不出现。 */
-function PrereqPicker({ selfId, taken, onPick, onClose }: { selfId: string; taken: string[]; onPick: (course: CoursePick) => void; onClose: () => void }) {
+/** 选一门课（先修课、专业课程设置共用）：搜索框 + 最多 PICK_LIMIT 条结果，exclude 里的不出现；窗口开得宽一点，不显得逼仄。 */
+export function CoursePicker({ title, exclude, onPick, onClose }: { title: string; exclude: string[]; onPick: (course: CoursePick) => void; onClose: () => void }) {
   const t = useTranslations("pages.edu");
   const tbl = useTable();
   const [q, setQ] = React.useState("");
@@ -33,7 +33,7 @@ function PrereqPicker({ selfId, taken, onPick, onClose }: { selfId: string; take
     }, q ? 250 : 0); // 打字时稍等一下再查，免得每敲一个字就查一次
     return () => { live = false; clearTimeout(timer); };
   }, [q]);
-  const shown = (rows ?? []).filter((r) => r.id !== selfId && !taken.includes(r.id));
+  const shown = (rows ?? []).filter((r) => !exclude.includes(r.id));
   const cols: Column<CoursePick>[] = [
     { key: "code", header: t("code"), cell: (r) => r.code },
     { key: "name", header: t("name"), cell: (r) => r.name },
@@ -41,8 +41,8 @@ function PrereqPicker({ selfId, taken, onPick, onClose }: { selfId: string; take
     { key: "actions", header: "", cell: (r) => <RowAction icon={Plus} onClick={() => onPick(r)}>{t("addPrereqRow")}</RowAction> },
   ];
   return (
-    <Modal title={t("pickPrereq")} onClose={onClose}>
-      <div className="space-y-3 text-sm">
+    <Modal wide title={title} onClose={onClose}>
+      <div className="min-h-[24rem] space-y-3 text-sm">
         <input aria-label={t("searchCourses")} placeholder={t("searchCourses")} className="w-full rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         <DataTable columns={cols} rows={shown} rowKey={(r) => r.id} loading={rows === null} emptyText={t("noMatches")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
         {rows && rows.length >= PICK_LIMIT ? <p className="text-xs text-muted">{t("searchHint", { n: PICK_LIMIT })}</p> : null}
@@ -70,7 +70,7 @@ function PrereqTab({ course, editable, onChanged }: { course: CourseFull; editab
       {editable ? <Can perm={PERMS.eduCourseEdit}><IconButton icon={Plus} label={t("addPrereq")} className="mb-3" onClick={() => setPicking(true)} /></Can> : null}
       {message}
       <DataTable columns={cols} rows={course.prerequisites} rowKey={(r) => r.id} emptyText={t("noPrereqs")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
-      {picking ? <PrereqPicker selfId={course.id} taken={course.prerequisites.map((p) => p.id)} onClose={() => setPicking(false)} onPick={(c) => { setPicking(false); void save([...course.prerequisites.map((p) => p.id), c.id]); }} /> : null}
+      {picking ? <CoursePicker title={t("pickPrereq")} exclude={[course.id, ...course.prerequisites.map((p) => p.id)]} onClose={() => setPicking(false)} onPick={(c) => { setPicking(false); void save([...course.prerequisites.map((p) => p.id), c.id]); }} /> : null}
     </div>
   );
 }

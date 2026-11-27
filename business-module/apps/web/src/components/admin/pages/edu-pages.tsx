@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { TabBody, Tabs } from "../tabs";
-import { BookOpen, Eye, Pencil, Plus, RefreshCw, Trash2, UserPlus, UsersRound } from "lucide-react";
+import { Eye, Pencil, Plus, RefreshCw, Trash2, UserPlus, UsersRound } from "lucide-react";
 import { IconButton, PermRowAction, RowAction } from "../icon-button";
 import { PERMS } from "@staredu/shared";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { useList } from "./use-api";
 import { useDict } from "../use-dict";
 import { CourseDetailDialog, CourseLink } from "./course-pages";
 import { CourseDialog } from "./course-dialogs";
+import { MajorDialog, type MajorRow } from "./major-dialogs";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
@@ -135,31 +136,16 @@ export function CoursesPage() {
 }
 
 // ---------------------------------------------------------------- 专业
-interface MajorRow { id: string; code: string; name: string; degreeType: string | null; totalCredits: number; status: boolean }
-interface MajorVersionRow { id: string; label: string; effectiveYear: number; entryYearFrom: number | null; entryYearTo: number | null; courseCount: number | null }
-interface MajorDetail { id: string; name: string; versionId: string; totalCredits: number; electiveMinCredits: number; versions: MajorVersionRow[]; courses: Array<{ courseId: string; code: string; name: string; credits: number; category: string; suggestedTerm: number | null }> }
 
 export function MajorsPage() {
   const t = useTranslations("pages.edu");
   const c = useTranslations("crud");
   const tt = useTable();
   const { rows, loading, error, reload } = useList<MajorRow>("majors");
-  const courses = useList<CourseRow>("courses");
   const degrees = useDict("degree_type");
   const { run, message } = useAct(reload);
-  const [form, setForm] = React.useState<{ row?: MajorRow } | null>(null);
-  const [open, setOpen] = React.useState<string | null>(null);
-  const [detail, setDetail] = React.useState<MajorDetail | null>(null);
-  const [items, setItems] = React.useState<Record<string, { category: string; suggestedTerm: string }>>({});
-  const [versionId, setVersionId] = React.useState<string | null>(null);
-  const [newYear, setNewYear] = React.useState("");
-  const [newLabel, setNewLabel] = React.useState("");
-  const [credits, setCredits] = React.useState({ total: "", elective: "" });
-  const [reloadKey, setReloadKey] = React.useState(0);
-  React.useEffect(() => {
-    if (!open) return;
-    void bff<MajorDetail>(`majors/${open}${versionId ? `?version=${versionId}` : ""}`).then((d) => { setCredits({ total: String(d.totalCredits), elective: String(d.electiveMinCredits) }); setDetail(d); setItems(Object.fromEntries(d.courses.map((x) => [x.courseId, { category: x.category, suggestedTerm: x.suggestedTerm ? String(x.suggestedTerm) : "" }]))); });
-  }, [open, versionId, reloadKey]);
+  const [form, setForm] = React.useState(false); // 新增（详情、编辑在 MajorDialog 里）
+  const [open, setOpen] = React.useState<{ row: MajorRow; mode: "view" | "edit" } | null>(null);
   const columns: Column<MajorRow>[] = [
     { key: "code", header: t("code"), cell: (r) => r.code },
     { key: "name", header: t("name"), cell: (r) => r.name },
@@ -170,8 +156,8 @@ export function MajorsPage() {
       header: "",
       cell: (r) => (
         <>
-          <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => setForm({ row: r })} icon={Pencil}>{c("edit")}</PermRowAction>
-          <RowAction onClick={() => { setVersionId(null); setOpen(r.id); }} icon={BookOpen}>{t("curriculum")}</RowAction>
+          <RowAction onClick={() => setOpen({ row: r, mode: "view" })} icon={Eye}>{t("details")}</RowAction>
+          <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => setOpen({ row: r, mode: "edit" })} icon={Pencil}>{c("edit")}</PermRowAction>
         </>
       ),
     },
@@ -181,52 +167,15 @@ export function MajorsPage() {
       <H2>{t("majorsTitle")}</H2>
       <Err error={error} />
       {message}
-      <Can perm={PERMS.eduMajorAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm({})} className="mb-3"/> : null}</Can>
+      <Can perm={PERMS.eduMajorAdd}>{!form ? <IconButton icon={Plus} label={c("add")} onClick={() => setForm(true)} className="mb-3"/> : null}</Can>
       {form ? (
-        <FormPanel key={form.row?.id ?? "new"} title={form.row ? c("edit") : c("add")}
-          fields={[...(form.row ? [] : [{ name: "code", label: t("code"), required: true }]), { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType"), type: "select" as const, options: form.row?.degreeType && !degrees.options.some((o) => o.value === form.row?.degreeType) ? [...degrees.options, { value: form.row.degreeType, label: form.row.degreeType }] : degrees.options }, { name: "totalCredits", label: t("totalCredits"), type: "number" as const }]}
-          initial={form.row ? { name: form.row.name, degreeType: form.row.degreeType ?? "", totalCredits: String(form.row.totalCredits) } : {}}
-          submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(null)}
-          onSubmit={async (p) => { if (await run(() => (form.row ? bff(`majors/${form.row.id}`, { method: "PATCH", body: p }) : bff("majors", { method: "POST", body: p })), c("saved"))) setForm(null); }} />
+        <FormPanel key="new" title={c("add")}
+          fields={[{ name: "code", label: t("code"), required: true }, { name: "name", label: t("name"), required: true }, { name: "degreeType", label: t("degreeType"), type: "select" as const, options: degrees.options }, { name: "totalCredits", label: t("totalCredits"), type: "number" as const }]}
+          submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={() => setForm(false)}
+          onSubmit={async (p) => { if (await run(() => bff("majors", { method: "POST", body: p }), c("saved"))) setForm(false); }} />
       ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
-      {open && detail ? (
-        <Modal wide title={t("curriculumOf", { name: detail.name })} onClose={() => { setOpen(null); setDetail(null); setVersionId(null); }}>
-        <div className="text-sm">
-          <div className="mb-3 flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">{t("version")}
-              <select className="rounded-md border border-border bg-transparent px-2 py-1" value={detail.versionId} onChange={(e) => setVersionId(e.target.value)}>
-                {detail.versions.map((v) => <option key={v.id} value={v.id}>{v.label} ({v.entryYearFrom ?? "…"}–{v.entryYearTo ?? "…"}, {v.courseCount})</option>)}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">{t("versionYear")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={newYear} onChange={(e) => setNewYear(e.target.value)} /></label>
-            <label className="flex flex-col gap-1">{t("versionLabel")}<input className="w-32 rounded-md border border-border bg-transparent px-2 py-1" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} /></label>
-            <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => void run(async () => { const r = await bff<{ id: string }>(`majors/${open}/versions`, { method: "POST", body: { effectiveYear: Number(newYear), ...(newLabel ? { label: newLabel } : {}), copyFromVersionId: detail.versionId } }); setNewYear(""); setNewLabel(""); setVersionId(r.id); setReloadKey((k) => k + 1); }, c("saved"))} icon={Plus}>{t("versionAdd")}</PermRowAction>
-            {detail.versions.length > 1 ? <PermRowAction perm={PERMS.eduMajorEdit} onClick={() => window.confirm(t("versionConfirmRemove")) && void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "DELETE" }); setVersionId(null); setReloadKey((k) => k + 1); }, c("done"))} icon={Trash2} danger>{t("versionRemove")}</PermRowAction> : null}
-          </div>
-          <p className="mb-2 text-xs text-muted">{t("versionHelp")}</p>
-          <div className="mb-3 flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">{t("totalCredits")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={credits.total} onChange={(e) => setCredits({ ...credits, total: e.target.value })} /></label>
-            <label className="flex flex-col gap-1">{t("electiveMin")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={credits.elective} onChange={(e) => setCredits({ ...credits, elective: e.target.value })} /></label>
-            <PermButton perm={PERMS.eduMajorEdit} size="sm" variant="outline" onClick={() => void run(async () => { await bff(`majors/${open}/versions/${detail.versionId}`, { method: "PATCH", body: { totalCredits: Number(credits.total), electiveMinCredits: Number(credits.elective) } }); setReloadKey((k) => k + 1); }, c("saved"))}>{c("save")}</PermButton>
-          </div>
-          <table className="mb-2 text-left"><tbody>
-            {courses.rows.map((x) => (
-              <tr key={x.id}>
-                <td className="pr-3"><label className="flex items-center gap-1"><input type="checkbox" checked={!!items[x.id]} onChange={(e) => setItems((s) => { const n = { ...s }; if (e.target.checked) n[x.id] = { category: "required", suggestedTerm: "" }; else delete n[x.id]; return n; })} />{x.code} · {x.name}</label></td>
-                <td className="pr-3">{items[x.id] ? (
-                  <select aria-label={`${x.code} ${t("category")}`} className="rounded-md border border-border bg-transparent px-1" value={items[x.id].category} onChange={(e) => setItems((s) => ({ ...s, [x.id]: { ...s[x.id], category: e.target.value } }))}>
-                    {["required", "elective", "general"].map((k) => <option key={k} value={k}>{t(`cat_${k}`)}</option>)}
-                  </select>) : null}</td>
-                <td>{items[x.id] ? <input aria-label={`${x.code} ${t("suggestedTerm")}`} className="w-14 rounded-md border border-border bg-transparent px-1" placeholder="#" value={items[x.id].suggestedTerm} onChange={(e) => setItems((s) => ({ ...s, [x.id]: { ...s[x.id], suggestedTerm: e.target.value } }))} /> : null}</td>
-              </tr>
-            ))}
-          </tbody></table>
-          <PermButton perm={PERMS.eduMajorEdit} size="sm" onClick={() => void run(() => bff(`majors/${open}/courses?version=${detail.versionId}`, { method: "PUT", body: { items: Object.entries(items).map(([courseId, v]) => ({ courseId, category: v.category, suggestedTerm: v.suggestedTerm ? Number(v.suggestedTerm) : null })) } }), c("saved"))}>{c("save")}</PermButton>
-          <Button size="sm" variant="outline" className="ml-2" onClick={() => { setOpen(null); setDetail(null); setVersionId(null); }}>{c("close")}</Button>
-        </div>
-        </Modal>
-      ) : null}
+      {open ? <MajorDialog row={open.row} mode={open.mode} onClose={() => setOpen(null)} onSaved={reload} /> : null}
     </section>
   );
 }
