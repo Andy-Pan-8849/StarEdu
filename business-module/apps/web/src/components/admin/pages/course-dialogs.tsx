@@ -100,10 +100,10 @@ export function CourseDialog({ id, mode, onClose, onSaved }: { id: string; mode:
   return (
     <Modal wide title={`${d.code} · ${d.name}`} onClose={onClose}>
       <Tabs value={tab} onChange={setTab} items={[{ key: "basic", label: t("tabBasic") }, { key: "prereq", label: t("tabPrereq") }]} />
-      <TabBody>
+      <TabBody className="h-[calc(88vh-13rem)]">
         {tab === "basic" ? (
           editable ? (
-            <FormPanel inline title={t("tabBasic")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={onClose}
+            <FormPanel inline fill title={t("tabBasic")} fields={fields} submitLabel={c("save")} cancelLabel={c("cancel")} onCancel={onClose}
               initial={{ code: d.code, name: d.name, credits: String(d.credits), syllabus: d.syllabus ?? "", status: d.status }}
               onSubmit={async (p) => { if (await run(() => bff(`courses/${id}`, { method: "PATCH", body: p }))) { onSaved(); onClose(); } }} />
           ) : (
