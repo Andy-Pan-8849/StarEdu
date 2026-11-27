@@ -25,6 +25,8 @@ describe("dictionaries, parameters, operation log, credentials, online users", (
       const dropdown = (await admin().get("/api/dicts/gender")).body;
       expect(dropdown.items.map((i: { value: string }) => i.value)).toEqual(["male", "female", "other", "unknown"]);
       expect(dropdown.items[0].labelKey).toBe("dict.gender.male");
+      // 学生门户的请求走 /api/portal/*，也能读同一个字典（学位计划页要把学位类型翻成文字）
+      expect((await admin().get("/api/portal/dicts/gender")).body).toEqual(dropdown);
     });
 
     it("a tenant can append its own entries to a platform dictionary; built-in entries stay read-only; other tenants do not see them", async () => {

@@ -68,10 +68,10 @@ describe("curriculum versions", () => {
     expect((await registrar().put(`/api/majors/${major}/students/${late.u.personId}`, { kind: "primary", entryYear: 2026 })).status).toBe(200);
     const a = await plan(early.token);
     const b = await plan(late.token);
-    expect(a.version).toMatchObject({ label: "Initial" });
+    expect(a.selected.version).toMatchObject({ label: "Initial" });
     expect(a.courses.map((c: { code: string }) => c.code).sort()).toEqual(["V101", "V102"]);
     expect(a.credits.required).toBe(9);
-    expect(b.version).toMatchObject({ label: "2026 plan" });
+    expect(b.selected.version).toMatchObject({ label: "2026 plan" });
     expect(b.courses.map((c: { code: string }) => c.code).sort()).toEqual(["V101", "V103"]);
     expect(b.credits.required).toBe(12);
     const roster = (await registrar().get(`/api/majors/${major}/students`)).body;

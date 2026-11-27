@@ -56,6 +56,7 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/dict-types", kind: "other" },
   { method: "GET", path: "/api/dict-types/:id/items", kind: "detail", fixture: "dictTypeId" },
   { method: "GET", path: "/api/dicts/:code", kind: "other" },
+  { method: "GET", path: "/api/portal/dicts/:code", kind: "other" }, // 学生入口的同一个读取接口
   { method: "GET", path: "/api/params", kind: "other" },
   { method: "GET", path: "/api/operation-logs", kind: "other" },
   { method: "GET", path: "/api/staff", kind: "list" },
@@ -288,6 +289,7 @@ export const OTHER_ROUTES: Record<string, string> = {
   "POST /api/portal/enrollments": "student portal: acts for the caller's own student record; section ids of other tenants are invisible (edu.e2e.spec.ts)",
   "DELETE /api/portal/enrollments/:id": "student portal: only the caller's own enrollments (edu.e2e.spec.ts)",
   "GET /api/portal/my-enrollments": "student portal: the caller's own enrollments only",
+  "GET /api/portal/courses/:id": "student portal: only courses in one of the caller's own majors or ones the caller took; other ids are 404 (edu.e2e.spec.ts)",
   "GET /api/portal/plan": "student portal: the caller's own plan only",
   "GET /api/portal/sections/:id": "student portal: only sections open for enrollment or ones the caller took; other ids are 404 (edu.e2e.spec.ts)",
   "GET /api/portal/sections/:id/materials": "student portal: members of the section only (edu.e2e.spec.ts)",

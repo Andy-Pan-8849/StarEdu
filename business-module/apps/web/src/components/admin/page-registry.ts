@@ -2,8 +2,9 @@
 // 还没有页面的菜单，外壳显示"页面尚未提供"。新里程碑的页面在这里登记。
 import type * as React from "react";
 import { JobsPage, MonitorPage, PlatformAuditPage, TenantsPage } from "./pages/platform-pages";
-import { CoursesPage, MajorsPage, PortalEnrollPage, PortalPlanPage, SectionsPage, TermsPage } from "./pages/edu-pages";
+import { CoursesPage, MajorsPage, PortalEnrollPage, SectionsPage, TermsPage } from "./pages/edu-pages";
 import { PortalCoursesPage } from "./pages/course-pages";
+import { PortalPlanPage } from "./pages/plan-pages";
 import { PortalAssignmentsPage } from "./pages/assignment-pages";
 import { DashboardPage, GradingScalePage, PortalGradesPage, TranscriptsPage } from "./pages/grade-pages";
 import { PortalRequestsPage, RequestsPage } from "./pages/request-pages";

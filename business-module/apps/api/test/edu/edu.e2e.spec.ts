@@ -13,6 +13,7 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
   let termId: string;
   let cs101: string;
   let cs102: string;
+  const noSuchMajor = "00000000-0000-4000-8000-000000000000";
   let major: string;
   let teacher1: TestUser;
   let teacher2: TestUser;
@@ -403,20 +404,70 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
   });
 
   describe("degree plan", () => {
-    it("shows each course of my major as passed, in progress or not taken, and counts only passed credits", async () => {
+    it("shows each course of my major as not started, in progress or passed, and counts only passed credits", async () => {
       const a = await student("plan.one");
-      expect((await h.call(a.token).get("/api/portal/plan")).body.declaredMajor).toBeNull();
+      const none = (await h.call(a.token).get("/api/portal/plan")).body;
+      expect(none).toMatchObject({ selected: null, majors: [], courses: [] }); // 还没有专业
       await registrar().put(`/api/majors/${major}/students/${a.u.personId}`, { kind: "primary" });
       const sec = await mkSection(cs101, "80");
       await h.call(a.token).post("/api/portal/enrollments", { sectionId: sec });
       let plan = (await h.call(a.token).get("/api/portal/plan")).body;
-      expect(plan.courses.map((c: { code: string; state: string }) => [c.code, c.state])).toEqual([["CS101", "in_progress"], ["CS102", "not_taken"]]);
+      expect(plan.selected).toMatchObject({ name: "Computer Science", kind: "primary", degreeType: "bachelor" });
+      // 进行中的在前，未开始的在后；没有"建议学期"，也没有"能不能修"的判断
+      expect(plan.courses.map((c: { code: string; state: string }) => [c.code, c.state])).toEqual([["CS101", "in_progress"], ["CS102", "not_started"]]);
+      expect(plan.courses[1].prerequisites).toEqual([{ code: "CS101", name: "Intro", passed: false }]);
+      expect(plan.courses[0]).not.toHaveProperty("suggestedTerm");
       expect(plan.credits).toEqual({ earned: 0, required: 7 }); // 进行中的不算
       await h.owner.enrollment.updateMany({ where: { sectionId: sec, studentPersonId: a.u.personId as string }, data: { status: "completed", passed: true } });
       plan = (await h.call(a.token).get("/api/portal/plan")).body;
-      expect(plan.courses[0].state).toBe("passed");
+      expect(plan.courses.map((c: { code: string; state: string }) => [c.code, c.state])).toEqual([["CS102", "not_started"], ["CS101", "passed"]]); // 已通过的排到最后
       expect(plan.credits).toEqual({ earned: 3, required: 7 });
-      expect(plan.courses[0]).toMatchObject({ category: "required", suggestedTerm: 1 });
+      expect(plan.categories.find((c: { category: string }) => c.category === "required")).toMatchObject({ earned: 3, planned: 3 });
+      expect(plan.courses.find((c: { code: string }) => c.code === "CS102").prerequisites[0].passed).toBe(true);
+    });
+
+    it("a student with a major and a minor picks which one to look at; each is counted on its own; strangers' majors are 404", async () => {
+      const a = await student("plan.two");
+      const minor = (await registrar().post("/api/majors", { code: "MN", name: "Minor Math", totalCredits: 3, electiveMinCredits: 3 })).body.id;
+      const mathCourse = (await registrar().post("/api/courses", { code: "MA101", name: "Calculus", credits: 3 })).body.id;
+      await registrar().put(`/api/majors/${minor}/courses`, { items: [{ courseId: mathCourse, category: "elective" }, { courseId: cs101, category: "elective" }] });
+      await registrar().put(`/api/majors/${major}/students/${a.u.personId}`, { kind: "primary" });
+      await registrar().put(`/api/majors/${minor}/students/${a.u.personId}`, { kind: "minor" });
+      const def = (await h.call(a.token).get("/api/portal/plan")).body;
+      expect(def.majors.map((m: { name: string; kind: string }) => [m.name, m.kind])).toEqual([["Computer Science", "primary"], ["Minor Math", "minor"]]);
+      expect(def.selected.name).toBe("Computer Science"); // 默认主修
+      const m = (await h.call(a.token).get(`/api/portal/plan?majorId=${minor}`)).body;
+      expect(m.selected).toMatchObject({ name: "Minor Math", kind: "minor" });
+      expect(m.courses.map((c: { code: string }) => c.code).sort()).toEqual(["CS101", "MA101"]);
+      expect(m.elective).toEqual({ earned: 0, min: 3 });
+      const other = (await registrar().post("/api/majors", { code: "OT", name: "Not mine", totalCredits: 3 })).body.id;
+      expect((await h.call(a.token).get(`/api/portal/plan?majorId=${other}`)).status).toBe(404);
+    });
+
+    it("course info: only for courses in my majors or that I took; prerequisites show whether I passed them", async () => {
+      const a = await student("plan.three");
+      await registrar().put(`/api/majors/${major}/students/${a.u.personId}`, { kind: "primary" });
+      const info = await h.call(a.token).get(`/api/portal/courses/${cs102}`);
+      expect(info.status).toBe(200);
+      expect(info.body).toMatchObject({ code: "CS102", credits: 4, prerequisites: [{ code: "CS101", passed: false }], majors: [{ name: "Computer Science" }] });
+      const outside = (await registrar().post("/api/courses", { code: "ZZ999", name: "Outside", credits: 1 })).body.id;
+      expect((await h.call(a.token).get(`/api/portal/courses/${outside}`)).status).toBe(404); // 不在我的方案里，也没修过
+      expect((await h.call(a.token).get("/api/portal/courses/00000000-0000-4000-8000-000000000000")).status).toBe(404);
+      const sec = await mkSection(outside, "81");
+      await h.call(a.token).post("/api/portal/enrollments", { sectionId: sec });
+      expect((await h.call(a.token).get(`/api/portal/courses/${outside}`)).status).toBe(200); // 选过的可以看
+    });
+
+    it("Course enrollment can be limited to one of my majors; without a major the list is simply everything", async () => {
+      const a = await student("plan.four");
+      const noMajor = (await h.call(a.token).get("/api/portal/sections")).body;
+      expect(noMajor).toMatchObject({ declaredMajor: null, majors: [] });
+      expect(noMajor.sections.length).toBeGreaterThan(0);
+      await registrar().put(`/api/majors/${major}/students/${a.u.personId}`, { kind: "primary" });
+      const only = (await h.call(a.token).get(`/api/portal/sections?majorId=${major}`)).body;
+      expect(only.majors).toEqual([expect.objectContaining({ name: "Computer Science", kind: "primary" })]);
+      expect(only.sections.every((x: { course: { code: string } }) => ["CS101", "CS102"].includes(x.course.code))).toBe(true);
+      expect((await h.call(a.token).get(`/api/portal/sections?majorId=${noSuchMajor}`)).status).toBe(404);
     });
   });
 
