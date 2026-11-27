@@ -48,7 +48,7 @@ export function CourseDetailDialog({ sectionId, onClose, onEnroll }: { sectionId
   React.useEffect(() => { void bff<SectionDetail>(`sections/${sectionId}`).then(setD).catch((e: Error) => setError(e.message)); }, [sectionId]);
   const row = (label: string, value: React.ReactNode) => (value ? <div className="grid grid-cols-[8rem_1fr] gap-2"><dt className="text-muted">{label}</dt><dd>{value}</dd></div> : null);
   return (
-    <Modal title={d ? `${d.course.code} · ${d.course.name}` : t("title")} onClose={onClose}>
+    <Modal wide title={d ? `${d.course.code} · ${d.course.name}` : t("title")} onClose={onClose}>
       {error ? <p role="alert" className="text-sm text-red-600">{error}</p> : !d ? <p className="text-sm text-muted">…</p> : (
         <div className="space-y-3 text-sm">
           {/* 选上这个班以后才有课件和作业两个页签 */}

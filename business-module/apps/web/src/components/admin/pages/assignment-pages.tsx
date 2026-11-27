@@ -216,15 +216,19 @@ export function StudentAssignments({ sectionId }: { sectionId: string }) {
   const t = useTranslations("pages.assignments");
   const tbl = useTable();
   const [rows, setRows] = React.useState<MyRow[] | null>(null);
-  React.useEffect(() => { void bff<MyRow[]>("assignments").then((all) => setRows(all.filter((a) => a.section.id === sectionId))).catch(() => setRows([])); }, [sectionId]);
+  const [open, setOpen] = React.useState<MyRow | null>(null);
+  const load = React.useCallback(() => { void bff<MyRow[]>("assignments").then((all) => setRows(all.filter((a) => a.section.id === sectionId))).catch(() => setRows([])); }, [sectionId]);
+  React.useEffect(load, [load]);
   const cols: Column<MyRow>[] = [
-    { key: "title", header: t("colTitle"), cell: (a) => <span className="font-medium">{a.title}</span> },
+    { key: "title", header: t("colTitle"), cell: (a) => <button type="button" className="font-medium text-primary hover:underline" onClick={() => setOpen(a)}>{a.title}</button> },
     { key: "deadline", header: t("colDeadline"), cell: (a) => `${new Date(a.deadline).toLocaleString()}${a.extensionDays ? ` · ${t("extended", { d: a.extensionDays })}` : ""}` },
     { key: "status", header: t("colStatus"), cell: (a) => t(`sub_${a.status}`) },
     { key: "score", header: t("colScore"), cell: (a) => (a.finalScore !== null ? `${a.finalScore}/${a.maxScore}` : "—") },
+    { key: "actions", header: "", cell: (a) => <RowAction icon={Eye} onClick={() => setOpen(a)}>{t("open")}</RowAction> },
   ];
   return (
     <div>
+      {open ? <Modal wide title={open.title} onClose={() => setOpen(null)}><StudentAssignmentDetail id={open.id} onChanged={load} /></Modal> : null}
       <DataTable columns={cols} rows={rows ?? []} rowKey={(a) => a.id} loading={rows === null} emptyText={t("studentEmpty")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
       {rows && rows.length ? <p className="mt-2 text-muted">{t("submitHint")}</p> : null}
     </div>
@@ -239,19 +243,17 @@ interface MyDetail {
   submission: null | { status: string; currentVersion: number; isLate: boolean; latePenaltyPct: number | null; versions: Array<{ version: number; textAnswer: string | null; submittedAt: string; isLate: boolean; files: Array<{ id: string; fileName: string; downloadUrl: string }> }>; result: null | { rawScore: number; latePenaltyPct: number; finalScore: number; feedback: string | null; scores: Array<{ rubricItemId: string; points: number }> } };
 }
 
-export function PortalAssignmentsPage() {
+/** 学生看一份作业的详情、提交记录和成绩，也能在这里提交；"我的作业"页和课程详情的作业页签共用。 */
+export function StudentAssignmentDetail({ id, onBack, onChanged }: { id: string; onBack?: () => void; onChanged: () => void }) {
   const t = useTranslations("pages.assignments");
   const c = useTranslations("crud");
-  const tbl = useTable();
-  const list = useList<MyRow>("assignments");
-  const [openId, setOpenId] = React.useState<string | null>(null);
   const [d, setD] = React.useState<MyDetail | null>(null);
   const [text, setText] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [msg, setMsg] = React.useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = React.useState(false);
   const load = React.useCallback((id: string) => { void bff<MyDetail>(`assignments/${id}`).then((x) => { setD(x); setText(x.submission?.versions.at(-1)?.textAnswer ?? ""); }); }, []);
-  React.useEffect(() => { if (openId) load(openId); }, [openId, load]);
+  React.useEffect(() => { load(id); }, [id, load]);
 
   async function submit() {
     if (!d) return;
@@ -268,7 +270,7 @@ export function PortalAssignmentsPage() {
       setMsg({ text: c("done"), error: false });
       setFiles([]);
       load(d.id);
-      list.reload();
+      onChanged();
     } catch (e) {
       setMsg({ text: (e as Error).message, error: true });
     } finally {
@@ -276,12 +278,13 @@ export function PortalAssignmentsPage() {
     }
   }
 
-  if (openId && d) {
+  if (!d) return <p className="text-sm text-muted">…</p>;
+  {
     const s = d.submission;
     return (
       <section className="text-sm">
-        <RowAction icon={ArrowLeft} className="mb-2" onClick={() => { setOpenId(null); setD(null); setMsg(null); }}>{t("back")}</RowAction>
-        <H2>{d.title}</H2>
+        {onBack ? <RowAction icon={ArrowLeft} className="mb-2" onClick={onBack}>{t("back")}</RowAction> : null}
+        {onBack ? <H2>{d.title}</H2> : null}
         <p className="mb-1 text-muted">{d.section.name} · {t("deadline", { when: new Date(d.deadline).toLocaleString() })} · {t("maxScore", { n: d.maxScore })}</p>
         {d.description ? <p className="mb-2 whitespace-pre-wrap">{d.description}</p> : null}
         <h3 className="mb-1 font-medium">{t("rubric")}</h3>
@@ -309,6 +312,14 @@ export function PortalAssignmentsPage() {
       </section>
     );
   }
+}
+
+export function PortalAssignmentsPage() {
+  const t = useTranslations("pages.assignments");
+  const tbl = useTable();
+  const list = useList<MyRow>("assignments");
+  const [openId, setOpenId] = React.useState<string | null>(null);
+  if (openId) return <StudentAssignmentDetail id={openId} onBack={() => setOpenId(null)} onChanged={list.reload} />;
   return (
     <section className="text-sm">
       <H2>{t("myTitle")}</H2>

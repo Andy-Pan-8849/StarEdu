@@ -19,6 +19,7 @@ vi.mock("@/lib/bff", () => ({
     if (path === "sections/s1") return mine.on ? { ...detail, myEnrollment: { id: "e1", status: "enrolled" } } : detail;
     if (path === "my-enrollments") return enrollments;
     if (path === "sections/s1/materials") return [{ id: "m1", title: "Week 1 slides", description: "Read chapter 1", url: null, category: "", published: true, files: [{ id: "f1", fileName: "week1.pdf", size: 2048, downloadUrl: "https://files.test/week1.pdf" }] }];
+    if (path === "assignments/a1") return { id: "a1", title: "Homework 1", description: "Write a loop.", section: { name: "x" }, deadline: "2027-01-01T00:00:00Z", allowLate: false, maxScore: 100, canSubmit: false, limits: { maxFiles: 3 }, rubric: [{ id: "r1", title: "Correctness", maxPoints: 100 }], submission: null };
     if (path === "assignments") return [
       { id: "a1", title: "Homework 1", section: { id: "s1", name: "x", course: "Java" }, deadline: "2027-01-01T00:00:00Z", extensionDays: 0, status: "missing", isLate: false, finalScore: null, maxScore: 100 },
       { id: "a2", title: "Other class homework", section: { id: "s2", name: "y", course: "Other" }, deadline: "2027-01-01T00:00:00Z", extensionDays: 0, status: "missing", isLate: false, finalScore: null, maxScore: 100 },
@@ -73,6 +74,10 @@ describe("course details for students", () => {
     await u.click(dialog.getByRole("tab", { name: "Assignments" }));
     expect(await dialog.findByText("Homework 1")).toBeTruthy();
     expect(dialog.queryByText("Other class homework")).toBeNull();
+    await u.click(dialog.getByRole("button", { name: "Homework 1" })); // 点作业名：打开作业详情
+    const detailDialog = within(screen.getByRole("dialog", { name: "Homework 1" }));
+    expect(await detailDialog.findByText("Write a loop.")).toBeTruthy();
+    expect(detailDialog.getByText(/Correctness/)).toBeTruthy();
     mine.on = false;
   });
 });
