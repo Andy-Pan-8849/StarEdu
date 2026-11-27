@@ -20,14 +20,13 @@ export const PICK_LIMIT = 20;
 export interface CoursePick { id: string; code: string; name: string; credits: number }
 interface CourseFull { id: string; code: string; name: string; credits: number; syllabus: string | null; status: boolean; prerequisites: CoursePick[]; majors: Array<{ code: string; name: string; category: string }>; sections: Array<{ id: string; name: string; status: string }> }
 
-/** 选课程（先修课、专业课程设置共用）：搜索框 + 最多 PICK_LIMIT 条结果，勾选后"添加所选"；添加后窗口不关，可以接着搜、接着选，点"完成"才关。 */
+/** 选课程（先修课、专业课程设置共用）：搜索框 + 最多 PICK_LIMIT 条结果，勾选后"添加所选"，添加完关闭窗口；"取消"不改任何东西直接退出。 */
 export function CoursePicker({ title, exclude, onPick, onClose }: { title: string; exclude: string[]; onPick: (courses: CoursePick[]) => Promise<unknown> | void; onClose: () => void }) {
   const t = useTranslations("pages.edu");
   const tbl = useTable();
   const [q, setQ] = React.useState("");
   const [rows, setRows] = React.useState<CoursePick[] | null>(null);
   const [picked, setPicked] = React.useState<CoursePick[]>([]); // 跨搜索保留：换个关键字再搜，之前勾的还在
-  const [added, setAdded] = React.useState<string[]>([]); // 这次已经加过的（父组件刷新之前也不再出现）
   const [busy, setBusy] = React.useState(false);
   React.useEffect(() => {
     let live = true;
@@ -36,7 +35,7 @@ export function CoursePicker({ title, exclude, onPick, onClose }: { title: strin
     }, q ? 250 : 0); // 打字时稍等一下再查，免得每敲一个字就查一次
     return () => { live = false; clearTimeout(timer); };
   }, [q]);
-  const shown = (rows ?? []).filter((r) => !exclude.includes(r.id) && !added.includes(r.id));
+  const shown = (rows ?? []).filter((r) => !exclude.includes(r.id));
   const has = (id: string) => picked.some((p) => p.id === id);
   const cols: Column<CoursePick>[] = [
     { key: "pick", header: "", cell: (r) => <input type="checkbox" aria-label={r.code} checked={has(r.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, r] : picked.filter((p) => p.id !== r.id))} /> },
@@ -47,9 +46,8 @@ export function CoursePicker({ title, exclude, onPick, onClose }: { title: strin
   async function addPicked() {
     setBusy(true);
     try {
-      await onPick(picked);
-      setAdded((a) => [...a, ...picked.map((p) => p.id)]);
-      setPicked([]);
+      const ok = await onPick(picked);
+      if (ok !== false) onClose(); // 保存失败（比如先修课成环）时窗口留着，错误显示在窗口里
     } finally {
       setBusy(false);
     }
@@ -62,8 +60,7 @@ export function CoursePicker({ title, exclude, onPick, onClose }: { title: strin
         {rows && rows.length >= PICK_LIMIT ? <p className="text-xs text-muted">{t("searchHint", { n: PICK_LIMIT })}</p> : null}
         <div className="flex items-center gap-2 border-t border-border pt-3">
           <Button size="sm" disabled={busy || picked.length === 0} onClick={() => void addPicked()}>{t("addSelected", { n: picked.length })}</Button>
-          {added.length ? <span role="status" className="text-muted">{t("addedCount", { n: added.length })}</span> : null}
-          <Button size="sm" variant="outline" className="ml-auto" onClick={onClose}>{t("doneAdding")}</Button>
+          <Button size="sm" variant="outline" onClick={onClose}>{t("cancelPick")}</Button>
         </div>
       </div>
     </Modal>

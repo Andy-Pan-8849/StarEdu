@@ -505,8 +505,6 @@
       "pickedCount": "已选 {n} 人",
       "cancelPick": "取消",
       "addSelected": "添加所选（{n}）",
-      "addedCount": "已添加 {n} 门",
-      "doneAdding": "完成",
       "history": "开过的教学班",
       "degreeType": "学位类型",
       "totalCredits": "总学分要求",

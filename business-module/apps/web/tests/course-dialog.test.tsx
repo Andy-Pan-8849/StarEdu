@@ -56,15 +56,25 @@ describe("course dialog", () => {
     expect(calls.some((c) => c.path.startsWith("courses?") && c.path.includes("limit=20") && c.path.includes("status=enabled"))).toBe(true);
     await u.type(picker.getByRole("textbox", { name: "Search by code or name" }), "calc");
     await waitFor(() => expect(calls.some((c) => c.path.includes("q=calc"))).toBe(true));
-    // 一次选两门；添加后窗口不关，已加的不再出现
+    // 一次选两门；点"添加所选"保存并关闭窗口
     await u.click(picker.getByRole("checkbox", { name: "MA101" }));
     await u.click(picker.getByRole("checkbox", { name: "PH101" }));
     await u.click(picker.getByRole("button", { name: "Add selected (2)" }));
     await waitFor(() => expect(calls.find((c) => c.path === "courses/c1/prerequisites")?.init?.body).toEqual({ courseIds: ["p1", "p2", "p3"] }));
-    await waitFor(() => expect(picker.queryByText("MA101")).toBeNull());
-    expect(screen.getByRole("dialog", { name: "Choose a prerequisite course" })).toBeTruthy();
-    await u.click(picker.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Choose a prerequisite course" })).toBeNull());
+  });
+
+  it("Cancel in the picker leaves without changing anything", async () => {
+    const u = userEvent.setup();
+    open("edit");
+    const dialog = within(await screen.findByRole("dialog"));
+    await u.click(await dialog.findByRole("tab", { name: "Prerequisites" }));
+    await u.click(await dialog.findByRole("button", { name: "Add prerequisite" }));
+    const picker = within(await screen.findByRole("dialog", { name: "Choose a prerequisite course" }));
+    await u.click(await picker.findByRole("checkbox", { name: "MA101" }));
+    await u.click(picker.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog", { name: "Choose a prerequisite course" })).toBeNull();
+    expect(calls.some((c) => c.path === "courses/c1/prerequisites")).toBe(false);
   });
 
   it("removing a prerequisite saves the shorter list", async () => {
