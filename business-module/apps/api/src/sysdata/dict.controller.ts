@@ -126,4 +126,11 @@ export class DictController {
     const items = await this.tenantDb.db.dictItem.findMany({ where: { typeId: type.id, status: true }, orderBy: [{ sort: "asc" }, { value: "asc" }] });
     return { code: type.code, items: items.map((i) => ({ value: i.value, label: i.label, labelKey: i.labelKey })) };
   }
+
+  /** 学生门户用的同一个读取接口（门户的请求都走 /api/portal/*）。 */
+  @Get("portal/dicts/:code")
+  @AnyAuthenticated()
+  async byCodeForPortal(@Param("code") code: string) {
+    return this.byCode(code);
+  }
 }

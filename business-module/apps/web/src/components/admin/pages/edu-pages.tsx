@@ -493,13 +493,13 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
 interface OpenSection { id: string; name: string; course: { code: string; name: string; credits: number }; campus: string; seatsLeft: number; capacity: number; requirement: string | null; prerequisitesMet: boolean; missingPrerequisites: string[]; conflicts: string[]; alreadyTaking: boolean; alreadyPassed: boolean; instructors: Array<{ fullName: string | null }> }
 export function PortalEnrollPage() {
   const t = useTranslations("pages.edu");
-  const [filter, setFilter] = React.useState<"mine" | "all">("all");
-  const [data, setData] = React.useState<{ declaredMajor: { name: string } | null; sections: OpenSection[] } | null>(null);
+  const [majorId, setMajorId] = React.useState(""); // "" = 全部课程
+  const [data, setData] = React.useState<{ declaredMajor: { name: string } | null; majors: Array<{ id: string; name: string; kind: string }>; sections: OpenSection[] } | null>(null);
   const [detail, setDetail] = React.useState<string | null>(null);
   const [msg, setMsg] = React.useState<{ text: string; error: boolean } | null>(null);
   const load = React.useCallback(() => {
-    void bff<{ declaredMajor: { name: string } | null; sections: OpenSection[] }>(`sections?filter=${filter}`).then(setData);
-  }, [filter]);
+    void bff<{ declaredMajor: { name: string } | null; majors: Array<{ id: string; name: string; kind: string }>; sections: OpenSection[] }>(`sections${majorId ? `?majorId=${majorId}` : ""}`).then(setData);
+  }, [majorId]);
   React.useEffect(load, [load]);
   async function act(fn: () => Promise<unknown>, ok: string) {
     try { const r = await fn(); const conflicts = (r as { conflicts?: Array<{ name: string }> })?.conflicts ?? []; setMsg({ text: conflicts.length ? `${ok} ${t("clashWarning", { list: conflicts.map((x) => x.name).join(", ") })}` : ok, error: false }); } catch (e) { setMsg({ text: (e as Error).message, error: true }); }
@@ -523,49 +523,17 @@ export function PortalEnrollPage() {
       <p className="mb-2 text-muted">{t("enrollHint")}</p>
       {!data.declaredMajor ? <p className="mb-2 text-muted">{t("declareFirst")}</p> : null}
       {msg ? <p role={msg.error ? "alert" : "status"} className={`mb-2 ${msg.error ? "text-red-600" : "text-muted"}`}>{msg.text}</p> : null}
-      <div className="mb-2 flex items-center gap-2">
-        <select aria-label={t("filter")} className="rounded-md border border-border bg-transparent px-2 py-1" value={filter} onChange={(e) => setFilter(e.target.value as "mine" | "all")}><option value="all">{t("allCourses")}</option><option value="mine">{t("myMajorOnly")}</option></select>
-      </div>
+      {/* 没有专业就没有可筛的，不给下拉（以前选"只看我的专业"会得到一个空列表） */}
+      {data.majors.length > 0 ? (
+        <div className="mb-2 flex items-center gap-2">
+          <select aria-label={t("filter")} className="rounded-md border border-border bg-transparent px-2 py-1" value={majorId} onChange={(e) => setMajorId(e.target.value)}>
+            <option value="">{t("allCourses")}</option>
+            {data.majors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </div>
+      ) : null}
       <DataTable columns={openCols} rows={data.sections} rowKey={(s) => s.id} emptyText={tbl.empty} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
       {detail ? <CourseDetailDialog sectionId={detail} onClose={() => setDetail(null)} onEnroll={(id) => { setDetail(null); void enroll(id); }} /> : null}
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------- 学生门户：培养方案
-interface Plan { declaredMajor: { name: string } | null; message?: string; courses: Array<{ courseId: string; code: string; name: string; credits: number; category: string; suggestedTerm: number | null; state: string }>; credits: { earned: number; required: number } }
-
-export function PortalPlanPage() {
-  const t = useTranslations("pages.edu");
-  const tbl = useTable();
-  const [plan, setPlan] = React.useState<Plan | null>(null);
-  React.useEffect(() => { void bff<Plan>("plan").then(setPlan); }, []);
-  if (!plan) return <p className="text-sm text-muted">…</p>;
-  return (
-    <section className="text-sm">
-      <H2>{t("planTitle")}</H2>
-      {!plan.declaredMajor ? <p className="text-sm text-muted">{t("declareFirst")}</p> : (
-        <>
-          <p className="mb-2 text-sm">{plan.declaredMajor.name} — {t("progress", { earned: plan.credits.earned, required: plan.credits.required })}</p>
-          <p className="mb-2 text-xs text-muted">{t("planNote")}</p>
-          <DataTable
-            columns={[
-              { key: "code", header: t("code"), cell: (x) => x.code },
-              { key: "name", header: t("name"), cell: (x) => x.name },
-              { key: "credits", header: t("credits"), cell: (x) => x.credits },
-              { key: "category", header: t("category"), cell: (x) => t(`cat_${x.category}`) },
-              { key: "term", header: t("suggestedTerm"), cell: (x) => x.suggestedTerm ?? "" },
-              { key: "state", header: t("state"), cell: (x) => t(`state_${x.state}`) },
-            ] as Column<Plan["courses"][number]>[]}
-            rows={plan.courses}
-            rowKey={(x) => x.courseId}
-            emptyText={tbl.empty}
-            loadingText={tbl.loading}
-            selectable={false}
-            labels={tbl.labels}
-          />
-        </>
-      )}
     </section>
   );
 }

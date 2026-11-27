@@ -30,22 +30,39 @@ export class PortalController {
     return { personId, profile };
   }
 
-  /** 我的专业（主修）的课程设置：courseId → 类别、建议学期。 */
-  private async myMajor(personId: string) {
-    const declared = await this.db.studentMajor.findFirst({ where: { personId, kind: "primary", active: true } });
-    if (!declared) return null;
-    const major = await this.db.major.findUnique({ where: { id: declared.majorId } });
-    // 按入学年份落在哪个培养方案版本，就用哪个版本的课程设置和学分要求
-    const version = resolveVersion(await this.db.majorVersion.findMany({ where: { majorId: declared.majorId } }), declared.entryYear);
-    const items = version ? await this.db.majorCourse.findMany({ where: { versionId: version.id } }) : [];
-    return { major, version, items: new Map(items.map((i) => [i.courseId, i])) };
+  /** 我的所有有效专业（主修在前，辅修在后），每个带它的培养方案版本（按入学年份）和课程设置：courseId → 类别。 */
+  private async myMajors(personId: string) {
+    const rows = await this.db.studentMajor.findMany({ where: { personId, active: true }, orderBy: { declaredOn: "asc" } });
+    rows.sort((a, b) => Number(b.kind === "primary") - Number(a.kind === "primary"));
+    const out = [];
+    for (const row of rows) {
+      const major = await this.db.major.findUnique({ where: { id: row.majorId } });
+      if (!major) continue;
+      // 按入学年份落在哪个培养方案版本，就用哪个版本的课程设置和学分要求
+      const version = resolveVersion(await this.db.majorVersion.findMany({ where: { majorId: row.majorId } }), row.entryYear);
+      const items = version ? await this.db.majorCourse.findMany({ where: { versionId: version.id } }) : [];
+      out.push({ row, major, version, items: new Map(items.map((i) => [i.courseId, i])) });
+    }
+    return out;
+  }
+
+  /** 选一个专业：指定了就必须是我自己的（否则 404）；没指定取主修，没有主修取第一个。没有专业返回 null。 */
+  private pick<T extends { major: { id: string } }>(majors: T[], majorId?: string): T | null {
+    if (majorId) {
+      const hit = majors.find((m) => m.major.id === majorId);
+      if (!hit) throw new NotFoundException();
+      return hit;
+    }
+    return majors[0] ?? null;
   }
 
   @Get("sections")
   @RequirePermissions(PERMS.portalEnrollList)
-  async openSections(@Auth() auth: AuthContext, @Query() query: { filter?: string }) {
+  async openSections(@Auth() auth: AuthContext, @Query() query: { filter?: string; majorId?: string }) {
     const { personId } = await this.me(auth);
-    const major = await this.myMajor(personId);
+    const myMajors = await this.myMajors(personId);
+    const major = this.pick(myMajors, query.majorId && query.majorId.length > 0 ? query.majorId : undefined);
+    const onlyMine = !!query.majorId || query.filter === "mine"; // 选了某个专业（或旧的"只看我的专业"）：只列这个专业方案里的课
     const sections = await this.db.section.findMany({ where: { status: "open", term: { status: { in: ["enrolling", "in_progress"] } } }, include: { course: true, term: true, campus: true, instructors: true }, orderBy: { name: "asc" } });
     const mine = await this.db.enrollment.findMany({ where: { studentPersonId: personId, status: { in: ["enrolled", "completed"] } }, include: { section: true } });
     const passedCourses = new Set(mine.filter((e) => e.passed).map((e) => e.section.courseId));
@@ -55,7 +72,7 @@ export class PortalController {
     const rows = [];
     for (const s of sections) {
       const requirement = major?.items.get(s.courseId)?.category ?? null;
-      if (query.filter === "mine" && !requirement) continue;
+      if (onlyMine && !requirement) continue;
       const seated = await this.db.enrollment.count({ where: { sectionId: s.id, status: "enrolled" } });
       const missing = prereqs.filter((p) => p.courseId === s.courseId && !passedCourses.has(p.prerequisiteId)).map((p) => p.prerequisite.code);
       const clashes = mine
@@ -69,7 +86,7 @@ export class PortalController {
         prerequisitesMet: missing.length === 0, missingPrerequisites: missing, conflicts: clashes, alreadyTaking: activeCourses.has(s.courseId), alreadyPassed: passedCourses.has(s.courseId),
       });
     }
-    return { declaredMajor: major ? { id: major.major?.id, name: major.major?.name } : null, sections: rows };
+    return { declaredMajor: major ? { id: major.major.id, name: major.major.name } : null, majors: myMajors.map((m) => ({ id: m.major.id, name: m.major.name, kind: m.row.kind })), sections: rows };
   }
 
   /**
@@ -90,7 +107,7 @@ export class PortalController {
     const prereqs = await this.db.coursePrerequisite.findMany({ where: { courseId: section.courseId }, include: { prerequisite: true } });
     const names = new Map((await this.db.person.findMany({ where: { id: { in: section.instructors.map((i) => i.personId) } }, select: { id: true, fullName: true } })).map((p) => [p.id, p.fullName]));
     const seated = await this.db.enrollment.count({ where: { sectionId: id, status: "enrolled" } });
-    const major = await this.myMajor(personId);
+    const major = this.pick(await this.myMajors(personId));
     return {
       id: section.id,
       name: section.name,
@@ -134,24 +151,73 @@ export class PortalController {
     return rows.map((e) => ({ id: e.id, status: e.status, passed: e.passed, section: { id: e.sectionId, name: e.section.name, status: e.section.status }, course: { code: e.section.course.code, name: e.section.course.name, credits: Number(e.section.course.credits) }, term: e.section.term.name, dropDeadline: deadline(e.section.term.dropDeadline), canDrop: e.status === "enrolled" && e.section.term.status !== "ended" && e.section.status !== "ended", willBeW: !!e.section.term.dropDeadline && todayUtc() > e.section.term.dropDeadline }));
   }
 
-  /** 培养方案：我的专业的课程，每门标注 已修 / 进行中 / 未修，学分进度只统计已通过的课程；不做毕业审核。 */
+  /**
+   * 培养方案：我的某个专业（默认主修）的课程设置，每门课标注 未开始 / 进行中 / 已通过 和前置课；学分进度只统计已通过的课程。
+   * 状态每次按当前的选课记录和培养方案实时算，不存冗余的状态；不判断"能不能修"，也不做毕业审核。
+   */
   @Get("plan")
   @RequirePermissions(PERMS.portalPlanView)
-  async plan(@Auth() auth: AuthContext) {
+  async plan(@Auth() auth: AuthContext, @Query() query: { majorId?: string }) {
     const { personId } = await this.me(auth);
-    const major = await this.myMajor(personId);
-    if (!major?.major) return { declaredMajor: null, message: "Declare a major first", courses: [], credits: { earned: 0, required: 0 } };
+    const myMajors = await this.myMajors(personId);
+    const majors = myMajors.map((m) => ({ id: m.major.id, name: m.major.name, kind: m.row.kind }));
+    const chosen = this.pick(myMajors, query.majorId && query.majorId.length > 0 ? query.majorId : undefined);
+    if (!chosen) return { majors, selected: null, message: "You have not chosen a major yet", credits: { earned: 0, required: 0 }, categories: [], elective: { earned: 0, min: 0 }, courses: [] };
+    const { major, version, row, items } = chosen;
     const taken = await this.db.enrollment.findMany({ where: { studentPersonId: personId, status: { in: ["enrolled", "completed"] } }, include: { section: true } });
-    const courses = await this.db.course.findMany({ where: { id: { in: [...major.items.keys()] } }, orderBy: { code: "asc" } });
-    let earned = 0;
-    const items = courses.map((c) => {
-      const mine = taken.filter((e) => e.section.courseId === c.id);
-      const state = mine.some((e) => e.passed) ? "passed" : mine.some((e) => e.status === "enrolled") ? "in_progress" : "not_taken";
-      if (state === "passed") earned += Number(c.credits);
-      const cfg = major.items.get(c.id);
-      return { courseId: c.id, code: c.code, name: c.name, credits: Number(c.credits), category: cfg?.category, suggestedTerm: cfg?.suggestedTerm ?? null, state };
+    const passedCourses = new Set(taken.filter((e) => e.passed).map((e) => e.section.courseId));
+    const courses = await this.db.course.findMany({ where: { id: { in: [...items.keys()] } }, orderBy: { code: "asc" } });
+    const prereqs = await this.db.coursePrerequisite.findMany({ where: { courseId: { in: courses.map((c) => c.id) } }, include: { prerequisite: true } });
+    const list = courses.map((c) => {
+      const state = passedCourses.has(c.id) ? "passed" : taken.some((e) => e.section.courseId === c.id && e.status === "enrolled") ? "in_progress" : "not_started";
+      return {
+        courseId: c.id, code: c.code, name: c.name, credits: Number(c.credits), category: items.get(c.id)?.category ?? "elective", state,
+        prerequisites: prereqs.filter((p) => p.courseId === c.id).map((p) => ({ code: p.prerequisite.code, name: p.prerequisite.name, passed: passedCourses.has(p.prerequisiteId) })),
+      };
     });
-    return { declaredMajor: { id: major.major.id, name: major.major.name }, courses: items, credits: { earned, required: Number(major.version?.totalCredits ?? major.major.totalCredits) }, version: major.version ? { id: major.version.id, label: major.version.label, effectiveYear: major.version.effectiveYear } : null };
+    const order = { in_progress: 0, not_started: 1, passed: 2 } as const;
+    list.sort((a, b) => order[a.state as keyof typeof order] - order[b.state as keyof typeof order] || a.code.localeCompare(b.code));
+    const sum = (xs: typeof list) => xs.reduce((n, c) => n + c.credits, 0);
+    const categories = ["required", "elective", "general"].map((category) => {
+      const inCat = list.filter((c) => c.category === category);
+      return { category, earned: sum(inCat.filter((c) => c.state === "passed")), planned: sum(inCat) };
+    }).filter((c) => c.planned > 0);
+    const dept = major.deptId ? await this.db.dept.findUnique({ where: { id: major.deptId }, select: { name: true } }) : null;
+    return {
+      majors,
+      selected: {
+        id: major.id, kind: row.kind, code: major.code, name: major.name, degreeType: major.degreeType, department: dept?.name ?? null, description: major.description,
+        entryYear: row.entryYear, declaredOn: row.declaredOn.toISOString().slice(0, 10),
+        version: version ? { id: version.id, label: version.label, effectiveYear: version.effectiveYear } : null,
+      },
+      credits: { earned: sum(list.filter((c) => c.state === "passed")), required: Number(version?.totalCredits ?? major.totalCredits) },
+      categories,
+      elective: { earned: sum(list.filter((c) => c.state === "passed" && c.category === "elective")), min: Number(version?.electiveMinCredits ?? major.electiveMinCredits) },
+      courses: list,
+    };
+  }
+
+  /**
+   * 课程信息（培养方案里点课程名）：学分、简介、前置课、在我各个专业里的类别。
+   * 能看的课：我任一专业的培养方案里有的，或我选过的；其他一律 404。
+   */
+  @Get("courses/:id")
+  @RequirePermissions(PERMS.portalPlanView)
+  async courseInfo(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+    const { personId } = await this.me(auth);
+    const myMajors = await this.myMajors(personId);
+    const inPlan = myMajors.filter((m) => m.items.has(id));
+    const taken = await this.db.enrollment.findMany({ where: { studentPersonId: personId, status: { in: ["enrolled", "completed", "withdrawn"] } }, include: { section: true } });
+    if (inPlan.length === 0 && !taken.some((e) => e.section.courseId === id)) throw new NotFoundException();
+    const course = await this.db.course.findUnique({ where: { id } });
+    if (!course) throw new NotFoundException();
+    const passed = new Set(taken.filter((e) => e.passed && e.status !== "withdrawn").map((e) => e.section.courseId));
+    const prereqs = await this.db.coursePrerequisite.findMany({ where: { courseId: id }, include: { prerequisite: true } });
+    return {
+      id: course.id, code: course.code, name: course.name, credits: Number(course.credits), syllabus: course.syllabus,
+      prerequisites: prereqs.map((p) => ({ code: p.prerequisite.code, name: p.prerequisite.name, passed: passed.has(p.prerequisiteId) })),
+      majors: inPlan.map((m) => ({ id: m.major.id, name: m.major.name, category: m.items.get(id)?.category })),
+    };
   }
 
   /** 班级课件：选课的学生可看已发布的（已作废/退课的失去访问；结课后保留只读）。 */
