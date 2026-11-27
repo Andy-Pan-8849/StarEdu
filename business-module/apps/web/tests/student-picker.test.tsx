@@ -14,7 +14,7 @@ vi.mock("@/lib/bff", () => ({
     if (path.startsWith("students?")) return [{ id: "p1", fullName: "Sam Demo", studentNo: "S-1", campusName: "HQ" }, { id: "p2", fullName: "Jo Demo", studentNo: "S-2", campusName: "HQ" }];
     if (path === "sections/s1/enrollments") {
       const body = init?.body as { confirm?: string[] };
-      return needConfirm && !body.confirm ? { results: [{ ok: false, code: "CONFIRMATION_REQUIRED", violations: ["capacity"] }] } : { results: [{ ok: true }] };
+      return needConfirm && !body.confirm ? { results: [{ studentId: "p1", ok: false, code: "CONFIRMATION_REQUIRED", violations: ["prerequisite"], detail: { prerequisite: ["CS100"] } }] } : { results: [{ ok: true }] };
     }
     return {};
   }),
@@ -55,12 +55,13 @@ describe("student picker (roster '+')", () => {
     await u.click(await dialog.findByRole("checkbox", { name: "Sam Demo" }));
     await u.click(dialog.getByRole("button", { name: "Enroll" }));
     expect(await dialog.findByText(/These need confirmation/)).toBeTruthy();
+    expect(dialog.getByText(/Sam Demo: prerequisite not met \(CS100\)/)).toBeTruthy(); // 告诉老师是谁、缺哪门先修课
     expect(onClose).not.toHaveBeenCalled();
     const confirm = dialog.getByRole("button", { name: "Confirm and enroll" });
     expect((confirm as HTMLButtonElement).disabled).toBe(true); // 没填原因不能确认
     await u.type(dialog.getByRole("textbox", { name: "Reason (required)" }), "approved by dean");
     await u.click(confirm);
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(calls.filter((c) => c.path === "sections/s1/enrollments").at(-1)?.init?.body).toMatchObject({ confirm: ["capacity"], reason: "approved by dean" });
+    expect(calls.filter((c) => c.path === "sections/s1/enrollments").at(-1)?.init?.body).toMatchObject({ confirm: ["prerequisite"], reason: "approved by dean" });
   });
 });

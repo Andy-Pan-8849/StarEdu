@@ -214,7 +214,7 @@ export class SectionsController {
     const input = parse(z.object({ studentIds: z.array(z.string().uuid()).min(1).max(100), confirm: z.array(z.enum(["capacity", "prerequisite", "conflict", "window", "retake"])).optional(), reason: z.string().trim().max(500).optional() }), body);
     await this.scoped(auth, id, PERMS.eduEnrollmentAdd);
     const studentScope = await this.hr.scope(auth, PERMS.eduEnrollmentAdd);
-    const results: Array<{ studentId: string; ok: boolean; enrollmentId?: string; code?: string; violations?: string[]; message?: string }> = [];
+    const results: Array<{ studentId: string; ok: boolean; enrollmentId?: string; code?: string; violations?: string[]; detail?: unknown; message?: string }> = [];
     for (const studentId of input.studentIds) {
       if (!(await this.db.person.findFirst({ where: withScope({ id: studentId, student: { isNot: null } }, studentScope, STUDENT_SCOPE) }))) {
         results.push({ studentId, ok: false, code: "NOT_FOUND", message: "Unknown student or outside your data scope" });
@@ -224,9 +224,9 @@ export class SectionsController {
         const r = await this.enrollments.enroll({ sectionId: id, studentPersonId: studentId, method: "registrar", actorAccountId: auth.accountId, confirm: input.confirm, reason: input.reason });
         results.push({ studentId, ok: true, enrollmentId: r.enrollmentId });
       } catch (err) {
-        const res = (err as { getResponse?: () => unknown }).getResponse?.() as { code?: string; message?: string; violations?: string[] } | undefined;
+        const res = (err as { getResponse?: () => unknown }).getResponse?.() as { code?: string; message?: string; violations?: string[]; detail?: unknown } | undefined;
         if (!res || typeof res !== "object") throw err;
-        results.push({ studentId, ok: false, code: res.code, message: res.message, violations: res.violations });
+        results.push({ studentId, ok: false, code: res.code, message: res.message, violations: res.violations, detail: res.detail });
       }
     }
     return { results };

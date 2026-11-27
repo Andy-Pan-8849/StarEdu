@@ -169,6 +169,9 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       expect(blocked.status).toBe(409);
       expect(blocked.body.violations).toEqual(["prerequisite"]);
       expect(blocked.body.detail.prerequisite).toEqual(["CS101"]);
+      // 教务代选：要确认，返回里带着缺哪几门先修课，界面才能告诉老师是什么问题
+      const asked = (await registrar().post(`/api/sections/${sec}/enrollments`, { studentIds: [a.u.personId] })).body.results[0];
+      expect(asked).toMatchObject({ ok: false, code: "CONFIRMATION_REQUIRED", violations: ["prerequisite"], detail: { prerequisite: ["CS101"] } });
       // 通过 CS101（成绩模块 B8 才会写；这里直接写）
       const old = await mkSection(cs101, "13", {}, false);
       await h.owner.enrollment.create({ data: { tenantId: h.tenant.tenantId, sectionId: old, studentPersonId: a.u.personId as string, status: "completed", passed: true } });
