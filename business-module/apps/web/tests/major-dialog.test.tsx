@@ -56,8 +56,10 @@ describe("major dialog", () => {
     await waitFor(() => expect(picker.getByText("MA101")).toBeTruthy());
     expect(picker.queryByText("CS101")).toBeNull(); // 已在培养方案里
     expect(calls.some((c) => c.path.startsWith("courses?") && c.path.includes("limit=20") && c.path.includes("status=enabled"))).toBe(true);
-    await u.click(picker.getByRole("button", { name: "Add" }));
+    await u.click(picker.getByRole("checkbox", { name: "MA101" }));
+    await u.click(picker.getByRole("button", { name: "Add selected (1)" }));
     await waitFor(() => expect(calls.find((c) => c.path.startsWith("majors/m1/courses"))?.init?.body).toEqual({ items: [{ courseId: "c1", category: "required", suggestedTerm: 1 }, { courseId: "c2", category: "required", suggestedTerm: null }] }));
+    await u.click(picker.getByRole("button", { name: "Done" }));
     await u.selectOptions(await dialog.findByRole("combobox", { name: "CS101 Category" }), "elective");
     await waitFor(() => expect(calls.filter((c) => c.path.startsWith("majors/m1/courses")).at(-1)?.init?.body).toMatchObject({ items: [{ courseId: "c1", category: "elective" }, { courseId: "c2" }] }));
     await u.click((await dialog.findAllByRole("button", { name: "Remove" }))[1]);

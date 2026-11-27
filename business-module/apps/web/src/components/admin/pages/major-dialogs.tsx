@@ -100,7 +100,7 @@ function CurriculumTab({ majorId, editable }: { majorId: string; editable: boole
       <div className="min-h-0 flex-1 overflow-y-auto">
         <DataTable columns={cols} rows={d.courses} rowKey={(r) => r.courseId} emptyText={t("noCurriculumCourses")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
       </div>
-      {picking ? <CoursePicker title={t("pickCurriculumCourse")} exclude={d.courses.map((x) => x.courseId)} onClose={() => setPicking(false)} onPick={(p) => { setPicking(false); void saveCourses([...d.courses, { courseId: p.id, code: p.code, name: p.name, credits: p.credits, category: "required", suggestedTerm: null }]); }} /> : null}
+      {picking ? <CoursePicker title={t("pickCurriculumCourse")} exclude={d.courses.map((x) => x.courseId)} onClose={() => setPicking(false)} onPick={(list) => saveCourses([...d.courses, ...list.map((p) => ({ courseId: p.id, code: p.code, name: p.name, credits: p.credits, category: "required", suggestedTerm: null }))])} /> : null}
     </div>
   );
 }

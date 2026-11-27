@@ -13,8 +13,8 @@ vi.mock("@/lib/bff", () => ({
   bff: vi.fn(async (path: string, init?: { method?: string; body?: unknown }) => {
     calls.push({ path, init });
     if (path === "courses/c1") return detail();
-    if (path === "courses/c1/prerequisites") { prereqs = (init?.body as { courseIds: string[] }).courseIds.map((id) => ({ id, code: id === "p2" ? "MA101" : "CS100", name: id === "p2" ? "Calculus" : "Intro", credits: 2 })); return {}; }
-    if (path.startsWith("courses?")) return [{ id: "p1", code: "CS100", name: "Intro", credits: 2 }, { id: "c1", code: "CS201", name: "Data Structures", credits: 3 }, { id: "p2", code: "MA101", name: "Calculus", credits: 2 }];
+    if (path === "courses/c1/prerequisites") { prereqs = (init?.body as { courseIds: string[] }).courseIds.map((id) => ({ id, code: id === "p2" ? "MA101" : id === "p3" ? "PH101" : "CS100", name: id === "p2" ? "Calculus" : id === "p3" ? "Physics" : "Intro", credits: 2 })); return {}; }
+    if (path.startsWith("courses?")) return [{ id: "p1", code: "CS100", name: "Intro", credits: 2 }, { id: "c1", code: "CS201", name: "Data Structures", credits: 3 }, { id: "p2", code: "MA101", name: "Calculus", credits: 2 }, { id: "p3", code: "PH101", name: "Physics", credits: 3 }];
     return {};
   }),
 }));
@@ -56,8 +56,15 @@ describe("course dialog", () => {
     expect(calls.some((c) => c.path.startsWith("courses?") && c.path.includes("limit=20") && c.path.includes("status=enabled"))).toBe(true);
     await u.type(picker.getByRole("textbox", { name: "Search by code or name" }), "calc");
     await waitFor(() => expect(calls.some((c) => c.path.includes("q=calc"))).toBe(true));
-    await u.click(picker.getByRole("button", { name: "Add" }));
-    await waitFor(() => expect(calls.find((c) => c.path === "courses/c1/prerequisites")?.init?.body).toEqual({ courseIds: ["p1", "p2"] }));
+    // 一次选两门；添加后窗口不关，已加的不再出现
+    await u.click(picker.getByRole("checkbox", { name: "MA101" }));
+    await u.click(picker.getByRole("checkbox", { name: "PH101" }));
+    await u.click(picker.getByRole("button", { name: "Add selected (2)" }));
+    await waitFor(() => expect(calls.find((c) => c.path === "courses/c1/prerequisites")?.init?.body).toEqual({ courseIds: ["p1", "p2", "p3"] }));
+    await waitFor(() => expect(picker.queryByText("MA101")).toBeNull());
+    expect(screen.getByRole("dialog", { name: "Choose a prerequisite course" })).toBeTruthy();
+    await u.click(picker.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog", { name: "Choose a prerequisite course" })).toBeNull();
   });
 
   it("removing a prerequisite saves the shorter list", async () => {
