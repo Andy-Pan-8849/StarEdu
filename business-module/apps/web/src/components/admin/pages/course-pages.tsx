@@ -1,6 +1,7 @@
 "use client";
 
 // 学生门户：课程详情（选课前要看清这门课，选上之后也能回头看）和"我的课程"页。
+import { StudentMaterials } from "./material-pages";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { UserMinus } from "lucide-react";
@@ -66,6 +67,7 @@ export function CourseDetailDialog({ sectionId, onClose, onEnroll }: { sectionId
             <h3 className="mb-1 font-medium">{t("syllabus")}</h3>
             <p className="whitespace-pre-wrap text-muted">{d.course.syllabus?.trim() ? d.course.syllabus : t("noSyllabus")}</p>
           </div>
+          {d.myEnrollment ? <StudentMaterials sectionId={d.id} /> : null}
           <div className="flex gap-2 border-t border-border pt-3">
             {onEnroll && !d.myEnrollment ? (
               <PermButton perm={PERMS.portalEnrollAdd} size="sm" disabled={d.seatsLeft === 0} onClick={() => onEnroll(d.id)}>{d.seatsLeft === 0 ? t("full") : t("enroll")}</PermButton>
