@@ -40,6 +40,7 @@ export function FormPanel({
   onSubmit,
   onCancel,
   inline = false,
+  fill = false,
 }: {
   title: string;
   fields: Field[];
@@ -50,20 +51,23 @@ export function FormPanel({
   onCancel: () => void;
   /** 默认以弹窗显示；已经在弹窗里面时用 inline，直接在原位显示。 */
   inline?: boolean;
+  /** 在固定高度的容器里（如弹窗页签）：字段区自己滚动，保存 / 取消按钮固定在最下面，不用滚动就能点到。 */
+  fill?: boolean;
 }) {
   const [values, setValues] = React.useState<Values>(() => Object.fromEntries(fields.map((f) => [f.name, initial[f.name] ?? (f.type === "checkbox" ? false : "")])));
   const set = (name: string, v: string | boolean) => setValues((s) => ({ ...s, [name]: v }));
   const cls = "rounded-md border border-border bg-transparent px-2 py-1";
   const form = (
     <form
-      className={inline ? "mb-3 flex flex-col gap-3 rounded-md border border-border p-3 text-sm" : "flex flex-col gap-3 text-sm"}
+      className={fill ? "flex h-full flex-col text-sm" : inline ? "mb-3 flex flex-col gap-3 rounded-md border border-border p-3 text-sm" : "flex flex-col gap-3 text-sm"}
       aria-label={title}
       onSubmit={(e) => {
         e.preventDefault();
         void onSubmit(toPayload(fields, values));
       }}
     >
-      {inline ? <h3 className="text-base font-semibold">{title}</h3> : null}
+      {inline && !fill ? <h3 className="text-base font-semibold">{title}</h3> : null}
+      <div className={fill ? "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" : "contents"}>
       {fields.map((f) => (
         <label key={f.name} className={f.type === "checkbox" ? "flex flex-wrap items-center gap-x-2" : "flex flex-col gap-1"}>
           {f.type === "checkbox" ? null : f.label}
@@ -82,7 +86,8 @@ export function FormPanel({
           {f.hint && f.type !== "checkbox" ? <span className="text-xs text-muted">{f.hint}</span> : null}
         </label>
       ))}
-      <div className="mt-2 flex justify-start gap-2 border-t border-border pt-3">
+      </div>
+      <div className={fill ? "mt-3 flex shrink-0 justify-start gap-2 border-t border-border pt-3" : "mt-2 flex justify-start gap-2 border-t border-border pt-3"}>
         <Button type="submit" size="sm">{submitLabel}</Button>
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>{cancelLabel}</Button>
       </div>
