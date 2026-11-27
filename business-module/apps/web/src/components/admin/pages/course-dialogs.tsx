@@ -20,12 +20,14 @@ export const PICK_LIMIT = 20;
 export interface CoursePick { id: string; code: string; name: string; credits: number }
 interface CourseFull { id: string; code: string; name: string; credits: number; syllabus: string | null; status: boolean; prerequisites: CoursePick[]; majors: Array<{ code: string; name: string; category: string }>; sections: Array<{ id: string; name: string; status: string }> }
 
-/** 选一门课（先修课、专业课程设置共用）：搜索框 + 最多 PICK_LIMIT 条结果，exclude 里的不出现；窗口开得宽一点，不显得逼仄。 */
-export function CoursePicker({ title, exclude, onPick, onClose }: { title: string; exclude: string[]; onPick: (course: CoursePick) => void; onClose: () => void }) {
+/** 选课程（先修课、专业课程设置共用）：搜索框 + 最多 PICK_LIMIT 条结果，勾选后"添加所选"，添加完关闭窗口；"取消"不改任何东西直接退出。 */
+export function CoursePicker({ title, exclude, onPick, onClose }: { title: string; exclude: string[]; onPick: (courses: CoursePick[]) => Promise<unknown> | void; onClose: () => void }) {
   const t = useTranslations("pages.edu");
   const tbl = useTable();
   const [q, setQ] = React.useState("");
   const [rows, setRows] = React.useState<CoursePick[] | null>(null);
+  const [picked, setPicked] = React.useState<CoursePick[]>([]); // 跨搜索保留：换个关键字再搜，之前勾的还在
+  const [busy, setBusy] = React.useState(false);
   React.useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
@@ -34,18 +36,32 @@ export function CoursePicker({ title, exclude, onPick, onClose }: { title: strin
     return () => { live = false; clearTimeout(timer); };
   }, [q]);
   const shown = (rows ?? []).filter((r) => !exclude.includes(r.id));
+  const has = (id: string) => picked.some((p) => p.id === id);
   const cols: Column<CoursePick>[] = [
+    { key: "pick", header: "", cell: (r) => <input type="checkbox" aria-label={r.code} checked={has(r.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, r] : picked.filter((p) => p.id !== r.id))} /> },
     { key: "code", header: t("code"), cell: (r) => r.code },
     { key: "name", header: t("name"), cell: (r) => r.name },
     { key: "credits", header: t("credits"), cell: (r) => r.credits },
-    { key: "actions", header: "", cell: (r) => <RowAction icon={Plus} onClick={() => onPick(r)}>{t("addPrereqRow")}</RowAction> },
   ];
+  async function addPicked() {
+    setBusy(true);
+    try {
+      const ok = await onPick(picked);
+      if (ok !== false) onClose(); // 保存失败（比如先修课成环）时窗口留着，错误显示在窗口里
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <Modal wide title={title} onClose={onClose}>
       <div className="min-h-[24rem] space-y-3 text-sm">
         <input aria-label={t("searchCourses")} placeholder={t("searchCourses")} className="w-full rounded-md border border-border bg-transparent px-2 py-1" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         <DataTable columns={cols} rows={shown} rowKey={(r) => r.id} loading={rows === null} emptyText={t("noMatches")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
         {rows && rows.length >= PICK_LIMIT ? <p className="text-xs text-muted">{t("searchHint", { n: PICK_LIMIT })}</p> : null}
+        <div className="flex items-center gap-2 border-t border-border pt-3">
+          <Button size="sm" disabled={busy || picked.length === 0} onClick={() => void addPicked()}>{t("addSelected", { n: picked.length })}</Button>
+          <Button size="sm" variant="outline" onClick={onClose}>{t("cancelPick")}</Button>
+        </div>
       </div>
     </Modal>
   );
@@ -70,7 +86,7 @@ function PrereqTab({ course, editable, onChanged }: { course: CourseFull; editab
       {editable ? <Can perm={PERMS.eduCourseEdit}><IconButton icon={Plus} label={t("addPrereq")} className="mb-3" onClick={() => setPicking(true)} /></Can> : null}
       {message}
       <DataTable columns={cols} rows={course.prerequisites} rowKey={(r) => r.id} emptyText={t("noPrereqs")} loadingText={tbl.loading} selectable={false} labels={tbl.labels} />
-      {picking ? <CoursePicker title={t("pickPrereq")} exclude={[course.id, ...course.prerequisites.map((p) => p.id)]} onClose={() => setPicking(false)} onPick={(c) => { setPicking(false); void save([...course.prerequisites.map((p) => p.id), c.id]); }} /> : null}
+      {picking ? <CoursePicker title={t("pickPrereq")} exclude={[course.id, ...course.prerequisites.map((p) => p.id)]} onClose={() => setPicking(false)} onPick={(list) => save([...course.prerequisites.map((p) => p.id), ...list.map((c) => c.id)])} /> : null}
     </div>
   );
 }
