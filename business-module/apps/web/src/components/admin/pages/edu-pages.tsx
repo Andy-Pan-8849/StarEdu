@@ -339,7 +339,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
     { key: "a", header: "", cell: (r) => (r.status === "enrolled" ? <PermRowAction perm={PERMS.eduEnrollmentRemove} onClick={() => void run(() => bff(`sections/${id}/enrollments/${r.id}`, { method: "DELETE" }), c("done"))} icon={Trash2} danger>{t("remove")}</PermRowAction> : null) },
   ];
   return (
-    <Modal wide title={`${s.name} — ${s.seated}/${s.capacity}`} onClose={onClose}>
+    <Modal wide title={`${s.name} — ${s.seated}/${s.capacity} · ${t(`sec_${s.status}`)}`} onClose={onClose}>
     <div className="text-sm">
       <Tabs value={tab} onChange={setTab} items={(["roster", "instructors", "materials", "assignments", "grades", "discussion"] as const).filter((k) => (k !== "assignments" || perms.has(PERMS.eduAssignmentList)) && (k !== "grades" || perms.has(PERMS.eduGradeList)) && (k !== "discussion" || perms.has(PERMS.eduDiscussionList))).map((k) => ({ key: k, label: t(`tab_${k}`) }))} />
       <TabBody>
@@ -349,7 +349,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
           <Can perm={PERMS.eduEnrollmentAdd}><IconButton icon={Plus} label={t("addStudents")} className="mb-3" onClick={() => setAdding(true)} /></Can>
           <label className="mb-2 flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} />{t("showHistory")}</label>
           <DataTable columns={rosterCols} rows={roster.rows} rowKey={(r) => r.id} loading={roster.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
-          {adding ? <StudentPicker sectionId={id} exclude={roster.rows.filter((r) => r.status === "enrolled").map((r) => r.studentPersonId)} onChanged={reloadAll} onClose={() => setAdding(false)} /> : null}
+          {adding ? <StudentPicker sectionId={id} sectionStatus={s.status} exclude={roster.rows.filter((r) => r.status === "enrolled").map((r) => r.studentPersonId)} onChanged={reloadAll} onClose={() => setAdding(false)} /> : null}
         </div>
       ) : null}
       {tab === "instructors" ? (

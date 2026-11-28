@@ -21,9 +21,9 @@ vi.mock("@/lib/bff", () => ({
 }));
 import { StudentPicker } from "../src/components/admin/pages/student-picker";
 
-const open = (onClose = vi.fn(), onChanged = vi.fn()) => render(
+const open = (onClose = vi.fn(), onChanged = vi.fn(), sectionStatus?: string) => render(
   <NextIntlClientProvider locale="en" messages={en}>
-    <PermissionProvider permissions={["edu:enrollment:add"]}><StudentPicker sectionId="s1" exclude={["p2"]} onChanged={onChanged} onClose={onClose} /></PermissionProvider>
+    <PermissionProvider permissions={["edu:enrollment:add"]}><StudentPicker sectionId="s1" sectionStatus={sectionStatus} exclude={["p2"]} onChanged={onChanged} onClose={onClose} /></PermissionProvider>
   </NextIntlClientProvider>,
 );
 
@@ -63,5 +63,14 @@ describe("student picker (roster '+')", () => {
     await u.click(confirm);
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(calls.filter((c) => c.path === "sections/s1/enrollments").at(-1)?.init?.body).toMatchObject({ confirm: ["prerequisite"], reason: "approved by dean" });
+  });
+
+  it("a draft class says why students cannot be added and blocks Enroll", async () => {
+    const u = userEvent.setup();
+    open(vi.fn(), vi.fn(), "draft");
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByText(/This class is Draft/i)).toBeTruthy();
+    await u.click(await dialog.findByRole("checkbox", { name: "Sam Demo" }));
+    expect((dialog.getByRole("button", { name: "Enroll" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

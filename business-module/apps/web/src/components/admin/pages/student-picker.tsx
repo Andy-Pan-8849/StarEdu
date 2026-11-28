@@ -16,7 +16,7 @@ export const STUDENT_PICK_LIMIT = 20;
 interface StudentHit { id: string; fullName: string; studentNo: string | null; campusName: string | null }
 const input = "rounded-md border border-border bg-transparent px-2 py-1";
 
-export function StudentPicker({ sectionId, exclude, onChanged, onClose }: { sectionId: string; exclude: string[]; onChanged: () => void; onClose: () => void }) {
+export function StudentPicker({ sectionId, sectionStatus, exclude, onChanged, onClose }: { sectionId: string; sectionStatus?: string; exclude: string[]; onChanged: () => void; onClose: () => void }) {
   const t = useTranslations("pages.edu");
   const tbl = useTable();
   const [q, setQ] = React.useState("");
@@ -27,6 +27,7 @@ export function StudentPicker({ sectionId, exclude, onChanged, onClose }: { sect
   const [issues, setIssues] = React.useState<Array<{ studentId: string; violations: string[]; detail?: { prerequisite?: string[] } }>>([]);
   const [msg, setMsg] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const closed = sectionStatus === "draft" || sectionStatus === "cancelled" || sectionStatus === "ended"; // 这三种状态不能加人
   React.useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
@@ -44,7 +45,7 @@ export function StudentPicker({ sectionId, exclude, onChanged, onClose }: { sect
       const failed = r.results.filter((x) => !x.ok && x.code !== "CONFIRMATION_REQUIRED").map((x) => x.message).filter(Boolean);
       setNeeds(need.length ? need : null);
       setIssues(asking.map((x) => ({ studentId: x.studentId, violations: x.violations ?? [], detail: x.detail })));
-      setMsg(failed.length ? failed.join("; ") : null);
+      setMsg(failed.length ? [...new Set(failed)].join("; ") : null); // 同一个原因只说一次
       onChanged();
       if (!need.length && !failed.length) onClose();
     } catch (e) {
@@ -82,9 +83,10 @@ export function StudentPicker({ sectionId, exclude, onChanged, onClose }: { sect
               <label className="mt-1 flex flex-col gap-1">{t("reason")}<input className={input} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
             </div>
           ) : null}
+          {closed ? <p role="status" className="rounded-md border border-amber-400 p-2">{t("sectionClosedHint", { status: t(`sec_${sectionStatus}`) })}</p> : null}
           {msg ? <p role="alert" className="text-red-600">{msg}</p> : null}
           <div className="flex items-center gap-2 border-t border-border pt-3">
-            <PermButton perm={PERMS.eduEnrollmentAdd} size="sm" disabled={busy || picked.length === 0 || (needs !== null && !reason.trim())} onClick={() => void enroll(needs ?? undefined)}>{needs ? t("confirmEnroll") : t("enroll")}</PermButton>
+            <PermButton perm={PERMS.eduEnrollmentAdd} size="sm" disabled={busy || closed || picked.length === 0 || (needs !== null && !reason.trim())} onClick={() => void enroll(needs ?? undefined)}>{needs ? t("confirmEnroll") : t("enroll")}</PermButton>
             <span className="text-muted">{t("pickedCount", { n: picked.length })}</span>
             <Button size="sm" variant="outline" onClick={onClose}>{t("cancelPick")}</Button>
           </div>
