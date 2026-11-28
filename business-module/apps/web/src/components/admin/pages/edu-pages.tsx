@@ -322,7 +322,8 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const [tab, setTab] = React.useState<"roster" | "instructors" | "materials" | "assignments" | "grades" | "discussion">("roster");
   const perms = usePermissions();
   const [s, setS] = React.useState<SectionRow | null>(null);
-  const roster = useList<RosterRow>(`sections/${id}/roster`);
+  const [history, setHistory] = React.useState(false); // 是否列出作废、退课的记录
+  const roster = useList<RosterRow>(`sections/${id}/roster${history ? "?history=true" : ""}`);
   const staff = useList<StaffOpt>("staff?size=100");
   const reloadAll = React.useCallback(() => { void bff<SectionRow>(`sections/${id}`).then(setS); roster.reload(); }, [id, roster]);
   React.useEffect(() => { void bff<SectionRow>(`sections/${id}`).then(setS); }, [id]);
@@ -346,6 +347,7 @@ function SectionPanel({ id, onClose }: { id: string; onClose: () => void }) {
       {tab === "roster" ? (
         <div>
           <Can perm={PERMS.eduEnrollmentAdd}><IconButton icon={Plus} label={t("addStudents")} className="mb-3" onClick={() => setAdding(true)} /></Can>
+          <label className="mb-2 flex items-center gap-1 text-xs text-muted"><input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} />{t("showHistory")}</label>
           <DataTable columns={rosterCols} rows={roster.rows} rowKey={(r) => r.id} loading={roster.loading} emptyText={tt.empty} loadingText={tt.loading} labels={tt.labels} />
           {adding ? <StudentPicker sectionId={id} exclude={roster.rows.filter((r) => r.status === "enrolled").map((r) => r.studentPersonId)} onChanged={reloadAll} onClose={() => setAdding(false)} /> : null}
         </div>

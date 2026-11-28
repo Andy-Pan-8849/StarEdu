@@ -199,9 +199,10 @@ export class SectionsController {
   // ------------------------------------------------------------ 名单与教务代选
   @Get(":id/roster")
   @RequirePermissions(PERMS.eduEnrollmentList)
-  async roster(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string) {
+  async roster(@Auth() auth: AuthContext, @Param("id", ParseUUIDPipe) id: string, @Query() query: { history?: string }) {
     await this.scoped(auth, id, PERMS.eduEnrollmentList);
-    const rows = await this.db.enrollment.findMany({ where: { sectionId: id }, orderBy: { enrolledAt: "asc" } });
+    // 默认只列现在在班里的（选上的、已修完的）；作废、退课的记录要留着（审计、成绩单上的 W），加 history=true 才列出来
+    const rows = await this.db.enrollment.findMany({ where: { sectionId: id, ...(query.history === "true" ? {} : { status: { in: ["enrolled", "completed"] } }) }, orderBy: { enrolledAt: "asc" } });
     const people = new Map((await this.db.person.findMany({ where: { id: { in: rows.map((r) => r.studentPersonId) } }, select: { id: true, fullName: true } })).map((p) => [p.id, p.fullName]));
     const profiles = new Map((await this.db.studentProfile.findMany({ where: { personId: { in: rows.map((r) => r.studentPersonId) } } })).map((p) => [p.personId, p.studentNo]));
     return rows.map((r) => ({ id: r.id, studentPersonId: r.studentPersonId, fullName: people.get(r.studentPersonId) ?? null, studentNo: profiles.get(r.studentPersonId) ?? null, status: r.status, method: r.method, reason: r.reason, overrides: r.overrides, enrolledAt: r.enrolledAt, droppedAt: r.droppedAt }));
