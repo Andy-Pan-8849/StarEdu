@@ -506,6 +506,7 @@
       "cancelPick": "Cancel",
       "addSelected": "Add selected ({n})",
       "overrideHelp": "As registrar you can enroll them anyway. Give a reason; it is recorded with the enrollment.",
+      "showHistory": "Also show removed and dropped records",
       "history": "Sections opened",
       "degreeType": "Degree type",
       "totalCredits": "Total credits required",

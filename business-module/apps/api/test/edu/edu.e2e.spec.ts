@@ -330,6 +330,9 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       const removed = await registrar().del(`/api/sections/${sec}/enrollments/${added.body.results[0].enrollmentId}`);
       expect(removed.body.status).toBe("voided");
       expect(await h.owner.outboxEvent.count({ where: { tenantId: h.tenant.tenantId, type: "enrollment.registrar_removed" } })).toBeGreaterThan(0);
+      // 移除后名单里不再有这位学生；记录还在，加 history=true 才看得到
+      expect((await registrar().get(`/api/sections/${sec}/roster`)).body).toEqual([]);
+      expect((await registrar().get(`/api/sections/${sec}/roster?history=true`)).body).toEqual([expect.objectContaining({ status: "voided", studentPersonId: s.u.personId })]);
 
       // 只管总部校区的教务：另一个校区的班不在范围内
       const sh = (await admin().post("/api/campuses", { code: "SH", name: "Shanghai" })).body;
