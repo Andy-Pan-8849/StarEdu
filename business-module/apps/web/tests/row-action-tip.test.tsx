@@ -22,3 +22,10 @@ describe("row action tips", () => {
     }
   });
 });
+
+describe("start class action", () => {
+  it("is a short button whose tip carries the full name", () => {
+    expect(en.pages.edu.to_sec_in_progress).toBe("Start class");
+    expect(en.pages.edu.tip_sec_in_progress.startsWith("Close enrollment & start class")).toBe(true);
+  });
+});
