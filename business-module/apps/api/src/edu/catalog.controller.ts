@@ -56,8 +56,23 @@ export class CatalogController {
 
   @Get("terms")
   @RequirePermissions(PERMS.eduTermList)
-  async terms() {
-    return (await this.db.term.findMany({ orderBy: { startDate: "desc" } })).map((t) => this.termView(t));
+  async terms(@Query() query: { q?: string; limit?: string; open?: string }) {
+    // 选择器用：q 按名称/代码搜索，limit 限制条数，open=true 不要已结束的学期
+    const q = query.q?.trim();
+    const limit = query.limit === undefined ? undefined : Math.min(Math.max(Math.trunc(Number(query.limit)) || 1, 1), 100);
+    const rows = await this.db.term.findMany({
+      where: { ...(query.open === "true" ? { status: { not: "ended" as never } } : {}), ...(q ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }] } : {}) },
+      orderBy: { startDate: "desc" },
+      ...(limit ? { take: limit } : {}),
+    });
+    return rows.map((t) => this.termView(t));
+  }
+
+  /** 建班、批量选课下拉用的校区清单：只给 id、名称、状态。教务没有"校区管理"权限，所以不能用 /api/campuses。 */
+  @Get("edu-campuses")
+  @RequirePermissions(PERMS.eduSectionList)
+  async campusOptions() {
+    return (await this.db.campus.findMany({ orderBy: { code: "asc" }, select: { id: true, tenantId: true, code: true, name: true, status: true } }));
   }
 
   @Get("terms/:id")
@@ -218,8 +233,15 @@ export class CatalogController {
   // ------------------------------------------------------------ 专业
   @Get("majors")
   @RequirePermissions(PERMS.eduMajorList)
-  async majors() {
-    const rows = await this.db.major.findMany({ orderBy: { code: "asc" } });
+  async majors(@Query() query: { q?: string; limit?: string; status?: string }) {
+    // 选择器用：q 按代码/名称搜索，limit 限制条数，status=enabled 只要启用的专业
+    const q = query.q?.trim();
+    const limit = query.limit === undefined ? undefined : Math.min(Math.max(Math.trunc(Number(query.limit)) || 1, 1), 100);
+    const rows = await this.db.major.findMany({
+      where: { ...(query.status === "enabled" ? { status: true } : {}), ...(q ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }] } : {}) },
+      orderBy: { code: "asc" },
+      ...(limit ? { take: limit } : {}),
+    });
     return rows.map((m) => ({ id: m.id, code: m.code, name: m.name, degreeType: m.degreeType, totalCredits: Number(m.totalCredits), electiveMinCredits: Number(m.electiveMinCredits), status: m.status }));
   }
 

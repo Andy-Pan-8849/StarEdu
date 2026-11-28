@@ -47,6 +47,7 @@ export const LEAK_REGISTRY: LeakEntry[] = [
   { method: "GET", path: "/api/me/profile", kind: "other" },
   { method: "GET", path: "/api/me/menus?entry=admin", kind: "other" },
   { method: "GET", path: "/api/campuses", kind: "list" },
+  { method: "GET", path: "/api/edu-campuses", kind: "list" },
   { method: "GET", path: "/api/requests", kind: "other" },
   { method: "GET", path: "/api/library/folders", kind: "list" },
   { method: "GET", path: "/api/library/folders/:id", kind: "detail", fixture: "folderId" },

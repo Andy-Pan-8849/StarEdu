@@ -22,6 +22,7 @@ import { CourseDetailDialog, CourseLink } from "./course-pages";
 import { CourseDialog } from "./course-dialogs";
 import { MajorDialog, type MajorRow } from "./major-dialogs";
 import { StudentPicker } from "./student-picker";
+import { SEARCH_SELECT_LIMIT, SearchSelect, type Picked } from "./search-select";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 const Err = ({ error }: { error: string | null }) => (error ? <p role="alert" className="mb-2 text-sm text-red-600">{error}</p> : null);
@@ -194,7 +195,7 @@ export function SectionsPage() {
   const sections = useList<SectionRow>("sections");
   const terms = useList<TermRow>("terms");
   const courses = useList<CourseRow>("courses");
-  const campuses = useList<{ id: string; name: string; status: string }>("campuses");
+  const campuses = useList<{ id: string; name: string; status: string }>("edu-campuses");
   const { run, message } = useAct(sections.reload);
   const [form, setForm] = React.useState(false);
   const [batchOpen, setBatchOpen] = React.useState(false);
@@ -248,22 +249,22 @@ interface BatchRow { studentId: string; fullName: string | null; studentNo: stri
 interface BatchResult { dryRun: boolean; summary: { selected: number; ok: number; needConfirmation: number; blocked: number }; rows: BatchRow[] }
 
 /** 批量安排选课：按专业、入学年份、校区选出学生，先预览，再执行（规则和教务代选相同，超员等要确认并填原因）。 */
-function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
+export function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
   const t = useTranslations("pages.edu");
   const c = useTranslations("crud");
-  const terms = useList<TermRow>("terms");
-  const courses = useList<CourseRow>("courses");
-  const majors = useList<MajorRow>("majors");
-  const campuses = useList<{ id: string; name: string; status: string }>("campuses");
-  const [f, setF] = React.useState({ termId: "", courseId: "", majorId: "", entryYear: "", campusId: "", reason: "" });
+  const campuses = useList<{ id: string; name: string; status: string }>("edu-campuses");
+  const [term, setTerm] = React.useState<Picked | null>(null);
+  const [course, setCourse] = React.useState<Picked | null>(null);
+  const [major, setMajor] = React.useState<Picked | null>(null);
+  const [f, setF] = React.useState({ entryYear: "", campusId: "", reason: "" });
   const [confirm, setConfirm] = React.useState<string[]>([]);
   const [result, setResult] = React.useState<BatchResult | null>(null);
   const [msg, setMsg] = React.useState<string | null>(null);
-  const body = (dryRun: boolean) => ({ termId: f.termId, courseId: f.courseId, majorId: f.majorId, ...(f.entryYear ? { entryYear: Number(f.entryYear) } : {}), ...(f.campusId ? { campusId: f.campusId } : {}), ...(confirm.length ? { confirm } : {}), ...(f.reason ? { reason: f.reason } : {}), dryRun });
+  const body = (dryRun: boolean) => ({ termId: term?.id, courseId: course?.id, majorId: major?.id, ...(f.entryYear ? { entryYear: Number(f.entryYear) } : {}), ...(f.campusId ? { campusId: f.campusId } : {}), ...(confirm.length ? { confirm } : {}), ...(f.reason ? { reason: f.reason } : {}), dryRun });
   async function go(dryRun: boolean) {
     try { setMsg(null); setResult(await bff<BatchResult>("enrollment-batches", { method: "POST", body: body(dryRun) })); } catch (e) { setMsg((e as Error).message); }
   }
-  const ready = f.termId && f.courseId && f.majorId;
+  const ready = Boolean(term && course && major);
   const sel = (label: string, key: keyof typeof f, opts: Array<{ value: string; label: string }>, optional = false) => (
     <label className="flex flex-col gap-1 text-sm">{label}
       <select className="rounded-md border border-border bg-transparent px-2 py-1" value={f[key]} onChange={(e) => { setF({ ...f, [key]: e.target.value }); setResult(null); }}>
@@ -277,9 +278,9 @@ function BatchEnrollPanel({ onClose }: { onClose: () => void }) {
     <div className="text-sm">
       <p className="mb-2 text-xs text-muted">{t("batchHelp")}</p>
       <div className="mb-3 flex flex-wrap items-end gap-3">
-        {sel(t("term"), "termId", terms.rows.filter((x) => x.status !== "ended").map((x) => ({ value: x.id, label: x.name })))}
-        {sel(t("course"), "courseId", courses.rows.filter((x) => x.status).map((x) => ({ value: x.id, label: `${x.code} · ${x.name}` })))}
-        {sel(t("major"), "majorId", majors.rows.filter((x) => x.status).map((x) => ({ value: x.id, label: `${x.code} · ${x.name}` })))}
+        <SearchSelect label={t("term")} path="terms?open=true" toLabel={(x: TermRow) => x.name} value={term} onChange={(v) => { setTerm(v); setResult(null); }} placeholder={t("typeToSearch")} hint={t("searchHint", { n: SEARCH_SELECT_LIMIT })} noMatches={t("noResults")} />
+        <SearchSelect label={t("course")} path="courses?status=enabled" toLabel={(x: CourseRow) => `${x.code} · ${x.name}`} value={course} onChange={(v) => { setCourse(v); setResult(null); }} placeholder={t("typeToSearch")} hint={t("searchHint", { n: SEARCH_SELECT_LIMIT })} noMatches={t("noResults")} />
+        <SearchSelect label={t("major")} path="majors?status=enabled" toLabel={(x: MajorRow) => `${x.code} · ${x.name}`} value={major} onChange={(v) => { setMajor(v); setResult(null); }} placeholder={t("typeToSearch")} hint={t("searchHint", { n: SEARCH_SELECT_LIMIT })} noMatches={t("noResults")} />
         <label className="flex flex-col gap-1">{t("entryYear")}<input type="number" className="w-24 rounded-md border border-border bg-transparent px-2 py-1" value={f.entryYear} onChange={(e) => { setF({ ...f, entryYear: e.target.value }); setResult(null); }} /></label>
         {sel(t("campus"), "campusId", campuses.rows.filter((x) => x.status === "normal").map((x) => ({ value: x.id, label: x.name })), true)}
       </div>

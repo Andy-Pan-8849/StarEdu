@@ -93,6 +93,18 @@ describe("teaching: catalog, enrollment, materials, plan", () => {
       expect((await registrar().get("/api/courses?limit=1")).body).toHaveLength(1);
     });
 
+    it("terms and majors can be searched with a limit, and the registrar can list campuses for pickers without the campus-management permission", async () => {
+      expect((await registrar().get("/api/majors?q=comp&limit=5")).body.map((m: { id: string }) => m.id)).toContain(major);
+      expect((await registrar().get("/api/majors?q=zzz-no-such")).body).toEqual([]);
+      expect((await registrar().get("/api/majors?limit=1")).body).toHaveLength(1);
+      expect((await registrar().get("/api/terms?q=2026F&open=true&limit=5")).body.map((t: { id: string }) => t.id)).toContain(termId);
+      expect((await registrar().get("/api/terms?q=zzz-no-such")).body).toEqual([]);
+      const campuses = await registrar().get("/api/edu-campuses");
+      expect(campuses.status).toBe(200);
+      expect(campuses.body.map((c: { id: string }) => c.id)).toContain(hqCampus);
+      expect(Object.keys(campuses.body[0]).sort()).toEqual(["code", "id", "name", "status", "tenantId"]);
+    });
+
     it("once a course has sections, its code and credits are read-only", async () => {
       const spare = (await registrar().post("/api/courses", { code: "SP100", name: "Spare", credits: 2 })).body.id;
       expect((await registrar().patch(`/api/courses/${spare}`, { credits: 3 })).status).toBe(200); // 还没有班级
