@@ -56,16 +56,17 @@ export function IconLink({ icon: Icon, label, href, className }: { icon: LucideI
 }
 
 /** 表格行里的操作：图标加文字，没有按钮边框（样式由表格操作列统一）。danger 为红色（删除类）。 */
-export function RowAction({ icon: Icon, danger = false, className, children, ...props }: Omit<ButtonProps, "size" | "variant"> & { icon: LucideIcon; danger?: boolean }) {
-  return (
+export function RowAction({ icon: Icon, danger = false, tip, className, children, ...props }: Omit<ButtonProps, "size" | "variant"> & { icon: LucideIcon; danger?: boolean; tip?: string }) {
+  const button = (
     <Button size="sm" variant="outline" {...props} className={cn("gap-1", danger && "!text-red-600", className)}>
       <Icon aria-hidden className="h-3.5 w-3.5" />
       {children}
     </Button>
   );
+  return tip ? <Tip label={tip}>{button}</Tip> : button; // tip：鼠标移上去说明这个操作会发生什么
 }
 
-export function PermRowAction({ perm, ...props }: Omit<ButtonProps, "size" | "variant"> & { icon: LucideIcon; danger?: boolean; perm: string }) {
+export function PermRowAction({ perm, ...props }: Omit<ButtonProps, "size" | "variant"> & { icon: LucideIcon; danger?: boolean; tip?: string; perm: string }) {
   return usePermissions().has(perm) ? <RowAction {...props} /> : null;
 }
 

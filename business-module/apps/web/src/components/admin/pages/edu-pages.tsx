@@ -212,7 +212,7 @@ export function SectionsPage() {
         <div className="flex flex-wrap gap-1">
           <RowAction onClick={() => setOpen(r.id)} icon={Eye}>{t("details")}</RowAction>
           {SEC_NEXT[r.status].map((next) => (
-            <PermRowAction key={next} perm={PERMS.eduSectionStatus} onClick={() => (next !== "cancelled" || window.confirm(t("confirmCancel", { name: r.name }))) && void run(() => bff(`sections/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))} icon={RefreshCw}>{t(`to_sec_${next}`)}</PermRowAction>
+            <PermRowAction key={next} perm={PERMS.eduSectionStatus} onClick={() => (next !== "cancelled" || window.confirm(t("confirmCancel", { name: r.name }))) && void run(() => bff(`sections/${r.id}/status`, { method: "POST", body: { status: next } }), c("done"))} icon={RefreshCw} tip={t(`tip_sec_${next}`)}>{t(`to_sec_${next}`)}</PermRowAction>
           ))}
         </div>
       ),
